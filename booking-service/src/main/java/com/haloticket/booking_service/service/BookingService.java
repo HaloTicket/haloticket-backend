@@ -1,0 +1,8 @@
+package com.haloticket.booking_service.service;
+
+import com.haloticket.booking_service.dto.request.BookingCreateRequest;
+import com.haloticket.booking_service.dto.response.BookingResponse;
+
+public interface BookingService {
+    BookingResponse createBooking(BookingCreateRequest request);
+}

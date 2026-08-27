@@ -1,0 +1,16 @@
+package com.haloticket.api_gateway;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import java.util.TimeZone;
+
+@SpringBootApplication
+public class ApiGatewayApplication {
+
+	public static void main(String[] args) {
+		TimeZone.setDefault(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+		SpringApplication.run(ApiGatewayApplication.class, args);
+	}
+
+}
