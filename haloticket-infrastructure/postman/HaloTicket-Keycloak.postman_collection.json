@@ -1,0 +1,408 @@
+{
+  "info": {
+    "_postman_id": "haloticket-keycloak-auth-v1",
+    "name": "HaloTicket - Keycloak & IAM",
+    "description": "Collection of Keycloak Authentication, Token, and Admin REST API endpoints for HaloTicket",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "keycloak_url",
+      "value": "http://localhost:9080",
+      "type": "string"
+    },
+    {
+      "key": "realm",
+      "value": "haloticket-realm",
+      "type": "string"
+    },
+    {
+      "key": "client_id",
+      "value": "user-service",
+      "type": "string"
+    },
+    {
+      "key": "client_secret",
+      "value": "user-service-secret",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. OpenID Configuration (Discovery)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{keycloak_url}}/realms/{{realm}}/.well-known/openid-configuration",
+          "host": [
+            "{{keycloak_url}}"
+          ],
+          "path": [
+            "realms",
+            "{{realm}}",
+            ".well-known",
+            "openid-configuration"
+          ]
+        },
+        "description": "Get OIDC discovery metadata including JWKS URI, token endpoint, etc."
+      },
+      "response": []
+    },
+    {
+      "name": "1. Get Admin Access Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.access_token) {",
+              "    pm.collectionVariables.set('admin_token', jsonData.access_token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "grant_type",
+              "value": "password",
+              "type": "text"
+            },
+            {
+              "key": "client_id",
+              "value": "admin-cli",
+              "type": "text"
+            },
+            {
+              "key": "username",
+              "value": "admin",
+              "type": "text"
+            },
+            {
+              "key": "password",
+              "value": "admin",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{keycloak_url}}/realms/master/protocol/openid-connect/token",
+          "host": [
+            "{{keycloak_url}}"
+          ],
+          "path": [
+            "realms",
+            "master",
+            "protocol",
+            "openid-connect",
+            "token"
+          ]
+        },
+        "description": "Obtain master admin token to call Keycloak Admin REST APIs"
+      },
+      "response": []
+    },
+    {
+      "name": "2. Customer Login (Direct Grant)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.access_token) {",
+              "    pm.collectionVariables.set('access_token', jsonData.access_token);",
+              "    pm.collectionVariables.set('refresh_token', jsonData.refresh_token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "grant_type",
+              "value": "password",
+              "type": "text"
+            },
+            {
+              "key": "client_id",
+              "value": "{{client_id}}",
+              "type": "text"
+            },
+            {
+              "key": "client_secret",
+              "value": "{{client_secret}}",
+              "type": "text"
+            },
+            {
+              "key": "username",
+              "value": "user",
+              "type": "text"
+            },
+            {
+              "key": "password",
+              "value": "user123",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{keycloak_url}}/realms/{{realm}}/protocol/openid-connect/token",
+          "host": [
+            "{{keycloak_url}}"
+          ],
+          "path": [
+            "realms",
+            "{{realm}}",
+            "protocol",
+            "openid-connect",
+            "token"
+          ]
+        },
+        "description": "Login standard customer account and receive JWT access token"
+      },
+      "response": []
+    },
+    {
+      "name": "3. Organizer Login (Direct Grant)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.access_token) {",
+              "    pm.collectionVariables.set('access_token', jsonData.access_token);",
+              "    pm.collectionVariables.set('refresh_token', jsonData.refresh_token);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "grant_type",
+              "value": "password",
+              "type": "text"
+            },
+            {
+              "key": "client_id",
+              "value": "{{client_id}}",
+              "type": "text"
+            },
+            {
+              "key": "client_secret",
+              "value": "{{client_secret}}",
+              "type": "text"
+            },
+            {
+              "key": "username",
+              "value": "organizer",
+              "type": "text"
+            },
+            {
+              "key": "password",
+              "value": "organizer123",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{keycloak_url}}/realms/{{realm}}/protocol/openid-connect/token",
+          "host": [
+            "{{keycloak_url}}"
+          ],
+          "path": [
+            "realms",
+            "{{realm}}",
+            "protocol",
+            "openid-connect",
+            "token"
+          ]
+        },
+        "description": "Login event organizer account"
+      },
+      "response": []
+    },
+    {
+      "name": "4. Refresh Access Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "if (jsonData.access_token) {",
+              "    pm.collectionVariables.set('access_token', jsonData.access_token);",
+              "    if (jsonData.refresh_token) {",
+              "        pm.collectionVariables.set('refresh_token', jsonData.refresh_token);",
+              "    }",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            {
+              "key": "grant_type",
+              "value": "refresh_token",
+              "type": "text"
+            },
+            {
+              "key": "client_id",
+              "value": "{{client_id}}",
+              "type": "text"
+            },
+            {
+              "key": "client_secret",
+              "value": "{{client_secret}}",
+              "type": "text"
+            },
+            {
+              "key": "refresh_token",
+              "value": "{{refresh_token}}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{keycloak_url}}/realms/{{realm}}/protocol/openid-connect/token",
+          "host": [
+            "{{keycloak_url}}"
+          ],
+          "path": [
+            "realms",
+            "{{realm}}",
+            "protocol",
+            "openid-connect",
+            "token"
+          ]
+        },
+        "description": "Exchange refresh token for a new access token"
+      },
+      "response": []
+    },
+    {
+      "name": "5. Get User Info",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{keycloak_url}}/realms/{{realm}}/protocol/openid-connect/userinfo",
+          "host": [
+            "{{keycloak_url}}"
+          ],
+          "path": [
+            "realms",
+            "{{realm}}",
+            "protocol",
+            "openid-connect",
+            "userinfo"
+          ]
+        },
+        "description": "Retrieve user profile information using current access token"
+      },
+      "response": []
+    },
+    {
+      "name": "6. Admin - Create User",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"testuser_01\",\n  \"email\": \"testuser01@haloticket.com\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"enabled\": true,\n  \"emailVerified\": true,\n  \"credentials\": [\n    {\n      \"type\": \"password\",\n      \"value\": \"password123\",\n      \"temporary\": false\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{keycloak_url}}/admin/realms/{{realm}}/users",
+          "host": [
+            "{{keycloak_url}}"
+          ],
+          "path": [
+            "admin",
+            "realms",
+            "{{realm}}",
+            "users"
+          ]
+        },
+        "description": "Create a new user via Keycloak Admin REST API"
+      },
+      "response": []
+    }
+  ]
+}

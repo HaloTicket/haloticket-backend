@@ -1,0 +1,59 @@
+services:
+  # =================================================================
+  # pgAdmin 4 (PostgreSQL Web UI)
+  # =================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: haloticket-pgadmin
+    restart: unless-stopped
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@haloticket.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - haloticket-network
+
+  # =================================================================
+  # Kafka UI (Topic & Consumer Monitoring)
+  # =================================================================
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: haloticket-kafka-ui
+    restart: unless-stopped
+    ports:
+      - "${KAFKA_UI_PORT:-9090}:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: haloticket
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    networks:
+      - haloticket-network
+
+  # =================================================================
+  # RedisInsight (Redis Data Visualization)
+  # =================================================================
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: haloticket-redis-insight
+    restart: unless-stopped
+    ports:
+      - "${REDIS_INSIGHT_PORT:-5540}:5540"
+    volumes:
+      - redis_insight_data:/data
+    networks:
+      - haloticket-network
+
+volumes:
+  pgadmin_data:
+    name: haloticket-pgadmin-data
+  redis_insight_data:
+    name: haloticket-redis-insight-data
+
+networks:
+  haloticket-network:
+    name: haloticket-network
+    external: true
