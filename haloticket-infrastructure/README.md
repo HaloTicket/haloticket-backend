@@ -1,10 +1,10 @@
-# 🏗️ HaloTicket Infrastructure & Observability Stack
+# HaloTicket Infrastructure & Observability Stack
 
 This directory contains the complete **Docker-based infrastructure, Identity and Access Management (Keycloak IAM), and Observability tooling** for the **HaloTicket Microservices Platform**.
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 - [1. Overview](#1-overview)
 - [2. Architecture & Service Breakdown](#2-architecture--service-breakdown)
 - [3. Directory Structure](#3-directory-structure)
@@ -28,7 +28,7 @@ To optimize developer machine resources (RAM/CPU) and follow microservices opera
 
 ## 2. Architecture & Service Breakdown
 
-### 🗄️ Core Services (`docker-compose.yml`)
+### Core Services (`docker-compose.yml`)
 
 | Service | Container Name | Image | Host Port | Internal Port | Purpose |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -37,7 +37,7 @@ To optimize developer machine resources (RAM/CPU) and follow microservices opera
 | **Apache Kafka** | `haloticket-kafka` | `apache/kafka:3.7.0` | `9092` | `9092` / `29092` | Event streaming broker (KRaft mode, ZooKeeper-less) |
 | **Keycloak IAM** | `haloticket-keycloak` | `quay.io/keycloak/keycloak:24.0.4` | `9080` | `8080` | OpenID Connect / OAuth2 Identity Provider (Quarkus engine) |
 
-### 📊 Observability Tools (`docker-observability.yml`)
+### Observability Tools (`docker-observability.yml`)
 
 | Tool | Container Name | Image | Host Port | Purpose | Pre-configured Credentials / Details |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -188,7 +188,7 @@ The initialization script [postgres/init/01-create-databases.sql](file:///d:/Hal
 ## 7. API Testing with Postman
 
 A comprehensive Postman Collection is provided in:
-👉 [postman/HaloTicket-Keycloak.postman_collection.json](file:///d:/HaloTicket/HaloTicket_Repo/haloticket-backend/haloticket-infrastructure/postman/HaloTicket-Keycloak.postman_collection.json)
+[postman/HaloTicket-Keycloak.postman_collection.json](file:///d:/HaloTicket/HaloTicket_Repo/haloticket-backend/haloticket-infrastructure/postman/HaloTicket-Keycloak.postman_collection.json)
 
 ### Included Requests:
 1. **0. OpenID Configuration (Discovery):** Fetch OIDC endpoints and public keys.

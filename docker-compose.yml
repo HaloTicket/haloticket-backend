@@ -1,7 +1,5 @@
 services:
-  # =================================================================
   # PostgreSQL Database
-  # =================================================================
   postgres:
     image: postgres:16-alpine
     container_name: haloticket-postgres
@@ -23,9 +21,7 @@ services:
     networks:
       - haloticket-network
 
-  # =================================================================
   # Redis Cache & Fast Locking
-  # =================================================================
   redis:
     image: redis:7-alpine
     container_name: haloticket-redis
@@ -46,9 +42,7 @@ services:
     networks:
       - haloticket-network
 
-  # =================================================================
   # Apache Kafka (KRaft Mode)
-  # =================================================================
   kafka:
     image: apache/kafka:3.7.0
     container_name: haloticket-kafka
@@ -80,9 +74,7 @@ services:
     networks:
       - haloticket-network
 
-  # =================================================================
   # Keycloak IAM (Quarkus with Auto-Import Realm)
-  # =================================================================
   keycloak:
     image: quay.io/keycloak/keycloak:24.0.4
     container_name: haloticket-keycloak
