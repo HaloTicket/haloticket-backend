@@ -36,6 +36,29 @@ public class Event {
 
     private String address;
 
+    private String author;
+
+    private String director;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "event_cast", joinColumns = @JoinColumn(name = "event_id"))
+    @Column(name = "actor_name")
+    private List<String> cast;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "event_gallery", joinColumns = @JoinColumn(name = "event_id"))
+    @Column(name = "image_url")
+    private List<String> galleryImages;
+
+    @Column(name = "dates_summary")
+    private String datesSummary;
+
+    @Column(name = "extra_days_count")
+    private Integer extraDaysCount;
+
+    @Column(name = "min_price")
+    private Double minPrice;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "event_status")
     private EventStatus eventStatus;

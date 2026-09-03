@@ -23,6 +23,11 @@ public class EventOrganizer {
     @Column(name = "user_id", nullable = false)
     private String userId;
 
+    private String name;
+
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
     private String description;
 
     @Enumerated(EnumType.STRING)
