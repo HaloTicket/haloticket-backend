@@ -28,6 +28,22 @@ public class EventController {
         return ResponseEntity.ok(eventService.getAllEvents());
     }
 
+    @GetMapping("/categories")
+    public ResponseEntity<List<EventCategoryResponse>> getAllCategories() {
+        return ResponseEntity.ok(eventService.getAllCategories());
+    }
+
+    @GetMapping("/trending-searches")
+    public ResponseEntity<List<String>> getTrendingSearches(@RequestParam(defaultValue = "3") int limit) {
+        return ResponseEntity.ok(eventService.getTopSearchedKeywords(limit));
+    }
+
+    @RequestMapping(value = "/search-log", method = {RequestMethod.POST, RequestMethod.GET})
+    public ResponseEntity<Void> logSearchQuery(@RequestParam String query) {
+        eventService.logSearchQuery(query);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<EventResponse> getEventById(@PathVariable String id) {
         EventResponse response = eventService.getEventById(id);
@@ -35,10 +51,5 @@ public class EventController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(response);
-    }
-
-    @GetMapping("/categories")
-    public ResponseEntity<List<EventCategoryResponse>> getAllCategories() {
-        return ResponseEntity.ok(eventService.getAllCategories());
     }
 }
