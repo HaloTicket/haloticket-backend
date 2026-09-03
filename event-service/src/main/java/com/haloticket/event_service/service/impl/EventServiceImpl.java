@@ -7,10 +7,14 @@ import com.haloticket.event_service.dto.response.OrganizerDto;
 import com.haloticket.event_service.entity.Event;
 import com.haloticket.event_service.entity.EventCategory;
 import com.haloticket.event_service.entity.EventOrganizer;
+import com.haloticket.event_service.entity.SearchLog;
 import com.haloticket.event_service.repository.EventCategoryRepository;
 import com.haloticket.event_service.repository.EventRepository;
+import com.haloticket.event_service.repository.SearchLogRepository;
 import com.haloticket.event_service.service.EventService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -22,6 +26,7 @@ public class EventServiceImpl implements EventService {
 
     private final EventRepository eventRepository;
     private final EventCategoryRepository eventCategoryRepository;
+    private final SearchLogRepository searchLogRepository;
 
     @Override
     public EventResponse createEvent(EventCreateRequest request) {
@@ -49,6 +54,29 @@ public class EventServiceImpl implements EventService {
         return eventCategoryRepository.findAll().stream()
                 .map(this::mapToCategoryResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<String> getTopSearchedKeywords(int limit) {
+        Pageable pageable = PageRequest.of(0, limit);
+        List<String> topKeywords = searchLogRepository.findTopSearchedKeywords(pageable);
+        if (topKeywords == null || topKeywords.isEmpty()) {
+            return List.of("idecaf", "xoay tròn", "Pickleball World Cup");
+        }
+        return topKeywords;
+    }
+
+    @Override
+    public void logSearchQuery(String query) {
+        if (query == null || query.trim().isEmpty()) return;
+        String cleanQuery = query.trim().toLowerCase();
+        SearchLog searchLog = searchLogRepository.findByQueryTermIgnoreCase(cleanQuery)
+                .orElseGet(() -> SearchLog.builder()
+                        .queryTerm(cleanQuery)
+                        .searchCount(0L)
+                        .build());
+        searchLog.setSearchCount(searchLog.getSearchCount() + 1);
+        searchLogRepository.save(searchLog);
     }
 
     private EventResponse mapToEventResponse(Event event) {

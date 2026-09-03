@@ -27,7 +27,7 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (eventRepository.existsById("event-001")) {
+        if (eventRepository.count() > 0) {
             log.info("Event database already populated. Skipping initialization.");
             return;
         }
@@ -41,7 +41,7 @@ public class DataInitializer implements CommandLineRunner {
                 .description("Hòa nhạc, live show âm nhạc kịch tính, lễ hội âm nhạc đỉnh cao.")
                 .status(CategoryStatus.ACTIVE)
                 .build();
-        entityManager.persist(musicCat);
+        entityManager.merge(musicCat);
 
         EventCategory sportsCat = EventCategory.builder()
                 .id("cat-002")
@@ -49,7 +49,7 @@ public class DataInitializer implements CommandLineRunner {
                 .description("Giải chạy marathon, bóng đá, esports và sự kiện thể thao sôi động.")
                 .status(CategoryStatus.ACTIVE)
                 .build();
-        entityManager.persist(sportsCat);
+        entityManager.merge(sportsCat);
 
         EventCategory theaterCat = EventCategory.builder()
                 .id("cat-003")
@@ -57,7 +57,7 @@ public class DataInitializer implements CommandLineRunner {
                 .description("Kịch nói, nhạc kịch, hài kịch và trình diễn nghệ thuật.")
                 .status(CategoryStatus.ACTIVE)
                 .build();
-        entityManager.persist(theaterCat);
+        entityManager.merge(theaterCat);
 
         EventCategory techCat = EventCategory.builder()
                 .id("cat-004")
@@ -65,7 +65,7 @@ public class DataInitializer implements CommandLineRunner {
                 .description("Tech summit, hội thảo AI, khởi nghiệp và triển lãm công nghệ.")
                 .status(CategoryStatus.ACTIVE)
                 .build();
-        entityManager.persist(techCat);
+        entityManager.merge(techCat);
 
         // 2. Organizer Profile
         EventOrganizer organizer = EventOrganizer.builder()
@@ -75,7 +75,7 @@ public class DataInitializer implements CommandLineRunner {
                 .role(EventOrganizerRole.OWNER)
                 .status(EventOrganizerStatus.ACTIVE)
                 .build();
-        entityManager.persist(organizer);
+        entityManager.merge(organizer);
 
         // 3. Events
         Event musicEvent = Event.builder()
@@ -95,7 +95,7 @@ public class DataInitializer implements CommandLineRunner {
                 .category(musicCat)
                 .organizers(List.of(organizer))
                 .build();
-        entityManager.persist(musicEvent);
+        entityManager.merge(musicEvent);
 
         Event sportsEvent = Event.builder()
                 .id("event-002")
@@ -114,7 +114,7 @@ public class DataInitializer implements CommandLineRunner {
                 .category(sportsCat)
                 .organizers(List.of(organizer))
                 .build();
-        entityManager.persist(sportsEvent);
+        entityManager.merge(sportsEvent);
 
         Event techEvent = Event.builder()
                 .id("event-003")
@@ -133,54 +133,8 @@ public class DataInitializer implements CommandLineRunner {
                 .category(techCat)
                 .organizers(List.of(organizer))
                 .build();
-        entityManager.persist(techEvent);
+        entityManager.merge(techEvent);
 
-        // 4. Staff Assignment
-        StaffAssignment staffAssignment = StaffAssignment.builder()
-                .id("staff-assign-01")
-                .event(musicEvent)
-                .userId("33333333-3333-3333-3333-333333333333") // Links to Staff User
-                .status(StaffAssignmentStatus.ACTIVE)
-                .assignedAt(LocalDateTime.now())
-                .build();
-        entityManager.persist(staffAssignment);
-
-        // 5. Vouchers
-        Voucher vipVoucher = Voucher.builder()
-                .id("voucher-01")
-                .event(musicEvent)
-                .code("HALOVIP2026")
-                .name("Ưu đãi 10% vé VIP Concert")
-                .description("Giảm 10% giá trị đơn hàng cho vé VIP, tối đa 200.000 VNĐ.")
-                .discountType(DiscountType.PERCENTAGE)
-                .discountValue(10.0)
-                .maxDiscountAmount(200000.0)
-                .minOrderAmount(500000.0)
-                .usageLimit(100)
-                .usedCount(5)
-                .startAt(LocalDateTime.of(2026, 8, 1, 0, 0))
-                .endAt(LocalDateTime.of(2026, 10, 14, 23, 59))
-                .status(VoucherStatus.ACTIVE)
-                .build();
-        entityManager.persist(vipVoucher);
-
-        Voucher fixedVoucher = Voucher.builder()
-                .id("voucher-02")
-                .event(musicEvent)
-                .code("HALO50K")
-                .name("Giảm trực tiếp 50.000 VNĐ")
-                .description("Giảm 50.000 VNĐ cho đơn hàng từ 300.000 VNĐ.")
-                .discountType(DiscountType.FIXED_AMOUNT)
-                .discountValue(50000.0)
-                .minOrderAmount(300000.0)
-                .usageLimit(50)
-                .usedCount(2)
-                .startAt(LocalDateTime.of(2026, 8, 1, 0, 0))
-                .endAt(LocalDateTime.of(2026, 10, 14, 23, 59))
-                .status(VoucherStatus.ACTIVE)
-                .build();
-        entityManager.persist(fixedVoucher);
-
-        log.info("Event Service sample data initialized successfully! Created categories, organizer, 3 events, staff assignment, and vouchers.");
+        log.info("Event Service sample data initialized successfully!");
     }
 }

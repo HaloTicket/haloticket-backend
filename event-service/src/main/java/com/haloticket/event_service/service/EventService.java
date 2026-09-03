@@ -11,4 +11,6 @@ public interface EventService {
     List<EventResponse> getAllEvents();
     EventResponse getEventById(String id);
     List<EventCategoryResponse> getAllCategories();
+    List<String> getTopSearchedKeywords(int limit);
+    void logSearchQuery(String query);
 }
