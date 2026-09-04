@@ -1,0 +1,22 @@
+package com.haloticket.notification_service.exception;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.time.Instant;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+    @ExceptionHandler(NotificationException.class)
+    public ResponseEntity<NotificationExceptionResponse> handleNotificationException(NotificationException exception) {
+        return ResponseEntity.status(exception.getStatus()).body(new NotificationExceptionResponse(
+                exception.getCode().name(), exception.getMessage(), Instant.now()));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<NotificationExceptionResponse> handleBadRequest(IllegalArgumentException exception) {
+        return ResponseEntity.badRequest().body(new NotificationExceptionResponse(
+                "INVALID_REQUEST", exception.getMessage(), Instant.now()));
+    }
+}

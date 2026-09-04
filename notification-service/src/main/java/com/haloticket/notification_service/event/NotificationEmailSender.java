@@ -1,6 +1,8 @@
 package com.haloticket.notification_service.event;
 
 import com.haloticket.notification_service.entity.NotificationTemplate;
+import com.haloticket.notification_service.exception.NotificationErrorCode;
+import com.haloticket.notification_service.exception.NotificationException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -19,13 +21,21 @@ public class NotificationEmailSender {
     }
 
     public void send(NotificationTemplate template, String recipient, Map<String, String> variables) {
-        if (recipient == null || recipient.isBlank()) throw new IllegalArgumentException("Notification recipient email is required");
+        if (recipient == null || recipient.isBlank()) {
+            throw new NotificationException(NotificationErrorCode.RECIPIENT_EMAIL_REQUIRED,
+                    "Notification recipient email is required", 400);
+        }
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(recipient);
         message.setSubject(render(template.getSubjectTemplate(), variables));
         message.setText(render(template.getBodyTemplate(), variables));
-        mailSender.send(message);
+        try {
+            mailSender.send(message);
+        } catch (RuntimeException exception) {
+            throw new NotificationException(NotificationErrorCode.EMAIL_DELIVERY_FAILED,
+                    "Email delivery failed", 503, exception);
+        }
     }
 
     private String render(String template, Map<String, String> variables) {

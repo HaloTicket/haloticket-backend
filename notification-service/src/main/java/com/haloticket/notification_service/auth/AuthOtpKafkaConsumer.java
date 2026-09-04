@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import com.haloticket.notification_service.exception.NotificationErrorCode;
+import com.haloticket.notification_service.exception.NotificationException;
 
 @Component
 @RequiredArgsConstructor
@@ -18,7 +20,8 @@ public class AuthOtpKafkaConsumer {
         if (event.email() == null || event.email().isBlank() || event.otp() == null
                 || !event.otp().matches("\\d{6}") || event.expiresAt() == null
                 || event.expiresAt().isBefore(java.time.Instant.now())) {
-            throw new IllegalArgumentException("Invalid or expired OTP event");
+            throw new NotificationException(NotificationErrorCode.INVALID_NOTIFICATION_EVENT,
+                    "Invalid or expired OTP event", 400);
         }
         emailSender.send(event);
     }

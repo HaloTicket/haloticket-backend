@@ -14,6 +14,8 @@ import com.haloticket.notification_service.repository.NotificationRepository;
 import com.haloticket.notification_service.repository.NotificationTemplateRepository;
 import com.haloticket.notification_service.service.NotificationService;
 import com.haloticket.notification_service.event.NotificationEvent;
+import com.haloticket.notification_service.exception.NotificationErrorCode;
+import com.haloticket.notification_service.exception.NotificationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -52,9 +54,11 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public NotificationResponse createNotification(NotificationCreateRequest request) {
         NotificationTemplate template = notificationTemplateRepository.findById(request.getTemplateId())
-                .orElseThrow(() -> new IllegalArgumentException("Notification template not found: " + request.getTemplateId()));
+                .orElseThrow(() -> new NotificationException(NotificationErrorCode.TEMPLATE_NOT_FOUND,
+                        "Notification template not found", 404));
         if (template.getStatus() != NotificationTemplateStatus.ACTIVE) {
-            throw new IllegalStateException("Notification template must be active");
+            throw new NotificationException(NotificationErrorCode.TEMPLATE_INACTIVE,
+                    "Notification template must be active", 409);
         }
 
         Notification notification = Notification.builder()
@@ -96,9 +100,11 @@ public class NotificationServiceImpl implements NotificationService {
                 .map(this::toNotificationResponse)
                 .orElseGet(() -> {
                     NotificationTemplate template = notificationTemplateRepository.findById(event.templateId())
-                            .orElseThrow(() -> new IllegalArgumentException("Notification template not found: " + event.templateId()));
+                            .orElseThrow(() -> new NotificationException(NotificationErrorCode.TEMPLATE_NOT_FOUND,
+                                    "Notification template not found", 404));
                     if (template.getStatus() != NotificationTemplateStatus.ACTIVE) {
-                        throw new IllegalStateException("Notification template must be active");
+                        throw new NotificationException(NotificationErrorCode.TEMPLATE_INACTIVE,
+                                "Notification template must be active", 409);
                     }
                     Notification notification = Notification.builder()
                             .eventId(event.eventId())
@@ -115,7 +121,8 @@ public class NotificationServiceImpl implements NotificationService {
 
     private Notification findNotification(String id) {
         return notificationRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Notification not found: " + id));
+                .orElseThrow(() -> new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND,
+                        "Notification not found", 404));
     }
 
     private String toVariablesJson(Map<String, String> variables) {
@@ -125,7 +132,8 @@ public class NotificationServiceImpl implements NotificationService {
         try {
             return objectMapper.writeValueAsString(variables);
         } catch (JsonProcessingException exception) {
-            throw new IllegalArgumentException("Notification variables cannot be serialized", exception);
+            throw new NotificationException(NotificationErrorCode.VARIABLES_SERIALIZATION_FAILED,
+                    "Notification variables cannot be serialized", 500, exception);
         }
     }
 
