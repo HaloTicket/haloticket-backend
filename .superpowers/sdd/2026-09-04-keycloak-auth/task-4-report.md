@@ -63,3 +63,8 @@ Verification attempted for this fix:
 - Focused command: `mvn -Dtest=OtpPersistenceBoundaryTest,OtpDomainTest test` with `MAVEN_OPTS=-Dmaven.repo.local=D:\\HaloTicket\\.m2repo`.
 - The command could not reach test execution because the existing uncommitted `user-service/config/SecurityConfig.java` does not compile against the resolved Spring Security version (`jwtValidator(...)` is unavailable). This is outside the OTP fix and was not modified.
 - A real PostgreSQL concurrency integration test was not runnable in this environment: the repository has no Testcontainers/H2 test dependency or configured PostgreSQL test profile. The production transaction boundary is explicit and the unit regression tests cover the failure/recovery semantics; database-level concurrency remains a deployment-level verification item.
+
+Final verification after commit `1ab32fe`:
+
+- Focused `OtpPersistenceBoundaryTest,OtpDomainTest`: not executed; Maven exited `1` during main compilation because the pre-existing uncommitted `config/SecurityConfig.java:37` calls unavailable `jwtValidator(...)`.
+- Full `user-service` suite: not executed for the same compile blocker; no test failures were produced because test execution never started.
