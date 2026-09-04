@@ -4,6 +4,15 @@ server:
 spring:
   application:
     name: user-service
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    from: ${SMTP_FROM:}
+    properties:
+      mail.smtp.auth: ${SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:true}
   security:
     oauth2:
       resourceserver:
@@ -29,3 +38,10 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
   instance:
     prefer-ip-address: true
+
+auth:
+  otp:
+    delivery: ${AUTH_OTP_DELIVERY:disabled}
+    mail:
+      from: ${SMTP_FROM:}
+      expiry-minutes: ${AUTH_OTP_EXPIRY_MINUTES:5}

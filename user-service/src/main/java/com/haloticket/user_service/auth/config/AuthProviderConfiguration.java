@@ -7,12 +7,14 @@ import com.haloticket.user_service.auth.service.KeycloakAuthPort;
 import com.haloticket.user_service.auth.service.OtpDeliveryPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 
 import java.time.Instant;
 
 @Configuration
 public class AuthProviderConfiguration {
     @Bean
+    @ConditionalOnMissingBean(OtpDeliveryPort.class)
     OtpDeliveryPort otpDeliveryPort() {
         return (email, purpose, otp, expiresAt) -> { throw new AuthException("OTP_DELIVERY_UNAVAILABLE", "Verification email delivery is unavailable", 503); };
     }
