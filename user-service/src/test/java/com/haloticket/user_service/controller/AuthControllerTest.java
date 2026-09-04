@@ -9,6 +9,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -54,6 +55,17 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"user@example.com\",\"password\":\"weak\",\"idempotencyKey\":\"req-1\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void passwordForgotAcceptsOneEmailOrPhoneIdentifier() throws Exception {
+        mockMvc.perform(post("/api/auth/password/forgot")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"identifier\":\"0912345678\",\"idempotencyKey\":\"req-1\"}"))
+                .andExpect(status().isAccepted());
+
+        verify(authService).startPasswordReset(new com.haloticket.user_service.auth.service.AuthRequests.PasswordForgot(
+                "0912345678", "req-1", "anonymous"));
     }
 
     @Test

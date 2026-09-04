@@ -42,10 +42,9 @@ public class AuthController {
     @PostMapping("/password/forgot")
     public ResponseEntity<AuthResponses.Challenge> passwordForgot(@RequestBody PasswordForgotRequest request,
                                                                    HttpServletRequest http) {
-        validateEmail(request.email());
-        requireText(request.phoneNumber(), "phoneNumber");
+        requireText(request.identifier(), "identifier");
         requireText(request.idempotencyKey(), "idempotencyKey");
-        var result = service.startPasswordReset(new AuthRequests.PasswordForgot(request.email(), request.phoneNumber(),
+        var result = service.startPasswordReset(new AuthRequests.PasswordForgot(request.identifier(),
                 request.idempotencyKey(), ipHash(http)));
         return ResponseEntity.accepted().body(challenge(result));
     }
@@ -104,7 +103,7 @@ public class AuthController {
     public record RegisterStartRequest(String email, String password, String idempotencyKey) {}
     public record RegisterVerifyRequest(String challengeId, String email, String password, String otp) {}
     public record ChallengeRequest(String challengeId) {}
-    public record PasswordForgotRequest(String email, String phoneNumber, String idempotencyKey) {}
+    public record PasswordForgotRequest(String identifier, String idempotencyKey) {}
     public record OtpVerifyRequest(String challengeId, String otp) {}
     public record PasswordResetRequest(String resetToken, String password) {}
     public record LoginRequest(String email, String password) {}

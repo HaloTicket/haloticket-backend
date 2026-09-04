@@ -168,16 +168,17 @@ class KeycloakAuthAdapterTest {
     }
 
     @Test
-    void matchesEmailAndPhoneNormalizedComparison() {
+    void resolvesPasswordResetEmailFromEmailOrNormalizedPhone() {
         User user = User.builder()
                 .email("test@example.com")
-                .phoneNumber("0912-345-678")
+                .phoneNumber("0912345678")
                 .build();
 
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findFirstByPhoneNumber("0912345678")).thenReturn(Optional.of(user));
 
-        assertThat(adapter.matchesEmailAndPhone("test@example.com", "+84 0912345678")).isTrue();
-        assertThat(adapter.matchesEmailAndPhone("test@example.com", "0987654321")).isFalse();
-        assertThat(adapter.matchesEmailAndPhone("unknown@example.com", "0912345678")).isFalse();
+        assertThat(adapter.resolvePasswordResetEmail("TEST@example.com")).contains("test@example.com");
+        assertThat(adapter.resolvePasswordResetEmail("+84 912345678")).contains("test@example.com");
+        assertThat(adapter.resolvePasswordResetEmail("0987654321")).isEmpty();
     }
 }

@@ -57,14 +57,14 @@ public class AuthApplicationServiceImpl implements AuthApplicationService {
 
     @Override
     public AuthOtpChallengeService.CreateResult startPasswordReset(AuthRequests.PasswordForgot request) {
-        requireEmail(request.email());
-        acquire(request.email(), request.requestIpHash());
-        if (!keycloak.matchesEmailAndPhone(request.email(), request.phoneNumber())) {
-            throw new AuthException("RESET_NOT_AVAILABLE", "Unable to start password recovery", 400);
-        }
+        if (request.identifier() == null || request.identifier().isBlank())
+            throw new AuthException("INVALID_REQUEST", "Email or phone number is required", 400);
+        String email = keycloak.resolvePasswordResetEmail(request.identifier())
+                .orElseThrow(() -> new AuthException("RESET_NOT_AVAILABLE", "Unable to start password recovery", 400));
+        acquire(email, request.requestIpHash());
         var result = otpService.create(new OtpChallengeCommand(
-                OtpPurpose.PASSWORD_RESET, request.email(), request.idempotencyKey(), request.requestIpHash()));
-        deliver(result, request.email(), OtpPurpose.PASSWORD_RESET);
+                OtpPurpose.PASSWORD_RESET, email, request.idempotencyKey(), request.requestIpHash()));
+        deliver(result, email, OtpPurpose.PASSWORD_RESET);
         return result;
     }
 

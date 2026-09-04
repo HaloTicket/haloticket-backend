@@ -42,7 +42,7 @@ public class AuthProviderConfiguration {
     KeycloakAuthPort fallbackKeycloakAuthPort() {
         return new KeycloakAuthPort() {
             public void register(String email, String password) { throw unavailable(); }
-            public boolean matchesEmailAndPhone(String email, String phoneNumber) { throw unavailable(); }
+            public java.util.Optional<String> resolvePasswordResetEmail(String identifier) { throw unavailable(); }
             public String issueResetToken(String challengeId) { throw unavailable(); }
             public void resetPassword(String resetToken, String password) { throw unavailable(); }
             public AuthResponses.Login login(String email, String password) { throw unavailable(); }

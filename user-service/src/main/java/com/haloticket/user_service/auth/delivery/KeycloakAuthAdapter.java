@@ -106,21 +106,15 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
     }
 
     @Override
-    public boolean matchesEmailAndPhone(String email, String phoneNumber) {
-        if (email == null || phoneNumber == null) {
-            return false;
+    public Optional<String> resolvePasswordResetEmail(String identifier) {
+        if (identifier == null || identifier.isBlank()) return Optional.empty();
+        String value = identifier.trim();
+        if (value.contains("@")) {
+            return userRepository.findByEmail(value.toLowerCase()).map(User::getEmail);
         }
-        Optional<User> userOpt = userRepository.findByEmail(email.trim().toLowerCase());
-        if (userOpt.isEmpty()) {
-            return false;
-        }
-        String storedPhone = userOpt.get().getPhoneNumber();
-        if (storedPhone == null || storedPhone.isBlank()) {
-            return false;
-        }
-        String cleanInput = normalizePhone(phoneNumber);
-        String cleanStored = normalizePhone(storedPhone);
-        return cleanInput.equals(cleanStored);
+        String phoneNumber = normalizePhone(value);
+        if (phoneNumber.isBlank()) return Optional.empty();
+        return userRepository.findFirstByPhoneNumber(phoneNumber).map(User::getEmail);
     }
 
     private String normalizePhone(String phone) {
