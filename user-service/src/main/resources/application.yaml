@@ -4,15 +4,11 @@ server:
 spring:
   application:
     name: user-service
-  mail:
-    host: ${SMTP_HOST:}
-    port: ${SMTP_PORT:587}
-    username: ${SMTP_USERNAME:}
-    password: ${SMTP_PASSWORD:}
-    from: ${SMTP_FROM:}
-    properties:
-      mail.smtp.auth: ${SMTP_AUTH:true}
-      mail.smtp.starttls.enable: ${SMTP_STARTTLS:true}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
   security:
     oauth2:
       resourceserver:
@@ -41,7 +37,13 @@ eureka:
 
 auth:
   otp:
-    delivery: ${AUTH_OTP_DELIVERY:disabled}
-    mail:
-      from: ${SMTP_FROM:}
-      expiry-minutes: ${AUTH_OTP_EXPIRY_MINUTES:5}
+    pepper: ${AUTH_OTP_PEPPER:haloticket-default-secret-pepper-2026}
+    delivery: kafka
+    kafka:
+      topic: ${AUTH_OTP_KAFKA_TOPIC:haloticket.auth.otp.v1}
+
+keycloak:
+  auth-server-url: ${KEYCLOAK_AUTH_SERVER_URL:http://localhost:9080}
+  realm: ${KEYCLOAK_REALM:haloticket-realm}
+  client-id: ${KEYCLOAK_CLIENT_ID:user-service}
+  client-secret: ${KEYCLOAK_CLIENT_SECRET:user-service-secret}
