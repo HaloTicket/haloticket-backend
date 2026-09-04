@@ -6,6 +6,11 @@ import com.haloticket.notification_service.exception.NotificationException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import com.haloticket.notification_service.mail.EmailTemplateRenderer;
+import com.haloticket.notification_service.enums.NotificationType;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import java.util.Map;
 
@@ -13,11 +18,14 @@ import java.util.Map;
 public class NotificationEmailSender {
     private final JavaMailSender mailSender;
     private final String from;
+    private final EmailTemplateRenderer renderer;
 
     public NotificationEmailSender(JavaMailSender mailSender,
-                                   @Value("${notification.mail.from:no-reply@haloticket.local}") String from) {
+                                   @Value("${notification.mail.from:no-reply@haloticket.local}") String from,
+                                   EmailTemplateRenderer renderer) {
         this.mailSender = mailSender;
         this.from = from;
+        this.renderer = renderer;
     }
 
     public void send(NotificationTemplate template, String recipient, Map<String, String> variables) {
@@ -25,17 +33,27 @@ public class NotificationEmailSender {
             throw new NotificationException(NotificationErrorCode.RECIPIENT_EMAIL_REQUIRED,
                     "Notification recipient email is required", 400);
         }
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(from);
-        message.setTo(recipient);
-        message.setSubject(render(template.getSubjectTemplate(), variables));
-        message.setText(render(template.getBodyTemplate(), variables));
+        MimeMessage message = mailSender.createMimeMessage();
         try {
+            MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
+            helper.setFrom(from);
+            helper.setTo(recipient);
+            helper.setSubject(render(template.getSubjectTemplate(), variables));
+            helper.setText(renderer.render(fileFor(template.getType()), variables), true);
             mailSender.send(message);
-        } catch (RuntimeException exception) {
+        } catch (MessagingException | RuntimeException exception) {
+            if (exception instanceof NotificationException notificationException) throw notificationException;
             throw new NotificationException(NotificationErrorCode.EMAIL_DELIVERY_FAILED,
                     "Email delivery failed", 503, exception);
         }
+    }
+
+    private String fileFor(NotificationType type) {
+        return switch (type) {
+            case TICKET_CONFIRMATION -> "order-confirmation.html";
+            case EKYC_RESULT -> "email-verification.html";
+            default -> "welcome.html";
+        };
     }
 
     private String render(String template, Map<String, String> variables) {

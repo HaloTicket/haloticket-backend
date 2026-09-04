@@ -19,4 +19,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(new NotificationExceptionResponse(
                 "INVALID_REQUEST", exception.getMessage(), Instant.now()));
     }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<NotificationExceptionResponse> handleUnexpectedException(Exception exception) {
+        return ResponseEntity.internalServerError().body(new NotificationExceptionResponse(
+                "INTERNAL_SERVER_ERROR", "An unexpected error occurred", Instant.now()));
+    }
 }
