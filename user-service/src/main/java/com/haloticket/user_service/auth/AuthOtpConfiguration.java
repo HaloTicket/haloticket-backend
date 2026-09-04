@@ -19,7 +19,12 @@ public class AuthOtpConfiguration {
     }
 
     @Bean
-    OtpHasher otpHasher(@Value("${auth.otp.pepper:${AUTH_OTP_PEPPER:local-development-only-change-me}}") String pepper) {
+    OtpHasher otpHasher(@Value("${auth.otp.pepper:${AUTH_OTP_PEPPER:}}") String pepper) {
         return new OtpHasher(pepper);
+    }
+
+    @Bean
+    OtpRateLimiter otpRateLimiter() {
+        return new OtpRateLimiter(10, 10);
     }
 }

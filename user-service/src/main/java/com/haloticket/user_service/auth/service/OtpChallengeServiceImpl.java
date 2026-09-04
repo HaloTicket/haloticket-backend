@@ -7,6 +7,7 @@ import com.haloticket.user_service.auth.domain.OtpStatus;
 import com.haloticket.user_service.auth.repository.AuthOtpChallengeRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.OptimisticLockException;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -38,7 +39,12 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
     public CreateResult create(OtpChallengeCommand command) {
         return repository.findByIdempotencyKeyAndPurposeAndSubject(
                         command.idempotencyKey(), command.purpose(), command.subject())
-                .map(challenge -> new CreateResult(challenge, null))
+                .map(challenge -> {
+                    if (challenge.getStatus() != OtpStatus.PENDING) {
+                        throw new AuthOtpChallengeService.IdempotencyKeyReuseException();
+                    }
+                    return new CreateResult(challenge, null);
+                })
                 .orElseGet(() -> createNew(command, clock.instant()));
     }
 
@@ -56,7 +62,7 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
     @Override
     @Transactional
     public CreateResult resend(String challengeId, Instant requestedAt) {
-        AuthOtpChallenge challenge = find(challengeId);
+        AuthOtpChallenge challenge = findForUpdate(challengeId);
         Instant now = requestedAt == null ? clock.instant() : requestedAt;
         if (challenge.getStatus() != OtpStatus.PENDING) {
             throw new AuthOtpChallengeService.InvalidStateException();
@@ -82,14 +88,14 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
     @Override
     @Transactional
     public VerifyResult verify(String challengeId, String otp, Instant requestedAt) {
-        AuthOtpChallenge challenge = find(challengeId);
+        AuthOtpChallenge challenge = findForUpdate(challengeId);
         Instant now = requestedAt == null ? clock.instant() : requestedAt;
         if (challenge.getStatus() != OtpStatus.PENDING) {
             return new VerifyResult(false);
         }
         if (!now.isBefore(challenge.getExpiresAt())) {
             challenge.setStatus(OtpStatus.EXPIRED);
-            repository.save(challenge);
+            saveSafely(challenge);
             return new VerifyResult(false);
         }
         if (otp == null || !hasher.matches(otp, challenge.getOtpHash())) {
@@ -97,28 +103,41 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
             if (challenge.getFailedAttempts() >= MAX_ATTEMPTS) {
                 challenge.setStatus(OtpStatus.LOCKED);
             }
-            repository.save(challenge);
+            saveSafely(challenge);
             return new VerifyResult(false);
         }
         challenge.setStatus(OtpStatus.VERIFIED);
         challenge.setVerifiedAt(now);
-        repository.save(challenge);
+        saveSafely(challenge);
         return new VerifyResult(true);
     }
 
     @Override
     @Transactional
     public void consume(String challengeId, Instant requestedAt) {
-        AuthOtpChallenge challenge = find(challengeId);
+        AuthOtpChallenge challenge = findForUpdate(challengeId);
         if (challenge.getStatus() != OtpStatus.VERIFIED) {
             throw new AuthOtpChallengeService.InvalidStateException();
         }
         challenge.setStatus(OtpStatus.CONSUMED);
         challenge.setConsumedAt(requestedAt == null ? clock.instant() : requestedAt);
-        repository.save(challenge);
+        saveSafely(challenge);
     }
 
     private AuthOtpChallenge find(String challengeId) {
         return repository.findById(challengeId).orElseThrow(AuthOtpChallengeService.ChallengeNotFoundException::new);
+    }
+
+    private AuthOtpChallenge findForUpdate(String challengeId) {
+        return repository.findByIdForUpdate(challengeId)
+                .orElseThrow(AuthOtpChallengeService.ChallengeNotFoundException::new);
+    }
+
+    private void saveSafely(AuthOtpChallenge challenge) {
+        try {
+            repository.save(challenge);
+        } catch (OptimisticLockException exception) {
+            throw new AuthOtpChallengeService.ConflictException();
+        }
     }
 }

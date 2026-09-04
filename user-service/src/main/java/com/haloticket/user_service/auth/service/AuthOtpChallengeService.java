@@ -17,4 +17,6 @@ public interface AuthOtpChallengeService {
     class RateLimitException extends RuntimeException {}
     class ChallengeNotFoundException extends RuntimeException {}
     class InvalidStateException extends RuntimeException {}
+    class ConflictException extends RuntimeException {}
+    class IdempotencyKeyReuseException extends RuntimeException {}
 }

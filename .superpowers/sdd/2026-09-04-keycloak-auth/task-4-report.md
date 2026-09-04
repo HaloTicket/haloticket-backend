@@ -14,16 +14,20 @@ The checked-in `task-4-brief.md` still describes the older current-user controll
 - `AuthOtpChallengeService` contract and implementation support idempotent create, resend, verify, and consume operations.
 - Lifecycle is `PENDING -> VERIFIED -> CONSUMED`; invalid/expired challenges become `EXPIRED` or `LOCKED` and cannot be reused.
 - Defaults: five-minute TTL, 60-second resend cooldown, five sends per challenge window, five failed attempts.
-- Bean configuration uses `AUTH_OTP_PEPPER`/`auth.otp.pepper`; the development fallback must be replaced by a secret in deployed environments.
+- Bean configuration uses `AUTH_OTP_PEPPER`/`auth.otp.pepper` with no public fallback; application startup fails fast when neither is configured.
+- Mutation reads use a JPA pessimistic write lock and optimistic-lock failures are translated to `ConflictException`.
+- Reusing an idempotency key for `EXPIRED`, `LOCKED`, `VERIFIED`, or `CONSUMED` challenges is rejected instead of returning stale state.
+- `OtpChallengeCommand` trims and validates nonblank, bounded purpose inputs before repository access.
+- `OtpRateLimiter` provides synchronized one-hour quotas of 10 per subject and 10 per IP for registration/reset API callers. It is intentionally a single-instance primitive; multi-instance deployment must replace its storage with Redis before exposure.
 
-Global email/IP quotas across separate challenges are intentionally left behind the rate-limit/API layer in the later registration/reset tasks; the durable per-challenge send and attempt controls are implemented here.
+The later registration/reset APIs must call `OtpRateLimiter.tryAcquire(subject, ipHash, now)` before creating a challenge and return a rate-limit response when it returns false. Controllers and email delivery remain out of scope.
 
 ## TDD evidence
 
 - RED: initial `OtpDomainTest` run failed at test compilation because the requested domain types did not exist. The Maven wrapper first also failed to start in the local sandbox; an approved Maven run then confirmed the expected missing-type failure.
-- GREEN focused: `cmd /c mvnw.cmd test -Dtest=OtpDomainTest` -> 7 tests, 0 failures, 0 errors.
-- Full suite: `cmd /c mvnw.cmd test` -> 21 tests, 0 failures, 0 errors. Spring context also verified JPA schema creation for `auth_otp_challenges` and its unique idempotency binding constraint.
+- GREEN focused: Maven compiler plus `OtpDomainTest,OtpRateLimitTest` -> 13 tests, 0 failures, 0 errors (with `AUTH_OTP_PEPPER=test-pepper`).
+- A full suite attempt reached Spring context and correctly failed without `AUTH_OTP_PEPPER`, proving the new fail-fast configuration. The requested minimal compile/focused verification passed; full suite was not rerun with the test secret before this commit.
 
 ## Known follow-up
 
-The service contract deliberately does not send mail and does not expose HTTP. Registration/reset tasks will consume the plaintext result in bounded memory, wire the email sender, and add Redis-backed email/IP quotas across separate challenges. This task enforces all durable challenge-local controls required before those adapters exist.
+The service contract deliberately does not send mail and does not expose HTTP. Registration/reset tasks will consume the plaintext result in bounded memory, wire the email sender, and replace the in-memory quota storage with Redis for multi-instance deployments.

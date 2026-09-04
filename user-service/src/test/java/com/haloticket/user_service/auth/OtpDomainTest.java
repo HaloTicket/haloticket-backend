@@ -8,6 +8,7 @@ import com.haloticket.user_service.auth.service.AuthOtpChallengeService;
 import com.haloticket.user_service.auth.service.OtpChallengeCommand;
 import com.haloticket.user_service.auth.service.OtpChallengeServiceImpl;
 import org.junit.jupiter.api.Test;
+import jakarta.persistence.OptimisticLockException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -32,6 +33,12 @@ class OtpDomainTest {
         assertThat(otp).matches("\\d{6}");
         assertThat(hasher.hash(otp)).doesNotContain(otp);
         assertThat(hasher.matches(otp, hasher.hash(otp))).isTrue();
+    }
+
+    @Test
+    void blankConfiguredPepperIsRejected() {
+        assertThatThrownBy(() -> new AuthOtpConfiguration().otpHasher(""))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -71,6 +78,35 @@ class OtpDomainTest {
     }
 
     @Test
+    void reusedIdempotencyKeyCannotReturnTerminalChallenge() {
+        AuthOtpChallenge existing = AuthOtpChallenge.builder().id("challenge-1")
+                .purpose(OtpPurpose.PASSWORD_RESET).subject("user@example.com")
+                .idempotencyKey("request-1").status(OtpStatus.EXPIRED).build();
+        AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
+        when(repository.findByIdempotencyKeyAndPurposeAndSubject("request-1", OtpPurpose.PASSWORD_RESET, "user@example.com"))
+                .thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service(repository).create(new OtpChallengeCommand(
+                OtpPurpose.PASSWORD_RESET, "user@example.com", "request-1", "ip-hash")))
+                .isInstanceOf(AuthOtpChallengeService.IdempotencyKeyReuseException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void rejectsBlankOrOversizedCommandBeforeRepositoryAccess() {
+        AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
+        AuthOtpChallengeService service = service(repository);
+
+        assertThatThrownBy(() -> service.create(new OtpChallengeCommand(
+                OtpPurpose.REGISTRATION, "  ", "request-1", "ip-hash")))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.create(new OtpChallengeCommand(
+                OtpPurpose.REGISTRATION, "user@example.com", "x".repeat(129), "ip-hash")))
+                .isInstanceOf(IllegalArgumentException.class);
+        verifyNoInteractions(repository);
+    }
+
+    @Test
     void verifyRejectsWrongOtpLocksAfterFiveAttemptsAndCannotBeReused() {
         AuthOtpChallenge challenge = AuthOtpChallenge.builder().id("challenge-1")
                 .purpose(OtpPurpose.REGISTRATION).subject("user@example.com")
@@ -78,7 +114,7 @@ class OtpDomainTest {
                 .status(OtpStatus.PENDING).expiresAt(NOW.plusSeconds(300))
                 .failedAttempts(0).build();
         AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
-        when(repository.findById("challenge-1")).thenReturn(Optional.of(challenge));
+        when(repository.findByIdForUpdate("challenge-1")).thenReturn(Optional.of(challenge));
         when(repository.save(any(AuthOtpChallenge.class))).thenAnswer(invocation -> invocation.getArgument(0));
         AuthOtpChallengeService service = service(repository);
 
@@ -98,7 +134,7 @@ class OtpDomainTest {
                 .status(OtpStatus.PENDING).expiresAt(NOW.plusSeconds(300))
                 .failedAttempts(0).build();
         AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
-        when(repository.findById("challenge-1")).thenReturn(Optional.of(challenge));
+        when(repository.findByIdForUpdate("challenge-1")).thenReturn(Optional.of(challenge));
         when(repository.save(any(AuthOtpChallenge.class))).thenAnswer(invocation -> invocation.getArgument(0));
         AuthOtpChallengeService service = service(repository);
 
@@ -116,11 +152,25 @@ class OtpDomainTest {
                 .otpHash(new OtpHasher("test-pepper").hash("123456"))
                 .status(OtpStatus.PENDING).expiresAt(NOW.minusSeconds(1)).failedAttempts(0).build();
         AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
-        when(repository.findById("challenge-1")).thenReturn(Optional.of(challenge));
+        when(repository.findByIdForUpdate("challenge-1")).thenReturn(Optional.of(challenge));
         when(repository.save(any(AuthOtpChallenge.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         assertThat(service(repository).verify("challenge-1", "123456", NOW).accepted()).isFalse();
         assertThat(challenge.getStatus()).isEqualTo(OtpStatus.EXPIRED);
+    }
+
+    @Test
+    void optimisticLockConflictIsTranslatedToSafeDomainException() {
+        AuthOtpChallenge challenge = AuthOtpChallenge.builder().id("challenge-1")
+                .purpose(OtpPurpose.REGISTRATION).subject("user@example.com")
+                .otpHash(new OtpHasher("test-pepper").hash("123456"))
+                .status(OtpStatus.PENDING).expiresAt(NOW.plusSeconds(300)).build();
+        AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
+        when(repository.findByIdForUpdate("challenge-1")).thenReturn(Optional.of(challenge));
+        when(repository.save(any(AuthOtpChallenge.class))).thenThrow(new OptimisticLockException());
+
+        assertThatThrownBy(() -> service(repository).verify("challenge-1", "123456", NOW))
+                .isInstanceOf(AuthOtpChallengeService.ConflictException.class);
     }
 
     @Test
@@ -131,7 +181,7 @@ class OtpDomainTest {
                 .resendAvailableAt(NOW.plusSeconds(60)).sendWindowStartedAt(NOW)
                 .sendCount(1).build();
         AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
-        when(repository.findById("challenge-1")).thenReturn(Optional.of(challenge));
+        when(repository.findByIdForUpdate("challenge-1")).thenReturn(Optional.of(challenge));
         when(repository.save(any(AuthOtpChallenge.class))).thenAnswer(invocation -> invocation.getArgument(0));
         AuthOtpChallengeService service = service(repository);
 
