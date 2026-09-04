@@ -48,3 +48,18 @@ Verification with `AUTH_OTP_PEPPER=test-pepper`:
 - `git diff --check`: clean.
 
 The Maven wrapper could not start in this environment; the installed Maven 3.9.16 distribution was invoked directly with `-Dmaven.compiler.fork=true` and `-Duser.home=C:\\Users\\Windows`. The forked compiler emitted a JDK archive cleanup warning, but the focused and full test reports completed successfully.
+
+## Final review fix: transaction boundary
+
+The remaining PostgreSQL transaction-boundary findings were addressed in the follow-up commit:
+
+- `OtpChallengePersistence.insert()` performs the unique-constrained insert in `REQUIRES_NEW`; after a losing insert rolls back, the service queries the winner only after that independent transaction has ended.
+- `OtpChallengePersistence.markExpired()` persists `PENDING -> EXPIRED` in `REQUIRES_NEW` before the idempotency-reuse exception is raised, so the state transition is not rolled back by the caller's exception.
+- Existing `resend`, `verify`, and `consume` methods retain their transaction and pessimistic-lock boundaries.
+- `OtpPersistenceBoundaryTest` asserts both persistence operations declare `Propagation.REQUIRES_NEW`; the domain test continues to assert winner recovery and expired-state persistence through the persistence collaborator.
+
+Verification attempted for this fix:
+
+- Focused command: `mvn -Dtest=OtpPersistenceBoundaryTest,OtpDomainTest test` with `MAVEN_OPTS=-Dmaven.repo.local=D:\\HaloTicket\\.m2repo`.
+- The command could not reach test execution because the existing uncommitted `user-service/config/SecurityConfig.java` does not compile against the resolved Spring Security version (`jwtValidator(...)` is unavailable). This is outside the OTP fix and was not modified.
+- A real PostgreSQL concurrency integration test was not runnable in this environment: the repository has no Testcontainers/H2 test dependency or configured PostgreSQL test profile. The production transaction boundary is explicit and the unit regression tests cover the failure/recovery semantics; database-level concurrency remains a deployment-level verification item.

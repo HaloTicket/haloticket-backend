@@ -27,17 +27,24 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
     private final OtpGenerator generator;
     private final OtpHasher hasher;
     private final Clock clock;
+    private final OtpChallengePersistence persistence;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public OtpChallengeServiceImpl(AuthOtpChallengeRepository repository, OtpGenerator generator,
-                                   OtpHasher hasher, Clock clock) {
+                                   OtpHasher hasher, Clock clock, OtpChallengePersistence persistence) {
         this.repository = repository;
         this.generator = generator;
         this.hasher = hasher;
         this.clock = clock;
+        this.persistence = persistence;
+    }
+
+    public OtpChallengeServiceImpl(AuthOtpChallengeRepository repository, OtpGenerator generator,
+                                   OtpHasher hasher, Clock clock) {
+        this(repository, generator, hasher, clock, new OtpChallengePersistence(repository));
     }
 
     @Override
-    @Transactional
     public CreateResult create(OtpChallengeCommand command) {
         Instant now = clock.instant();
         return repository.findByIdempotencyKeyAndPurposeAndSubject(
@@ -47,9 +54,9 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
                             || challenge.getExpiresAt() == null
                             || !now.isBefore(challenge.getExpiresAt())) {
                         if (challenge.getStatus() == OtpStatus.PENDING
-                                && (challenge.getExpiresAt() == null || !now.isBefore(challenge.getExpiresAt()))) {
+                            && (challenge.getExpiresAt() == null || !now.isBefore(challenge.getExpiresAt()))) {
                             challenge.setStatus(OtpStatus.EXPIRED);
-                            saveSafely(challenge);
+                            persistence.markExpired(challenge);
                         }
                         throw new AuthOtpChallengeService.IdempotencyKeyReuseException();
                     }
@@ -67,8 +74,9 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
                 .expiresAt(now.plus(TTL)).resendAvailableAt(now.plus(RESEND_COOLDOWN))
                 .sendWindowStartedAt(now).sendCount(1).failedAttempts(0).build();
         try {
-            return new CreateResult(repository.saveAndFlush(challenge), otp);
+            return new CreateResult(persistence.insert(challenge), otp);
         } catch (DataIntegrityViolationException exception) {
+            // The failed insert has already rolled back in its REQUIRES_NEW transaction.
             AuthOtpChallenge winner = repository.findByIdempotencyKeyAndPurposeAndSubject(
                             command.idempotencyKey(), command.purpose(), command.subject())
                     .orElseThrow(() -> exception);
