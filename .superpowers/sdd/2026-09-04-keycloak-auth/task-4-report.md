@@ -31,3 +31,20 @@ The later registration/reset APIs must call `OtpRateLimiter.tryAcquire(subject, 
 ## Known follow-up
 
 The service contract deliberately does not send mail and does not expose HTTP. Registration/reset tasks will consume the plaintext result in bounded memory, wire the email sender, and replace the in-memory quota storage with Redis for multi-instance deployments.
+
+## Review fix round
+
+Addressed the remaining Task 4 review findings:
+
+- Expired `PENDING` challenges are transitioned to `EXPIRED` and are never returned for a reused idempotency key.
+- Concurrent inserts that lose the idempotency unique constraint reload the winning challenge and return no plaintext OTP, preventing a duplicate email send from the losing request.
+- Challenge mutations use `saveAndFlush()` and translate both JPA `OptimisticLockException` and Spring optimistic-lock failures into the domain conflict exception.
+- Regression tests were added before implementation and observed failing for all three behaviors.
+
+Verification with `AUTH_OTP_PEPPER=test-pepper`:
+
+- Focused `OtpDomainTest`: 13/13 passed.
+- Full `user-service` suite: 29/29 passed.
+- `git diff --check`: clean.
+
+The Maven wrapper could not start in this environment; the installed Maven 3.9.16 distribution was invoked directly with `-Dmaven.compiler.fork=true` and `-Duser.home=C:\\Users\\Windows`. The forked compiler emitted a JDK archive cleanup warning, but the focused and full test reports completed successfully.

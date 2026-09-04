@@ -7,6 +7,8 @@ import com.haloticket.user_service.auth.domain.OtpStatus;
 import com.haloticket.user_service.auth.repository.AuthOtpChallengeRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import jakarta.persistence.OptimisticLockException;
 
 import java.time.Clock;
@@ -37,15 +39,23 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
     @Override
     @Transactional
     public CreateResult create(OtpChallengeCommand command) {
+        Instant now = clock.instant();
         return repository.findByIdempotencyKeyAndPurposeAndSubject(
                         command.idempotencyKey(), command.purpose(), command.subject())
                 .map(challenge -> {
-                    if (challenge.getStatus() != OtpStatus.PENDING) {
+                    if (challenge.getStatus() != OtpStatus.PENDING
+                            || challenge.getExpiresAt() == null
+                            || !now.isBefore(challenge.getExpiresAt())) {
+                        if (challenge.getStatus() == OtpStatus.PENDING
+                                && (challenge.getExpiresAt() == null || !now.isBefore(challenge.getExpiresAt()))) {
+                            challenge.setStatus(OtpStatus.EXPIRED);
+                            saveSafely(challenge);
+                        }
                         throw new AuthOtpChallengeService.IdempotencyKeyReuseException();
                     }
                     return new CreateResult(challenge, null);
                 })
-                .orElseGet(() -> createNew(command, clock.instant()));
+                .orElseGet(() -> createNew(command, now));
     }
 
     private CreateResult createNew(OtpChallengeCommand command, Instant now) {
@@ -56,7 +66,18 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
                 .otpHash(hasher.hash(otp)).status(OtpStatus.PENDING)
                 .expiresAt(now.plus(TTL)).resendAvailableAt(now.plus(RESEND_COOLDOWN))
                 .sendWindowStartedAt(now).sendCount(1).failedAttempts(0).build();
-        return new CreateResult(repository.save(challenge), otp);
+        try {
+            return new CreateResult(repository.saveAndFlush(challenge), otp);
+        } catch (DataIntegrityViolationException exception) {
+            AuthOtpChallenge winner = repository.findByIdempotencyKeyAndPurposeAndSubject(
+                            command.idempotencyKey(), command.purpose(), command.subject())
+                    .orElseThrow(() -> exception);
+            if (winner.getStatus() != OtpStatus.PENDING || winner.getExpiresAt() == null
+                    || !now.isBefore(winner.getExpiresAt())) {
+                throw new AuthOtpChallengeService.IdempotencyKeyReuseException();
+            }
+            return new CreateResult(winner, null);
+        }
     }
 
     @Override
@@ -82,7 +103,8 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
         challenge.setSendCount(challenge.getSendCount() + 1);
         challenge.setResendAvailableAt(now.plus(RESEND_COOLDOWN));
         challenge.setExpiresAt(now.plus(TTL));
-        return new CreateResult(repository.save(challenge), otp);
+        saveSafely(challenge);
+        return new CreateResult(challenge, otp);
     }
 
     @Override
@@ -135,8 +157,8 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
 
     private void saveSafely(AuthOtpChallenge challenge) {
         try {
-            repository.save(challenge);
-        } catch (OptimisticLockException exception) {
+            repository.saveAndFlush(challenge);
+        } catch (OptimisticLockException | OptimisticLockingFailureException exception) {
             throw new AuthOtpChallengeService.ConflictException();
         }
     }

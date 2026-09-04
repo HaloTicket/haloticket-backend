@@ -9,6 +9,8 @@ import com.haloticket.user_service.auth.service.OtpChallengeCommand;
 import com.haloticket.user_service.auth.service.OtpChallengeServiceImpl;
 import org.junit.jupiter.api.Test;
 import jakarta.persistence.OptimisticLockException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -46,7 +48,7 @@ class OtpDomainTest {
         AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
         when(repository.findByIdempotencyKeyAndPurposeAndSubject("request-1", OtpPurpose.REGISTRATION, "user@example.com"))
                 .thenReturn(Optional.empty());
-        when(repository.save(any(AuthOtpChallenge.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.saveAndFlush(any(AuthOtpChallenge.class))).thenAnswer(invocation -> invocation.getArgument(0));
         AuthOtpChallengeService service = service(repository);
 
         var result = service.create(new OtpChallengeCommand(
@@ -63,7 +65,8 @@ class OtpDomainTest {
     void idempotentCreateReturnsExistingChallengeWithoutGeneratingAnotherOtp() {
         AuthOtpChallenge existing = AuthOtpChallenge.builder().id("challenge-1")
                 .purpose(OtpPurpose.PASSWORD_RESET).subject("user@example.com")
-                .idempotencyKey("request-1").status(OtpStatus.PENDING).build();
+                .idempotencyKey("request-1").status(OtpStatus.PENDING)
+                .expiresAt(NOW.plusSeconds(300)).build();
         AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
         when(repository.findByIdempotencyKeyAndPurposeAndSubject("request-1", OtpPurpose.PASSWORD_RESET, "user@example.com"))
                 .thenReturn(Optional.of(existing));
@@ -74,7 +77,43 @@ class OtpDomainTest {
 
         assertThat(result.challenge()).isSameAs(existing);
         assertThat(result.plaintextOtp()).isNull();
-        verify(repository, never()).save(any());
+        verify(repository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void expiredPendingChallengeIsNotReturnedForReusedIdempotencyKey() {
+        AuthOtpChallenge existing = AuthOtpChallenge.builder().id("challenge-1")
+                .purpose(OtpPurpose.REGISTRATION).subject("user@example.com")
+                .idempotencyKey("request-1").status(OtpStatus.PENDING)
+                .expiresAt(NOW.minusSeconds(1)).build();
+        AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
+        when(repository.findByIdempotencyKeyAndPurposeAndSubject("request-1", OtpPurpose.REGISTRATION, "user@example.com"))
+                .thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service(repository).create(new OtpChallengeCommand(
+                OtpPurpose.REGISTRATION, "user@example.com", "request-1", "ip-hash")))
+                .isInstanceOf(AuthOtpChallengeService.IdempotencyKeyReuseException.class);
+        assertThat(existing.getStatus()).isEqualTo(OtpStatus.EXPIRED);
+        verify(repository).saveAndFlush(existing);
+    }
+
+    @Test
+    void concurrentCreateLosingUniqueInsertReturnsWinningChallengeWithoutOtp() {
+        AuthOtpChallenge winner = AuthOtpChallenge.builder().id("challenge-1")
+                .purpose(OtpPurpose.REGISTRATION).subject("user@example.com")
+                .idempotencyKey("request-1").status(OtpStatus.PENDING)
+                .expiresAt(NOW.plusSeconds(300)).build();
+        AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
+        when(repository.findByIdempotencyKeyAndPurposeAndSubject("request-1", OtpPurpose.REGISTRATION, "user@example.com"))
+                .thenReturn(Optional.empty(), Optional.of(winner));
+        when(repository.saveAndFlush(any(AuthOtpChallenge.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate idempotency key"));
+
+        var result = service(repository).create(new OtpChallengeCommand(
+                OtpPurpose.REGISTRATION, "user@example.com", "request-1", "ip-hash"));
+
+        assertThat(result.challenge()).isSameAs(winner);
+        assertThat(result.plaintextOtp()).isNull();
     }
 
     @Test
@@ -115,7 +154,7 @@ class OtpDomainTest {
                 .failedAttempts(0).build();
         AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
         when(repository.findByIdForUpdate("challenge-1")).thenReturn(Optional.of(challenge));
-        when(repository.save(any(AuthOtpChallenge.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.saveAndFlush(any(AuthOtpChallenge.class))).thenAnswer(invocation -> invocation.getArgument(0));
         AuthOtpChallengeService service = service(repository);
 
         for (int attempt = 1; attempt <= 5; attempt++) {
@@ -135,7 +174,7 @@ class OtpDomainTest {
                 .failedAttempts(0).build();
         AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
         when(repository.findByIdForUpdate("challenge-1")).thenReturn(Optional.of(challenge));
-        when(repository.save(any(AuthOtpChallenge.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.saveAndFlush(any(AuthOtpChallenge.class))).thenAnswer(invocation -> invocation.getArgument(0));
         AuthOtpChallengeService service = service(repository);
 
         assertThat(service.verify("challenge-1", "123456", NOW).accepted()).isTrue();
@@ -153,7 +192,7 @@ class OtpDomainTest {
                 .status(OtpStatus.PENDING).expiresAt(NOW.minusSeconds(1)).failedAttempts(0).build();
         AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
         when(repository.findByIdForUpdate("challenge-1")).thenReturn(Optional.of(challenge));
-        when(repository.save(any(AuthOtpChallenge.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.saveAndFlush(any(AuthOtpChallenge.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         assertThat(service(repository).verify("challenge-1", "123456", NOW).accepted()).isFalse();
         assertThat(challenge.getStatus()).isEqualTo(OtpStatus.EXPIRED);
@@ -167,7 +206,8 @@ class OtpDomainTest {
                 .status(OtpStatus.PENDING).expiresAt(NOW.plusSeconds(300)).build();
         AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
         when(repository.findByIdForUpdate("challenge-1")).thenReturn(Optional.of(challenge));
-        when(repository.save(any(AuthOtpChallenge.class))).thenThrow(new OptimisticLockException());
+        when(repository.saveAndFlush(any(AuthOtpChallenge.class))).thenThrow(new ObjectOptimisticLockingFailureException(
+                AuthOtpChallenge.class, "challenge-1"));
 
         assertThatThrownBy(() -> service(repository).verify("challenge-1", "123456", NOW))
                 .isInstanceOf(AuthOtpChallengeService.ConflictException.class);
@@ -182,7 +222,7 @@ class OtpDomainTest {
                 .sendCount(1).build();
         AuthOtpChallengeRepository repository = mock(AuthOtpChallengeRepository.class);
         when(repository.findByIdForUpdate("challenge-1")).thenReturn(Optional.of(challenge));
-        when(repository.save(any(AuthOtpChallenge.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.saveAndFlush(any(AuthOtpChallenge.class))).thenAnswer(invocation -> invocation.getArgument(0));
         AuthOtpChallengeService service = service(repository);
 
         assertThatThrownBy(() -> service.resend("challenge-1", NOW.plusSeconds(30)))
