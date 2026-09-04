@@ -63,6 +63,9 @@ public class EventServiceImpl implements EventService {
         if (request.getCategoryId() != null) {
             category = eventCategoryRepository.findById(request.getCategoryId()).orElse(null);
         }
+        if (category == null && request.getCategoryName() != null) {
+            category = eventCategoryRepository.findByNameContainingIgnoreCase(request.getCategoryName()).orElse(null);
+        }
 
         Event newEvent = Event.builder()
                 .title(request.getTitle())

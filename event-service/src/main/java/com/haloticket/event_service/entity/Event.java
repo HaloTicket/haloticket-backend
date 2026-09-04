@@ -25,22 +25,23 @@ public class Event {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "banner_url")
+    @Column(name = "banner_url", columnDefinition = "TEXT")
     private String bannerUrl;
 
-    @Column(name = "thumbnail_url")
+    @Column(name = "thumbnail_url", columnDefinition = "TEXT")
     private String thumbnailUrl;
 
     @Column(name = "location_type")
     private String locationType;
 
-    @Column(name = "location_name")
+    @Column(name = "location_name", columnDefinition = "TEXT")
     private String locationName;
 
     private String city;
 
     private String ward;
 
+    @Column(columnDefinition = "TEXT")
     private String address;
 
     private String author;
@@ -54,7 +55,7 @@ public class Event {
 
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "event_gallery", joinColumns = @JoinColumn(name = "event_id"))
-    @Column(name = "image_url")
+    @Column(name = "image_url", columnDefinition = "TEXT")
     private List<String> galleryImages;
 
     @Column(name = "dates_summary")
