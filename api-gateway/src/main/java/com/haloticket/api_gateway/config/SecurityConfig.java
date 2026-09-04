@@ -19,7 +19,8 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
                         .pathMatchers("/eureka/**", "/actuator/**").permitAll()
                         .pathMatchers("/api/events/**", "/api/tickets/**", "/api/marketplace/**", "/api/v1/**").permitAll()
-                        .pathMatchers("/api/users/**", "/api/bookings/**", "/api/payments/**").permitAll()
+                        .pathMatchers("/api/users/me").authenticated()
+                        .pathMatchers("/api/users/**", "/api/bookings/**", "/api/payments/**", "/api/notifications/**").authenticated()
                         .anyExchange().permitAll()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}));
