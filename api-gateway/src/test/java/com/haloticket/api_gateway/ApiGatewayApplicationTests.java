@@ -8,6 +8,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,6 +21,9 @@ class ApiGatewayApplicationTests {
 
 	@MockBean
 	JwtDecoder jwtDecoder;
+
+	@MockBean
+	ReactiveJwtDecoder reactiveJwtDecoder;
 
 	@Autowired
 	WebTestClient webTestClient;

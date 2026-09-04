@@ -7,6 +7,8 @@ import org.springframework.security.config.annotation.web.reactive.EnableWebFlux
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.beans.factory.annotation.Value;
 
@@ -16,6 +18,15 @@ public class SecurityConfig {
 
     @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
     private String issuerUri;
+
+    @Bean("reactiveJwtDecoder")
+    ReactiveJwtDecoder jwtDecoder() {
+        NimbusReactiveJwtDecoder decoder = NimbusReactiveJwtDecoder.withIssuerLocation(issuerUri).build();
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefaultWithIssuer(issuerUri),
+                new AudienceValidator("api-gateway")));
+        return decoder;
+    }
 
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
@@ -29,9 +40,7 @@ public class SecurityConfig {
                         .pathMatchers("/api/users/**", "/api/bookings/**", "/api/payments/**", "/api/notifications/**").authenticated()
                         .anyExchange().permitAll()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtValidator(
-                        new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefaultWithIssuer(issuerUri),
-                                new AudienceValidator("api-gateway")))));
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtDecoder(jwtDecoder())));
 
         return http.build();
     }
