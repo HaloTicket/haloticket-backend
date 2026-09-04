@@ -54,6 +54,11 @@ spring:
           predicates:
             - Path=/api/notifications/**
 
+        - id: media-service
+          uri: lb://MEDIA-SERVICE
+          predicates:
+            - Path=/api/media/**
+
 eureka:
   client:
     service-url:
