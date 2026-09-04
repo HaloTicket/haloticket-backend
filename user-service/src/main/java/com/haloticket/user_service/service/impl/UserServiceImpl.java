@@ -82,7 +82,10 @@ public class UserServiceImpl implements UserService {
                     "Email already belongs to another identity");
         }
         user.setEmail(email);
-        user.setFullName(resolveName(jwt));
+        String resolvedName = resolveName(jwt);
+        if (!isBlank(resolvedName)) {
+            user.setFullName(resolvedName);
+        }
         user.setRoles(jwtRoleConverter.toApplicationRoles(jwt));
         user.setLastLoginAt(LocalDateTime.now());
         if (user.getIsActive() == null) {

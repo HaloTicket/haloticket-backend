@@ -18,6 +18,14 @@
 - GREEN: `./mvnw -Dtest=UserServiceImplTest,UserControllerTest test` passed with 10 tests, 0 failures, 0 errors, and 0 skipped.
 - Full suite: `./mvnw test` passed with 13 tests, 0 failures, 0 errors, and 0 skipped.
 
+## Review follow-up
+
+- Added regression coverage proving an existing user's manually updated `fullName` is preserved when all JWT name claims are blank.
+- RED: focused `UserServiceImplTest` failed with the expected value being overwritten by an empty string.
+- GREEN: focused `UserServiceImplTest` passed with 7 tests, 0 failures, and 0 errors after the minimal guard was added.
+- Full suite: `./mvnw test` passed with 14 tests, 0 failures, 0 errors, and 0 skipped.
+- The sync operation now updates `fullName` only when the resolved JWT name is non-blank, preventing null/blank claims from overwriting profile data.
+
 The Windows Maven wrapper was invoked through Git Bash with elevated filesystem access because direct PowerShell startup failed with `Cannot start maven from wrapper`; the full suite also connected to the configured local PostgreSQL test database successfully.
 
 ## Commit

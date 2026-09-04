@@ -99,6 +99,36 @@ class UserServiceImplTest {
     }
 
     @Test
+    void syncCurrentUserPreservesExistingFullNameWhenJwtNameIsBlank() {
+        Jwt jwt = Jwt.withTokenValue("token")
+                .header("alg", "none")
+                .subject("kc-123")
+                .claim("email", "user@example.com")
+                .claim("name", "   ")
+                .claim("given_name", "")
+                .claim("family_name", "")
+                .claim("preferred_username", "")
+                .claim("roles", List.of("ROLE_USER"))
+                .build();
+        User existing = User.builder()
+                .keycloakId("kc-123")
+                .email("user@example.com")
+                .fullName("Manually Updated Name")
+                .isActive(true)
+                .status(UserStatus.ACTIVE)
+                .build();
+
+        when(userRepository.findByKeycloakId("kc-123")).thenReturn(Optional.of(existing));
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(existing));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserResponse response = service.syncCurrentUser(jwt);
+
+        assertThat(response.getFullName()).isEqualTo("Manually Updated Name");
+        assertThat(existing.getFullName()).isEqualTo("Manually Updated Name");
+    }
+
+    @Test
     void updateCurrentUserOnlyUpdatesEditableProfileFields() {
         Jwt jwt = Jwt.withTokenValue("token")
                 .header("alg", "none")
