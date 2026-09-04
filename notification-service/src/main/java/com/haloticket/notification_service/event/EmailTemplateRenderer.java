@@ -1,4 +1,4 @@
-package com.haloticket.notification_service.mail;
+package com.haloticket.notification_service.event;
 
 import com.haloticket.notification_service.exception.NotificationErrorCode;
 import com.haloticket.notification_service.exception.NotificationException;
@@ -14,8 +14,10 @@ public class EmailTemplateRenderer {
     public String render(String templateName, Map<String, String> variables) {
         try {
             String html = new ClassPathResource("templates/" + templateName).getContentAsString(StandardCharsets.UTF_8);
-            if (variables != null) for (Map.Entry<String, String> entry : variables.entrySet()) {
-                html = html.replace("{{" + entry.getKey() + "}}", entry.getValue());
+            if (variables != null) {
+                for (Map.Entry<String, String> entry : variables.entrySet()) {
+                    html = html.replace("{{" + entry.getKey() + "}}", entry.getValue());
+                }
             }
             return html;
         } catch (IOException exception) {

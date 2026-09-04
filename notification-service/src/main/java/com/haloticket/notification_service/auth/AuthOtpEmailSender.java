@@ -3,7 +3,7 @@ package com.haloticket.notification_service.auth;
 import org.springframework.beans.factory.annotation.Value;
 import com.haloticket.notification_service.exception.NotificationErrorCode;
 import com.haloticket.notification_service.exception.NotificationException;
-import com.haloticket.notification_service.mail.EmailTemplateRenderer;
+import com.haloticket.notification_service.event.EmailTemplateRenderer;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.mail.javamail.MimeMessageHelper;

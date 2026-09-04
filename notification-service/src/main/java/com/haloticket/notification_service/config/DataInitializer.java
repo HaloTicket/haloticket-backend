@@ -18,49 +18,50 @@ import org.springframework.transaction.annotation.Transactional;
 public class DataInitializer implements CommandLineRunner {
 
     private final NotificationTemplateRepository notificationTemplateRepository;
-
     private final EntityManager entityManager;
 
     @Override
     @Transactional
     public void run(String... args) {
-        if (notificationTemplateRepository.existsById("ntpl-ticket-confirmation-email")) {
-            log.info("Notification database already populated. Skipping initialization.");
-            return;
-        }
-
         log.info("Initializing sample data for Notification Service...");
 
-        NotificationTemplate ticketConfirmation = NotificationTemplate.builder()
-                .id("ntpl-ticket-confirmation-email")
-                .type(NotificationType.TICKET_CONFIRMATION)
-                .channel(NotificationChannel.EMAIL)
-                .subjectTemplate("Your HaloTicket order is confirmed")
-                .bodyTemplate("Hi {{fullName}}, your booking {{bookingCode}} has been confirmed.")
+        upsertTemplate("ntpl-ticket-confirmation-email",
+                NotificationType.TICKET_CONFIRMATION,
+                NotificationChannel.EMAIL,
+                "Your HaloTicket order is confirmed",
+                "Hi {{fullName}}, your booking {{bookingCode}} has been confirmed.");
+
+        upsertTemplate("ntpl-event-reminder-push",
+                NotificationType.EVENT_REMINDER,
+                NotificationChannel.PUSH,
+                "Event reminder",
+                "Your event {{eventTitle}} starts at {{startTime}}.");
+
+        upsertTemplate("ntpl-ekyc-result-email",
+                NotificationType.EKYC_RESULT,
+                NotificationChannel.EMAIL,
+                "eKYC verification result",
+                "Your eKYC verification status is {{status}}.");
+
+        log.info("Notification Service sample data initialized successfully!");
+    }
+
+    private void upsertTemplate(String id, NotificationType type, NotificationChannel channel,
+                                 String subject, String body) {
+        if (notificationTemplateRepository.existsById(id)) {
+            log.info("Template '{}' already exists. Skipping.", id);
+            return;
+        }
+        NotificationTemplate template = NotificationTemplate.builder()
+                .id(id)
+                .type(type)
+                .channel(channel)
+                .subjectTemplate(subject)
+                .bodyTemplate(body)
                 .status(NotificationTemplateStatus.ACTIVE)
                 .build();
-        entityManager.persist(ticketConfirmation);
-
-        NotificationTemplate eventReminder = NotificationTemplate.builder()
-                .id("ntpl-event-reminder-push")
-                .type(NotificationType.EVENT_REMINDER)
-                .channel(NotificationChannel.PUSH)
-                .subjectTemplate("Event reminder")
-                .bodyTemplate("Your event {{eventTitle}} starts at {{startTime}}.")
-                .status(NotificationTemplateStatus.ACTIVE)
-                .build();
-        entityManager.persist(eventReminder);
-
-        NotificationTemplate ekycResult = NotificationTemplate.builder()
-                .id("ntpl-ekyc-result-email")
-                .type(NotificationType.EKYC_RESULT)
-                .channel(NotificationChannel.EMAIL)
-                .subjectTemplate("eKYC verification result")
-                .bodyTemplate("Your eKYC verification status is {{status}}.")
-                .status(NotificationTemplateStatus.ACTIVE)
-                .build();
-        entityManager.persist(ekycResult);
-
-        log.info("Notification Service sample data initialized successfully! Created notification templates.");
+        entityManager.persist(template);
+        log.info("Created template '{}'.", id);
     }
 }
+

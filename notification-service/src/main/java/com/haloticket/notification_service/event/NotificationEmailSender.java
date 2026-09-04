@@ -6,7 +6,6 @@ import com.haloticket.notification_service.exception.NotificationException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
-import com.haloticket.notification_service.mail.EmailTemplateRenderer;
 import com.haloticket.notification_service.enums.NotificationType;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
