@@ -24,6 +24,11 @@ spring:
 
       # routing rules
       routes:
+        - id: auth-user-service
+          uri: lb://USER-SERVICE
+          predicates:
+            - Path=/api/auth/**
+
         - id: user-service
           uri: lb://USER-SERVICE
           predicates:

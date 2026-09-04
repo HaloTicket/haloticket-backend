@@ -34,6 +34,7 @@ class ApiGatewayApplicationTests {
 
 	@Test
 	void deniesUnauthenticatedRequestsToProtectedApiRoutes() {
+		webTestClient.get().uri("/api/auth/registrations").exchange().expectStatus().isNotFound();
 		webTestClient.get().uri("/api/users/me").exchange().expectStatus().isUnauthorized();
 		webTestClient.get().uri("/api/users/probe").exchange().expectStatus().isUnauthorized();
 		webTestClient.get().uri("/api/bookings/probe").exchange().expectStatus().isUnauthorized();
