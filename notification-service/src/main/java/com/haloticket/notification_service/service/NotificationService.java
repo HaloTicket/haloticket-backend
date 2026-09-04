@@ -6,6 +6,7 @@ import com.haloticket.notification_service.dto.response.NotificationResponse;
 import com.haloticket.notification_service.dto.response.NotificationTemplateResponse;
 
 import java.util.List;
+import com.haloticket.notification_service.event.NotificationEvent;
 
 public interface NotificationService {
     NotificationTemplateResponse createTemplate(NotificationTemplateCreateRequest request);
@@ -19,4 +20,6 @@ public interface NotificationService {
     NotificationResponse markAsSent(String id);
 
     NotificationResponse markAsFailed(String id);
+
+    NotificationResponse processEvent(NotificationEvent event);
 }

@@ -34,12 +34,18 @@ public class Notification {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
+    @Column(name = "event_id", unique = true)
+    private String eventId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "template_id", nullable = false)
     private NotificationTemplate template;
 
     @Column(name = "user_id", nullable = false)
     private String userId;
+
+    @Column(name = "recipient_email")
+    private String recipientEmail;
 
     @Column(name = "variables_json", columnDefinition = "TEXT")
     private String variablesJson;

@@ -36,6 +36,16 @@ public class AuthKafkaConfiguration {
     }
 
     @Bean
+    NewTopic notificationTopic(@Value("${notification.kafka.topic:haloticket.notifications.v1}") String topic) {
+        return TopicBuilder.name(topic).partitions(3).replicas(1).build();
+    }
+
+    @Bean
+    NewTopic notificationDeadLetterTopic(@Value("${notification.kafka.topic:haloticket.notifications.v1}") String topic) {
+        return TopicBuilder.name(topic + ".DLT").partitions(3).replicas(1).build();
+    }
+
+    @Bean
     KafkaTemplate<String, Object> authOtpKafkaTemplate(
             @Value("${spring.kafka.bootstrap-servers:localhost:9092}") String bootstrapServers) {
         Map<String, Object> properties = new HashMap<>();

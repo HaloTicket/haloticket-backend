@@ -13,6 +13,7 @@ import com.haloticket.notification_service.enums.NotificationTemplateStatus;
 import com.haloticket.notification_service.repository.NotificationRepository;
 import com.haloticket.notification_service.repository.NotificationTemplateRepository;
 import com.haloticket.notification_service.service.NotificationService;
+import com.haloticket.notification_service.event.NotificationEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -89,6 +90,29 @@ public class NotificationServiceImpl implements NotificationService {
         return toNotificationResponse(notificationRepository.save(notification));
     }
 
+    @Override
+    public NotificationResponse processEvent(NotificationEvent event) {
+        return notificationRepository.findByEventId(event.eventId())
+                .map(this::toNotificationResponse)
+                .orElseGet(() -> {
+                    NotificationTemplate template = notificationTemplateRepository.findById(event.templateId())
+                            .orElseThrow(() -> new IllegalArgumentException("Notification template not found: " + event.templateId()));
+                    if (template.getStatus() != NotificationTemplateStatus.ACTIVE) {
+                        throw new IllegalStateException("Notification template must be active");
+                    }
+                    Notification notification = Notification.builder()
+                            .eventId(event.eventId())
+                            .template(template)
+                            .userId(event.userId() == null ? "system" : event.userId())
+                            .recipientEmail(event.recipientEmail())
+                            .variablesJson(toVariablesJson(event.variables()))
+                            .channel(event.channel())
+                            .status(NotificationStatus.PENDING)
+                            .build();
+                    return toNotificationResponse(notificationRepository.save(notification));
+                });
+    }
+
     private Notification findNotification(String id) {
         return notificationRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Notification not found: " + id));
@@ -121,8 +145,10 @@ public class NotificationServiceImpl implements NotificationService {
     private NotificationResponse toNotificationResponse(Notification notification) {
         return NotificationResponse.builder()
                 .id(notification.getId())
+                .eventId(notification.getEventId())
                 .templateId(notification.getTemplate() == null ? null : notification.getTemplate().getId())
                 .userId(notification.getUserId())
+                .recipientEmail(notification.getRecipientEmail())
                 .variablesJson(notification.getVariablesJson())
                 .channel(notification.getChannel())
                 .status(notification.getStatus())

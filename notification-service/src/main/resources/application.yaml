@@ -48,4 +48,6 @@ notification:
     from: ${SMTP_FROM:no-reply@haloticket.local}
   kafka:
     auth-otp-topic: ${AUTH_OTP_KAFKA_TOPIC:haloticket.auth.otp.v1}
-    auth-otp-group: ${NOTIFICATION_KAFKA_GROUP:notification-auth-otp}
+    auth-otp-group: ${AUTH_OTP_KAFKA_GROUP:notification-auth-otp}
+    topic: ${NOTIFICATION_KAFKA_TOPIC:haloticket.notifications.v1}
+    group: ${NOTIFICATION_KAFKA_GROUP:notification-service}
