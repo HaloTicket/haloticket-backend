@@ -12,11 +12,7 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.UUID;
 
@@ -35,11 +31,6 @@ public class S3StorageService {
 
     @Value("${aws.s3.endpoint:}")
     private String endpoint;
-
-    @Value("${aws.s3.access-key-id:dummy-access-key}")
-    private String accessKey;
-
-    private static final String LOCAL_UPLOAD_DIR = "uploads";
 
     public FileUploadResponse uploadImage(MultipartFile file, String folder) {
         if (file == null || file.isEmpty()) {
@@ -61,45 +52,39 @@ public class S3StorageService {
         String fileName = UUID.randomUUID() + extension;
         String key = folderPrefix + "/" + fileName;
 
-        byte[] bytes;
-        try {
-            bytes = file.getBytes();
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to read upload file bytes", e);
+        String actualBucket = System.getProperty("AWS_S3_BUCKET", bucketName);
+
+        try (InputStream inputStream = file.getInputStream()) {
+            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                    .bucket(actualBucket)
+                    .key(key)
+                    .contentType(contentType)
+                    .build();
+
+            s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(inputStream, file.getSize()));
+
+            String fileUrl = buildPublicUrl(actualBucket, key);
+            log.info("Successfully uploaded file to AWS S3: {}", fileUrl);
+
+            return FileUploadResponse.builder()
+                    .imageUrl(fileUrl)
+                    .fileName(key)
+                    .fileSize(file.getSize())
+                    .contentType(contentType)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Failed to upload image file to AWS S3 (Bucket: {}): {}", actualBucket, e.getMessage(), e);
+            throw new RuntimeException("AWS S3 Upload Error (" + actualBucket + "): " + e.getMessage(), e);
         }
-
-        if (isS3Configured()) {
-            try (InputStream inputStream = file.getInputStream()) {
-                PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                        .bucket(bucketName)
-                        .key(key)
-                        .contentType(contentType)
-                        .build();
-
-                s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(inputStream, file.getSize()));
-
-                String fileUrl = buildPublicUrl(key);
-                log.info("Successfully uploaded file to S3: {}", fileUrl);
-
-                return FileUploadResponse.builder()
-                        .imageUrl(fileUrl)
-                        .fileName(key)
-                        .fileSize(file.getSize())
-                        .contentType(contentType)
-                        .build();
-
-            } catch (Exception e) {
-                log.warn("S3 upload failed ({}), falling back to local disk storage", e.getMessage());
-            }
-        }
-
-        return saveLocally(bytes, folderPrefix, fileName, file.getSize(), contentType);
     }
 
     public FileUploadResponse uploadBase64Image(String base64Data, String folder) {
         if (base64Data == null || !base64Data.startsWith("data:image/")) {
             throw new IllegalArgumentException("Invalid Base64 image data");
         }
+
+        String actualBucket = System.getProperty("AWS_S3_BUCKET", bucketName);
 
         try {
             String[] parts = base64Data.split(",");
@@ -117,96 +102,55 @@ public class S3StorageService {
             String fileName = UUID.randomUUID() + extension;
             String key = folderPrefix + "/" + fileName;
 
-            if (isS3Configured()) {
-                try {
-                    PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                            .bucket(bucketName)
-                            .key(key)
-                            .contentType(contentType)
-                            .build();
+            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                    .bucket(actualBucket)
+                    .key(key)
+                    .contentType(contentType)
+                    .build();
 
-                    s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(new ByteArrayInputStream(imageBytes), imageBytes.length));
+            s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(new ByteArrayInputStream(imageBytes), imageBytes.length));
 
-                    String fileUrl = buildPublicUrl(key);
-                    log.info("Successfully uploaded Base64 image to S3: {}", fileUrl);
+            String fileUrl = buildPublicUrl(actualBucket, key);
+            log.info("Successfully uploaded Base64 image to AWS S3: {}", fileUrl);
 
-                    return FileUploadResponse.builder()
-                            .imageUrl(fileUrl)
-                            .fileName(key)
-                            .fileSize((long) imageBytes.length)
-                            .contentType(contentType)
-                            .build();
-                } catch (Exception e) {
-                    log.warn("S3 upload failed ({}), falling back to local disk storage", e.getMessage());
-                }
-            }
+            return FileUploadResponse.builder()
+                    .imageUrl(fileUrl)
+                    .fileName(key)
+                    .fileSize((long) imageBytes.length)
+                    .contentType(contentType)
+                    .build();
 
-            return saveLocally(imageBytes, folderPrefix, fileName, (long) imageBytes.length, contentType);
         } catch (Exception e) {
-            log.error("Failed to process Base64 image: {}", e.getMessage());
-            throw new RuntimeException("Could not upload Base64 image: " + e.getMessage(), e);
+            log.error("Failed to upload Base64 image to AWS S3 (Bucket: {}): {}", actualBucket, e.getMessage(), e);
+            throw new RuntimeException("AWS S3 Base64 Upload Error (" + actualBucket + "): " + e.getMessage(), e);
         }
     }
 
     public void deleteFile(String fileKey) {
         if (fileKey == null || fileKey.trim().isEmpty()) return;
 
-        if (isS3Configured()) {
-            try {
-                DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
-                        .bucket(bucketName)
-                        .key(fileKey)
-                        .build();
-
-                s3Client.deleteObject(deleteObjectRequest);
-                log.info("Deleted file from S3: {}", fileKey);
-                return;
-            } catch (Exception e) {
-                log.warn("Failed to delete S3 file ({}): {}", fileKey, e.getMessage());
-            }
-        }
+        String actualBucket = System.getProperty("AWS_S3_BUCKET", bucketName);
 
         try {
-            Path filePath = Paths.get(LOCAL_UPLOAD_DIR, fileKey);
-            Files.deleteIfExists(filePath);
-            log.info("Deleted local file: {}", fileKey);
-        } catch (IOException e) {
-            log.warn("Failed to delete local file ({}): {}", fileKey, e.getMessage());
-        }
-    }
-
-    private FileUploadResponse saveLocally(byte[] bytes, String folder, String fileName, long fileSize, String contentType) {
-        try {
-            Path targetDir = Paths.get(LOCAL_UPLOAD_DIR, folder);
-            Files.createDirectories(targetDir);
-            Path filePath = targetDir.resolve(fileName);
-            Files.write(filePath, bytes);
-
-            String localUrl = "http://localhost:8888/api/media/files/" + folder + "/" + fileName;
-            log.info("Successfully saved file locally: {}", localUrl);
-
-            return FileUploadResponse.builder()
-                    .imageUrl(localUrl)
-                    .fileName(folder + "/" + fileName)
-                    .fileSize(fileSize)
-                    .contentType(contentType)
+            DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+                    .bucket(actualBucket)
+                    .key(fileKey)
                     .build();
-        } catch (IOException e) {
-            log.error("Failed to save file locally: {}", e.getMessage());
-            throw new RuntimeException("Failed to save file locally: " + e.getMessage(), e);
+
+            s3Client.deleteObject(deleteObjectRequest);
+            log.info("Deleted file from AWS S3: {}", fileKey);
+        } catch (Exception e) {
+            log.error("Failed to delete AWS S3 file ({}): {}", fileKey, e.getMessage());
+            throw new RuntimeException("AWS S3 Delete Error: " + e.getMessage(), e);
         }
     }
 
-    private boolean isS3Configured() {
-        return accessKey != null && !accessKey.trim().isEmpty() && !"dummy-access-key".equalsIgnoreCase(accessKey);
-    }
-
-    private String buildPublicUrl(String key) {
+    private String buildPublicUrl(String bucket, String key) {
+        String actualRegion = System.getProperty("AWS_REGION", region);
         if (endpoint != null && !endpoint.trim().isEmpty()) {
             String cleanEndpoint = endpoint.endsWith("/") ? endpoint.substring(0, endpoint.length() - 1) : endpoint;
-            return cleanEndpoint + "/" + bucketName + "/" + key;
+            return cleanEndpoint + "/" + bucket + "/" + key;
         }
-        return String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, key);
+        return String.format("https://%s.s3.%s.amazonaws.com/%s", bucket, actualRegion, key);
     }
 }
-
