@@ -76,6 +76,11 @@ public class UserServiceImpl implements UserService {
                     .status(UserStatus.ACTIVE)
                     .build();
         });
+        Optional<User> emailOwner = userRepository.findByEmail(email);
+        if (emailOwner.isPresent() && !keycloakId.equals(emailOwner.get().getKeycloakId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Email already belongs to another identity");
+        }
         user.setEmail(email);
         user.setFullName(resolveName(jwt));
         user.setRoles(jwtRoleConverter.toApplicationRoles(jwt));
