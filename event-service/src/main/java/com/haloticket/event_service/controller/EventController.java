@@ -3,6 +3,7 @@ package com.haloticket.event_service.controller;
 import com.haloticket.event_service.dto.request.EventCreateRequest;
 import com.haloticket.event_service.dto.response.EventCategoryResponse;
 import com.haloticket.event_service.dto.response.EventResponse;
+import com.haloticket.event_service.dto.response.OrganizerDto;
 import com.haloticket.event_service.service.EventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,15 @@ public class EventController {
     @PostMapping
     public ResponseEntity<EventResponse> createEvent(@RequestBody EventCreateRequest request) {
         return new ResponseEntity<>(eventService.createEvent(request), HttpStatus.CREATED);
+    }
+
+    @GetMapping("/organizer-profile")
+    public ResponseEntity<OrganizerDto> getOrganizerProfile(@RequestParam(required = false) String userId) {
+        OrganizerDto dto = eventService.getOrganizerProfile(userId);
+        if (dto == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(dto);
     }
 
     @GetMapping

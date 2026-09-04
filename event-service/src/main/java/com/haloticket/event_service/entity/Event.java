@@ -31,8 +31,15 @@ public class Event {
     @Column(name = "thumbnail_url")
     private String thumbnailUrl;
 
+    @Column(name = "location_type")
+    private String locationType;
+
     @Column(name = "location_name")
     private String locationName;
+
+    private String city;
+
+    private String ward;
 
     private String address;
 
@@ -80,7 +87,7 @@ public class Event {
     private LocalDateTime saleEndTime;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "category_id", nullable = false)
+    @JoinColumn(name = "category_id")
     private EventCategory category;
 
     @ManyToMany
@@ -93,6 +100,12 @@ public class Event {
 
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<StaffAssignment> staffAssignments;
+
+    @Column(name = "is_private")
+    private Boolean isPrivate;
+
+    @Column(name = "confirmation_message", columnDefinition = "TEXT")
+    private String confirmationMessage;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

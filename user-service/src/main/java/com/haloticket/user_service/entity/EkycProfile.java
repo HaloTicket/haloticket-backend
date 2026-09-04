@@ -50,6 +50,21 @@ public class EkycProfile {
     @Column(name = "bank_account_number")
     private String bankAccountNumber;
 
+    @Column(name = "bank_branch")
+    private String bankBranch;
+
+    @Column(name = "business_type")
+    private String businessType;
+
+    @Column(name = "tax_name")
+    private String taxName;
+
+    @Column(name = "tax_code")
+    private String taxCode;
+
+    @Column(name = "tax_address")
+    private String taxAddress;
+
     @Enumerated(EnumType.STRING)
     private EkycVerificationStatus status;
 

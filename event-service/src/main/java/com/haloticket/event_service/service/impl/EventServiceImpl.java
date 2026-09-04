@@ -8,7 +8,10 @@ import com.haloticket.event_service.entity.Event;
 import com.haloticket.event_service.entity.EventCategory;
 import com.haloticket.event_service.entity.EventOrganizer;
 import com.haloticket.event_service.entity.SearchLog;
+import com.haloticket.event_service.enums.EventApprovalStatus;
+import com.haloticket.event_service.enums.EventStatus;
 import com.haloticket.event_service.repository.EventCategoryRepository;
+import com.haloticket.event_service.repository.EventOrganizerRepository;
 import com.haloticket.event_service.repository.EventRepository;
 import com.haloticket.event_service.repository.SearchLogRepository;
 import com.haloticket.event_service.service.EventService;
@@ -17,6 +20,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,11 +31,74 @@ public class EventServiceImpl implements EventService {
 
     private final EventRepository eventRepository;
     private final EventCategoryRepository eventCategoryRepository;
+    private final EventOrganizerRepository eventOrganizerRepository;
     private final SearchLogRepository searchLogRepository;
 
     @Override
     public EventResponse createEvent(EventCreateRequest request) {
-        return null;
+        if (request == null) return null;
+
+        // Create or update Organizer profile
+        List<EventOrganizer> organizers = new ArrayList<>();
+        if (request.getOrganizerName() != null && !request.getOrganizerName().trim().isEmpty()) {
+            EventOrganizer organizer = eventOrganizerRepository
+                    .findByName(request.getOrganizerName())
+                    .orElseGet(() -> EventOrganizer.builder()
+                            .userId("user_default_id")
+                            .name(request.getOrganizerName())
+                            .description(request.getOrganizerInfo())
+                            .avatarUrl(request.getOrganizerLogo())
+                            .build());
+
+            organizer.setName(request.getOrganizerName());
+            if (request.getOrganizerInfo() != null) organizer.setDescription(request.getOrganizerInfo());
+            if (request.getOrganizerLogo() != null) organizer.setAvatarUrl(request.getOrganizerLogo());
+
+            organizer = eventOrganizerRepository.save(organizer);
+            organizers.add(organizer);
+        }
+
+        // Find category
+        EventCategory category = null;
+        if (request.getCategoryId() != null) {
+            category = eventCategoryRepository.findById(request.getCategoryId()).orElse(null);
+        }
+
+        Event newEvent = Event.builder()
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .locationType(request.getLocationType())
+                .locationName(request.getLocationName())
+                .city(request.getCity())
+                .ward(request.getWard())
+                .address(request.getAddress())
+                .thumbnailUrl(request.getThumbnailUrl())
+                .bannerUrl(request.getBannerUrl())
+                .startTime(request.getStartTime() != null ? request.getStartTime() : LocalDateTime.now().plusDays(30))
+                .endTime(request.getEndTime() != null ? request.getEndTime() : LocalDateTime.now().plusDays(30).plusHours(4))
+                .isPrivate(request.getIsPrivate())
+                .confirmationMessage(request.getConfirmationMessage())
+                .eventStatus(EventStatus.PENDING)
+                .eventApprovalStatus(EventApprovalStatus.PENDING)
+                .category(category)
+                .organizers(organizers)
+                .build();
+
+        Event saved = eventRepository.save(newEvent);
+        return mapToEventResponse(saved);
+    }
+
+    @Override
+    public OrganizerDto getOrganizerProfile(String userId) {
+        String uid = (userId != null && !userId.isEmpty()) ? userId : "user_default_id";
+        return eventOrganizerRepository.findFirstByUserIdOrderByCreatedAtDesc(uid)
+                .map(org -> OrganizerDto.builder()
+                        .id(org.getId())
+                        .name(org.getName())
+                        .avatar(org.getAvatarUrl())
+                        .description(org.getDescription())
+                        .build())
+                .orElse(null);
     }
 
     @Override

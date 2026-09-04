@@ -29,7 +29,7 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (bookingRepository.existsById("booking-001")) {
+        if (bookingRepository.count() > 0) {
             log.info("Booking database already populated. Skipping initialization.");
             return;
         }
@@ -38,7 +38,6 @@ public class DataInitializer implements CommandLineRunner {
 
         // 1. Confirmed Booking
         Booking confirmedBooking = Booking.builder()
-                .id("booking-001")
                 .bookingCode("HT-20260829-001")
                 .customerId("44444444-4444-4444-4444-444444444444") // Customer User
                 .eventId("event-001")
@@ -52,7 +51,6 @@ public class DataInitializer implements CommandLineRunner {
         entityManager.persist(confirmedBooking);
 
         BookingItem item1 = BookingItem.builder()
-                .id("bitem-001")
                 .booking(confirmedBooking)
                 .ticketTypeId("tt-001")
                 .quantity(2)
@@ -62,7 +60,6 @@ public class DataInitializer implements CommandLineRunner {
         entityManager.persist(item1);
 
         SeatReservation res1 = SeatReservation.builder()
-                .id("res-001")
                 .booking(confirmedBooking)
                 .seatId("seat-a1")
                 .status(SeatReservationStatus.CONFIRMED)
@@ -71,7 +68,6 @@ public class DataInitializer implements CommandLineRunner {
         entityManager.persist(res1);
 
         SeatReservation res2 = SeatReservation.builder()
-                .id("res-002")
                 .booking(confirmedBooking)
                 .seatId("seat-a2")
                 .status(SeatReservationStatus.CONFIRMED)
@@ -81,7 +77,6 @@ public class DataInitializer implements CommandLineRunner {
 
         // 2. Pending Booking
         Booking pendingBooking = Booking.builder()
-                .id("booking-002")
                 .bookingCode("HT-20260829-002")
                 .customerId("44444444-4444-4444-4444-444444444444")
                 .eventId("event-001")
@@ -94,7 +89,6 @@ public class DataInitializer implements CommandLineRunner {
         entityManager.persist(pendingBooking);
 
         BookingItem item2 = BookingItem.builder()
-                .id("bitem-002")
                 .booking(pendingBooking)
                 .ticketTypeId("tt-002")
                 .quantity(1)
@@ -104,7 +98,6 @@ public class DataInitializer implements CommandLineRunner {
         entityManager.persist(item2);
 
         SeatReservation res3 = SeatReservation.builder()
-                .id("res-003")
                 .booking(pendingBooking)
                 .seatId("seat-c1")
                 .status(SeatReservationStatus.HOLDING)

@@ -24,7 +24,7 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (notificationTemplateRepository.existsById("ntpl-ticket-confirmation-email")) {
+        if (notificationTemplateRepository.count() > 0) {
             log.info("Notification database already populated. Skipping initialization.");
             return;
         }
@@ -39,7 +39,7 @@ public class DataInitializer implements CommandLineRunner {
                 .bodyTemplate("Hi {{fullName}}, your booking {{bookingCode}} has been confirmed.")
                 .status(NotificationTemplateStatus.ACTIVE)
                 .build();
-        entityManager.persist(ticketConfirmation);
+        entityManager.merge(ticketConfirmation);
 
         NotificationTemplate eventReminder = NotificationTemplate.builder()
                 .id("ntpl-event-reminder-push")
@@ -49,7 +49,7 @@ public class DataInitializer implements CommandLineRunner {
                 .bodyTemplate("Your event {{eventTitle}} starts at {{startTime}}.")
                 .status(NotificationTemplateStatus.ACTIVE)
                 .build();
-        entityManager.persist(eventReminder);
+        entityManager.merge(eventReminder);
 
         NotificationTemplate ekycResult = NotificationTemplate.builder()
                 .id("ntpl-ekyc-result-email")
@@ -59,7 +59,7 @@ public class DataInitializer implements CommandLineRunner {
                 .bodyTemplate("Your eKYC verification status is {{status}}.")
                 .status(NotificationTemplateStatus.ACTIVE)
                 .build();
-        entityManager.persist(ekycResult);
+        entityManager.merge(ekycResult);
 
         log.info("Notification Service sample data initialized successfully! Created notification templates.");
     }

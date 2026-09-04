@@ -26,7 +26,7 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (ticketTypeRepository.existsById("tt-001")) {
+        if (ticketTypeRepository.count() > 0) {
             log.info("Ticket database already populated. Skipping initialization.");
             return;
         }
@@ -42,7 +42,7 @@ public class DataInitializer implements CommandLineRunner {
                 .totalQuantity(100)
                 .ticketTypeStatus(TicketTypeStatus.ACTIVE)
                 .build();
-        entityManager.persist(vipType);
+        entityManager.merge(vipType);
 
         TicketType stdType = TicketType.builder()
                 .id("tt-002")
@@ -52,7 +52,7 @@ public class DataInitializer implements CommandLineRunner {
                 .totalQuantity(200)
                 .ticketTypeStatus(TicketTypeStatus.ACTIVE)
                 .build();
-        entityManager.persist(stdType);
+        entityManager.merge(stdType);
 
         TicketType ecoType = TicketType.builder()
                 .id("tt-003")
@@ -62,7 +62,7 @@ public class DataInitializer implements CommandLineRunner {
                 .totalQuantity(300)
                 .ticketTypeStatus(TicketTypeStatus.ACTIVE)
                 .build();
-        entityManager.persist(ecoType);
+        entityManager.merge(ecoType);
 
         // Ticket Types for Event 002 (Sports)
         TicketType marathonType = TicketType.builder()
@@ -73,7 +73,7 @@ public class DataInitializer implements CommandLineRunner {
                 .totalQuantity(500)
                 .ticketTypeStatus(TicketTypeStatus.ACTIVE)
                 .build();
-        entityManager.persist(marathonType);
+        entityManager.merge(marathonType);
 
         // 2. Seat Layout
         SeatLayout layout = SeatLayout.builder()
@@ -82,7 +82,7 @@ public class DataInitializer implements CommandLineRunner {
                 .svgData("<svg viewBox='0 0 800 600'><rect width='800' height='100' fill='#333'/><text x='350' y='60' fill='#fff'>SÂN SÂN KHẤU CHÍNH</text></svg>")
                 .status(SeatLayoutStatus.PUBLISHED)
                 .build();
-        entityManager.persist(layout);
+        entityManager.merge(layout);
 
         // 3. Seat Zones
         SeatZone vipZone = SeatZone.builder()
@@ -92,7 +92,7 @@ public class DataInitializer implements CommandLineRunner {
                 .colorCode("#FFD700")
                 .capacity(20)
                 .build();
-        entityManager.persist(vipZone);
+        entityManager.merge(vipZone);
 
         SeatZone stdZone = SeatZone.builder()
                 .id("zone-std")
@@ -101,7 +101,7 @@ public class DataInitializer implements CommandLineRunner {
                 .colorCode("#1E90FF")
                 .capacity(40)
                 .build();
-        entityManager.persist(stdZone);
+        entityManager.merge(stdZone);
 
         // 4. Seat Rows
         SeatRow rowA = SeatRow.builder()
@@ -109,21 +109,21 @@ public class DataInitializer implements CommandLineRunner {
                 .seatZone(vipZone)
                 .label("Hàng A")
                 .build();
-        entityManager.persist(rowA);
+        entityManager.merge(rowA);
 
         SeatRow rowB = SeatRow.builder()
                 .id("row-b")
                 .seatZone(vipZone)
                 .label("Hàng B")
                 .build();
-        entityManager.persist(rowB);
+        entityManager.merge(rowB);
 
         SeatRow rowC = SeatRow.builder()
                 .id("row-c")
                 .seatZone(stdZone)
                 .label("Hàng C")
                 .build();
-        entityManager.persist(rowC);
+        entityManager.merge(rowC);
 
         // 5. Seats
         Seat seatA1 = Seat.builder()
@@ -135,7 +135,7 @@ public class DataInitializer implements CommandLineRunner {
                 .seatType(SeatType.VIP)
                 .seatStatus(SeatStatus.SOLD)
                 .build();
-        entityManager.persist(seatA1);
+        entityManager.merge(seatA1);
 
         Seat seatA2 = Seat.builder()
                 .id("seat-a2")
@@ -146,7 +146,7 @@ public class DataInitializer implements CommandLineRunner {
                 .seatType(SeatType.VIP)
                 .seatStatus(SeatStatus.SOLD)
                 .build();
-        entityManager.persist(seatA2);
+        entityManager.merge(seatA2);
 
         Seat seatA3 = Seat.builder()
                 .id("seat-a3")
@@ -157,7 +157,7 @@ public class DataInitializer implements CommandLineRunner {
                 .seatType(SeatType.VIP)
                 .seatStatus(SeatStatus.AVAILABLE)
                 .build();
-        entityManager.persist(seatA3);
+        entityManager.merge(seatA3);
 
         Seat seatC1 = Seat.builder()
                 .id("seat-c1")
@@ -168,7 +168,7 @@ public class DataInitializer implements CommandLineRunner {
                 .seatType(SeatType.REGULAR)
                 .seatStatus(SeatStatus.AVAILABLE)
                 .build();
-        entityManager.persist(seatC1);
+        entityManager.merge(seatC1);
 
         // 6. Tickets (Issued for Customer User)
         Ticket ticket1 = Ticket.builder()
@@ -183,7 +183,7 @@ public class DataInitializer implements CommandLineRunner {
                 .status(TicketStatus.VALID)
                 .issuedAt(LocalDateTime.now().minusDays(2))
                 .build();
-        entityManager.persist(ticket1);
+        entityManager.merge(ticket1);
 
         Ticket ticket2 = Ticket.builder()
                 .id("ticket-002")
@@ -198,7 +198,7 @@ public class DataInitializer implements CommandLineRunner {
                 .issuedAt(LocalDateTime.now().minusDays(2))
                 .usedAt(LocalDateTime.now().minusHours(1))
                 .build();
-        entityManager.persist(ticket2);
+        entityManager.merge(ticket2);
 
         // 7. Checkins & CheckInAttempt
         Checkin checkin = Checkin.builder()
@@ -209,7 +209,7 @@ public class DataInitializer implements CommandLineRunner {
                 .status(CheckInStatus.VALID)
                 .checkedInAt(LocalDateTime.now().minusHours(1))
                 .build();
-        entityManager.persist(checkin);
+        entityManager.merge(checkin);
 
         CheckInAttempt attempt = CheckInAttempt.builder()
                 .id("attempt-001")
@@ -219,7 +219,7 @@ public class DataInitializer implements CommandLineRunner {
                 .result(CheckInAttemptResult.SUCCESS)
                 .attemptedAt(LocalDateTime.now().minusHours(1))
                 .build();
-        entityManager.persist(attempt);
+        entityManager.merge(attempt);
 
         log.info("Ticket Service sample data initialized successfully! Created ticket types, seat layout, zones, rows, seats, tickets, and check-in history.");
     }

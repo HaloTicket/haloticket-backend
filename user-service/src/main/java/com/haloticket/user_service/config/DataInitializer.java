@@ -32,7 +32,7 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (userRepository.existsById("11111111-1111-1111-1111-111111111111")) {
+        if (userRepository.count() > 0) {
             log.info("User database already populated. Skipping initialization.");
             return;
         }
@@ -52,7 +52,7 @@ public class DataInitializer implements CommandLineRunner {
                 .status(UserStatus.ACTIVE)
                 .roles(Set.of(Role.ADMIN))
                 .build();
-        entityManager.persist(admin);
+        entityManager.merge(admin);
 
         // 2. Organizer User
         User organizer = User.builder()
@@ -83,7 +83,7 @@ public class DataInitializer implements CommandLineRunner {
                 .build();
 
         organizer.setEkycProfile(orgEkyc);
-        entityManager.persist(organizer);
+        entityManager.merge(organizer);
 
         // 3. Staff User
         User staff = User.builder()
@@ -98,7 +98,7 @@ public class DataInitializer implements CommandLineRunner {
                 .status(UserStatus.ACTIVE)
                 .roles(Set.of(Role.STAFF))
                 .build();
-        entityManager.persist(staff);
+        entityManager.merge(staff);
 
         // 4. Customer User
         User customer = User.builder()
@@ -129,7 +129,7 @@ public class DataInitializer implements CommandLineRunner {
                 .build();
 
         customer.setEkycProfile(customerEkyc);
-        entityManager.persist(customer);
+        entityManager.merge(customer);
 
         log.info("User Service sample data initialized successfully! Created 4 users.");
     }

@@ -28,7 +28,7 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (paymentRepository.existsById("payment-001")) {
+        if (paymentRepository.count() > 0) {
             log.info("Payment database already populated. Skipping initialization.");
             return;
         }
@@ -37,7 +37,6 @@ public class DataInitializer implements CommandLineRunner {
 
         // 1. Successful VNPay Payment
         Payment payment1 = Payment.builder()
-                .id("payment-001")
                 .bookingId("booking-001")
                 .amount(2800000.0)
                 .method(PaymentMethod.VNPAY)
@@ -47,7 +46,6 @@ public class DataInitializer implements CommandLineRunner {
         entityManager.persist(payment1);
 
         PaymentTransaction tx1 = PaymentTransaction.builder()
-                .id("tx-001")
                 .payment(payment1)
                 .gatewayRefId("VNPAY_REF_20260829001")
                 .payloadJson("{\"vnp_ResponseCode\":\"00\",\"vnp_TransactionNo\":\"14589230\",\"vnp_BankCode\":\"NCB\"}")
@@ -57,7 +55,6 @@ public class DataInitializer implements CommandLineRunner {
 
         // 2. Pending Payment
         Payment payment2 = Payment.builder()
-                .id("payment-002")
                 .bookingId("booking-002")
                 .amount(800000.0)
                 .method(PaymentMethod.ZALOPAY)

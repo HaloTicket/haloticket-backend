@@ -3,6 +3,7 @@ package com.haloticket.event_service.service;
 import com.haloticket.event_service.dto.request.EventCreateRequest;
 import com.haloticket.event_service.dto.response.EventCategoryResponse;
 import com.haloticket.event_service.dto.response.EventResponse;
+import com.haloticket.event_service.dto.response.OrganizerDto;
 
 import java.util.List;
 
@@ -13,4 +14,5 @@ public interface EventService {
     List<EventCategoryResponse> getAllCategories();
     List<String> getTopSearchedKeywords(int limit);
     void logSearchQuery(String query);
+    OrganizerDto getOrganizerProfile(String userId);
 }
