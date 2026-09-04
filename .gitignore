@@ -58,3 +58,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+.superpowers/**
+.docs/**
+.m2/**

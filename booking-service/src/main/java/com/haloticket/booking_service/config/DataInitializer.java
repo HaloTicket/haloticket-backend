@@ -1,10 +1,5 @@
 package com.haloticket.booking_service.config;
 
-import com.haloticket.booking_service.entity.Booking;
-import com.haloticket.booking_service.entity.BookingItem;
-import com.haloticket.booking_service.entity.SeatReservation;
-import com.haloticket.booking_service.enums.BookingStatus;
-import com.haloticket.booking_service.enums.SeatReservationStatus;
 import com.haloticket.booking_service.repository.BookingRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -13,8 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 
 @Component
 @RequiredArgsConstructor
@@ -36,81 +29,34 @@ public class DataInitializer implements CommandLineRunner {
 
         log.info("Initializing sample data for Booking Service...");
 
-        // 1. Confirmed Booking
-        Booking confirmedBooking = Booking.builder()
-                .id("booking-001")
-                .bookingCode("HT-20260829-001")
-                .customerId("44444444-4444-4444-4444-444444444444") // Customer User
-                .eventId("event-001")
-                .voucherId("voucher-01")
-                .subtotal(3000000.0)
-                .discountAmount(200000.0)
-                .totalAmount(2800000.0)
-                .status(BookingStatus.PAID)
-                .expiredAt(LocalDateTime.now().plusDays(30))
-                .build();
-        entityManager.persist(confirmedBooking);
+        // Use native SQL to bypass Hibernate @GeneratedValue(UUID) lifecycle with manual IDs
+        entityManager.createNativeQuery("""
+                INSERT INTO bookings (id, booking_code, customer_id, event_id, voucher_id,
+                    subtotal, discount_amount, total_amount, status, expired_at, created_at, updated_at)
+                VALUES
+                    ('booking-001', 'HT-20260829-001', '44444444-4444-4444-4444-444444444444', 'event-001', 'voucher-01',
+                     3000000.0, 200000.0, 2800000.0, 'PAID', NOW() + INTERVAL '30 days', NOW(), NOW()),
+                    ('booking-002', 'HT-20260829-002', '44444444-4444-4444-4444-444444444444', 'event-001', NULL,
+                     800000.0, 0.0, 800000.0, 'PENDING', NOW() + INTERVAL '10 minutes', NOW(), NOW())
+                ON CONFLICT (id) DO NOTHING
+                """).executeUpdate();
 
-        BookingItem item1 = BookingItem.builder()
-                .id("bitem-001")
-                .booking(confirmedBooking)
-                .ticketTypeId("tt-001")
-                .quantity(2)
-                .unitPrice(1500000.0)
-                .subTotal(3000000.0)
-                .build();
-        entityManager.persist(item1);
+        entityManager.createNativeQuery("""
+                INSERT INTO booking_items (id, booking_id, ticket_type_id, quantity, unit_price, sub_total)
+                VALUES
+                    ('bitem-001', 'booking-001', 'tt-001', 2, 1500000.0, 3000000.0),
+                    ('bitem-002', 'booking-002', 'tt-002', 1, 800000.0, 800000.0)
+                ON CONFLICT (id) DO NOTHING
+                """).executeUpdate();
 
-        SeatReservation res1 = SeatReservation.builder()
-                .id("res-001")
-                .booking(confirmedBooking)
-                .seatId("seat-a1")
-                .status(SeatReservationStatus.CONFIRMED)
-                .lockExpiresAt(LocalDateTime.now().plusHours(1))
-                .build();
-        entityManager.persist(res1);
-
-        SeatReservation res2 = SeatReservation.builder()
-                .id("res-002")
-                .booking(confirmedBooking)
-                .seatId("seat-a2")
-                .status(SeatReservationStatus.CONFIRMED)
-                .lockExpiresAt(LocalDateTime.now().plusHours(1))
-                .build();
-        entityManager.persist(res2);
-
-        // 2. Pending Booking
-        Booking pendingBooking = Booking.builder()
-                .id("booking-002")
-                .bookingCode("HT-20260829-002")
-                .customerId("44444444-4444-4444-4444-444444444444")
-                .eventId("event-001")
-                .subtotal(800000.0)
-                .discountAmount(0.0)
-                .totalAmount(800000.0)
-                .status(BookingStatus.PENDING)
-                .expiredAt(LocalDateTime.now().plusMinutes(10))
-                .build();
-        entityManager.persist(pendingBooking);
-
-        BookingItem item2 = BookingItem.builder()
-                .id("bitem-002")
-                .booking(pendingBooking)
-                .ticketTypeId("tt-002")
-                .quantity(1)
-                .unitPrice(800000.0)
-                .subTotal(800000.0)
-                .build();
-        entityManager.persist(item2);
-
-        SeatReservation res3 = SeatReservation.builder()
-                .id("res-003")
-                .booking(pendingBooking)
-                .seatId("seat-c1")
-                .status(SeatReservationStatus.HOLDING)
-                .lockExpiresAt(LocalDateTime.now().plusMinutes(10))
-                .build();
-        entityManager.persist(res3);
+        entityManager.createNativeQuery("""
+                INSERT INTO seat_reservations (id, booking_id, seat_id, status, lock_expires_at)
+                VALUES
+                    ('res-001', 'booking-001', 'seat-a1', 'CONFIRMED', NOW() + INTERVAL '1 hour'),
+                    ('res-002', 'booking-001', 'seat-a2', 'CONFIRMED', NOW() + INTERVAL '1 hour'),
+                    ('res-003', 'booking-002', 'seat-c1', 'HOLDING',   NOW() + INTERVAL '10 minutes')
+                ON CONFLICT (id) DO NOTHING
+                """).executeUpdate();
 
         log.info("Booking Service sample data initialized successfully! Created confirmed and pending bookings with items and seat reservations.");
     }

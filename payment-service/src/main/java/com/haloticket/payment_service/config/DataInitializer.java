@@ -1,11 +1,5 @@
 package com.haloticket.payment_service.config;
 
-import com.haloticket.payment_service.entity.Payment;
-import com.haloticket.payment_service.entity.PaymentTransaction;
-import com.haloticket.payment_service.enums.PaymentMethod;
-import com.haloticket.payment_service.enums.PaymentProvider;
-import com.haloticket.payment_service.enums.PaymentStatus;
-import com.haloticket.payment_service.enums.TransactionStatus;
 import com.haloticket.payment_service.repository.PaymentRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -35,36 +29,23 @@ public class DataInitializer implements CommandLineRunner {
 
         log.info("Initializing sample data for Payment Service...");
 
-        // 1. Successful VNPay Payment
-        Payment payment1 = Payment.builder()
-                .id("payment-001")
-                .bookingId("booking-001")
-                .amount(2800000.0)
-                .method(PaymentMethod.VNPAY)
-                .provider(PaymentProvider.VNPAY_GATEWAY)
-                .status(PaymentStatus.SUCCESS)
-                .build();
-        entityManager.persist(payment1);
+        // Use native SQL to bypass Hibernate @GeneratedValue(UUID) lifecycle with manual IDs
+        entityManager.createNativeQuery("""
+                INSERT INTO payments (id, booking_id, amount, method, provider, status, created_at, updated_at)
+                VALUES
+                    ('payment-001', 'booking-001', 2800000.0, 'VNPAY',   'VNPAY_GATEWAY',   'SUCCESS', NOW(), NOW()),
+                    ('payment-002', 'booking-002', 800000.0,  'ZALOPAY', 'ZALOPAY_GATEWAY', 'PENDING', NOW(), NOW())
+                ON CONFLICT (id) DO NOTHING
+                """).executeUpdate();
 
-        PaymentTransaction tx1 = PaymentTransaction.builder()
-                .id("tx-001")
-                .payment(payment1)
-                .gatewayRefId("VNPAY_REF_20260829001")
-                .payloadJson("{\"vnp_ResponseCode\":\"00\",\"vnp_TransactionNo\":\"14589230\",\"vnp_BankCode\":\"NCB\"}")
-                .status(TransactionStatus.SUCCESS)
-                .build();
-        entityManager.persist(tx1);
-
-        // 2. Pending Payment
-        Payment payment2 = Payment.builder()
-                .id("payment-002")
-                .bookingId("booking-002")
-                .amount(800000.0)
-                .method(PaymentMethod.ZALOPAY)
-                .provider(PaymentProvider.ZALOPAY_GATEWAY)
-                .status(PaymentStatus.PENDING)
-                .build();
-        entityManager.persist(payment2);
+        entityManager.createNativeQuery("""
+                INSERT INTO payment_transactions (id, payment_id, gateway_ref_id, payload_json, status)
+                VALUES
+                    ('tx-001', 'payment-001', 'VNPAY_REF_20260829001',
+                     '{"vnp_ResponseCode":"00","vnp_TransactionNo":"14589230","vnp_BankCode":"NCB"}',
+                     'SUCCESS')
+                ON CONFLICT (id) DO NOTHING
+                """).executeUpdate();
 
         log.info("Payment Service sample data initialized successfully! Created payment records and payment transactions.");
     }
