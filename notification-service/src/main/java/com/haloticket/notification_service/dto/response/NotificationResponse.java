@@ -11,8 +11,10 @@ import java.time.LocalDateTime;
 @Builder
 public class NotificationResponse {
     private String id;
+    private String eventId;
     private String templateId;
     private String userId;
+    private String recipientEmail;
     private String variablesJson;
     private NotificationChannel channel;
     private NotificationStatus status;

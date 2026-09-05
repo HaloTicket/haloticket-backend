@@ -2,8 +2,31 @@ server:
   port: 8086
 
 spring:
+  config:
+    import: optional:file:.env[.properties],optional:file:../.env[.properties]
   application:
     name: notification-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${NOTIFICATION_KAFKA_GROUP:notification-auth-otp}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  mail:
+    host: ${SMTP_HOST:smtp.gmail.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${SMTP_STARTTLS:true}
+      mail.smtp.connectiontimeout: ${SMTP_CONNECTION_TIMEOUT:10000}
+      mail.smtp.timeout: ${SMTP_TIMEOUT:10000}
+      mail.smtp.writetimeout: ${SMTP_WRITE_TIMEOUT:10000}
   datasource:
     url: jdbc:postgresql://localhost:5433/notification_db
     username: ${POSTGRES_USER:haloticket}
@@ -24,3 +47,12 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
   instance:
     prefer-ip-address: true
+
+notification:
+  mail:
+    from: ${SMTP_FROM:no-reply@haloticket.local}
+  kafka:
+    auth-otp-topic: ${AUTH_OTP_KAFKA_TOPIC:haloticket.auth.otp.v1}
+    auth-otp-group: ${AUTH_OTP_KAFKA_GROUP:notification-auth-otp}
+    topic: ${NOTIFICATION_KAFKA_TOPIC:haloticket.notifications.v1}
+    group: ${NOTIFICATION_KAFKA_GROUP:notification-service}

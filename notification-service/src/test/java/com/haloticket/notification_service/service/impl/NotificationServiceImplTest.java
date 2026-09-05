@@ -26,6 +26,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import com.haloticket.notification_service.exception.NotificationException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -122,7 +123,7 @@ class NotificationServiceImplTest {
         when(notificationTemplateRepository.findById("template-1")).thenReturn(Optional.of(template));
 
         assertThatThrownBy(() -> notificationService.createNotification(request))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(NotificationException.class)
                 .hasMessageContaining("active");
     }
 

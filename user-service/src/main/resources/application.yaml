@@ -4,6 +4,16 @@ server:
 spring:
   application:
     name: user-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:9080/realms/haloticket-realm}
   datasource:
     url: jdbc:postgresql://localhost:5433/user_db
     username: ${POSTGRES_USER:haloticket}
@@ -24,3 +34,16 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
   instance:
     prefer-ip-address: true
+
+auth:
+  otp:
+    pepper: ${AUTH_OTP_PEPPER:haloticket-default-secret-pepper-2026}
+    delivery: kafka
+    kafka:
+      topic: ${AUTH_OTP_KAFKA_TOPIC:haloticket.auth.otp.v1}
+
+keycloak:
+  auth-server-url: ${KEYCLOAK_AUTH_SERVER_URL:http://localhost:9080}
+  realm: ${KEYCLOAK_REALM:haloticket-realm}
+  client-id: ${KEYCLOAK_CLIENT_ID:user-service}
+  client-secret: ${KEYCLOAK_CLIENT_SECRET:user-service-secret}

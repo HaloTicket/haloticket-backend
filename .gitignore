@@ -58,3 +58,9 @@ build/
 
 ### VS Code ###
 .vscode/
+
+.superpowers/**
+.docs/**
+/docs/**
+.m2/**
+.codex-temp/**

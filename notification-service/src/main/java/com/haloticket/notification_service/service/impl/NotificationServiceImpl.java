@@ -13,6 +13,9 @@ import com.haloticket.notification_service.enums.NotificationTemplateStatus;
 import com.haloticket.notification_service.repository.NotificationRepository;
 import com.haloticket.notification_service.repository.NotificationTemplateRepository;
 import com.haloticket.notification_service.service.NotificationService;
+import com.haloticket.notification_service.event.NotificationEvent;
+import com.haloticket.notification_service.exception.NotificationErrorCode;
+import com.haloticket.notification_service.exception.NotificationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -51,9 +54,11 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     public NotificationResponse createNotification(NotificationCreateRequest request) {
         NotificationTemplate template = notificationTemplateRepository.findById(request.getTemplateId())
-                .orElseThrow(() -> new IllegalArgumentException("Notification template not found: " + request.getTemplateId()));
+                .orElseThrow(() -> new NotificationException(NotificationErrorCode.TEMPLATE_NOT_FOUND,
+                        "Notification template not found", 404));
         if (template.getStatus() != NotificationTemplateStatus.ACTIVE) {
-            throw new IllegalStateException("Notification template must be active");
+            throw new NotificationException(NotificationErrorCode.TEMPLATE_INACTIVE,
+                    "Notification template must be active", 409);
         }
 
         Notification notification = Notification.builder()
@@ -89,9 +94,35 @@ public class NotificationServiceImpl implements NotificationService {
         return toNotificationResponse(notificationRepository.save(notification));
     }
 
+    @Override
+    public NotificationResponse processEvent(NotificationEvent event) {
+        return notificationRepository.findByEventId(event.eventId())
+                .map(this::toNotificationResponse)
+                .orElseGet(() -> {
+                    NotificationTemplate template = notificationTemplateRepository.findById(event.templateId())
+                            .orElseThrow(() -> new NotificationException(NotificationErrorCode.TEMPLATE_NOT_FOUND,
+                                    "Notification template not found", 404));
+                    if (template.getStatus() != NotificationTemplateStatus.ACTIVE) {
+                        throw new NotificationException(NotificationErrorCode.TEMPLATE_INACTIVE,
+                                "Notification template must be active", 409);
+                    }
+                    Notification notification = Notification.builder()
+                            .eventId(event.eventId())
+                            .template(template)
+                            .userId(event.userId() == null ? "system" : event.userId())
+                            .recipientEmail(event.recipientEmail())
+                            .variablesJson(toVariablesJson(event.variables()))
+                            .channel(event.channel())
+                            .status(NotificationStatus.PENDING)
+                            .build();
+                    return toNotificationResponse(notificationRepository.save(notification));
+                });
+    }
+
     private Notification findNotification(String id) {
         return notificationRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Notification not found: " + id));
+                .orElseThrow(() -> new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND,
+                        "Notification not found", 404));
     }
 
     private String toVariablesJson(Map<String, String> variables) {
@@ -101,7 +132,8 @@ public class NotificationServiceImpl implements NotificationService {
         try {
             return objectMapper.writeValueAsString(variables);
         } catch (JsonProcessingException exception) {
-            throw new IllegalArgumentException("Notification variables cannot be serialized", exception);
+            throw new NotificationException(NotificationErrorCode.VARIABLES_SERIALIZATION_FAILED,
+                    "Notification variables cannot be serialized", 500, exception);
         }
     }
 
@@ -121,8 +153,10 @@ public class NotificationServiceImpl implements NotificationService {
     private NotificationResponse toNotificationResponse(Notification notification) {
         return NotificationResponse.builder()
                 .id(notification.getId())
+                .eventId(notification.getEventId())
                 .templateId(notification.getTemplate() == null ? null : notification.getTemplate().getId())
                 .userId(notification.getUserId())
+                .recipientEmail(notification.getRecipientEmail())
                 .variablesJson(notification.getVariablesJson())
                 .channel(notification.getChannel())
                 .status(notification.getStatus())
