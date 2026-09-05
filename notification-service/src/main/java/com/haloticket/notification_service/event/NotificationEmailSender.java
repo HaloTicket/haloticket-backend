@@ -4,7 +4,6 @@ import com.haloticket.notification_service.entity.NotificationTemplate;
 import com.haloticket.notification_service.exception.NotificationErrorCode;
 import com.haloticket.notification_service.exception.NotificationException;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import com.haloticket.notification_service.enums.NotificationType;
 import jakarta.mail.MessagingException;
@@ -20,8 +19,8 @@ public class NotificationEmailSender {
     private final EmailTemplateRenderer renderer;
 
     public NotificationEmailSender(JavaMailSender mailSender,
-                                   @Value("${notification.mail.from:no-reply@haloticket.local}") String from,
-                                   EmailTemplateRenderer renderer) {
+            @Value("${notification.mail.from:no-reply@haloticket.local}") String from,
+            EmailTemplateRenderer renderer) {
         this.mailSender = mailSender;
         this.from = from;
         this.renderer = renderer;
@@ -41,7 +40,8 @@ public class NotificationEmailSender {
             helper.setText(renderer.render(fileFor(template.getType()), variables), true);
             mailSender.send(message);
         } catch (MessagingException | RuntimeException exception) {
-            if (exception instanceof NotificationException notificationException) throw notificationException;
+            if (exception instanceof NotificationException notificationException)
+                throw notificationException;
             throw new NotificationException(NotificationErrorCode.EMAIL_DELIVERY_FAILED,
                     "Email delivery failed", 503, exception);
         }
@@ -57,9 +57,10 @@ public class NotificationEmailSender {
 
     private String render(String template, Map<String, String> variables) {
         String rendered = template == null ? "" : template;
-        if (variables != null) for (Map.Entry<String, String> entry : variables.entrySet()) {
-            rendered = rendered.replace("{{" + entry.getKey() + "}}", entry.getValue());
-        }
+        if (variables != null)
+            for (Map.Entry<String, String> entry : variables.entrySet()) {
+                rendered = rendered.replace("{{" + entry.getKey() + "}}", entry.getValue());
+            }
         return rendered;
     }
 }

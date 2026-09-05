@@ -62,3 +62,4 @@ build/
 .superpowers/**
 .docs/**
 .m2/**
+.codex-temp/**

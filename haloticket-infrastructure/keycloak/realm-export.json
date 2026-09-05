@@ -3,6 +3,7 @@
   "realm": "haloticket-realm",
   "displayName": "HaloTicket Platform",
   "displayNameHtml": "<b>HaloTicket Platform</b>",
+  "loginTheme": "haloticket",
   "notBefore": 0,
   "defaultSignatureAlgorithm": "RS256",
   "revokeRefreshToken": false,
@@ -91,6 +92,27 @@
     "composite": true,
     "clientRole": false
   },
+  "identityProviders": [
+    {
+      "alias": "google",
+      "displayName": "Google",
+      "providerId": "google",
+      "enabled": true,
+      "trustEmail": true,
+      "storeToken": false,
+      "addReadTokenRoleOnCreate": false,
+      "authenticateByDefault": false,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "first broker login",
+      "config": {
+        "clientId": "${GOOGLE_OAUTH_CLIENT_ID}",
+        "clientSecret": "${GOOGLE_OAUTH_CLIENT_SECRET}",
+        "defaultScope": "openid profile email",
+        "prompt": "select_account",
+        "syncMode": "IMPORT"
+      }
+    }
+  ],
   "clients": [
     {
       "clientId": "user-service",

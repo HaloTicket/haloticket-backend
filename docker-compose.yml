@@ -95,9 +95,13 @@ services:
       KC_PROXY_HEADERS: ${KC_PROXY_HEADERS:-xforwarded}
       KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-}
       KC_HOSTNAME_STRICT: ${KEYCLOAK_HOSTNAME_STRICT:-false}
+      # Google IdP credentials are supplied at runtime and are never stored in the realm export.
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:?GOOGLE_OAUTH_CLIENT_ID must be set}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:?GOOGLE_OAUTH_CLIENT_SECRET must be set}
       JAVA_OPTS_APPEND: "-Xms256m -Xmx512m"
     volumes:
       - ./haloticket-infrastructure/keycloak/realm-export.json:/opt/keycloak/data/import/realm.json:ro
+      - ./haloticket-infrastructure/keycloak/themes:/opt/keycloak/themes:ro
     healthcheck:
       test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
       interval: 10s

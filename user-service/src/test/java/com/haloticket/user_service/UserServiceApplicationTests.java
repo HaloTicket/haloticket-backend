@@ -1,6 +1,6 @@
 package com.haloticket.user_service;
 
-import com.haloticket.user_service.auth.OtpHasher;
+import com.haloticket.user_service.service.OtpHasher;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

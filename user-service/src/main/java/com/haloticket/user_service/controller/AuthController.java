@@ -1,9 +1,9 @@
 package com.haloticket.user_service.controller;
 
-import com.haloticket.user_service.auth.service.AuthApplicationService;
-import com.haloticket.user_service.auth.service.AuthRequests;
-import com.haloticket.user_service.auth.service.AuthResponses;
-import com.haloticket.user_service.auth.service.AuthOtpChallengeService;
+import com.haloticket.user_service.service.AuthApplicationService;
+import com.haloticket.user_service.service.AuthRequests;
+import com.haloticket.user_service.service.AuthResponses;
+import com.haloticket.user_service.service.AuthOtpChallengeService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

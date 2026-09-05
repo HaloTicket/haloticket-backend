@@ -1,7 +1,7 @@
 package com.haloticket.user_service.controller;
 
-import com.haloticket.user_service.auth.service.AuthApplicationService;
-import com.haloticket.user_service.auth.service.AuthOtpChallengeService;
+import com.haloticket.user_service.service.AuthApplicationService;
+import com.haloticket.user_service.service.AuthOtpChallengeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -22,7 +22,7 @@ class AuthControllerTest {
 
     @BeforeEach
     void setUp() {
-        var challenge = com.haloticket.user_service.auth.domain.AuthOtpChallenge.builder().id("challenge-1")
+        var challenge = com.haloticket.user_service.entity.AuthOtpChallenge.builder().id("challenge-1")
                 .subject("user@example.com")
                 .expiresAt(java.time.Instant.parse("2026-09-04T10:05:00Z"))
                 .resendAvailableAt(java.time.Instant.parse("2026-09-04T10:01:00Z"))
@@ -37,7 +37,7 @@ class AuthControllerTest {
     @Test
     void registerStartReturnsChallengeMetadataWithoutOtp() throws Exception {
         when(authService.startRegistration(any())).thenReturn(new AuthOtpChallengeService.CreateResult(
-                com.haloticket.user_service.auth.domain.AuthOtpChallenge.builder().id("challenge-1")
+                com.haloticket.user_service.entity.AuthOtpChallenge.builder().id("challenge-1")
                         .expiresAt(java.time.Instant.parse("2026-09-04T10:05:00Z"))
                         .resendAvailableAt(java.time.Instant.parse("2026-09-04T10:01:00Z")).build(), "123456"));
 
@@ -64,7 +64,7 @@ class AuthControllerTest {
                         .content("{\"identifier\":\"0912345678\",\"idempotencyKey\":\"req-1\"}"))
                 .andExpect(status().isAccepted());
 
-        verify(authService).startPasswordReset(new com.haloticket.user_service.auth.service.AuthRequests.PasswordForgot(
+        verify(authService).startPasswordReset(new com.haloticket.user_service.service.AuthRequests.PasswordForgot(
                 "0912345678", "req-1", "anonymous"));
     }
 

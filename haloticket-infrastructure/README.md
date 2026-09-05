@@ -36,7 +36,6 @@ To optimize developer machine resources (RAM/CPU) and follow microservices opera
 | **Redis** | `haloticket-redis` | `redis:7-alpine` | `6379` | `6379` | High-performance cache & distributed locking (AOF enabled) |
 | **Apache Kafka** | `haloticket-kafka` | `apache/kafka:3.7.0` | `9092` | `9092` / `29092` | Event streaming broker (KRaft mode, ZooKeeper-less) |
 | **Keycloak IAM** | `haloticket-keycloak` | `quay.io/keycloak/keycloak:24.0.4` | `9080` | `8080` | OpenID Connect / OAuth2 Identity Provider (Quarkus engine) |
-| **Mailpit** | `haloticket-mailpit` | `axllent/mailpit:v1.21` | `8025` (UI), `1025` (SMTP) | `8025`, `1025` | Local-only SMTP sink for auth OTP testing |
 
 ### Observability Tools (`docker-observability.yml`)
 
@@ -99,14 +98,6 @@ From the `haloticket-infrastructure` folder (or backend root), run:
 ```bash
 docker compose up -d
 ```
-
-Mailpit is included in the core stack for local OTP testing:
-
-- Open the inbox at [http://localhost:8025](http://localhost:8025).
-- Configure a locally running mail sender with SMTP host `localhost`, port `1025`, and no username or password.
-- If an application is later added to this compose file, use SMTP host `mailpit` and port `1025` on the shared `haloticket-network` network.
-
-The current compose file does not run `user-service`, so it does not inject application environment variables. The `MAILPIT_SMTP_PORT` and `MAILPIT_UI_PORT` values in `.env.example` only control host port mappings; they contain no production credentials.
 
 > **Note:** On the first startup, PostgreSQL will automatically execute `01-create-databases.sql` to initialize all databases. Keycloak will then wait for PostgreSQL to become healthy and automatically import the `haloticket-realm` configuration from `keycloak/realm-export.json`.
 
