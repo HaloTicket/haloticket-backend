@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class OrganizerDto {
     private String id;
+    private String userId;
     private String name;
     private String avatar;
     private String description;

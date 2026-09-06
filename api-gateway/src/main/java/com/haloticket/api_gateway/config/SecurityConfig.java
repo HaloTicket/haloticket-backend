@@ -9,8 +9,13 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
-import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.reactive.CorsConfigurationSource;
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+
+import java.util.Arrays;
+import java.util.Collections;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -22,20 +27,33 @@ public class SecurityConfig {
     @Bean("reactiveJwtDecoder")
     ReactiveJwtDecoder jwtDecoder() {
         NimbusReactiveJwtDecoder decoder = NimbusReactiveJwtDecoder.withIssuerLocation(issuerUri).build();
-        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefaultWithIssuer(issuerUri),
-                new AudienceValidator("api-gateway")));
+        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuerUri));
         return decoder;
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration corsConfig = new CorsConfiguration();
+        corsConfig.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:3000", "http://localhost:5174"));
+        corsConfig.setMaxAge(3600L);
+        corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        corsConfig.setAllowedHeaders(Collections.singletonList("*"));
+        corsConfig.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", corsConfig);
+        return source;
     }
 
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
                         .pathMatchers("/eureka/**", "/actuator/**").permitAll()
-                        .pathMatchers("/api/events/**", "/api/tickets/**", "/api/marketplace/**", "/api/v1/**").permitAll()
+                        .pathMatchers("/api/events/**", "/api/tickets/**", "/api/media/**", "/api/marketplace/**", "/api/v1/**").permitAll()
                         .pathMatchers("/api/users/me").authenticated()
                         .pathMatchers("/api/users/**", "/api/bookings/**", "/api/payments/**", "/api/notifications/**").authenticated()
                         .anyExchange().permitAll()

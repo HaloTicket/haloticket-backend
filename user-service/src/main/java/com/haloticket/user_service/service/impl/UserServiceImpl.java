@@ -5,6 +5,7 @@ import com.haloticket.user_service.dto.request.UserCreateRequest;
 import com.haloticket.user_service.dto.request.UserProfileUpdateRequest;
 import com.haloticket.user_service.dto.response.UserResponse;
 import com.haloticket.user_service.entity.User;
+import com.haloticket.user_service.enums.Role;
 import com.haloticket.user_service.enums.UserStatus;
 import com.haloticket.user_service.repository.UserRepository;
 import com.haloticket.user_service.service.UserService;
@@ -16,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -59,34 +61,79 @@ public class UserServiceImpl implements UserService {
     public UserResponse syncCurrentUser(Jwt jwt) {
         String keycloakId = jwt == null ? null : jwt.getSubject();
         String email = jwt == null ? null : jwt.getClaimAsString("email");
-        if (isBlank(keycloakId) || isBlank(email)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Authenticated token must contain subject and email");
+
+        if (isBlank(email) && jwt != null) {
+            String preferredUsername = jwt.getClaimAsString("preferred_username");
+            if (!isBlank(preferredUsername) && preferredUsername.contains("@")) {
+                email = preferredUsername;
+            }
         }
-        User user = userRepository.findByKeycloakId(keycloakId).orElseGet(() -> {
-            Optional<User> emailOwner = userRepository.findByEmail(email);
-            if (emailOwner.isPresent()) {
+
+        if (isBlank(keycloakId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Authenticated token must contain subject (sub)");
+        }
+        if (isBlank(email)) {
+            email = keycloakId + "@haloticket.local";
+        }
+
+        final String targetEmail = email;
+
+        // 1. Try to find user by Keycloak ID
+        Optional<User> userByKeycloak = userRepository.findByKeycloakId(keycloakId);
+        User user;
+
+        if (userByKeycloak.isPresent()) {
+            user = userByKeycloak.get();
+        } else {
+            // 2. Try to find user by email (e.g. from seed data or prior registration)
+            Optional<User> userByEmail = userRepository.findByEmail(targetEmail);
+            if (userByEmail.isPresent()) {
+                User existing = userByEmail.get();
+                // If keycloak_id is null/blank or is a seed dummy id like "kc-...", link keycloakId
+                if (isBlank(existing.getKeycloakId()) || existing.getKeycloakId().startsWith("kc-") || keycloakId.equals(existing.getKeycloakId())) {
+                    existing.setKeycloakId(keycloakId);
+                    user = existing;
+                } else {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Email already belongs to another identity");
+                }
+            } else {
+                user = User.builder()
+                        .keycloakId(keycloakId)
+                        .email(targetEmail)
+                        .isActive(true)
+                        .status(UserStatus.ACTIVE)
+                        .build();
+            }
+        }
+
+        // Check if email collides with another user (other than current user)
+        Optional<User> emailOwner = userRepository.findByEmail(targetEmail);
+        if (emailOwner.isPresent() && !user.getId().equals(emailOwner.get().getId())) {
+            User existingOwner = emailOwner.get();
+            if (isBlank(existingOwner.getKeycloakId()) || existingOwner.getKeycloakId().startsWith("kc-")) {
+                existingOwner.setKeycloakId(keycloakId);
+                user = existingOwner;
+            } else {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,
                         "Email already belongs to another identity");
             }
-            return User.builder()
-                    .keycloakId(keycloakId)
-                    .email(email)
-                    .isActive(true)
-                    .status(UserStatus.ACTIVE)
-                    .build();
-        });
-        Optional<User> emailOwner = userRepository.findByEmail(email);
-        if (emailOwner.isPresent() && !keycloakId.equals(emailOwner.get().getKeycloakId())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Email already belongs to another identity");
         }
-        user.setEmail(email);
+
+        user.setEmail(targetEmail);
         String resolvedName = resolveName(jwt);
         if (!isBlank(resolvedName)) {
             user.setFullName(resolvedName);
         }
-        user.setRoles(jwtRoleConverter.toApplicationRoles(jwt));
+
+        Set<Role> rolesFromJwt = jwtRoleConverter.toApplicationRoles(jwt);
+        if (user.getRoles() == null || user.getRoles().isEmpty()) {
+            user.setRoles(rolesFromJwt);
+        } else if (rolesFromJwt != null && !rolesFromJwt.isEmpty()) {
+            user.getRoles().addAll(rolesFromJwt);
+        }
+
         user.setLastLoginAt(LocalDateTime.now());
         if (user.getIsActive() == null) {
             user.setIsActive(true);

@@ -44,15 +44,6 @@ public class Event {
     @Column(columnDefinition = "TEXT")
     private String address;
 
-    private String author;
-
-    private String director;
-
-    @ElementCollection(fetch = FetchType.LAZY)
-    @CollectionTable(name = "event_cast", joinColumns = @JoinColumn(name = "event_id"))
-    @Column(name = "actor_name")
-    private List<String> cast;
-
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "event_gallery", joinColumns = @JoinColumn(name = "event_id"))
     @Column(name = "image_url", columnDefinition = "TEXT")
@@ -107,6 +98,18 @@ public class Event {
 
     @Column(name = "confirmation_message", columnDefinition = "TEXT")
     private String confirmationMessage;
+
+    @Column(name = "enable_custom_questions")
+    private Boolean enableCustomQuestions;
+
+    @Column(name = "question_scope")
+    private String questionScope;
+
+    @Column(name = "tickets_data", columnDefinition = "TEXT")
+    private String ticketsData;
+
+    @Column(name = "custom_questions_data", columnDefinition = "TEXT")
+    private String customQuestionsData;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

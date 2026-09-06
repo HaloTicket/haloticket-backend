@@ -6,6 +6,8 @@ import java.util.List;
 
 @Data
 public class EventCreateRequest {
+    private String eventId; // ID of existing draft event to update
+    private String status; // "DRAFT" | "PENDING"
     private String title;
     private String categoryName;
     private String categoryId;
@@ -17,17 +19,19 @@ public class EventCreateRequest {
     private String thumbnailUrl; // poster 3:4
     private String bannerUrl; // banner 16:9
     private String description;
-    
-    // Organizer info
+    private List<String> galleryImages; // event image gallery URLs
+
+    // organizer info
+    private String userId;
     private String organizerName;
     private String organizerInfo;
     private String organizerLogo;
 
-    // Time schedule
+    // time schedule
     private LocalDateTime startTime;
     private LocalDateTime endTime;
 
-    // Tickets list
+    // tickets list
     private List<TicketCreateRequest> tickets;
 
     // settings
@@ -37,7 +41,7 @@ public class EventCreateRequest {
     private String questionScope;
     private List<CustomQuestionRequest> customQuestions;
 
-    // Payment & Tax
+    // payment & tax
     private String accountHolder;
     private String accountNumber;
     private String bankName;

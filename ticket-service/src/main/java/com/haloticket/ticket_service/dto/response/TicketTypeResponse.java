@@ -11,6 +11,12 @@ public class TicketTypeResponse {
     private String eventId;
     private String name;
     private Double price;
+    private Boolean isFree;
     private Integer totalQuantity;
+    private Integer minPerOrder;
+    private Integer maxPerOrder;
+    private String startSaleDate;
+    private String endSaleDate;
+    private String description;
     private TicketTypeStatus status;
 }

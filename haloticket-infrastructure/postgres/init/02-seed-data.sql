@@ -1,7 +1,7 @@
 -- SQL Seed Data Script for HaloTicket Microservices Platform
 -- Creates tables (if not exist) and inserts initial sample data matching frontend mock data for each service DB
 
--- 1. USER DB (user_db
+-- 1. USER DB (user_db)
 \c user_db;
 
 CREATE TABLE IF NOT EXISTS users (
@@ -96,12 +96,13 @@ CREATE TABLE IF NOT EXISTS events (
     id VARCHAR(255) PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     description TEXT,
-    banner_url VARCHAR(255),
-    thumbnail_url VARCHAR(255),
-    location_name VARCHAR(255),
-    address VARCHAR(255),
-    author VARCHAR(255),
-    director VARCHAR(255),
+    banner_url TEXT,
+    thumbnail_url TEXT,
+    location_type VARCHAR(50),
+    location_name TEXT,
+    city VARCHAR(255),
+    ward VARCHAR(255),
+    address TEXT,
     dates_summary VARCHAR(255),
     extra_days_count INT,
     min_price DOUBLE PRECISION,
@@ -112,18 +113,19 @@ CREATE TABLE IF NOT EXISTS events (
     sale_start_time TIMESTAMP,
     sale_end_time TIMESTAMP,
     category_id VARCHAR(255) REFERENCES event_categories(id),
+    is_private BOOLEAN DEFAULT false,
+    confirmation_message TEXT,
+    enable_custom_questions BOOLEAN DEFAULT false,
+    question_scope VARCHAR(50),
+    tickets_data TEXT,
+    custom_questions_data TEXT,
     created_at TIMESTAMP,
     updated_at TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS event_cast (
-    event_id VARCHAR(255) REFERENCES events(id) ON DELETE CASCADE,
-    actor_name VARCHAR(255)
-);
-
 CREATE TABLE IF NOT EXISTS event_gallery (
     event_id VARCHAR(255) REFERENCES events(id) ON DELETE CASCADE,
-    image_url VARCHAR(255)
+    image_url TEXT
 );
 
 CREATE TABLE IF NOT EXISTS event_organizer_mapping (
@@ -184,14 +186,13 @@ VALUES
 ('org-003', '11111111-1111-1111-1111-111111111111', 'Halo Entertainment Inc.', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80', 'Halo Entertainment Inc. - Ban tổ chức sự kiện văn hóa lớn.', 'OWNER', 'ACTIVE', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
--- Insert Comprehensive Real-world Events
-INSERT INTO events (id, title, description, banner_url, thumbnail_url, location_name, address, author, director, dates_summary, extra_days_count, min_price, event_status, event_approval_status, start_time, end_time, sale_start_time, sale_end_time, category_id, created_at, updated_at)
+INSERT INTO events (id, title, description, banner_url, thumbnail_url, location_type, location_name, city, ward, address, dates_summary, extra_days_count, min_price, event_status, event_approval_status, start_time, end_time, sale_start_time, sale_end_time, category_id, is_private, confirmation_message, enable_custom_questions, question_scope, created_at, updated_at)
 VALUES
-('nxnx37-hoc-vien-phep-thuat', 'Nhà Hát Kịch IDECAF: NXNX37 - Học Viện Phép Thuật', 'Chương trình Ngày Xửa Ngày Xưa 37 [NXNX37] -- HỌC VIỆN PHÉP THUẬT --\n\nVở kịch thiếu nhi hoành tráng được đầu tư công phu với bối cảnh Học Viện Phép Thuật huyền bí.', 'https://images.unsplash.com/photo-1514306191717-452ec28c7814?w=1000&q=80', 'https://images.unsplash.com/photo-1514306191717-452ec28c7814?w=600&q=80', 'Nhà Hát Bến Thành', 'Số 06 Mạc Đĩnh Chi, Phường Sài Gòn, Thành phố Hồ Chí Minh', 'Quang Thảo', 'Đình Toàn', '20:00, 25 Tháng 09, 2026 - 23:00, 27 Tháng 09, 2026', 5, 250000.0, 'LIVE', 'APPROVED', '2026-09-25 20:00:00', '2026-09-27 23:00:00', '2026-08-01 09:00:00', '2026-09-27 20:00:00', 'cat-003', NOW(), NOW()),
+('nxnx37-hoc-vien-phep-thuat', 'Nhà Hát Kịch IDECAF: NXNX37 - Học Viện Phép Thuật', 'Chương trình Ngày Xửa Ngày Xưa 37 [NXNX37] -- HỌC VIỆN PHÉP THUẬT --\n\nVở kịch thiếu nhi hoành tráng được đầu tư công phu với bối cảnh Học Viện Phép Thuật huyền bí.', 'https://images.unsplash.com/photo-1514306191717-452ec28c7814?w=1000&q=80', 'https://images.unsplash.com/photo-1514306191717-452ec28c7814?w=600&q=80', 'offline', 'Nhà Hát Bến Thành', 'TP. Hồ Chí Minh', 'Phường Bến Nghé', 'Số 06 Mạc Đĩnh Chi, Phường Bến Nghé, Quận 1, TP.HCM', '20:00, 25 Tháng 09, 2026 - 23:00, 27 Tháng 09, 2026', 5, 250000.0, 'LIVE', 'APPROVED', '2026-09-25 20:00:00', '2026-09-27 23:00:00', '2026-08-01 09:00:00', '2026-09-27 20:00:00', 'cat-003', false, 'Cảm ơn bạn đã đặt vé tham dự Ngày Xửa Ngày Xưa 37!', true, 'ticket', NOW(), NOW()),
 
-('xoay-tron-concert-hoang-dung', 'Xoay Tròn Concert - Hoàng Dũng', 'Live concert cá nhân đặc sắc từ ca sĩ Hoàng Dũng mang tên Xoay Tròn.', 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=1000&q=80', 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80', 'VINHOMES OCEAN PARK 3', 'Vinhomes Ocean Park 3, Xã Văn Giang, Tỉnh Hưng Yên', 'Hoàng Dũng', 'Hoàng Dũng Team', '19:00, 06 Tháng 09, 2026', 0, 1399000.0, 'LIVE', 'APPROVED', '2026-09-06 19:00:00', '2026-09-06 22:30:00', '2026-07-15 09:00:00', '2026-09-06 19:00:00', 'cat-001', NOW(), NOW()),
+('xoay-tron-concert-hoang-dung', 'Xoay Tròn Concert - Hoàng Dũng', 'Live concert cá nhân đặc sắc từ ca sĩ Hoàng Dũng mang tên Xoay Tròn.', 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=1000&q=80', 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=600&q=80', 'offline', 'VINHOMES OCEAN PARK 3', 'Hưng Yên', 'Xã Văn Giang', 'Vinhomes Ocean Park 3, Xã Văn Giang, Tỉnh Hưng Yên', '19:00, 06 Tháng 09, 2026', 0, 1399000.0, 'LIVE', 'APPROVED', '2026-09-06 19:00:00', '2026-09-06 22:30:00', '2026-07-15 09:00:00', '2026-09-06 19:00:00', 'cat-001', false, 'Hẹn gặp bạn tại Xoay Tròn Concert!', false, 'order', NOW(), NOW()),
 
-('idecaf-tam-cam-dai-chien', 'Nhà Hát Kịch IDECAF: TẤM CÁM ĐẠI CHIẾN!', 'Vở kịch hài kước sắc sảo Tấm Cám Đại Chiến biến tấu hiện đại.', 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=800&q=80', 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=600&q=80', 'Nhà Hát Bến Thành', 'Số 06 Mạc Đĩnh Chi, Phường Sài Gòn, TP.HCM', 'Hùng Lâm', 'Đình Toàn', '19:00, 03 Tháng 10, 2026', 2, 220000.0, 'LIVE', 'APPROVED', '2026-10-03 19:00:00', '2026-10-03 22:00:00', '2026-08-01 09:00:00', '2026-10-03 19:00:00', 'cat-003', NOW(), NOW())
+('idecaf-tam-cam-dai-chien', 'Nhà Hát Kịch IDECAF: TẤM CÁM ĐẠI CHIẾN!', 'Vở kịch hài kước sắc sảo Tấm Cám Đại Chiến biến tấu hiện đại.', 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=800&q=80', 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=600&q=80', 'offline', 'Nhà Hát Bến Thành', 'TP. Hồ Chí Minh', 'Phường Bến Nghé', 'Số 06 Mạc Đĩnh Chi, Phường Bến Nghé, Quận 1, TP.HCM', '19:00, 03 Tháng 10, 2026', 2, 220000.0, 'LIVE', 'APPROVED', '2026-10-03 19:00:00', '2026-10-03 22:00:00', '2026-08-01 09:00:00', '2026-10-03 19:00:00', 'cat-003', false, 'Cảm ơn bạn đã mua vé xem kịch Tấm Cám Đại Chiến!', false, 'order', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO search_logs (id, query_term, search_count, created_at)
@@ -201,12 +202,6 @@ VALUES
 ('log-003', 'Pickleball World Cup', 750, NOW())
 ON CONFLICT (id) DO NOTHING;
 
--- Seed Cast for NXNX37 & Events
-INSERT INTO event_cast (event_id, actor_name) VALUES
-('nxnx37-hoc-vien-phep-thuat', 'Bạch Long'),
-('nxnx37-hoc-vien-phep-thuat', 'Thanh Thuỷ'),
-('xoay-tron-concert-hoang-dung', 'Hoàng Dũng');
-
 -- Seed Gallery Images
 INSERT INTO event_gallery (event_id, image_url) VALUES
 ('nxnx37-hoc-vien-phep-thuat', 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=800&q=80');
@@ -214,7 +209,8 @@ INSERT INTO event_gallery (event_id, image_url) VALUES
 INSERT INTO event_organizer_mapping (event_id, organizer_id)
 VALUES
 ('nxnx37-hoc-vien-phep-thuat', 'org-001'),
-('xoay-tron-concert-hoang-dung', 'org-002')
+('xoay-tron-concert-hoang-dung', 'org-002'),
+('idecaf-tam-cam-dai-chien', 'org-001')
 ON CONFLICT DO NOTHING;
 
 -- 3. TICKET DB (ticket_db)
@@ -225,19 +221,64 @@ CREATE TABLE IF NOT EXISTS ticket_types (
     event_id VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
     price DOUBLE PRECISION NOT NULL,
+    is_free BOOLEAN DEFAULT false,
     total_quantity INT,
+    min_per_order INT DEFAULT 1,
+    max_per_order INT DEFAULT 10,
+    start_sale_date TIMESTAMP,
+    end_sale_date TIMESTAMP,
+    description TEXT,
     ticket_type_status VARCHAR(50),
     created_at TIMESTAMP,
     updated_at TIMESTAMP
 );
 
-INSERT INTO ticket_types (id, event_id, name, price, total_quantity, ticket_type_status, created_at, updated_at)
+INSERT INTO ticket_types (id, event_id, name, price, is_free, total_quantity, min_per_order, max_per_order, description, ticket_type_status, created_at, updated_at)
 VALUES
-('tt-nxnx-vvip', 'nxnx37-hoc-vien-phep-thuat', 'VVIP', 400000.0, 100, 'ACTIVE', NOW(), NOW()),
-('tt-xoay-a2', 'xoay-tron-concert-hoang-dung', 'XOAY TRÒN A2 (SEATED)', 2499000.0, 80, 'ACTIVE', NOW(), NOW())
+('tt-nxnx-vvip', 'nxnx37-hoc-vien-phep-thuat', 'VVIP', 400000.0, false, 100, 1, 10, 'Hạng vé VVIP vị trí đẹp nhất sát sân khấu', 'ACTIVE', NOW(), NOW()),
+('tt-nxnx-vip', 'nxnx37-hoc-vien-phep-thuat', 'VIP', 250000.0, false, 200, 1, 10, 'Hạng vé VIP khu vực khán đài trung tâm', 'ACTIVE', NOW(), NOW()),
+('tt-xoay-a2', 'xoay-tron-concert-hoang-dung', 'XOAY TRÒN A2 (SEATED)', 2499000.0, false, 80, 1, 4, 'Ghế ngồi chính diện sân khấu concert Hoàng Dũng', 'ACTIVE', NOW(), NOW()),
+('tt-xoay-ga', 'xoay-tron-concert-hoang-dung', 'XOAY TRÒN GA (STANDING)', 1399000.0, false, 500, 1, 6, 'Khu vực đứng gần sân khấu sôi động', 'ACTIVE', NOW(), NOW()),
+('tt-tc-std', 'idecaf-tam-cam-dai-chien', 'Khán Đài Thường', 220000.0, false, 300, 1, 10, 'Vé thường xem Tấm Cám Đại Chiến', 'ACTIVE', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
--- 4. MARKETPLACE DB (marketplace_db)
+-- 4. PAYMENT DB (payment_db)
+\c payment_db;
+
+CREATE TABLE IF NOT EXISTS organizer_payout_accounts (
+    id VARCHAR(255) PRIMARY KEY,
+    organizer_user_id VARCHAR(255) NOT NULL,
+    account_holder VARCHAR(255) NOT NULL,
+    account_number VARCHAR(255) NOT NULL,
+    bank_name VARCHAR(255) NOT NULL,
+    bank_branch VARCHAR(255),
+    business_type VARCHAR(50),
+    tax_name VARCHAR(255),
+    tax_code VARCHAR(255),
+    tax_address TEXT,
+    is_verified BOOLEAN DEFAULT true,
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS payments (
+    id VARCHAR(255) PRIMARY KEY,
+    booking_id VARCHAR(255) NOT NULL,
+    amount DOUBLE PRECISION,
+    method VARCHAR(50),
+    provider VARCHAR(50),
+    status VARCHAR(50),
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
+
+INSERT INTO organizer_payout_accounts (id, organizer_user_id, account_holder, account_number, bank_name, bank_branch, business_type, tax_name, tax_code, tax_address, is_verified, created_at, updated_at)
+VALUES
+('payout-org-001', '22222222-2222-2222-2222-222222222222', 'CÔNG TY TNHH NHÀ HÁT IDECAF', '999988887777', 'Vietcombank', 'Chi nhánh Tân Bình', 'company', 'CÔNG TY TNHH NHÀ HÁT IDECAF', '0312345678', 'Số 06 Mạc Đĩnh Chi, Phường Bến Nghé, Quận 1, TP.HCM', true, NOW(), NOW()),
+('payout-org-002', '55555555-5555-5555-5555-555555555555', 'HOÀNG DŨNG', '1012345678', 'MBBank', 'Chi nhánh Hà Nội', 'individual', 'HOÀNG DŨNG ENTERTAINMENT', '079200001234', 'Vinhomes Ocean Park 3, Hưng Yên', true, NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
+-- 5. MARKETPLACE DB (marketplace_db)
 \c marketplace_db;
 
 CREATE TABLE IF NOT EXISTS resale_listings (

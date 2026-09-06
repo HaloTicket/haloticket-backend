@@ -23,9 +23,6 @@ public class EventResponse {
     private String posterImage;
     private String locationName;
     private String address;
-    private String author;
-    private String director;
-    private List<String> cast;
     private List<String> galleryImages;
     private String datesSummary;
     private Integer extraDaysCount;
@@ -35,5 +32,22 @@ public class EventResponse {
     private LocalDateTime endTime;
     private String categoryId;
     private String categoryName;
+    private String locationType;
+    private String city;
+    private String ward;
+    private Boolean isPrivate;
+    private String confirmationMessage;
+    private Boolean enableCustomQuestions;
+    private String questionScope;
+    private Object tickets;
+    private Object customQuestions;
+    private String accountHolder;
+    private String accountNumber;
+    private String bankName;
+    private String bankBranch;
+    private String businessType;
+    private String taxName;
+    private String taxAddress;
+    private String taxCode;
     private OrganizerDto organizer;
 }
