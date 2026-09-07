@@ -28,6 +28,10 @@ public class EventResponse {
     private Integer extraDaysCount;
     private Double minPrice;
     private EventStatus eventStatus;
+    private String eventApprovalStatus;
+    private String rejectionReason;
+    private String rejectionNotes;
+    private String submittedAt;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private String categoryId;

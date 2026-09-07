@@ -111,6 +111,12 @@ public class Event {
     @Column(name = "custom_questions_data", columnDefinition = "TEXT")
     private String customQuestionsData;
 
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
+
+    @Column(name = "rejection_notes", columnDefinition = "TEXT")
+    private String rejectionNotes;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

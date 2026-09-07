@@ -1,5 +1,6 @@
 package com.haloticket.event_service.service.impl;
 
+import com.haloticket.event_service.client.NotificationServiceClient;
 import com.haloticket.event_service.client.PaymentServiceClient;
 import com.haloticket.event_service.client.TicketServiceClient;
 import com.haloticket.event_service.dto.request.EventCreateRequest;
@@ -25,9 +26,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.core.KafkaTemplate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,6 +44,13 @@ public class EventServiceImpl implements EventService {
     private final SearchLogRepository searchLogRepository;
     private final TicketServiceClient ticketServiceClient;
     private final PaymentServiceClient paymentServiceClient;
+
+    @Autowired(required = false)
+    private NotificationServiceClient notificationServiceClient;
+
+    @Autowired(required = false)
+    private KafkaTemplate<String, Object> kafkaTemplate;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -117,10 +128,13 @@ public class EventServiceImpl implements EventService {
                 eventToSave.getGalleryImages().addAll(request.getGalleryImages());
             }
         }
-        LocalDateTime startEvt = request.getStartTime() != null ? request.getStartTime() : LocalDateTime.now().plusDays(30);
-        LocalDateTime endEvt = request.getEndTime() != null ? request.getEndTime() : LocalDateTime.now().plusDays(30).plusHours(4);
+        LocalDateTime startEvt = request.getStartTime() != null ? request.getStartTime()
+                : LocalDateTime.now().plusDays(30);
+        LocalDateTime endEvt = request.getEndTime() != null ? request.getEndTime()
+                : LocalDateTime.now().plusDays(30).plusHours(4);
         if (endEvt.isBefore(startEvt) || endEvt.isEqual(startEvt)) {
-            throw new IllegalArgumentException("Thời gian kết thúc sự kiện phải diễn ra sau thời gian bắt đầu sự kiện!");
+            throw new IllegalArgumentException(
+                    "Thời gian kết thúc sự kiện phải diễn ra sau thời gian bắt đầu sự kiện!");
         }
         eventToSave.setStartTime(startEvt);
         eventToSave.setEndTime(endEvt);
@@ -139,6 +153,8 @@ public class EventServiceImpl implements EventService {
         } catch (Exception e) {
             // ignore JSON serialization exceptions
         }
+
+        EventApprovalStatus oldApprovalStatus = eventToSave.getEventApprovalStatus();
 
         if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
             boolean isDraft = "DRAFT".equalsIgnoreCase(request.getStatus());
@@ -159,7 +175,17 @@ public class EventServiceImpl implements EventService {
         String uid = (request.getUserId() != null && !request.getUserId().trim().isEmpty()) ? request.getUserId()
                 : "user_default_id";
         syncPayoutAccountToPaymentService(uid, request);
+
+        boolean isNewlySubmitted = (oldApprovalStatus == null || oldApprovalStatus == EventApprovalStatus.DRAFT)
+                && saved.getEventApprovalStatus() == EventApprovalStatus.PENDING;
+
+        if (isNewlySubmitted) {
+            publishNotification("ADMIN", "NEW_EVENT_APPROVAL", "Sự kiện mới cần duyệt",
+                    "Sự kiện \"" + saved.getTitle() + "\" vừa được gửi yêu cầu phê duyệt.");
+        }
+
         return mapToEventResponse(saved);
+
     }
 
     private void syncTicketsToTicketService(String eventId, List<EventCreateRequest.TicketCreateRequest> tickets) {
@@ -349,6 +375,11 @@ public class EventServiceImpl implements EventService {
                 .endTime(event.getEndTime())
                 .categoryId(event.getCategory() != null ? event.getCategory().getId() : null)
                 .categoryName(event.getCategory() != null ? event.getCategory().getName() : null)
+                .eventApprovalStatus(
+                        event.getEventApprovalStatus() != null ? event.getEventApprovalStatus().name() : "PENDING")
+                .rejectionReason(event.getRejectionReason())
+                .rejectionNotes(event.getRejectionNotes())
+                .submittedAt(event.getCreatedAt() != null ? event.getCreatedAt().toString() : "Mới gửi")
                 .isPrivate(event.getIsPrivate())
                 .confirmationMessage(event.getConfirmationMessage())
                 .enableCustomQuestions(event.getEnableCustomQuestions())
@@ -365,6 +396,93 @@ public class EventServiceImpl implements EventService {
                 .taxCode(taxCode)
                 .organizer(organizerDto)
                 .build();
+    }
+
+    @Override
+    public List<EventResponse> getApprovalEvents(String status) {
+        List<Event> events = eventRepository.findAll();
+        if (status != null && !"ALL".equalsIgnoreCase(status.trim())) {
+            events = events.stream()
+                    .filter(e -> e.getEventApprovalStatus() != null
+                            && e.getEventApprovalStatus().name().equalsIgnoreCase(status.trim()))
+                    .collect(Collectors.toList());
+        }
+        return events.stream()
+                .sorted((a, b) -> {
+                    if (a.getCreatedAt() != null && b.getCreatedAt() != null) {
+                        return b.getCreatedAt().compareTo(a.getCreatedAt());
+                    }
+                    return b.getId().compareTo(a.getId());
+                })
+                .map(this::mapToEventResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public EventResponse approveEvent(String id) {
+        Event event = eventRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sự kiện với ID: " + id));
+
+        event.setEventApprovalStatus(EventApprovalStatus.APPROVED);
+        event.setEventStatus(EventStatus.APPROVED);
+        Event saved = eventRepository.save(event);
+
+        String recipientUserId = (saved.getOrganizers() != null && !saved.getOrganizers().isEmpty()
+                && saved.getOrganizers().get(0).getUserId() != null)
+                        ? saved.getOrganizers().get(0).getUserId()
+                        : "user_default_id";
+
+        publishNotification(recipientUserId, "EVENT_APPROVED", "Sự kiện đã được phê duyệt!",
+                "Sự kiện \"" + saved.getTitle() + "\" của bạn đã được phê duyệt chính thức.");
+
+        return mapToEventResponse(saved);
+    }
+
+    @Override
+    public EventResponse rejectEvent(String id, String reason, String notes) {
+        Event event = eventRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sự kiện với ID: " + id));
+
+        event.setEventApprovalStatus(EventApprovalStatus.REJECTED);
+        event.setRejectionReason(reason);
+        event.setRejectionNotes(notes);
+        Event saved = eventRepository.save(event);
+
+        String recipientUserId = (saved.getOrganizers() != null && !saved.getOrganizers().isEmpty()
+                && saved.getOrganizers().get(0).getUserId() != null)
+                        ? saved.getOrganizers().get(0).getUserId()
+                        : "user_default_id";
+
+        publishNotification(recipientUserId, "EVENT_REJECTED", "Sự kiện bị từ chối phê duyệt",
+                "Sự kiện \"" + saved.getTitle() + "\" của bạn bị từ chối. Lý do: "
+                        + (reason != null ? reason : "Cần bổ sung thông tin."));
+
+        return mapToEventResponse(saved);
+    }
+
+    private void publishNotification(String userId, String type, String title, String message) {
+        Map<String, Object> payload = Map.of(
+                "userId", userId,
+                "type", type,
+                "title", title,
+                "message", message,
+                "timestamp", LocalDateTime.now().toString());
+
+        if (kafkaTemplate != null) {
+            try {
+                kafkaTemplate.send("haloticket.notifications.v1", userId, payload);
+            } catch (Exception e) {
+                // silent catch
+            }
+        }
+
+        if (notificationServiceClient != null) {
+            try {
+                notificationServiceClient.publishNotification(payload);
+            } catch (Exception e) {
+                // silent catch
+            }
+        }
     }
 
     private EventCategoryResponse mapToCategoryResponse(EventCategory category) {

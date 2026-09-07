@@ -25,6 +25,13 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) {
         log.info("Initializing sample data for Notification Service...");
 
+        try {
+            entityManager.createNativeQuery("ALTER TABLE notifications ALTER COLUMN template_id DROP NOT NULL;").executeUpdate();
+            log.info("Successfully dropped NOT NULL constraint on notifications.template_id");
+        } catch (Exception e) {
+            log.info("template_id column already nullable: " + e.getMessage());
+        }
+
         upsertTemplate("ntpl-ticket-confirmation-email",
                 NotificationType.TICKET_CONFIRMATION,
                 NotificationChannel.EMAIL,

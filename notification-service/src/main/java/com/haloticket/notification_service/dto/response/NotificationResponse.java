@@ -16,6 +16,10 @@ public class NotificationResponse {
     private String userId;
     private String recipientEmail;
     private String variablesJson;
+    private String title;
+    private String message;
+    private String type;
+    private Boolean readStatus;
     private NotificationChannel channel;
     private NotificationStatus status;
     private LocalDateTime createdAt;

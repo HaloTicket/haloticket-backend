@@ -43,6 +43,25 @@ public class EventController {
         return ResponseEntity.ok(eventService.getAllCategories());
     }
 
+    @GetMapping("/approvals")
+    public ResponseEntity<List<EventResponse>> getApprovalEvents(@RequestParam(required = false) String status) {
+        return ResponseEntity.ok(eventService.getApprovalEvents(status));
+    }
+
+    @PatchMapping("/{id}/approve")
+    public ResponseEntity<EventResponse> approveEvent(@PathVariable String id) {
+        return ResponseEntity.ok(eventService.approveEvent(id));
+    }
+
+    @PatchMapping("/{id}/reject")
+    public ResponseEntity<EventResponse> rejectEvent(
+            @PathVariable String id,
+            @RequestBody(required = false) java.util.Map<String, String> body) {
+        String reason = body != null ? body.get("reason") : "Không đạt tiêu chuẩn kiểm duyệt";
+        String notes = body != null ? body.get("notes") : "";
+        return ResponseEntity.ok(eventService.rejectEvent(id, reason, notes));
+    }
+
     @GetMapping("/trending-searches")
     public ResponseEntity<List<String>> getTrendingSearches(@RequestParam(defaultValue = "3") int limit) {
         return ResponseEntity.ok(eventService.getTopSearchedKeywords(limit));

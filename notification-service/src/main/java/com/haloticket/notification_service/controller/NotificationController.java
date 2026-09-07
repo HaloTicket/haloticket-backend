@@ -56,4 +56,23 @@ public class NotificationController {
     public ResponseEntity<NotificationResponse> markAsFailed(@PathVariable String id) {
         return ResponseEntity.ok(notificationService.markAsFailed(id));
     }
+
+    @PatchMapping("/{id}/read")
+    public ResponseEntity<NotificationResponse> markAsRead(@PathVariable String id) {
+        return ResponseEntity.ok(notificationService.markAsRead(id));
+    }
+
+    @PatchMapping("/users/{userId}/read-all")
+    public ResponseEntity<List<NotificationResponse>> markAllAsRead(@PathVariable String userId) {
+        return ResponseEntity.ok(notificationService.markAllAsRead(userId));
+    }
+
+    @PostMapping("/publish")
+    public ResponseEntity<NotificationResponse> publishNotification(@RequestBody java.util.Map<String, String> body) {
+        String userId = body.getOrDefault("userId", "ADMIN");
+        String type = body.getOrDefault("type", "GENERAL");
+        String title = body.getOrDefault("title", "Thông báo mới");
+        String message = body.getOrDefault("message", "");
+        return ResponseEntity.ok(notificationService.publishDirectNotification(userId, type, title, message));
+    }
 }

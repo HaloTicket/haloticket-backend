@@ -19,6 +19,9 @@ import com.haloticket.notification_service.exception.NotificationException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +33,9 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationRepository notificationRepository;
     private final NotificationTemplateRepository notificationTemplateRepository;
     private final ObjectMapper objectMapper;
+
+    @Autowired(required = false)
+    private SimpMessagingTemplate messagingTemplate;
 
     @Override
     public NotificationTemplateResponse createTemplate(NotificationTemplateCreateRequest request) {
@@ -95,28 +101,73 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    public NotificationResponse markAsRead(String id) {
+        Notification notification = findNotification(id);
+        notification.setReadStatus(true);
+        return toNotificationResponse(notificationRepository.save(notification));
+    }
+
+    @Override
+    public List<NotificationResponse> markAllAsRead(String userId) {
+        List<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        for (Notification n : notifications) {
+            n.setReadStatus(true);
+        }
+        return notificationRepository.saveAll(notifications).stream()
+                .map(this::toNotificationResponse)
+                .toList();
+    }
+
+    @Override
     public NotificationResponse processEvent(NotificationEvent event) {
-        return notificationRepository.findByEventId(event.eventId())
+        NotificationResponse res = notificationRepository.findByEventId(event.eventId())
                 .map(this::toNotificationResponse)
                 .orElseGet(() -> {
-                    NotificationTemplate template = notificationTemplateRepository.findById(event.templateId())
-                            .orElseThrow(() -> new NotificationException(NotificationErrorCode.TEMPLATE_NOT_FOUND,
-                                    "Notification template not found", 404));
-                    if (template.getStatus() != NotificationTemplateStatus.ACTIVE) {
-                        throw new NotificationException(NotificationErrorCode.TEMPLATE_INACTIVE,
-                                "Notification template must be active", 409);
-                    }
                     Notification notification = Notification.builder()
                             .eventId(event.eventId())
-                            .template(template)
-                            .userId(event.userId() == null ? "system" : event.userId())
+                            .userId(event.recipientEmail())
                             .recipientEmail(event.recipientEmail())
                             .variablesJson(toVariablesJson(event.variables()))
                             .channel(event.channel())
                             .status(NotificationStatus.PENDING)
                             .build();
+
                     return toNotificationResponse(notificationRepository.save(notification));
                 });
+        broadcastStompNotification(res);
+        return res;
+    }
+
+    @Override
+    public NotificationResponse publishDirectNotification(String userId, String type, String title, String message) {
+        Notification notification = Notification.builder()
+                .userId(userId)
+                .type(type)
+                .title(title)
+                .message(message)
+                .readStatus(false)
+                .channel(com.haloticket.notification_service.enums.NotificationChannel.EMAIL)
+                .status(NotificationStatus.SENT)
+                .build();
+        Notification saved = notificationRepository.save(notification);
+        NotificationResponse response = toNotificationResponse(saved);
+        broadcastStompNotification(response);
+        return response;
+    }
+
+    private void broadcastStompNotification(NotificationResponse response) {
+        try {
+            if (messagingTemplate != null && response != null) {
+                if ("ADMIN".equalsIgnoreCase(response.getUserId()) || "NEW_EVENT_APPROVAL".equalsIgnoreCase(response.getType())) {
+                    messagingTemplate.convertAndSend("/topic/admin-notifications", response);
+                }
+                if (response.getUserId() != null && !"ADMIN".equalsIgnoreCase(response.getUserId())) {
+                    messagingTemplate.convertAndSend("/topic/user-notifications/" + response.getUserId(), response);
+                }
+            }
+        } catch (Exception e) {
+            // silent catch for WebSocket broadcast
+        }
     }
 
     private Notification findNotification(String id) {
@@ -158,6 +209,10 @@ public class NotificationServiceImpl implements NotificationService {
                 .userId(notification.getUserId())
                 .recipientEmail(notification.getRecipientEmail())
                 .variablesJson(notification.getVariablesJson())
+                .title(notification.getTitle())
+                .message(notification.getMessage())
+                .type(notification.getType())
+                .readStatus(notification.getReadStatus())
                 .channel(notification.getChannel())
                 .status(notification.getStatus())
                 .createdAt(notification.getCreatedAt())

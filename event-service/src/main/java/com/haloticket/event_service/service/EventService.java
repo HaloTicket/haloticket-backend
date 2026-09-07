@@ -15,4 +15,7 @@ public interface EventService {
     List<String> getTopSearchedKeywords(int limit);
     void logSearchQuery(String query);
     OrganizerDto getOrganizerProfile(String userId);
+    List<EventResponse> getApprovalEvents(String status);
+    EventResponse approveEvent(String id);
+    EventResponse rejectEvent(String id, String reason, String notes);
 }

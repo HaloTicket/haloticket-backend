@@ -4,6 +4,8 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 @Data
 public class EventCreateRequest {
     private String eventId; // ID of existing draft event to update
@@ -28,7 +30,9 @@ public class EventCreateRequest {
     private String organizerLogo;
 
     // time schedule
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm[:ss]")
     private LocalDateTime startTime;
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm[:ss]")
     private LocalDateTime endTime;
 
     // tickets list

@@ -38,7 +38,7 @@ public class Notification {
     private String eventId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "template_id", nullable = false)
+    @JoinColumn(name = "template_id", nullable = true)
     private NotificationTemplate template;
 
     @Column(name = "user_id", nullable = false)
@@ -49,6 +49,18 @@ public class Notification {
 
     @Column(name = "variables_json", columnDefinition = "TEXT")
     private String variablesJson;
+
+    @Column(name = "title", columnDefinition = "TEXT")
+    private String title;
+
+    @Column(name = "message", columnDefinition = "TEXT")
+    private String message;
+
+    @Column(name = "type")
+    private String type;
+
+    @Column(name = "read_status")
+    private Boolean readStatus;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

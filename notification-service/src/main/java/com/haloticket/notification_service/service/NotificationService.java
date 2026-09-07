@@ -21,5 +21,12 @@ public interface NotificationService {
 
     NotificationResponse markAsFailed(String id);
 
+    NotificationResponse markAsRead(String id);
+
+    List<NotificationResponse> markAllAsRead(String userId);
+
     NotificationResponse processEvent(NotificationEvent event);
+
+    NotificationResponse publishDirectNotification(String userId, String type, String title, String message);
 }
+
