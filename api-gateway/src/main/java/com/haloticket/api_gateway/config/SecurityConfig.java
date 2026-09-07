@@ -24,17 +24,31 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
     private String issuerUri;
 
+    @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
+    private String jwkSetUri;
+
     @Bean("reactiveJwtDecoder")
     ReactiveJwtDecoder jwtDecoder() {
+<<<<<<< Updated upstream
         NimbusReactiveJwtDecoder decoder = NimbusReactiveJwtDecoder.withIssuerLocation(issuerUri).build();
         decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuerUri));
+=======
+        // Containers fetch keys internally while tokens retain their public issuer.
+        NimbusReactiveJwtDecoder decoder = org.springframework.util.StringUtils.hasText(jwkSetUri)
+                ? NimbusReactiveJwtDecoder.withJwkSetUri(jwkSetUri).build()
+                : NimbusReactiveJwtDecoder.withIssuerLocation(issuerUri).build();
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefaultWithIssuer(issuerUri),
+                new AudienceValidator("api-gateway")));
+>>>>>>> Stashed changes
         return decoder;
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration corsConfig = new CorsConfiguration();
-        corsConfig.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:3000", "http://localhost:5174"));
+        corsConfig.setAllowedOrigins(
+                Arrays.asList("http://localhost:5173", "http://localhost:3000", "http://localhost:5174"));
         corsConfig.setMaxAge(3600L);
         corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         corsConfig.setAllowedHeaders(Collections.singletonList("*"));
@@ -53,11 +67,13 @@ public class SecurityConfig {
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
                         .pathMatchers("/eureka/**", "/actuator/**").permitAll()
-                        .pathMatchers("/api/events/**", "/api/tickets/**", "/api/media/**", "/api/marketplace/**", "/api/v1/**").permitAll()
+                        .pathMatchers("/api/events/**", "/api/tickets/**", "/api/media/**", "/api/marketplace/**",
+                                "/api/v1/**")
+                        .permitAll()
                         .pathMatchers("/api/users/me").authenticated()
-                        .pathMatchers("/api/users/**", "/api/bookings/**", "/api/payments/**", "/api/notifications/**").authenticated()
-                        .anyExchange().permitAll()
-                )
+                        .pathMatchers("/api/users/**", "/api/bookings/**", "/api/payments/**", "/api/notifications/**")
+                        .authenticated()
+                        .anyExchange().permitAll())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtDecoder(jwtDecoder())));
 
         return http.build();

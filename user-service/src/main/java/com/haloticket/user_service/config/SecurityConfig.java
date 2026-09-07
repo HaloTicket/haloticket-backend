@@ -23,9 +23,15 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
     private String issuerUri;
 
+    @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
+    private String jwkSetUri;
+
     @Bean
     JwtDecoder jwtDecoder() {
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
+        // Containers fetch keys internally while tokens retain their public issuer.
+        NimbusJwtDecoder decoder = org.springframework.util.StringUtils.hasText(jwkSetUri)
+                ? NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build()
+                : NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                 JwtValidators.createDefaultWithIssuer(issuerUri),
                 new AudienceValidator("user-service")));
