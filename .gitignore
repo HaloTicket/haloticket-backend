@@ -64,3 +64,5 @@ build/
 /docs/**
 .m2/**
 .codex-temp/**
+.local-backups/
+__pycache__/
