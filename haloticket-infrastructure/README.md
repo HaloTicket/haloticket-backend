@@ -49,7 +49,7 @@ To optimize developer machine resources (RAM/CPU) and follow microservices opera
 
 ## 3. Directory Structure
 
-```
+```bash
 haloticket-infrastructure/
 ├── docker-compose.yml            # Core services definition (Postgres, Redis, Kafka, Keycloak)
 ├── docker-observability.yml      # Observability tooling definition (pgAdmin, Kafka-UI, RedisInsight)
@@ -162,11 +162,15 @@ The Keycloak server automatically initializes with the **`haloticket-realm`** Re
 - `ROLE_USER`: Standard Customer (Default role assigned upon registration).
 
 ### Seeded Test Accounts
-| Username | Password | Email | Assigned Roles |
-| :--- | :--- | :--- | :--- |
-| `admin` | `admin123` | `admin@haloticket.com` | `ROLE_ADMIN`, `ROLE_USER` |
-| `organizer` | `organizer123` | `organizer@haloticket.com` | `ROLE_ORGANIZER`, `ROLE_USER` |
-| `user` | `user123` | `user@haloticket.com` | `ROLE_USER` |
+| Username | Email | Password | Assigned Roles | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `admin` | `admin@haloticket.vn` | `HaloAdmin@2026` | `ROLE_ADMIN`, `ROLE_USER` | Platform Administrator |
+| `organizer` | `organizer@haloticket.vn` | `HaloOrganizer@2026` | `ROLE_ORGANIZER`, `ROLE_USER` | IDECAF Organizer |
+| `hoangdung` | `hoangdung@haloticket.vn` | `HaloOrganizer@2026` | `ROLE_ORGANIZER`, `ROLE_USER` | Hoang Dung Organizer |
+| `customer` | `customer@haloticket.vn` | `HaloCustomer@2026` | `ROLE_USER` | Standard Ticket Buyer |
+| `staff` | `staff@haloticket.vn` | `HaloStaff@2026` | `ROLE_STAFF`, `ROLE_USER` | Ticket Inspector |
+| `seller1` | `seller1@haloticket.vn` | `HaloSeller@2026` | `ROLE_USER` | Resale Seller |
+| `user` | `user@haloticket.com` | `HaloUser@2026` | `ROLE_USER` | Fallback Test User |
 
 ---
 
@@ -192,9 +196,9 @@ A comprehensive Postman Collection is provided in:
 
 ### Included Requests:
 1. **0. OpenID Configuration (Discovery):** Fetch OIDC endpoints and public keys.
-2. **1. Get Admin Access Token:** Authenticate master admin to call Keycloak Admin REST APIs.
-3. **2. Customer Login (Direct Grant):** Authenticate `user / user123` and retrieve JWT Bearer token.
-4. **3. Organizer Login (Direct Grant):** Authenticate `organizer / organizer123`.
+2. **1. Get Admin Access Token:** Authenticate master admin to call Keycloak Admin REST APIs (`admin` / `admin`).
+3. **2. Customer Login (Direct Grant):** Authenticate `customer@haloticket.vn` / `HaloCustomer@2026` and retrieve JWT Bearer token.
+4. **3. Organizer Login (Direct Grant):** Authenticate `organizer@haloticket.vn` / `HaloOrganizer@2026`.
 5. **4. Refresh Access Token:** Exchange `refresh_token` for a renewed `access_token`.
 6. **5. Get User Info:** Call `/protocol/openid-connect/userinfo` with access token.
 7. **6. Admin - Create User:** Call Keycloak Admin REST API to provision a new user programmatically.
@@ -234,7 +238,7 @@ docker logs -f haloticket-kafka
 
 **Universal Single-Line Command (Works in PowerShell, CMD, Git Bash, macOS, Linux):**
 ```bash
-curl.exe -X POST http://localhost:9080/realms/haloticket-realm/protocol/openid-connect/token -d "grant_type=password" -d "client_id=user-service" -d "client_secret=user-service-secret" -d "username=user" -d "password=user123"
+curl.exe -X POST http://localhost:9080/realms/haloticket-realm/protocol/openid-connect/token -d "grant_type=password" -d "client_id=user-service" -d "client_secret=user-service-secret" -d "username=admin@haloticket.vn" -d "password=HaloAdmin@2026"
 ```
 
 **PowerShell Native Script:**
@@ -243,8 +247,8 @@ $body = @{
     grant_type = 'password'
     client_id = 'user-service'
     client_secret = 'user-service-secret'
-    username = 'user'
-    password = 'user123'
+    username = 'admin@haloticket.vn'
+    password = 'HaloAdmin@2026'
 }
 Invoke-RestMethod -Uri "http://localhost:9080/realms/haloticket-realm/protocol/openid-connect/token" -Method POST -Body $body
 ```

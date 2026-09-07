@@ -175,12 +175,12 @@
             },
             {
               "key": "username",
-              "value": "user",
+              "value": "customer@haloticket.vn",
               "type": "text"
             },
             {
               "key": "password",
-              "value": "user123",
+              "value": "HaloCustomer@2026",
               "type": "text"
             }
           ]
@@ -247,12 +247,12 @@
             },
             {
               "key": "username",
-              "value": "organizer",
+              "value": "organizer@haloticket.vn",
               "type": "text"
             },
             {
               "key": "password",
-              "value": "organizer123",
+              "value": "HaloOrganizer@2026",
               "type": "text"
             }
           ]
@@ -386,7 +386,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"username\": \"testuser_01\",\n  \"email\": \"testuser01@haloticket.com\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"enabled\": true,\n  \"emailVerified\": true,\n  \"credentials\": [\n    {\n      \"type\": \"password\",\n      \"value\": \"password123\",\n      \"temporary\": false\n    }\n  ]\n}"
+          "raw": "{\n  \"username\": \"testuser_01\",\n  \"email\": \"testuser01@haloticket.vn\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"enabled\": true,\n  \"emailVerified\": true,\n  \"credentials\": [\n    {\n      \"type\": \"password\",\n      \"value\": \"HaloTest@2026\",\n      \"temporary\": false\n    }\n  ]\n}"
         },
         "url": {
           "raw": "{{keycloak_url}}/admin/realms/{{realm}}/users",
