@@ -205,8 +205,6 @@ VALUES
 ('log-003', 'Pickleball World Cup', 750, NOW())
 ON CONFLICT (id) DO NOTHING;
 
-<<<<<<< Updated upstream
-=======
 -- Seed Cast for NXNX37 & Events
 INSERT INTO event_cast (event_id, actor_name)
 SELECT seed.event_id, seed.actor_name FROM (VALUES
@@ -218,8 +216,6 @@ WHERE NOT EXISTS (
     SELECT 1 FROM event_cast existing
     WHERE existing.event_id = seed.event_id AND existing.actor_name = seed.actor_name
 );
-
->>>>>>> Stashed changes
 -- Seed Gallery Images
 INSERT INTO event_gallery (event_id, image_url)
 SELECT seed.event_id, seed.image_url FROM (VALUES

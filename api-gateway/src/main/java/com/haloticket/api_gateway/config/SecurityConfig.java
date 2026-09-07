@@ -29,18 +29,10 @@ public class SecurityConfig {
 
     @Bean("reactiveJwtDecoder")
     ReactiveJwtDecoder jwtDecoder() {
-<<<<<<< Updated upstream
-        NimbusReactiveJwtDecoder decoder = NimbusReactiveJwtDecoder.withIssuerLocation(issuerUri).build();
-        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuerUri));
-=======
-        // Containers fetch keys internally while tokens retain their public issuer.
         NimbusReactiveJwtDecoder decoder = org.springframework.util.StringUtils.hasText(jwkSetUri)
                 ? NimbusReactiveJwtDecoder.withJwkSetUri(jwkSetUri).build()
                 : NimbusReactiveJwtDecoder.withIssuerLocation(issuerUri).build();
-        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefaultWithIssuer(issuerUri),
-                new AudienceValidator("api-gateway")));
->>>>>>> Stashed changes
+        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuerUri));
         return decoder;
     }
 
