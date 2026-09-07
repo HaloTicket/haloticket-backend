@@ -9,12 +9,5 @@ CREATE DATABASE payment_db;
 CREATE DATABASE notification_db;
 CREATE DATABASE marketplace_db;
 CREATE DATABASE keycloak_db;
-
-GRANT ALL PRIVILEGES ON DATABASE user_db TO haloticket;
-GRANT ALL PRIVILEGES ON DATABASE event_db TO haloticket;
-GRANT ALL PRIVILEGES ON DATABASE ticket_db TO haloticket;
-GRANT ALL PRIVILEGES ON DATABASE booking_db TO haloticket;
-GRANT ALL PRIVILEGES ON DATABASE payment_db TO haloticket;
-GRANT ALL PRIVILEGES ON DATABASE notification_db TO haloticket;
-GRANT ALL PRIVILEGES ON DATABASE marketplace_db TO haloticket;
-GRANT ALL PRIVILEGES ON DATABASE keycloak_db TO haloticket;
+-- The PostgreSQL entrypoint runs this script as POSTGRES_USER. That user owns
+-- every database it creates, so no grant to a hard-coded role is required.

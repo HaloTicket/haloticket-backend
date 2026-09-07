@@ -342,11 +342,11 @@
       "emailVerified": true,
       "firstName": "Admin",
       "lastName": "HaloTicket",
-      "email": "admin@haloticket.com",
+      "email": "admin@haloticket.vn",
       "credentials": [
         {
           "type": "password",
-          "value": "admin123",
+          "value": "HaloAdmin@2026",
           "temporary": false
         }
       ],
@@ -364,11 +364,11 @@
       "emailVerified": true,
       "firstName": "Organizer",
       "lastName": "HaloTicket",
-      "email": "organizer@haloticket.com",
+      "email": "organizer@haloticket.vn",
       "credentials": [
         {
           "type": "password",
-          "value": "organizer123",
+          "value": "HaloOrganizer@2026",
           "temporary": false
         }
       ],
@@ -390,7 +390,7 @@
       "credentials": [
         {
           "type": "password",
-          "value": "user123",
+          "value": "HaloUser@2026",
           "temporary": false
         }
       ],
@@ -410,6 +410,85 @@
           "query-users"
         ]
       }
+    },
+    {
+      "id": "e0000000-0000-0000-0000-000000000005",
+      "username": "staff",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Staff",
+      "lastName": "HaloTicket",
+      "email": "staff@haloticket.vn",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "HaloStaff@2026",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ROLE_STAFF",
+        "ROLE_USER"
+      ]
+    },
+    {
+      "id": "e0000000-0000-0000-0000-000000000004",
+      "username": "customer",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Customer",
+      "lastName": "HaloTicket",
+      "email": "customer@haloticket.vn",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "HaloCustomer@2026",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ROLE_USER"
+      ]
+    },
+    {
+      "id": "e0000000-0000-0000-0000-000000000006",
+      "username": "hoangdung",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Hoangdung",
+      "lastName": "HaloTicket",
+      "email": "hoangdung@haloticket.vn",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "HaloOrganizer@2026",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ROLE_ORGANIZER",
+        "ROLE_USER"
+      ]
+    },
+    {
+      "id": "e0000000-0000-0000-0000-000000000007",
+      "username": "seller1",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Seller1",
+      "lastName": "HaloTicket",
+      "email": "seller1@haloticket.vn",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "HaloSeller@2026",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "ROLE_USER"
+      ]
     }
-  ]
+  ],
+  "passwordPolicy": "length(8) and maxLength(32) and lowerCase(1) and upperCase(1) and digits(1) and specialChars(1)"
 }

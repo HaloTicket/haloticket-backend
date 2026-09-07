@@ -1,5 +1,8 @@
 -- SQL Seed Data Script for HaloTicket Microservices Platform
 -- Creates tables (if not exist) and inserts initial sample data matching frontend mock data for each service DB
+-- Run with psql -f (or docker cp + psql -f), never a Windows text pipeline.
+\set ON_ERROR_STOP on
+\encoding UTF8
 
 -- 1. USER DB (user_db)
 \c user_db;
@@ -44,12 +47,12 @@ CREATE TABLE IF NOT EXISTS ekyc_profiles (
 
 INSERT INTO users (id, keycloak_id, email, full_name, phone_number, avatar_url, is_active, gender, status, created_at, updated_at)
 VALUES 
-('11111111-1111-1111-1111-111111111111', 'kc-admin-001', 'admin@haloticket.vn', 'Trần Long Vũ (Admin)', '0901234567', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', true, 'MALE', 'ACTIVE', NOW(), NOW()),
-('22222222-2222-2222-2222-222222222222', 'kc-organizer-001', 'organizer@haloticket.vn', 'Nhà Hát Kịch IDECAF', '0912345678', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', true, 'MALE', 'ACTIVE', NOW(), NOW()),
-('33333333-3333-3333-3333-333333333333', 'kc-staff-001', 'staff@haloticket.vn', 'Nguyễn Văn Soát Vé', '0987654321', 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200', true, 'MALE', 'ACTIVE', NOW(), NOW()),
-('44444444-4444-4444-4444-444444444444', 'kc-customer-001', 'customer@haloticket.vn', 'Lê Thị Mua Vé', '0933445566', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200', true, 'FEMALE', 'ACTIVE', NOW(), NOW()),
-('55555555-5555-5555-5555-555555555555', 'kc-organizer-002', 'hoangdung@haloticket.vn', 'Hoàng Dũng Entertainment', '0977889900', 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=200', true, 'MALE', 'ACTIVE', NOW(), NOW()),
-('66666666-6666-6666-6666-666666666666', 'kc-seller-001', 'seller1@haloticket.vn', 'Nguyễn Văn Nhượng Vé', '0911223344', 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200', true, 'MALE', 'ACTIVE', NOW(), NOW())
+('11111111-1111-1111-1111-111111111111', 'e0000000-0000-0000-0000-000000000001', 'admin@haloticket.vn', 'Trần Long Vũ (Admin)', '0901234567', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200', true, 'MALE', 'ACTIVE', NOW(), NOW()),
+('22222222-2222-2222-2222-222222222222', 'e0000000-0000-0000-0000-000000000002', 'organizer@haloticket.vn', 'Nhà Hát Kịch IDECAF', '0912345678', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', true, 'MALE', 'ACTIVE', NOW(), NOW()),
+('33333333-3333-3333-3333-333333333333', 'e0000000-0000-0000-0000-000000000005', 'staff@haloticket.vn', 'Nguyễn Văn Soát Vé', '0987654321', 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200', true, 'MALE', 'ACTIVE', NOW(), NOW()),
+('44444444-4444-4444-4444-444444444444', 'e0000000-0000-0000-0000-000000000004', 'customer@haloticket.vn', 'Lê Thị Mua Vé', '0933445566', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200', true, 'FEMALE', 'ACTIVE', NOW(), NOW()),
+('55555555-5555-5555-5555-555555555555', 'e0000000-0000-0000-0000-000000000006', 'hoangdung@haloticket.vn', 'Hoàng Dũng Entertainment', '0977889900', 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=200', true, 'MALE', 'ACTIVE', NOW(), NOW()),
+('66666666-6666-6666-6666-666666666666', 'e0000000-0000-0000-0000-000000000007', 'seller1@haloticket.vn', 'Nguyễn Văn Nhượng Vé', '0911223344', 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=200', true, 'MALE', 'ACTIVE', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO user_roles (user_id, role)
@@ -202,9 +205,30 @@ VALUES
 ('log-003', 'Pickleball World Cup', 750, NOW())
 ON CONFLICT (id) DO NOTHING;
 
+<<<<<<< Updated upstream
+=======
+-- Seed Cast for NXNX37 & Events
+INSERT INTO event_cast (event_id, actor_name)
+SELECT seed.event_id, seed.actor_name FROM (VALUES
+('nxnx37-hoc-vien-phep-thuat', 'Bạch Long'),
+('nxnx37-hoc-vien-phep-thuat', 'Thanh Thuỷ'),
+('xoay-tron-concert-hoang-dung', 'Hoàng Dũng')
+) AS seed(event_id, actor_name)
+WHERE NOT EXISTS (
+    SELECT 1 FROM event_cast existing
+    WHERE existing.event_id = seed.event_id AND existing.actor_name = seed.actor_name
+);
+
+>>>>>>> Stashed changes
 -- Seed Gallery Images
-INSERT INTO event_gallery (event_id, image_url) VALUES
-('nxnx37-hoc-vien-phep-thuat', 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=800&q=80');
+INSERT INTO event_gallery (event_id, image_url)
+SELECT seed.event_id, seed.image_url FROM (VALUES
+('nxnx37-hoc-vien-phep-thuat', 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=800&q=80')
+) AS seed(event_id, image_url)
+WHERE NOT EXISTS (
+    SELECT 1 FROM event_gallery existing
+    WHERE existing.event_id = seed.event_id AND existing.image_url = seed.image_url
+);
 
 INSERT INTO event_organizer_mapping (event_id, organizer_id)
 VALUES
