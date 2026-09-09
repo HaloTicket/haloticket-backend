@@ -1,9 +1,16 @@
 package com.haloticket.ticket_service.service.impl;
 
+import com.haloticket.ticket_service.dto.request.SeatLayoutRequest;
 import com.haloticket.ticket_service.dto.request.TicketTypeCreateRequest;
+import com.haloticket.ticket_service.dto.response.SeatLayoutResponse;
 import com.haloticket.ticket_service.dto.response.TicketTypeResponse;
+import com.haloticket.ticket_service.entity.SeatLayout;
+import com.haloticket.ticket_service.entity.SeatZone;
 import com.haloticket.ticket_service.entity.TicketType;
+import com.haloticket.ticket_service.enums.SeatLayoutStatus;
 import com.haloticket.ticket_service.enums.TicketTypeStatus;
+import com.haloticket.ticket_service.repository.SeatLayoutRepository;
+import com.haloticket.ticket_service.repository.SeatZoneRepository;
 import com.haloticket.ticket_service.repository.TicketTypeRepository;
 import com.haloticket.ticket_service.service.TicketService;
 import lombok.RequiredArgsConstructor;
@@ -13,12 +20,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class TicketServiceImpl implements TicketService {
 
     private final TicketTypeRepository ticketTypeRepository;
+    private final SeatLayoutRepository seatLayoutRepository;
+    private final SeatZoneRepository seatZoneRepository;
 
     @Override
     @Transactional
@@ -132,6 +142,122 @@ public class TicketServiceImpl implements TicketService {
                 .endSaleDate(entity.getEndSaleDate() != null ? entity.getEndSaleDate().toString() : null)
                 .description(entity.getDescription())
                 .status(entity.getTicketTypeStatus())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public SeatLayoutResponse saveSeatLayoutDraft(String eventId, SeatLayoutRequest request) {
+        return processSaveSeatLayout(eventId, request, SeatLayoutStatus.DRAFT);
+    }
+
+    @Override
+    @Transactional
+    public SeatLayoutResponse publishSeatLayout(String eventId, SeatLayoutRequest request) {
+        return processSaveSeatLayout(eventId, request, SeatLayoutStatus.PUBLISHED);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SeatLayoutResponse getSeatLayoutByEventId(String eventId) {
+        if (eventId == null || eventId.trim().isEmpty()) {
+            return null;
+        }
+        Optional<SeatLayout> layoutOpt = seatLayoutRepository.findByEventId(eventId);
+        if (layoutOpt.isEmpty()) {
+            return null;
+        }
+        SeatLayout layout = layoutOpt.get();
+        layout.setSeatZones(seatZoneRepository.findBySeatLayoutId(layout.getId()));
+        return mapLayoutToResponse(layout);
+    }
+
+    private SeatLayoutResponse processSaveSeatLayout(String eventId, SeatLayoutRequest request, SeatLayoutStatus status) {
+        String targetEventId = (eventId != null && !eventId.trim().isEmpty()) ? eventId : request.getEventId();
+        if (targetEventId == null || targetEventId.trim().isEmpty()) {
+            throw new IllegalArgumentException("eventId is required for SeatLayout");
+        }
+
+        SeatLayout layout = seatLayoutRepository.findByEventId(targetEventId)
+                .orElseGet(() -> SeatLayout.builder()
+                        .eventId(targetEventId)
+                        .status(status)
+                        .build());
+
+        layout.setStatus(status);
+        if (request.getDraftJson() != null) layout.setDraftJson(request.getDraftJson());
+        if (request.getSvgData() != null) layout.setSvgData(request.getSvgData());
+        if (request.getImageUrl() != null) layout.setImageUrl(request.getImageUrl());
+
+        SeatLayout savedLayout = seatLayoutRepository.save(layout);
+
+        if (request.getZones() != null) {
+            // Remove existing zones cleanly for layout
+            seatZoneRepository.deleteBySeatLayoutId(savedLayout.getId());
+
+            List<SeatZone> zoneEntities = new ArrayList<>();
+            for (SeatLayoutRequest.ZoneDto zDto : request.getZones()) {
+                SeatZone zone = SeatZone.builder()
+                        .seatLayout(savedLayout)
+                        .name(zDto.getName() != null ? zDto.getName() : "Khu vực mới")
+                        .ticketTypeId(zDto.getTicketTypeId())
+                        .shapeType(zDto.getShapeType() != null ? zDto.getShapeType() : "RECTANGLE")
+                        .colorCode(zDto.getColorCode())
+                        .fillColor(zDto.getFillColor())
+                        .strokeColor(zDto.getStrokeColor())
+                        .curvature(zDto.getCurvature())
+                        .x(zDto.getX())
+                        .y(zDto.getY())
+                        .width(zDto.getWidth())
+                        .height(zDto.getHeight())
+                        .rotation(zDto.getRotation())
+                        .points(zDto.getPoints())
+                        .capacity(zDto.getCapacity())
+                        .build();
+                zoneEntities.add(zone);
+            }
+            List<SeatZone> savedZones = seatZoneRepository.saveAll(zoneEntities);
+            savedLayout.setSeatZones(savedZones);
+        } else {
+            savedLayout.setSeatZones(seatZoneRepository.findBySeatLayoutId(savedLayout.getId()));
+        }
+
+        return mapLayoutToResponse(savedLayout);
+    }
+
+    private SeatLayoutResponse mapLayoutToResponse(SeatLayout layout) {
+        if (layout == null) return null;
+        List<SeatLayoutResponse.ZoneResponseDto> zoneDtos = new ArrayList<>();
+        if (layout.getSeatZones() != null) {
+            for (SeatZone z : layout.getSeatZones()) {
+                zoneDtos.add(SeatLayoutResponse.ZoneResponseDto.builder()
+                        .id(z.getId())
+                        .name(z.getName())
+                        .ticketTypeId(z.getTicketTypeId())
+                        .shapeType(z.getShapeType())
+                        .colorCode(z.getColorCode())
+                        .fillColor(z.getFillColor())
+                        .strokeColor(z.getStrokeColor())
+                        .curvature(z.getCurvature())
+                        .x(z.getX())
+                        .y(z.getY())
+                        .width(z.getWidth())
+                        .height(z.getHeight())
+                        .rotation(z.getRotation())
+                        .points(z.getPoints())
+                        .capacity(z.getCapacity())
+                        .build());
+            }
+        }
+
+        return SeatLayoutResponse.builder()
+                .id(layout.getId())
+                .eventId(layout.getEventId())
+                .draftJson(layout.getDraftJson())
+                .svgData(layout.getSvgData())
+                .imageUrl(layout.getImageUrl())
+                .status(layout.getStatus() != null ? layout.getStatus().name() : null)
+                .zones(zoneDtos)
                 .build();
     }
 }

@@ -34,6 +34,79 @@ public class DataInitializer implements CommandLineRunner {
 
         log.info("Initializing sample data for Event Service...");
 
+        // 0. Preset Venues
+        Venue myDinh = Venue.builder()
+                .name("Sân vận động Quốc gia Mỹ Đình")
+                .address("Đường Lê Đức Thọ, Phường Mỹ Đình 1, Quận Nam Từ Liêm")
+                .city("Hà Nội")
+                .ward("Phường Mỹ Đình 1")
+                .capacity(40000)
+                .type("outdoor")
+                .verified(true)
+                .eventsHosted(25)
+                .build();
+        entityManager.merge(myDinh);
+
+        Venue phuTho = Venue.builder()
+                .name("Nhà thi đấu Phú Thọ")
+                .address("1 Lý Thường Kiệt, Phường 15, Quận 11")
+                .city("TP.Hồ Chí Minh")
+                .ward("Phường 15")
+                .capacity(5000)
+                .type("indoor")
+                .verified(true)
+                .eventsHosted(18)
+                .build();
+        entityManager.merge(phuTho);
+
+        Venue ncc = Venue.builder()
+                .name("Trung tâm Hội nghị Quốc gia")
+                .address("57 Phạm Hùng, Phường Mễ Trì, Quận Nam Từ Liêm")
+                .city("Hà Nội")
+                .ward("Phường Mễ Trì")
+                .capacity(3800)
+                .type("indoor")
+                .verified(true)
+                .eventsHosted(30)
+                .build();
+        entityManager.merge(ncc);
+
+        Venue hoaBinh = Venue.builder()
+                .name("Nhà hát Hòa Bình")
+                .address("240 3 Tháng 2, Phường 12, Quận 10")
+                .city("TP.Hồ Chí Minh")
+                .ward("Phường 12")
+                .capacity(2500)
+                .type("indoor")
+                .verified(true)
+                .eventsHosted(12)
+                .build();
+        entityManager.merge(hoaBinh);
+
+        Venue quanNguai = Venue.builder()
+                .name("Cung Thể thao Quần Ngựa")
+                .address("30 Văn Cao, Phường Liễu Giai, Quận Ba Đình")
+                .city("Hà Nội")
+                .ward("Phường Liễu Giai")
+                .capacity(5500)
+                .type("hybrid")
+                .verified(true)
+                .eventsHosted(10)
+                .build();
+        entityManager.merge(quanNguai);
+
+        Venue gemCenter = Venue.builder()
+                .name("Trung tâm Hội nghị GEM Center")
+                .address("8 Nguyễn Bỉnh Khiêm, Đa Kao, Quận 1")
+                .city("TP.Hồ Chí Minh")
+                .ward("Phường Đa Kao")
+                .capacity(1200)
+                .type("indoor")
+                .verified(true)
+                .eventsHosted(45)
+                .build();
+        entityManager.merge(gemCenter);
+
         // 1. Categories
         EventCategory musicCat = EventCategory.builder()
                 .id("cat-001")

@@ -23,8 +23,32 @@ public class SeatZone {
     @Column(nullable = false)
     private String name;
 
+    @Column(name = "ticket_type_id")
+    private String ticketTypeId;
+
+    @Column(name = "shape_type")
+    private String shapeType; // RECTANGLE, CIRCLE, POLYGON, PATH_CURVED
+
     @Column(name = "color_code")
     private String colorCode;
+
+    @Column(name = "fill_color")
+    private String fillColor;
+
+    @Column(name = "stroke_color")
+    private String strokeColor;
+
+    @Column(name = "curvature")
+    private Double curvature;
+
+    private Double x;
+    private Double y;
+    private Double width;
+    private Double height;
+    private Double rotation;
+
+    @Column(name = "points", columnDefinition = "TEXT")
+    private String points;
 
     private Integer capacity;
 

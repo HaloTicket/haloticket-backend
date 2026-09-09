@@ -24,6 +24,12 @@ public class SeatLayout {
     @Column(name = "svg_data", columnDefinition = "TEXT")
     private String svgData;
 
+    @Column(name = "draft_json", columnDefinition = "TEXT")
+    private String draftJson;
+
+    @Column(name = "image_url", columnDefinition = "TEXT")
+    private String imageUrl;
+
     @Enumerated(EnumType.STRING)
     private SeatLayoutStatus status;
 

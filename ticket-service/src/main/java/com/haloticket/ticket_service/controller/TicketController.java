@@ -8,6 +8,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import com.haloticket.ticket_service.dto.request.SeatLayoutRequest;
+import com.haloticket.ticket_service.dto.response.SeatLayoutResponse;
+
 import java.util.List;
 
 @RestController
@@ -33,6 +36,33 @@ public class TicketController {
     @GetMapping("/types/event/{eventId}")
     public ResponseEntity<List<TicketTypeResponse>> getTicketTypesByEventId(@PathVariable("eventId") String eventId) {
         List<TicketTypeResponse> response = ticketService.getTicketTypesByEventId(eventId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/seat-layouts/event/{eventId}")
+    public ResponseEntity<SeatLayoutResponse> getSeatLayoutByEventId(@PathVariable("eventId") String eventId) {
+        SeatLayoutResponse response = ticketService.getSeatLayoutByEventId(eventId);
+        if (response == null) {
+            response = SeatLayoutResponse.builder()
+                    .eventId(eventId)
+                    .status("DRAFT")
+                    .zones(List.of())
+                    .build();
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/seat-layouts/event/{eventId}/draft")
+    public ResponseEntity<SeatLayoutResponse> saveSeatLayoutDraft(@PathVariable("eventId") String eventId,
+                                                                    @RequestBody SeatLayoutRequest request) {
+        SeatLayoutResponse response = ticketService.saveSeatLayoutDraft(eventId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/seat-layouts/event/{eventId}/publish")
+    public ResponseEntity<SeatLayoutResponse> publishSeatLayout(@PathVariable("eventId") String eventId,
+                                                                  @RequestBody SeatLayoutRequest request) {
+        SeatLayoutResponse response = ticketService.publishSeatLayout(eventId, request);
         return ResponseEntity.ok(response);
     }
 }
