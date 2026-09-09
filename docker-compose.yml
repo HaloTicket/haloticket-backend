@@ -45,9 +45,7 @@ x-dependencies: &dependencies
     condition: service_healthy
 
 services:
-  # ============================================================================
-  # Infrastructure Services (Tối ưu RAM & Disk cho Server Giá Rẻ)
-  # ============================================================================
+  # Infrastructure Services
 
   # PostgreSQL Database
   postgres:
@@ -56,7 +54,7 @@ services:
     container_name: haloticket-postgres
     restart: unless-stopped
     logging: *logging
-    command: postgres -c shared_buffers=64MB -c work_mem=4MB -c maintenance_work_mem=16MB -c max_connections=40
+    command: postgres -c shared_buffers=64MB -c work_mem=4MB -c maintenance_work_mem=16MB -c max_connections=200
     ports:
       - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_PORT:-5433}:5432"
     environment:
@@ -179,9 +177,7 @@ services:
     networks:
       - haloticket-network
 
-  # ============================================================================
-  # Application Microservices (Tối ưu JVM SerialGC, Stack 256k & Heap 128-160M)
-  # ============================================================================
+  # Application Microservices
 
   discovery-server:
     <<: *runtime
