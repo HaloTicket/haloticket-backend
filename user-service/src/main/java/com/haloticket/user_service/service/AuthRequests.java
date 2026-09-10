@@ -9,4 +9,5 @@ public final class AuthRequests {
     public record OtpVerify(String challengeId, String otp) {}
     public record PasswordReset(String resetToken, String password) {}
     public record Login(String email, String password) {}
+    public record Refresh(String refreshToken, String clientId) {}
 }

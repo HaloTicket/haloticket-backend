@@ -75,6 +75,12 @@ public class AuthController {
         return ResponseEntity.ok(service.login(new AuthRequests.Login(request.email(), request.password())));
     }
 
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponses.Login> refresh(@RequestBody RefreshRequest request) {
+        requireText(request.refreshToken(), "refreshToken");
+        return ResponseEntity.ok(service.refresh(new AuthRequests.Refresh(request.refreshToken(), request.clientId())));
+    }
+
     private AuthResponses.Challenge challenge(AuthOtpChallengeService.CreateResult result) {
         return new AuthResponses.Challenge(result.challenge().getId(), result.challenge().getExpiresAt(), result.challenge().getResendAvailableAt());
     }
@@ -107,6 +113,7 @@ public class AuthController {
     public record OtpVerifyRequest(String challengeId, String otp) {}
     public record PasswordResetRequest(String resetToken, String password) {}
     public record LoginRequest(String email, String password) {}
+    public record RefreshRequest(String refreshToken, String clientId) {}
 
     @ExceptionHandler(AuthApplicationService.AuthException.class)
     ResponseEntity<AuthResponses.Error> handleAuth(AuthApplicationService.AuthException exception) {

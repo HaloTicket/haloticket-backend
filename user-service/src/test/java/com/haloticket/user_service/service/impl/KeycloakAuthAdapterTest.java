@@ -30,6 +30,25 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 class KeycloakAuthAdapterTest {
 
+    @Test
+    void refreshExchangesAndReturnsRotatedTokens() {
+        mockServer.expect(requestTo("http://localhost:9080/realms/haloticket-realm/protocol/openid-connect/token"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().string(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.containsString("grant_type=refresh_token"),
+                        org.hamcrest.Matchers.containsString("refresh_token=old-refresh"))))
+                .andRespond(withSuccess("""
+                        {"access_token":"fresh-access","refresh_token":"fresh-refresh","id_token":"fresh-id","expires_in":1800}
+                        """, MediaType.APPLICATION_JSON));
+
+        AuthResponses.Login refreshed = adapter.refresh("old-refresh", "user-service");
+
+        assertThat(refreshed.accessToken()).isEqualTo("fresh-access");
+        assertThat(refreshed.refreshToken()).isEqualTo("fresh-refresh");
+        assertThat(refreshed.expiresIn()).isEqualTo(1800);
+        mockServer.verify();
+    }
+
     private RestClient.Builder restClientBuilder;
     private MockRestServiceServer mockServer;
     private UserRepository userRepository;

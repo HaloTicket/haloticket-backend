@@ -103,6 +103,14 @@ public class AuthApplicationServiceImpl implements AuthApplicationService {
         return keycloak.login(request.email(), request.password());
     }
 
+    @Override
+    public AuthResponses.Login refresh(AuthRequests.Refresh request) {
+        if (request == null || request.refreshToken() == null || request.refreshToken().isBlank()) {
+            throw new AuthException("INVALID_REFRESH_TOKEN", "Refresh token is required", 400);
+        }
+        return keycloak.refresh(request.refreshToken(), request.clientId());
+    }
+
     private void deliver(AuthOtpChallengeService.CreateResult result, String email, OtpPurpose purpose) {
         if (result.plaintextOtp() != null) {
             delivery.send(email, purpose, result.plaintextOtp(), result.challenge().getExpiresAt());

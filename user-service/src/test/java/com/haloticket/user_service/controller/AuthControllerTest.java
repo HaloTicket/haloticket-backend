@@ -31,6 +31,8 @@ class AuthControllerTest {
         when(authService.resendRegistration(any())).thenReturn(new AuthOtpChallengeService.CreateResult(challenge, null));
         when(authService.startPasswordReset(any())).thenReturn(new AuthOtpChallengeService.CreateResult(challenge, null));
         when(authService.resendPasswordReset(any())).thenReturn(new AuthOtpChallengeService.CreateResult(challenge, null));
+        when(authService.refresh(any())).thenReturn(new com.haloticket.user_service.service.AuthResponses.Login(
+                "fresh-access", "fresh-refresh", "fresh-id", 1800));
         mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(authService)).build();
     }
 
@@ -72,10 +74,21 @@ class AuthControllerTest {
     void allAuthContractRoutesAreMapped() throws Exception {
         for (String path : new String[]{"/api/auth/register/verify", "/api/auth/register/resend",
                 "/api/auth/password/forgot", "/api/auth/password/verify", "/api/auth/password/resend",
-                "/api/auth/password/reset", "/api/auth/login"}) {
+                "/api/auth/password/reset", "/api/auth/login", "/api/auth/refresh"}) {
             mockMvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content("{}"))
                     .andExpect(result -> org.assertj.core.api.Assertions.assertThat(result.getResponse().getStatus())
                             .isNotEqualTo(404));
         }
+    }
+
+    @Test
+    void refreshReturnsRotatedTokenSet() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"old-refresh\",\"clientId\":\"user-service\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("fresh-access"))
+                .andExpect(jsonPath("$.refreshToken").value("fresh-refresh"));
+        verify(authService).refresh(new com.haloticket.user_service.service.AuthRequests.Refresh(
+                "old-refresh", "user-service"));
     }
 }
