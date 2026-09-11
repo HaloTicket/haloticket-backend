@@ -3,12 +3,14 @@ package com.haloticket.event_service.service.impl;
 import com.haloticket.event_service.client.NotificationServiceClient;
 import com.haloticket.event_service.client.PaymentServiceClient;
 import com.haloticket.event_service.client.TicketServiceClient;
+import com.haloticket.event_service.client.UserServiceClient;
 import com.haloticket.event_service.dto.request.EventCreateRequest;
 import com.haloticket.event_service.dto.request.OrganizerPayoutAccountRequest;
 import com.haloticket.event_service.dto.response.EventCategoryResponse;
 import com.haloticket.event_service.dto.response.EventResponse;
 import com.haloticket.event_service.dto.response.OrganizerDto;
 import com.haloticket.event_service.dto.response.OrganizerPayoutAccountResponse;
+import com.haloticket.event_service.dto.response.OrganizerEligibilityResponse;
 import com.haloticket.event_service.entity.Event;
 import com.haloticket.event_service.entity.EventCategory;
 import com.haloticket.event_service.entity.EventOrganizer;
@@ -25,6 +27,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -44,6 +48,7 @@ public class EventServiceImpl implements EventService {
     private final SearchLogRepository searchLogRepository;
     private final TicketServiceClient ticketServiceClient;
     private final PaymentServiceClient paymentServiceClient;
+    private final UserServiceClient userServiceClient;
 
     @Autowired(required = false)
     private NotificationServiceClient notificationServiceClient;
@@ -54,38 +59,46 @@ public class EventServiceImpl implements EventService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    public EventResponse createEvent(EventCreateRequest request) {
+    public EventResponse createEvent(EventCreateRequest request, String authorization) {
         if (request == null)
             return null;
 
+        OrganizerEligibilityResponse eligibility = requireEligibleOrganizer(authorization);
+        String uid = eligibility.userId();
+
+        Event eventToSave;
+        if (request.getEventId() != null && !request.getEventId().isBlank()) {
+            eventToSave = eventRepository.findById(request.getEventId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND"));
+            if (!isOwnedBy(eventToSave, uid)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "EVENT_OWNERSHIP_REQUIRED");
+            }
+        } else {
+            eventToSave = new Event();
+        }
+
         // create or update Organizer profile
         List<EventOrganizer> organizers = new ArrayList<>();
+        EventOrganizer organizer = eventOrganizerRepository
+                .findFirstByUserIdOrderByCreatedAtDesc(uid)
+                .orElseGet(() -> EventOrganizer.builder()
+                        .userId(uid)
+                        .name(request.getOrganizerName())
+                        .description(request.getOrganizerInfo())
+                        .avatarUrl(request.getOrganizerLogo())
+                        .build());
+
+        organizer.setUserId(uid);
         if (request.getOrganizerName() != null && !request.getOrganizerName().trim().isEmpty()) {
-            String uid = (request.getUserId() != null && !request.getUserId().trim().isEmpty())
-                    ? request.getUserId()
-                    : "user_default_id";
-
-            EventOrganizer organizer = eventOrganizerRepository
-                    .findByName(request.getOrganizerName())
-                    .orElseGet(() -> EventOrganizer.builder()
-                            .userId(uid)
-                            .name(request.getOrganizerName())
-                            .description(request.getOrganizerInfo())
-                            .avatarUrl(request.getOrganizerLogo())
-                            .build());
-
-            if (organizer.getUserId() == null || "user_default_id".equals(organizer.getUserId())) {
-                organizer.setUserId(uid);
-            }
             organizer.setName(request.getOrganizerName());
-            if (request.getOrganizerInfo() != null)
-                organizer.setDescription(request.getOrganizerInfo());
-            if (request.getOrganizerLogo() != null)
-                organizer.setAvatarUrl(request.getOrganizerLogo());
-
-            organizer = eventOrganizerRepository.save(organizer);
-            organizers.add(organizer);
         }
+        if (request.getOrganizerInfo() != null)
+            organizer.setDescription(request.getOrganizerInfo());
+        if (request.getOrganizerLogo() != null)
+            organizer.setAvatarUrl(request.getOrganizerLogo());
+
+        organizer = eventOrganizerRepository.save(organizer);
+        organizers.add(organizer);
 
         // find category
         EventCategory category = null;
@@ -94,15 +107,6 @@ public class EventServiceImpl implements EventService {
         }
         if (category == null && request.getCategoryName() != null) {
             category = eventCategoryRepository.findByNameContainingIgnoreCase(request.getCategoryName()).orElse(null);
-        }
-
-        Event eventToSave = null;
-        if (request.getEventId() != null && !request.getEventId().trim().isEmpty()) {
-            eventToSave = eventRepository.findById(request.getEventId()).orElse(null);
-        }
-
-        if (eventToSave == null) {
-            eventToSave = new Event();
         }
 
         String eventTitle = (request.getTitle() != null && !request.getTitle().trim().isEmpty())
@@ -122,7 +126,7 @@ public class EventServiceImpl implements EventService {
             eventToSave.setBannerUrl(request.getBannerUrl());
         if (request.getGalleryImages() != null) {
             if (eventToSave.getGalleryImages() == null) {
-                eventToSave.setGalleryImages(new java.util.ArrayList<>(request.getGalleryImages()));
+                eventToSave.setGalleryImages(new ArrayList<>(request.getGalleryImages()));
             } else {
                 eventToSave.getGalleryImages().clear();
                 eventToSave.getGalleryImages().addAll(request.getGalleryImages());
@@ -166,15 +170,11 @@ public class EventServiceImpl implements EventService {
         }
 
         eventToSave.setCategory(category);
-        if (!organizers.isEmpty()) {
-            eventToSave.setOrganizers(organizers);
-        }
+        eventToSave.setOrganizers(organizers);
 
         Event saved = eventRepository.save(eventToSave);
         syncTicketsToTicketService(saved.getId(), request.getTickets());
-        String uid = (request.getUserId() != null && !request.getUserId().trim().isEmpty()) ? request.getUserId()
-                : "user_default_id";
-        syncPayoutAccountToPaymentService(uid, request);
+        syncPayoutAccountToPaymentService(uid, request, authorization);
 
         boolean isNewlySubmitted = (oldApprovalStatus == null || oldApprovalStatus == EventApprovalStatus.DRAFT)
                 && saved.getEventApprovalStatus() == EventApprovalStatus.PENDING;
@@ -188,6 +188,25 @@ public class EventServiceImpl implements EventService {
 
     }
 
+    private OrganizerEligibilityResponse requireEligibleOrganizer(String authorization) {
+        try {
+            OrganizerEligibilityResponse eligibility = userServiceClient.getOrganizerEligibility(authorization);
+            if (eligibility == null || !eligibility.eligible() || eligibility.userId() == null) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "EKYC_REQUIRED");
+            }
+            return eligibility;
+        } catch (ResponseStatusException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "EKYC_STATUS_UNAVAILABLE");
+        }
+    }
+
+    private boolean isOwnedBy(Event event, String userId) {
+        return event.getOrganizers() != null && event.getOrganizers().stream()
+                .anyMatch(organizer -> userId.equals(organizer.getUserId()));
+    }
+
     private void syncTicketsToTicketService(String eventId, List<EventCreateRequest.TicketCreateRequest> tickets) {
         if (eventId == null || tickets == null || tickets.isEmpty())
             return;
@@ -198,7 +217,7 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-    private void syncPayoutAccountToPaymentService(String userId, EventCreateRequest request) {
+    private void syncPayoutAccountToPaymentService(String userId, EventCreateRequest request, String authorization) {
         if (userId == null || request.getAccountHolder() == null || request.getAccountHolder().trim().isEmpty())
             return;
         try {
@@ -214,7 +233,7 @@ public class EventServiceImpl implements EventService {
                     .taxAddress(request.getTaxAddress())
                     .build();
 
-            paymentServiceClient.saveOrUpdatePayoutAccount(payoutReq);
+            paymentServiceClient.saveOrUpdatePayoutAccount(authorization, payoutReq);
         } catch (Exception e) {
             System.err.println("Warning: Could not sync payout account to payment-service: " + e.getMessage());
         }
@@ -234,16 +253,16 @@ public class EventServiceImpl implements EventService {
         if (userId == null)
             return null;
         try {
-            return paymentServiceClient.getPayoutAccountByUserId(userId);
+            return null;
         } catch (Exception e) {
             return null;
         }
     }
 
     @Override
-    public OrganizerDto getOrganizerProfile(String userId) {
-        String uid = (userId != null && !userId.isEmpty()) ? userId : "user_default_id";
-        return eventOrganizerRepository.findFirstByUserIdOrderByCreatedAtDesc(uid)
+    public OrganizerDto getOrganizerProfile(String authorization) {
+        String userId = requireEligibleOrganizer(authorization).userId();
+        return eventOrganizerRepository.findFirstByUserIdOrderByCreatedAtDesc(userId)
                 .map(org -> OrganizerDto.builder()
                         .id(org.getId())
                         .name(org.getName())
@@ -339,19 +358,6 @@ public class EventServiceImpl implements EventService {
             }
         }
 
-        // fetch organizer payout / banking details dynamically from payment-service
-        String orgUserId = organizerDto != null ? organizerDto.getUserId() : null;
-        OrganizerPayoutAccountResponse payoutData = fetchPayoutAccountFromPaymentService(orgUserId);
-
-        String accountHolder = payoutData != null ? payoutData.getAccountHolder() : null;
-        String accountNumber = payoutData != null ? payoutData.getAccountNumber() : null;
-        String bankName = payoutData != null ? payoutData.getBankName() : null;
-        String bankBranch = payoutData != null ? payoutData.getBankBranch() : null;
-        String businessType = payoutData != null ? payoutData.getBusinessType() : null;
-        String taxName = payoutData != null ? payoutData.getTaxName() : null;
-        String taxAddress = payoutData != null ? payoutData.getTaxAddress() : null;
-        String taxCode = payoutData != null ? payoutData.getTaxCode() : null;
-
         return EventResponse.builder()
                 .id(event.getId())
                 .title(event.getTitle())
@@ -386,14 +392,6 @@ public class EventServiceImpl implements EventService {
                 .questionScope(event.getQuestionScope())
                 .tickets(ticketsObj)
                 .customQuestions(customQuestionsObj)
-                .accountHolder(accountHolder)
-                .accountNumber(accountNumber)
-                .bankName(bankName)
-                .bankBranch(bankBranch)
-                .businessType(businessType)
-                .taxName(taxName)
-                .taxAddress(taxAddress)
-                .taxCode(taxCode)
                 .organizer(organizerDto)
                 .build();
     }

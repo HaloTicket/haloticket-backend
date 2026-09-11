@@ -229,6 +229,36 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         }
     }
 
+    @Override
+    public AuthResponses.Login refresh(String refreshToken, String clientId) {
+        String requestedClient = clientId == null || clientId.isBlank() ? properties.clientId() : clientId;
+        if (!requestedClient.equals(properties.clientId()) && !requestedClient.equals("haloticket-web")) {
+            throw new AuthException("INVALID_CLIENT", "Token client is not supported", 400);
+        }
+        String tokenUrl = properties.authServerUrl() + "/realms/" + properties.realm() + "/protocol/openid-connect/token";
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        formData.add("grant_type", "refresh_token");
+        formData.add("client_id", requestedClient);
+        formData.add("refresh_token", refreshToken);
+        if (requestedClient.equals(properties.clientId())) formData.add("client_secret", properties.clientSecret());
+        try {
+            TokenResponse response = restClient.post().uri(tokenUrl)
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED).body(formData)
+                    .retrieve().body(TokenResponse.class);
+            if (response == null || response.accessToken() == null) {
+                throw new AuthException("INVALID_REFRESH_TOKEN", "Session has expired", 401);
+            }
+            return new AuthResponses.Login(response.accessToken(), response.refreshToken(), response.idToken(), response.expiresIn());
+        } catch (HttpClientErrorException ex) {
+            if (ex.getStatusCode().value() == 400 || ex.getStatusCode().value() == 401) {
+                throw new AuthException("INVALID_REFRESH_TOKEN", "Session has expired", 401);
+            }
+            throw new AuthException("KEYCLOAK_ERROR", "Token refresh failed", ex.getStatusCode().value());
+        } catch (ResourceAccessException | HttpServerErrorException ex) {
+            throw new AuthException("KEYCLOAK_UNAVAILABLE", "Identity provider is unavailable", 503);
+        }
+    }
+
     private synchronized String obtainAdminToken() {
         Instant now = Instant.now();
         if (cachedAdminToken != null && cachedAdminToken.expiresAt().isAfter(now.plusSeconds(30))) {

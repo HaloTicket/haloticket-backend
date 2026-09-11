@@ -15,6 +15,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Set;
@@ -110,7 +111,8 @@ public class UserServiceImpl implements UserService {
 
         // Check if email collides with another user (other than current user)
         Optional<User> emailOwner = userRepository.findByEmail(targetEmail);
-        if (emailOwner.isPresent() && !user.getId().equals(emailOwner.get().getId())) {
+        if (emailOwner.isPresent() && user != emailOwner.get()
+                && (user.getId() == null || !user.getId().equals(emailOwner.get().getId()))) {
             User existingOwner = emailOwner.get();
             if (isBlank(existingOwner.getKeycloakId()) || existingOwner.getKeycloakId().startsWith("kc-")) {
                 existingOwner.setKeycloakId(keycloakId);
@@ -122,9 +124,15 @@ public class UserServiceImpl implements UserService {
         }
 
         user.setEmail(targetEmail);
-        String resolvedName = resolveName(jwt);
-        if (!isBlank(resolvedName)) {
-            user.setFullName(resolvedName);
+        if (isBlank(user.getAvatarUrl()) || user.getAvatarUrl().startsWith("blob:")) {
+            String picture = jwt.getClaimAsString("picture");
+            user.setAvatarUrl(isPublicImageUrl(picture) ? picture : null);
+        }
+        if (isBlank(user.getFullName())) {
+            String resolvedName = resolveName(jwt);
+            if (!isBlank(resolvedName)) {
+                user.setFullName(resolvedName);
+            }
         }
 
         Set<Role> rolesFromJwt = jwtRoleConverter.toApplicationRoles(jwt);
@@ -152,6 +160,9 @@ public class UserServiceImpl implements UserService {
         }
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Profile request is required");
+        }
+        if (!isBlank(request.getAvatarUrl()) && !isPublicImageUrl(request.getAvatarUrl())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Avatar must be an HTTPS image URL");
         }
         User user = userRepository.findByKeycloakId(keycloakId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
@@ -191,5 +202,15 @@ public class UserServiceImpl implements UserService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private boolean isPublicImageUrl(String value) {
+        if (isBlank(value)) return false;
+        try {
+            URI uri = URI.create(value);
+            return "https".equalsIgnoreCase(uri.getScheme()) && uri.getHost() != null && uri.getUserInfo() == null;
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
     }
 }

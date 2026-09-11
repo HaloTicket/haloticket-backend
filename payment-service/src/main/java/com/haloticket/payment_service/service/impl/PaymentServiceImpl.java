@@ -7,12 +7,15 @@ import com.haloticket.payment_service.dto.response.PaymentResponse;
 import com.haloticket.payment_service.entity.OrganizerPayoutAccount;
 import com.haloticket.payment_service.entity.Payment;
 import com.haloticket.payment_service.enums.PaymentStatus;
+import com.haloticket.payment_service.enums.PayoutAccountVerificationStatus;
 import com.haloticket.payment_service.repository.OrganizerPayoutAccountRepository;
 import com.haloticket.payment_service.repository.PaymentRepository;
 import com.haloticket.payment_service.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Objects;
 
 @Service
 public class PaymentServiceImpl implements PaymentService {
@@ -55,7 +58,15 @@ public class PaymentServiceImpl implements PaymentService {
                 .findByOrganizerUserId(request.getOrganizerUserId())
                 .orElseGet(() -> OrganizerPayoutAccount.builder()
                         .organizerUserId(request.getOrganizerUserId())
+                        .isVerified(false)
+                        .verificationStatus(PayoutAccountVerificationStatus.UNVERIFIED)
+                        .accountVersion(0L)
                         .build());
+
+        boolean bankIdentityChanged = differs(request.getAccountHolder(), account.getAccountHolder())
+                || differs(request.getAccountNumber(), account.getAccountNumber())
+                || differs(request.getBankName(), account.getBankName())
+                || !Objects.equals(request.getIdentityVersion(), account.getIdentityVersion());
 
         if (request.getAccountHolder() != null) account.setAccountHolder(request.getAccountHolder());
         if (request.getAccountNumber() != null) account.setAccountNumber(request.getAccountNumber());
@@ -65,6 +76,15 @@ public class PaymentServiceImpl implements PaymentService {
         if (request.getTaxName() != null) account.setTaxName(request.getTaxName());
         if (request.getTaxCode() != null) account.setTaxCode(request.getTaxCode());
         if (request.getTaxAddress() != null) account.setTaxAddress(request.getTaxAddress());
+
+        if (bankIdentityChanged) {
+            account.setIsVerified(false);
+            account.setVerificationStatus(PayoutAccountVerificationStatus.UNVERIFIED);
+            account.setVerificationReference(null);
+            account.setVerifiedAt(null);
+            account.setAccountVersion((account.getAccountVersion() == null ? 0L : account.getAccountVersion()) + 1L);
+        }
+        account.setIdentityVersion(request.getIdentityVersion());
 
         OrganizerPayoutAccount saved = organizerPayoutAccountRepository.save(account);
         return mapToPayoutResponse(saved);
@@ -91,7 +111,17 @@ public class PaymentServiceImpl implements PaymentService {
                 .taxName(entity.getTaxName())
                 .taxCode(entity.getTaxCode())
                 .taxAddress(entity.getTaxAddress())
-                .isVerified(entity.getIsVerified())
+                .isVerified(Boolean.TRUE.equals(entity.getIsVerified())
+                        && entity.getVerificationStatus() == PayoutAccountVerificationStatus.VERIFIED
+                        && entity.getVerificationReference() != null && entity.getVerifiedAt() != null
+                        && entity.getIdentityVersion() != null)
+                .verificationStatus(entity.getVerificationStatus())
+                .accountVersion(entity.getAccountVersion())
+                .identityVersion(entity.getIdentityVersion())
                 .build();
+    }
+
+    private boolean differs(String incoming, String existing) {
+        return incoming != null && !Objects.equals(incoming.trim(), existing == null ? null : existing.trim());
     }
 }

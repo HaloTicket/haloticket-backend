@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.StringUtils;
 
 @Configuration
 @EnableWebSecurity
@@ -29,7 +30,7 @@ public class SecurityConfig {
     @Bean
     JwtDecoder jwtDecoder() {
         // Containers fetch keys internally while tokens retain their public issuer.
-        NimbusJwtDecoder decoder = org.springframework.util.StringUtils.hasText(jwkSetUri)
+        NimbusJwtDecoder decoder = StringUtils.hasText(jwkSetUri)
                 ? NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build()
                 : NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(

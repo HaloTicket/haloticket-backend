@@ -9,4 +9,5 @@ public interface KeycloakAuthPort {
     String issueResetToken(String challengeId);
     void resetPassword(String resetToken, String password);
     AuthResponses.Login login(String email, String password);
+    AuthResponses.Login refresh(String refreshToken, String clientId);
 }

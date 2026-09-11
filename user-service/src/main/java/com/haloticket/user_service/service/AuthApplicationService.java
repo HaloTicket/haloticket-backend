@@ -9,6 +9,7 @@ public interface AuthApplicationService {
     AuthOtpChallengeService.CreateResult resendPasswordReset(AuthRequests.Challenge request);
     void resetPassword(AuthRequests.PasswordReset request);
     AuthResponses.Login login(AuthRequests.Login request);
+    AuthResponses.Login refresh(AuthRequests.Refresh request);
 
     class AuthException extends RuntimeException {
         private final String code;

@@ -1,5 +1,6 @@
 package com.haloticket.payment_service.dto.response;
 
+import com.haloticket.payment_service.enums.PayoutAccountVerificationStatus;
 import lombok.Builder;
 import lombok.Data;
 
@@ -17,4 +18,7 @@ public class OrganizerPayoutAccountResponse {
     private String taxCode;
     private String taxAddress;
     private Boolean isVerified;
+    private PayoutAccountVerificationStatus verificationStatus;
+    private Long accountVersion;
+    private Long identityVersion;
 }

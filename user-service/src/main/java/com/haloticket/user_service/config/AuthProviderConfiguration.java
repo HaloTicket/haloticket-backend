@@ -47,6 +47,7 @@ public class AuthProviderConfiguration {
             public String issueResetToken(String challengeId) { throw unavailable(); }
             public void resetPassword(String resetToken, String password) { throw unavailable(); }
             public AuthResponses.Login login(String email, String password) { throw unavailable(); }
+            public AuthResponses.Login refresh(String refreshToken, String clientId) { throw unavailable(); }
             private AuthException unavailable() {
                 return new AuthException("KEYCLOAK_UNAVAILABLE", "Identity provider is unavailable", 503);
             }
