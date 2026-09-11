@@ -9,8 +9,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/events")
@@ -20,13 +23,19 @@ public class EventController {
     private final EventService eventService;
 
     @PostMapping
-    public ResponseEntity<EventResponse> createEvent(@RequestBody EventCreateRequest request) {
-        return new ResponseEntity<>(eventService.createEvent(request), HttpStatus.CREATED);
+    public ResponseEntity<EventResponse> createEvent(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody EventCreateRequest request
+    ) {
+        return new ResponseEntity<>(eventService.createEvent(request, authorization), HttpStatus.CREATED);
     }
 
     @GetMapping("/organizer-profile")
-    public ResponseEntity<OrganizerDto> getOrganizerProfile(@RequestParam(required = false) String userId) {
-        OrganizerDto dto = eventService.getOrganizerProfile(userId);
+    public ResponseEntity<OrganizerDto> getOrganizerProfile(
+            @RequestHeader("Authorization") String authorization,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        OrganizerDto dto = eventService.getOrganizerProfile(authorization);
         if (dto == null) {
             return ResponseEntity.noContent().build();
         }
@@ -56,7 +65,7 @@ public class EventController {
     @PatchMapping("/{id}/reject")
     public ResponseEntity<EventResponse> rejectEvent(
             @PathVariable String id,
-            @RequestBody(required = false) java.util.Map<String, String> body) {
+            @RequestBody(required = false) Map<String, String> body) {
         String reason = body != null ? body.get("reason") : "Không đạt tiêu chuẩn kiểm duyệt";
         String notes = body != null ? body.get("notes") : "";
         return ResponseEntity.ok(eventService.rejectEvent(id, reason, notes));

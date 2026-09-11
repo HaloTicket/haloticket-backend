@@ -2,6 +2,8 @@ server:
   port: 8081
 
 spring:
+  config:
+    import: optional:file:../.env[.properties],optional:file:.env[.properties]
   application:
     name: user-service
   kafka:
@@ -27,6 +29,10 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 30MB
 
 eureka:
   client:
@@ -47,3 +53,13 @@ keycloak:
   realm: ${KEYCLOAK_REALM:haloticket-realm}
   client-id: ${KEYCLOAK_CLIENT_ID:user-service}
   client-secret: ${KEYCLOAK_CLIENT_SECRET:user-service-secret}
+
+ekyc:
+  fingerprint-secret: ${EKYC_FINGERPRINT_SECRET:}
+  minimum-face-match-score: ${EKYC_MINIMUM_FACE_MATCH_SCORE:0.9}
+  vnpt:
+    enabled: ${VNPT_EKYC_ENABLED:false}
+    base-url: ${VNPT_EKYC_BASE_URL:https://api.idg.vnpt.vn}
+    token-id: ${VNPT_EKYC_TOKEN_ID:}
+    token-key: ${VNPT_EKYC_TOKEN_KEY:}
+    access-token: ${VNPT_EKYC_ACCESS_TOKEN:}

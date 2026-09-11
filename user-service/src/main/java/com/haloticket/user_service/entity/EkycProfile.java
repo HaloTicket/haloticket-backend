@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "ekyc_profiles")
@@ -31,6 +32,12 @@ public class EkycProfile {
 
     @Column(name = "document_number")
     private String documentNumber;
+
+    @Column(name = "document_number_hash", unique = true, length = 64)
+    private String documentNumberHash;
+
+    @Column(name = "legal_name")
+    private String legalName;
 
     @Column(name = "front_image_url")
     private String frontImageUrl;
@@ -68,8 +75,17 @@ public class EkycProfile {
     @Enumerated(EnumType.STRING)
     private EkycVerificationStatus status;
 
+    @Column(name = "identity_version")
+    private Long identityVersion;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "accepted_attempt_id")
+    private EkycAttempt acceptedAttempt;
+
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
+
+    private LocalDate documentExpiresOn;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -83,6 +99,9 @@ public class EkycProfile {
         this.updatedAt = LocalDateTime.now();
         if (this.status == null) {
             this.status = EkycVerificationStatus.PENDING;
+        }
+        if (this.identityVersion == null) {
+            this.identityVersion = 1L;
         }
     }
 

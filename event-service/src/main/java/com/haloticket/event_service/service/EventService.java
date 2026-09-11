@@ -8,13 +8,13 @@ import com.haloticket.event_service.dto.response.OrganizerDto;
 import java.util.List;
 
 public interface EventService {
-    EventResponse createEvent(EventCreateRequest request);
+    EventResponse createEvent(EventCreateRequest request, String authorization);
     List<EventResponse> getAllEvents();
     EventResponse getEventById(String id);
     List<EventCategoryResponse> getAllCategories();
     List<String> getTopSearchedKeywords(int limit);
     void logSearchQuery(String query);
-    OrganizerDto getOrganizerProfile(String userId);
+    OrganizerDto getOrganizerProfile(String authorization);
     List<EventResponse> getApprovalEvents(String status);
     EventResponse approveEvent(String id);
     EventResponse rejectEvent(String id, String reason, String notes);

@@ -1,5 +1,6 @@
 package com.haloticket.payment_service.entity;
 
+import com.haloticket.payment_service.enums.PayoutAccountVerificationStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -46,6 +47,22 @@ public class OrganizerPayoutAccount {
     @Column(name = "is_verified")
     private Boolean isVerified;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verification_status")
+    private PayoutAccountVerificationStatus verificationStatus;
+
+    @Column(name = "account_version")
+    private Long accountVersion;
+
+    @Column(name = "identity_version")
+    private Long identityVersion;
+
+    @Column(name = "verification_reference")
+    private String verificationReference;
+
+    @Column(name = "verified_at")
+    private LocalDateTime verifiedAt;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -56,7 +73,9 @@ public class OrganizerPayoutAccount {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
-        if (this.isVerified == null) this.isVerified = true;
+        if (this.isVerified == null) this.isVerified = false;
+        if (this.verificationStatus == null) this.verificationStatus = PayoutAccountVerificationStatus.UNVERIFIED;
+        if (this.accountVersion == null) this.accountVersion = 1L;
     }
 
     @PreUpdate

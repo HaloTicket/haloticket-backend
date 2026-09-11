@@ -4,6 +4,12 @@ server:
 spring:
   application:
     name: payment-service
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:9080/realms/haloticket-realm}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
   datasource:
     url: jdbc:postgresql://localhost:5433/payment_db
     username: ${POSTGRES_USER:haloticket}

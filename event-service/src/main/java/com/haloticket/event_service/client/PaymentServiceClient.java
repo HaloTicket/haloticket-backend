@@ -9,8 +9,12 @@ import org.springframework.web.bind.annotation.*;
 public interface PaymentServiceClient {
 
     @PostMapping("/organizer-payout-account")
-    OrganizerPayoutAccountResponse saveOrUpdatePayoutAccount(@RequestBody OrganizerPayoutAccountRequest request);
+    OrganizerPayoutAccountResponse saveOrUpdatePayoutAccount(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody OrganizerPayoutAccountRequest request);
 
     @GetMapping("/organizer-payout-account/{userId}")
-    OrganizerPayoutAccountResponse getPayoutAccountByUserId(@PathVariable("userId") String userId);
+    OrganizerPayoutAccountResponse getPayoutAccountByUserId(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable("userId") String userId);
 }
