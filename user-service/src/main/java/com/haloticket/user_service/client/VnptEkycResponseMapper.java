@@ -7,11 +7,14 @@ import com.haloticket.user_service.service.VnptEkycClient;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.ResolverStyle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** VNPT API contract: /admin-dashboard/vi/documents/api, read 2026-09-11.
  * Only explicit successful, consistent CCCD results can be accepted.
  */
 public class VnptEkycResponseMapper {
+    private static final Logger log = LoggerFactory.getLogger(VnptEkycResponseMapper.class);
     private final ObjectMapper mapper;
     public VnptEkycResponseMapper(ObjectMapper mapper) { this.mapper = mapper; }
 
@@ -20,16 +23,24 @@ public class VnptEkycResponseMapper {
         JsonNode ocr = object(ocrResponse);
         String number = text(ocr, "id");
         String name = text(ocr, "name");
+        String birthDay = text(ocr, "birth_day");
+        if (birthDay.isBlank()) birthDay = text(ocr, "dob");
+        String address = text(ocr, "recent_location");
+        if (address.isBlank()) address = text(ocr, "address");
+        if (address.isBlank()) address = text(ocr, "origin_location");
         LocalDate expires = date(text(ocr, "valid_date"));
 
         JsonNode compare = object(compareResponse);
 
-        // OCR must succeed and document must be the correct type (chip CCCD = type_id 1)
+        // VNPT's configured document catalog can return different numeric IDs (for example 5
+        // for the current CCCD profile). The provider result is authoritative; require only
+        // that both sides are present and classified consistently.
         boolean ocrOk = success(ocrResponse)
                 && "OK".equals(text(ocr, "msg"))
                 && "OK".equals(text(ocr, "msg_back"))
-                && ocr.path("type_id").isIntegralNumber() && ocr.path("type_id").asInt(-1) == 1
-                && ocr.path("back_type_id").isIntegralNumber() && ocr.path("back_type_id").asInt(-1) == 1
+                && ocr.path("type_id").isIntegralNumber()
+                && ocr.path("back_type_id").isIntegralNumber()
+                && ocr.path("type_id").asInt(-1) == ocr.path("back_type_id").asInt(-2)
                 && number.matches("[0-9]{12}") && !name.isBlank();
 
         // VNPT may return quality warnings even when OCR completed successfully. Fraud/tampering
@@ -37,6 +48,12 @@ public class VnptEkycResponseMapper {
         // A successful VNPT dashboard transaction is the source of truth. The application
         // stores the OCR identity and does not run a second, conflicting verdict locally.
         boolean valid = ocrOk;
+        if (!valid) {
+            log.warn("VNPT OCR rejected locally: providerSuccess={}, msg={}, msgBack={}, typeId={}, backTypeId={}, idDigits={}, namePresent={}",
+                    success(ocrResponse), text(ocr, "msg"), text(ocr, "msg_back"),
+                    ocr.path("type_id").asText("missing"), ocr.path("back_type_id").asText("missing"),
+                    number.matches("[0-9]{12}"), !name.isBlank());
+        }
 
         double score;
         try { score = Double.parseDouble(compare.path("prob").asText()) / 100.0; }
@@ -47,7 +64,8 @@ public class VnptEkycResponseMapper {
                 && (!compare.has("multiple_faces") || isFalse(compare.path("multiple_faces")));
 
         return new VnptEkycClient.VerificationResult(reference, EkycDocumentType.ID_CARD,
-                number, name, valid, liveCard(front) && liveCard(back), faceLive, matched, score, expires);
+                number, name, valid, liveCard(front) && liveCard(back), faceLive, matched, score, expires,
+                birthDay, address);
     }
     private boolean liveCard(JsonNode response) {
         JsonNode value = object(response);

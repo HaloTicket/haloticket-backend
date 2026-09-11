@@ -39,6 +39,12 @@ public class EkycProfile {
     @Column(name = "legal_name")
     private String legalName;
 
+    @Column(name = "birth_date")
+    private String birthDate;
+
+    @Column(name = "address")
+    private String address;
+
     @Column(name = "front_image_url")
     private String frontImageUrl;
 

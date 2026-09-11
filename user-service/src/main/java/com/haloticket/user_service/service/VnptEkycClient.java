@@ -19,6 +19,24 @@ public interface VnptEkycClient {
             boolean faceLivenessPassed,
             boolean faceMatched,
             double matchScore,
-            LocalDate documentExpiresOn
-    ) {}
+            LocalDate documentExpiresOn,
+            String birthDay,
+            String address
+    ) {
+        public VerificationResult(
+                String providerReference,
+                EkycDocumentType documentType,
+                String documentNumber,
+                String legalName,
+                boolean documentValid,
+                boolean documentLivenessPassed,
+                boolean faceLivenessPassed,
+                boolean faceMatched,
+                double matchScore,
+                LocalDate documentExpiresOn
+        ) {
+            this(providerReference, documentType, documentNumber, legalName, documentValid,
+                    documentLivenessPassed, faceLivenessPassed, faceMatched, matchScore, documentExpiresOn, null, null);
+        }
+    }
 }

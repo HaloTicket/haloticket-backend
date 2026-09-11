@@ -110,4 +110,14 @@ class VnptEkycResponseMapperTest {
 
         assertThat(result.documentValid()).isTrue();
     }
+
+    @Test
+    void acceptsVnptConfiguredDocumentTypeFiveWhenBothSidesMatch() throws Exception {
+        var ocr = new ObjectMapper().readTree("""
+                {"message":"IDG-00000000","object":{"id":"079123456789","name":"NGUYEN VAN A",
+                "msg":"OK","msg_back":"OK","type_id":5,"back_type_id":5}}
+                """);
+
+        assertThat(mapper.map("session-7", ocr, null, null, null, null).documentValid()).isTrue();
+    }
 }

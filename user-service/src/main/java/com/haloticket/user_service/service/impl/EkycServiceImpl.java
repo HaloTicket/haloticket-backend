@@ -223,6 +223,15 @@ public class EkycServiceImpl implements EkycService {
         profile.setDocumentNumberHash(fingerprint);
         profile.setLegalName(result.legalName().trim());
         user.setFullName(result.legalName().trim());
+        if (result.birthDay() != null && !result.birthDay().isBlank()) {
+            profile.setBirthDate(result.birthDay().trim());
+        }
+        if (result.address() != null && !result.address().isBlank()) {
+            profile.setAddress(result.address().trim());
+            if (profile.getTaxAddress() == null || profile.getTaxAddress().isBlank()) {
+                profile.setTaxAddress(result.address().trim());
+            }
+        }
         profile.setStatus(EkycVerificationStatus.APPROVED);
         profile.setApprovedAt(clock.instant().atZone(ZoneOffset.UTC).toLocalDateTime());
         profile.setDocumentExpiresOn(result.documentExpiresOn());
@@ -327,6 +336,9 @@ public class EkycServiceImpl implements EkycService {
         Instant verifiedAt = profile.getApprovedAt() == null
                 ? null
                 : profile.getApprovedAt().toInstant(ZoneOffset.UTC);
+        String address = profile.getAddress() != null && !profile.getAddress().isBlank()
+                ? profile.getAddress()
+                : profile.getTaxAddress();
         return new EkycStatusResponse(
                 profile.getStatus() == EkycVerificationStatus.APPROVED && !isVerified(profile)
                         ? EkycVerificationStatus.REQUIRES_UPDATE : profile.getStatus(),
@@ -334,7 +346,10 @@ public class EkycServiceImpl implements EkycService {
                 profile.getDocumentNumber(),
                 verifiedAt,
                 profile.getIdentityVersion(),
-                reason
+                reason,
+                profile.getBirthDate(),
+                address,
+                profile.getDocumentExpiresOn()
         );
     }
 
