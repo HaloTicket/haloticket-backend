@@ -73,6 +73,11 @@ public class EkycServiceImpl implements EkycService {
             String idempotencyKey
     ) {
         User user = requireUserForUpdate(keycloakId);
+        if (profileRepository.findByUserId(user.getId())
+                .filter(profile -> profile.getStatus() == EkycVerificationStatus.APPROVED)
+                .isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "EKYC_ALREADY_VERIFIED");
+        }
         if (!consentAccepted || !"2026.1".equals(consentVersion)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CONSENT_REQUIRED");
         }
@@ -129,8 +134,7 @@ public class EkycServiceImpl implements EkycService {
             String keycloakId,
             String sessionId,
             MultipartFile frontImage,
-            MultipartFile backImage,
-            MultipartFile faceImage
+            MultipartFile backImage
     ) {
         User user = requireUserForUpdate(keycloakId);
         EkycAttempt attempt = attemptRepository.findById(sessionId)
@@ -146,7 +150,6 @@ public class EkycServiceImpl implements EkycService {
         }
         validateImage(frontImage, "FRONT_IMAGE_INVALID");
         validateImage(backImage, "BACK_IMAGE_INVALID");
-        validateImage(faceImage, "FACE_IMAGE_INVALID");
 
         identityFingerprint.requireConfigured();
 
@@ -156,7 +159,7 @@ public class EkycServiceImpl implements EkycService {
         VnptEkycClient.VerificationResult result;
         try {
             vnptClient.requireReady();
-            result = vnptClient.verify(frontImage, backImage, faceImage);
+            result = vnptClient.verify(frontImage, backImage);
         } catch (HttpStatusCodeException ex) {
             String reasonCode = providerRejectionReason(ex);
             log.warn("VNPT verification rejected for user {}: status={}, reason={}", user.getId(), ex.getStatusCode(), reasonCode);

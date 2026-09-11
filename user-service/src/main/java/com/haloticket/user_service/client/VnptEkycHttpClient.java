@@ -30,9 +30,6 @@ public class VnptEkycHttpClient implements VnptEkycClient {
     private final String accessToken;
     private final String uploadPath;
     private final String ocrPath;
-    private final String cardLivenessPath;
-    private final String faceLivenessPath;
-    private final String comparePath;
     private final boolean enabled;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -43,9 +40,6 @@ public class VnptEkycHttpClient implements VnptEkycClient {
             @Value("${ekyc.vnpt.access-token:}") String accessToken,
             @Value("${ekyc.vnpt.upload-path:/file-service/v1/addFile}") String uploadPath,
             @Value("${ekyc.vnpt.ocr-path:/ai/v1/ocr/id}") String ocrPath,
-            @Value("${ekyc.vnpt.card-liveness-path:/ai/v1/card/liveness}") String cardLivenessPath,
-            @Value("${ekyc.vnpt.face-liveness-path:/ai/v1/face/liveness}") String faceLivenessPath,
-            @Value("${ekyc.vnpt.compare-path:/ai/v1/face/compare}") String comparePath,
             @Value("${ekyc.vnpt.enabled:false}") boolean enabled
     ) {
         var endpoint = URI.create(baseUrl);
@@ -63,13 +57,10 @@ public class VnptEkycHttpClient implements VnptEkycClient {
         this.accessToken = accessToken;
         this.uploadPath = uploadPath;
         this.ocrPath = ocrPath;
-        this.cardLivenessPath = cardLivenessPath;
-        this.faceLivenessPath = faceLivenessPath;
-        this.comparePath = comparePath;
     }
 
     @Override
-    public VerificationResult verify(MultipartFile frontImage, MultipartFile backImage, MultipartFile faceImage) {
+    public VerificationResult verify(MultipartFile frontImage, MultipartFile backImage) {
         requireReady();
         String session = UUID.randomUUID().toString();
         String token = session.replace("-", "");
@@ -77,16 +68,7 @@ public class VnptEkycHttpClient implements VnptEkycClient {
         String backHash = upload(backImage, "cccd-back");
 
         JsonNode ocr = post(ocrPath, ocrRequest(frontHash, backHash, session, token));
-        if (faceImage == null || faceImage.isEmpty()) {
-            throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "FACE_IMAGE_REQUIRED");
-        }
-        String faceHash = upload(faceImage, "portrait");
-        JsonNode card = post(cardLivenessPath, Map.of("img", frontHash, "client_session", session));
-        JsonNode cardBack = post(cardLivenessPath, Map.of("img", backHash, "client_session", session));
-        JsonNode face = post(faceLivenessPath, Map.of("img", faceHash, "token", token, "client_session", session));
-        JsonNode compare = post(comparePath, Map.of("img_front", frontHash, "img_face", faceHash, "token", token, "client_session", session));
-
-        return responseMapper.map(session, ocr, card, cardBack, face, compare);
+        return responseMapper.map(session, ocr, null, null, null, null);
     }
 
     static Map<String, Object> ocrRequest(String frontHash, String backHash, String session, String token) {

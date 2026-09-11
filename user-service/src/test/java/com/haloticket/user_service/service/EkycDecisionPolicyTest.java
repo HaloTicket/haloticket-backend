@@ -6,19 +6,13 @@ import java.time.LocalDate;
 import static org.assertj.core.api.Assertions.*;
 
 class EkycDecisionPolicyTest {
-    @Test void rejectsNonFiniteAndOutOfRangeScores() {
-        var policy = new EkycDecisionPolicy(0.9);
-        for (double score : new double[]{Double.NaN, Double.POSITIVE_INFINITY, 1.1, -1}) {
-            var result = new VnptEkycClient.VerificationResult("ref", EkycDocumentType.ID_CARD,
-                    "079123456789", "TEST PERSON", true, true, true, true, score, LocalDate.of(2036, 1, 1));
-            assertThat(policy.evaluate(result).passed()).as("score %s", score).isFalse();
-        }
-    }
-    @Test void rejectsInvalidConfiguration() {
-        assertThatIllegalArgumentException().isThrownBy(() -> new EkycDecisionPolicy(Double.NaN));
-        assertThatIllegalArgumentException().isThrownBy(() -> new EkycDecisionPolicy(0));
+    @Test void approvesValidOcrWithoutLivenessOrFaceChecks() {
+        var policy = new EkycDecisionPolicy();
+        var result = new VnptEkycClient.VerificationResult("ref", EkycDocumentType.ID_CARD,
+                "079123456789", "TEST PERSON", true, false, false, false, Double.NaN, LocalDate.of(2036, 1, 1));
+        assertThat(policy.evaluate(result).passed()).isTrue();
     }
     @Test void missingProviderResultCannotApprove() {
-        assertThat(new EkycDecisionPolicy(0.9).evaluate(null).passed()).isFalse();
+        assertThat(new EkycDecisionPolicy().evaluate(null).passed()).isFalse();
     }
 }

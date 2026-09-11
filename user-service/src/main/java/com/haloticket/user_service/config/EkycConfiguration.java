@@ -9,8 +9,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class EkycConfiguration {
     @Bean
-    EkycDecisionPolicy ekycDecisionPolicy(@Value("${ekyc.minimum-face-match-score:0.9}") double score) {
-        return new EkycDecisionPolicy(score);
+    EkycDecisionPolicy ekycDecisionPolicy() {
+        return new EkycDecisionPolicy();
     }
 
     @Bean

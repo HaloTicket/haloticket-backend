@@ -56,7 +56,6 @@ keycloak:
 
 ekyc:
   fingerprint-secret: ${EKYC_FINGERPRINT_SECRET:}
-  minimum-face-match-score: ${EKYC_MINIMUM_FACE_MATCH_SCORE:0.9}
   vnpt:
     enabled: ${VNPT_EKYC_ENABLED:false}
     base-url: ${VNPT_EKYC_BASE_URL:https://api.idg.vnpt.vn}

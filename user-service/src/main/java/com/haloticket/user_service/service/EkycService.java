@@ -19,8 +19,7 @@ public interface EkycService {
             String keycloakId,
             String sessionId,
             MultipartFile frontImage,
-            MultipartFile backImage,
-            MultipartFile faceImage
+            MultipartFile backImage
     );
 
     EkycOrganizerEligibilityResponse getOrganizerEligibility(String keycloakId);

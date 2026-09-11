@@ -7,7 +7,7 @@ import java.time.LocalDate;
 
 public interface VnptEkycClient {
     void requireReady();
-    VerificationResult verify(MultipartFile frontImage, MultipartFile backImage, MultipartFile faceImage);
+    VerificationResult verify(MultipartFile frontImage, MultipartFile backImage);
 
     record VerificationResult(
             String providerReference,

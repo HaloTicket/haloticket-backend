@@ -65,7 +65,7 @@ class EkycServiceImplTest {
                 attemptRepository,
                 profileRepository,
                 vnptClient,
-                new EkycDecisionPolicy(0.8),
+                new EkycDecisionPolicy(),
                 new IdentityFingerprint("test-secret-at-least-16-bytes"),
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
@@ -110,6 +110,17 @@ class EkycServiceImplTest {
     }
 
     @Test
+    void startSessionRejectsAlreadyVerifiedAccount() {
+        when(userRepository.findForEkycUpdateByKeycloakId("kc-1")).thenReturn(Optional.of(user));
+        EkycProfile profile = EkycProfile.builder().user(user).status(EkycVerificationStatus.APPROVED).build();
+        when(profileRepository.findByUserId("user-1")).thenReturn(Optional.of(profile));
+
+        assertThatThrownBy(() -> service.startSession("kc-1", true, "2026.1", "idem-1"))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("EKYC_ALREADY_VERIFIED");
+    }
+
+    @Test
     void verifyApprovesOnlyWhenAllProviderChecksPass() {
         EkycAttempt attempt = EkycAttempt.builder()
                 .id("attempt-1")
@@ -120,7 +131,7 @@ class EkycServiceImplTest {
         when(userRepository.findForEkycUpdateByKeycloakId("kc-1")).thenReturn(Optional.of(user));
         when(attemptRepository.findById("attempt-1")).thenReturn(Optional.of(attempt));
         when(profileRepository.findByUserId("user-1")).thenReturn(Optional.empty());
-        when(vnptClient.verify(any(), any(), any())).thenReturn(new VnptEkycClient.VerificationResult(
+        when(vnptClient.verify(any(), any())).thenReturn(new VnptEkycClient.VerificationResult(
                 "vnpt-123", EkycDocumentType.ID_CARD, "079123456789", "NGUYEN VAN A",
                 true, true, true, true, 0.97, LocalDate.of(2036, 1, 1)
         ));
@@ -130,8 +141,7 @@ class EkycServiceImplTest {
                 "kc-1",
                 "attempt-1",
                 file("front"),
-                file("back"),
-                file("face")
+                file("back")
         );
 
         assertThat(result.status()).isEqualTo(EkycVerificationStatus.APPROVED);
@@ -155,7 +165,7 @@ class EkycServiceImplTest {
         when(userRepository.findForEkycUpdateByKeycloakId("kc-1")).thenReturn(Optional.of(user));
         when(attemptRepository.findById("attempt-1")).thenReturn(Optional.of(attempt));
 
-        assertThatThrownBy(() -> service.verify("kc-1", "attempt-1", file("front"), file("back"), file("face")))
+        assertThatThrownBy(() -> service.verify("kc-1", "attempt-1", file("front"), file("back")))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("EKYC_SESSION_NOT_FOUND");
     }
@@ -170,13 +180,13 @@ class EkycServiceImplTest {
                 .build();
         when(userRepository.findForEkycUpdateByKeycloakId("kc-1")).thenReturn(Optional.of(user));
         when(attemptRepository.findById("attempt-1")).thenReturn(Optional.of(attempt));
-        when(vnptClient.verify(any(), any(), any())).thenThrow(
+        when(vnptClient.verify(any(), any())).thenThrow(
                 HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad request", null,
                         "{\"message\":\"IDG-00010445\",\"errors\":[\"Loại giấy tờ không hợp lệ\"]}".getBytes(), null)
         );
 
         EkycStatusResponse result = service.verify(
-                "kc-1", "attempt-1", file("front"), file("back"), file("face")
+                "kc-1", "attempt-1", file("front"), file("back")
         );
 
         assertThat(result.status()).isEqualTo(EkycVerificationStatus.REJECTED);
@@ -195,7 +205,7 @@ class EkycServiceImplTest {
         when(userRepository.findForEkycUpdateByKeycloakId("kc-1")).thenReturn(Optional.of(user));
         when(attemptRepository.findById("attempt-1")).thenReturn(Optional.of(attempt));
 
-        assertThatThrownBy(() -> service.verify("kc-1", "attempt-1", file("front"), file("back"), file("face")))
+        assertThatThrownBy(() -> service.verify("kc-1", "attempt-1", file("front"), file("back")))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("EKYC_SESSION_ALREADY_PROCESSED");
 
