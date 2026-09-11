@@ -1,5 +1,8 @@
 package com.haloticket.user_service.service;
 
+import com.haloticket.user_service.dto.response.EkycOrganizerEligibilityResponse;
+import com.haloticket.user_service.dto.response.EkycSessionResponse;
+import com.haloticket.user_service.dto.response.EkycStatusResponse;
 import com.haloticket.user_service.entity.EkycAttempt;
 import com.haloticket.user_service.entity.EkycProfile;
 import com.haloticket.user_service.entity.User;
@@ -19,6 +22,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.server.ResponseStatusException;
 
 import javax.imageio.ImageIO;
@@ -60,20 +65,21 @@ class EkycServiceImplTest {
                 attemptRepository,
                 profileRepository,
                 vnptClient,
-                new EkycDecisionPolicy(0.9),
-                new IdentityFingerprint("test-fingerprint-secret"),
+                new EkycDecisionPolicy(0.8),
+                new IdentityFingerprint("test-secret-at-least-16-bytes"),
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
         user = User.builder()
                 .id("user-1")
                 .keycloakId("kc-1")
-                .isActive(true).status(UserStatus.ACTIVE)
+                .isActive(true)
+                .status(UserStatus.ACTIVE)
                 .roles(new HashSet<>(Set.of(Role.CUSTOMER)))
                 .build();
     }
 
     @Test
-    void startSessionRejectsMissingConsent() {
+    void startSessionRequiresConsent() {
         when(userRepository.findForEkycUpdateByKeycloakId("kc-1")).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> service.startSession("kc-1", false, "2026.1", "idem-1"))
@@ -92,7 +98,7 @@ class EkycServiceImplTest {
             return attempt;
         });
 
-        EkycDtos.SessionResponse result = service.startSession("kc-1", true, "2026.1", "idem-1");
+        EkycSessionResponse result = service.startSession("kc-1", true, "2026.1", "idem-1");
 
         assertThat(result.sessionId()).isEqualTo("attempt-1");
         assertThat(result.status()).isEqualTo(EkycAttemptStatus.CREATED);
@@ -120,7 +126,7 @@ class EkycServiceImplTest {
         ));
         when(profileRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        EkycDtos.StatusResponse result = service.verify(
+        EkycStatusResponse result = service.verify(
                 "kc-1",
                 "attempt-1",
                 file("front"),
@@ -155,6 +161,30 @@ class EkycServiceImplTest {
     }
 
     @Test
+    void verifyReturnsRejectedStatusWhenProviderRejectsDocument() {
+        EkycAttempt attempt = EkycAttempt.builder()
+                .id("attempt-1")
+                .user(user)
+                .status(EkycAttemptStatus.CREATED)
+                .expiresAt(NOW.plusSeconds(60))
+                .build();
+        when(userRepository.findForEkycUpdateByKeycloakId("kc-1")).thenReturn(Optional.of(user));
+        when(attemptRepository.findById("attempt-1")).thenReturn(Optional.of(attempt));
+        when(vnptClient.verify(any(), any(), any())).thenThrow(
+                HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad request", null,
+                        "{\"message\":\"IDG-00010445\",\"errors\":[\"Loại giấy tờ không hợp lệ\"]}".getBytes(), null)
+        );
+
+        EkycStatusResponse result = service.verify(
+                "kc-1", "attempt-1", file("front"), file("back"), file("face")
+        );
+
+        assertThat(result.status()).isEqualTo(EkycVerificationStatus.REJECTED);
+        assertThat(result.reasonCode()).isEqualTo("DOCUMENT_TYPE_INVALID");
+        assertThat(attempt.getStatus()).isEqualTo(EkycAttemptStatus.FAILED);
+    }
+
+    @Test
     void verifyDoesNotExpireAnAlreadyCompletedAttempt() {
         EkycAttempt attempt = EkycAttempt.builder()
                 .id("attempt-1")
@@ -178,7 +208,7 @@ class EkycServiceImplTest {
         when(userRepository.findByKeycloakId("kc-1")).thenReturn(Optional.of(user));
         when(profileRepository.findByUserId("user-1")).thenReturn(Optional.empty());
 
-        EkycDtos.OrganizerEligibility result = service.getOrganizerEligibility("kc-1");
+        EkycOrganizerEligibilityResponse result = service.getOrganizerEligibility("kc-1");
 
         assertThat(result.eligible()).isFalse();
         assertThat(result.reasonCode()).isEqualTo("EKYC_NOT_STARTED");

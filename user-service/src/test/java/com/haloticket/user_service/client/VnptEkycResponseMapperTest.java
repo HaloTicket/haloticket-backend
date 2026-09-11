@@ -53,4 +53,36 @@ class VnptEkycResponseMapperTest {
         assertThat(result.faceMatched()).isFalse();
         assertThat(result.matchScore()).isCloseTo(0.0099, offset(0.000001));
     }
+
+    @Test
+    void rejectsDocumentWhenTamperingIsLegalIsNo() throws Exception {
+        var ocr = new ObjectMapper().readTree("""
+                {"message":"IDG-00000000","object":{"id":"079123456789","name":"NGUYEN VAN A",
+                "tampering":{"is_legal":"no","warning":["input_khong_hop_le"]}}}
+                """);
+        var card = new ObjectMapper().readTree("""
+                {"message":"IDG-00000000","object":{"liveness":"success"}}
+                """);
+
+        var result = mapper.map("session-3", ocr, card, card, null, null);
+
+        assertThat(result.documentValid()).isFalse();
+    }
+
+    @Test
+    void missingLivenessAndFaceChecksNeverBecomeSuccessful() throws Exception {
+        var ocr = new ObjectMapper().readTree("""
+                {"message":"IDG-00000000","object":{"id":"079123456789","name":"NGUYEN VAN A",
+                "msg":"OK","msg_back":"OK","type_id":1,"back_type_id":1,"valid_date":"01/01/2036",
+                "expire_warning":"no","back_expire_warning":"no","id_fake_warning":"no",
+                "tampering":{"is_legal":"yes","warning":[]}}}
+                """);
+
+        var result = mapper.map("session-4", ocr, null, null, null, null);
+
+        assertThat(result.documentLivenessPassed()).isFalse();
+        assertThat(result.faceLivenessPassed()).isFalse();
+        assertThat(result.faceMatched()).isFalse();
+        assertThat(result.matchScore()).isNaN();
+    }
 }

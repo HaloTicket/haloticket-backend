@@ -1,5 +1,8 @@
 package com.haloticket.user_service.service.impl;
 
+import com.haloticket.user_service.dto.response.EkycOrganizerEligibilityResponse;
+import com.haloticket.user_service.dto.response.EkycSessionResponse;
+import com.haloticket.user_service.dto.response.EkycStatusResponse;
 import com.haloticket.user_service.entity.EkycAttempt;
 import com.haloticket.user_service.entity.EkycProfile;
 import com.haloticket.user_service.entity.User;
@@ -11,13 +14,13 @@ import com.haloticket.user_service.repository.EkycAttemptRepository;
 import com.haloticket.user_service.repository.EkycProfileRepository;
 import com.haloticket.user_service.repository.UserRepository;
 import com.haloticket.user_service.service.EkycDecisionPolicy;
-import com.haloticket.user_service.service.EkycDtos;
 import com.haloticket.user_service.service.EkycService;
 import com.haloticket.user_service.service.IdentityFingerprint;
 import com.haloticket.user_service.service.VnptEkycClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -27,10 +30,12 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.Optional;
 import javax.imageio.ImageIO;
 
 @Service
 public class EkycServiceImpl implements EkycService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EkycServiceImpl.class);
     private static final long MAX_IMAGE_SIZE = 10L * 1024 * 1024;
 
     private final UserRepository userRepository;
@@ -61,7 +66,7 @@ public class EkycServiceImpl implements EkycService {
 
     @Override
     @Transactional
-    public EkycDtos.SessionResponse startSession(
+    public EkycSessionResponse startSession(
             String keycloakId,
             boolean consentAccepted,
             String consentVersion,
@@ -74,51 +79,59 @@ public class EkycServiceImpl implements EkycService {
         if (idempotencyKey == null || !idempotencyKey.matches("[A-Za-z0-9_-]{1,100}")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "IDEMPOTENCY_KEY_REQUIRED");
         }
-        return attemptRepository.findFirstByUserIdAndIdempotencyKey(user.getId(), idempotencyKey)
-                .map(this::toSession)
-                .orElseGet(() -> {
-                    identityFingerprint.requireConfigured();
-                    vnptClient.requireReady();
-                    if (attemptRepository.countByUserIdAndCreatedAtAfter(user.getId(), clock.instant().minusSeconds(86400)) >= 5) {
-                        throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "EKYC_ATTEMPT_LIMIT");
-                    }
-                    EkycAttempt attempt = EkycAttempt.builder()
-                            .user(user)
-                            .idempotencyKey(idempotencyKey)
-                            .consentVersion(consentVersion)
-                            .status(EkycAttemptStatus.CREATED)
-                            .createdAt(clock.instant())
-                            .expiresAt(clock.instant().plusSeconds(15 * 60))
-                            .build();
-                    return toSession(attemptRepository.save(attempt));
-                });
+        Optional<EkycAttempt> existing = attemptRepository.findFirstByUserIdAndIdempotencyKey(user.getId(), idempotencyKey);
+        if (existing.isPresent()) {
+            return toSession(existing.get());
+        }
+
+        Optional<EkycAttempt> active = attemptRepository.findFirstByUserIdOrderByCreatedAtDesc(user.getId());
+        if (active.isPresent() && active.get().getStatus() == EkycAttemptStatus.CREATED
+                && active.get().getExpiresAt().isAfter(clock.instant())) {
+            return toSession(active.get());
+        }
+
+        if (attemptRepository.countByUserIdAndCreatedAtAfter(user.getId(), clock.instant().minusSeconds(86400)) >= 50) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "EKYC_ATTEMPT_LIMIT");
+        }
+        EkycAttempt attempt = EkycAttempt.builder()
+                .user(user)
+                .idempotencyKey(idempotencyKey)
+                .consentVersion(consentVersion)
+                .status(EkycAttemptStatus.CREATED)
+                .createdAt(clock.instant())
+                .expiresAt(clock.instant().plusSeconds(15 * 60))
+                .build();
+        return toSession(attemptRepository.save(attempt));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public EkycDtos.StatusResponse getStatus(String keycloakId) {
-        User user = requireUser(keycloakId);
-        return profileRepository.findByUserId(user.getId())
-                .map(profile -> toStatus(profile, null))
-                .orElseGet(() -> attemptRepository.findFirstByUserIdOrderByCreatedAtDesc(user.getId())
-                        .map(attempt -> new EkycDtos.StatusResponse(
-                                attempt.getStatus() == EkycAttemptStatus.MANUAL_REVIEW ? EkycVerificationStatus.PENDING
-                                        : attempt.getStatus() == EkycAttemptStatus.FAILED ? EkycVerificationStatus.REJECTED
-                                        : EkycVerificationStatus.NOT_STARTED,
-                                null, null, null, null, attempt.getFailureReason()))
-                        .orElse(new EkycDtos.StatusResponse(EkycVerificationStatus.NOT_STARTED, null, null, null, null, "EKYC_NOT_STARTED")));
+    public EkycStatusResponse getStatus(String keycloakId) {
+        if (keycloakId == null || keycloakId.isBlank()) {
+            return new EkycStatusResponse(EkycVerificationStatus.NOT_STARTED, null, null, null, null, "EKYC_NOT_STARTED");
+        }
+        return userRepository.findByKeycloakId(keycloakId)
+                .map(user -> profileRepository.findByUserId(user.getId())
+                        .map(profile -> toStatus(profile, null))
+                        .orElseGet(() -> attemptRepository.findFirstByUserIdOrderByCreatedAtDesc(user.getId())
+                                .map(attempt -> new EkycStatusResponse(
+                                        attempt.getStatus() == EkycAttemptStatus.MANUAL_REVIEW ? EkycVerificationStatus.PENDING
+                                                : attempt.getStatus() == EkycAttemptStatus.FAILED ? EkycVerificationStatus.REJECTED
+                                                : EkycVerificationStatus.NOT_STARTED,
+                                        null, null, null, null, attempt.getFailureReason()))
+                                .orElse(new EkycStatusResponse(EkycVerificationStatus.NOT_STARTED, null, null, null, null, "EKYC_NOT_STARTED"))))
+                .orElse(new EkycStatusResponse(EkycVerificationStatus.NOT_STARTED, null, null, null, null, "EKYC_NOT_STARTED"));
     }
 
     @Override
     @Transactional(noRollbackFor = ResponseStatusException.class)
-    public EkycDtos.StatusResponse verify(
+    public EkycStatusResponse verify(
             String keycloakId,
             String sessionId,
             MultipartFile frontImage,
             MultipartFile backImage,
             MultipartFile faceImage
     ) {
-        // Serialize session consumption for this user; HTTP calls have bounded timeouts.
         User user = requireUserForUpdate(keycloakId);
         EkycAttempt attempt = attemptRepository.findById(sessionId)
                 .filter(value -> value.getUser().getId().equals(user.getId()))
@@ -134,62 +147,89 @@ public class EkycServiceImpl implements EkycService {
         validateImage(frontImage, "FRONT_IMAGE_INVALID");
         validateImage(backImage, "BACK_IMAGE_INVALID");
         validateImage(faceImage, "FACE_IMAGE_INVALID");
+
         identityFingerprint.requireConfigured();
-        vnptClient.requireReady();
 
         attempt.setStatus(EkycAttemptStatus.PROCESSING);
         attemptRepository.save(attempt);
 
-        VnptEkycClient.VerificationResult providerResult;
+        VnptEkycClient.VerificationResult result;
         try {
-            providerResult = vnptClient.verify(frontImage, backImage, faceImage);
-        } catch (RuntimeException exception) {
-            attempt.setStatus(EkycAttemptStatus.ERROR);
-            attempt.setFailureReason("PROVIDER_UNAVAILABLE");
+            vnptClient.requireReady();
+            result = vnptClient.verify(frontImage, backImage, faceImage);
+        } catch (HttpStatusCodeException ex) {
+            String reasonCode = providerRejectionReason(ex);
+            log.warn("VNPT verification rejected for user {}: status={}, reason={}", user.getId(), ex.getStatusCode(), reasonCode);
+            attempt.setStatus(EkycAttemptStatus.FAILED);
+            attempt.setFailureReason(reasonCode);
             attemptRepository.save(attempt);
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "EKYC_PROVIDER_UNAVAILABLE");
+            return new EkycStatusResponse(EkycVerificationStatus.REJECTED, null, null, null, null, reasonCode);
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (Exception exception) {
+            log.warn("VNPT verification encountered an error [{}].", exception.getMessage());
+            attempt.setStatus(EkycAttemptStatus.FAILED);
+            attempt.setFailureReason("Không thể hoàn tất đối soát giấy tờ từ cổng VNPT.");
+            attemptRepository.save(attempt);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Không thể đối soát giấy tờ. Vui lòng kiểm tra lại ảnh chụp.");
         }
 
-        EkycDecisionPolicy.Decision decision = decisionPolicy.evaluate(providerResult);
-        if (providerResult != null) {
-            attempt.setProviderReference(providerResult.providerReference());
-            if (Double.isFinite(providerResult.matchScore())) attempt.setMatchScore(providerResult.matchScore());
-        }
-        if (!decision.passed()) {
+        if (result == null || !result.documentValid() || result.documentNumber() == null || result.documentNumber().isBlank()
+                || result.legalName() == null || result.legalName().isBlank()) {
             attempt.setStatus(EkycAttemptStatus.FAILED);
+            attempt.setFailureReason("Loại giấy tờ không hợp lệ. Vui lòng chụp rõ nét 2 mặt Căn cước công dân gắn chip.");
+            attemptRepository.save(attempt);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Loại giấy tờ không hợp lệ. Vui lòng chụp rõ nét 2 mặt Căn cước công dân gắn chip.");
+        }
+
+        attempt.setProviderReference(result.providerReference());
+        if (Double.isFinite(result.matchScore())) attempt.setMatchScore(result.matchScore());
+
+        EkycDecisionPolicy.Decision decision = decisionPolicy.evaluate(result);
+        if (!decision.passed()) {
+            attempt.setStatus("PROVIDER_RESULT_INVALID".equals(decision.reasonCode())
+                    ? EkycAttemptStatus.MANUAL_REVIEW
+                    : EkycAttemptStatus.FAILED);
             attempt.setFailureReason(decision.reasonCode());
             attemptRepository.save(attempt);
-            return new EkycDtos.StatusResponse(
-                    EkycVerificationStatus.REJECTED, null, null, null, null, decision.reasonCode()
+            return new EkycStatusResponse(
+                    attempt.getStatus() == EkycAttemptStatus.MANUAL_REVIEW
+                            ? EkycVerificationStatus.PENDING
+                            : EkycVerificationStatus.REJECTED,
+                    null,
+                    null,
+                    null,
+                    null,
+                    decision.reasonCode()
             );
         }
 
-        if (providerResult.documentExpiresOn() == null || providerResult.documentExpiresOn().isBefore(LocalDate.now(clock))) {
+        if (result.documentExpiresOn() != null && result.documentExpiresOn().isBefore(LocalDate.now(clock))) {
             attempt.setStatus(EkycAttemptStatus.FAILED);
             attempt.setFailureReason("DOCUMENT_EXPIRED");
             attemptRepository.save(attempt);
-            return new EkycDtos.StatusResponse(EkycVerificationStatus.REJECTED, null, null, null, null, "DOCUMENT_EXPIRED");
+            return new EkycStatusResponse(EkycVerificationStatus.REJECTED, null, null, null, null, "DOCUMENT_EXPIRED");
         }
 
-        String fingerprint = identityFingerprint.create(providerResult.documentNumber());
+        String fingerprint = identityFingerprint.create(result.documentNumber());
         EkycProfile profile = profileRepository.findByUserId(user.getId()).orElseGet(EkycProfile::new);
         if (profileRepository.existsByDocumentNumberHashAndUserIdNot(fingerprint, user.getId())) {
             attempt.setStatus(EkycAttemptStatus.FAILED);
             attempt.setFailureReason("DUPLICATE_IDENTITY");
             attemptRepository.save(attempt);
-            return new EkycDtos.StatusResponse(
+            return new EkycStatusResponse(
                     EkycVerificationStatus.REJECTED, null, null, null, null, "DUPLICATE_IDENTITY"
             );
         }
 
         profile.setUser(user);
-        profile.setDocumentType(providerResult.documentType());
-        profile.setDocumentNumber(mask(providerResult.documentNumber()));
+        profile.setDocumentType(result.documentType());
+        profile.setDocumentNumber(mask(result.documentNumber()));
         profile.setDocumentNumberHash(fingerprint);
-        profile.setLegalName(providerResult.legalName().trim());
+        profile.setLegalName(result.legalName().trim());
         profile.setStatus(EkycVerificationStatus.APPROVED);
         profile.setApprovedAt(clock.instant().atZone(ZoneOffset.UTC).toLocalDateTime());
-        profile.setDocumentExpiresOn(providerResult.documentExpiresOn());
+        profile.setDocumentExpiresOn(result.documentExpiresOn());
         profile.setAcceptedAttempt(attempt);
         profile.setIdentityVersion(profile.getIdentityVersion() == null ? 1L : profile.getIdentityVersion() + 1L);
         profile = profileRepository.save(profile);
@@ -203,18 +243,28 @@ public class EkycServiceImpl implements EkycService {
         return toStatus(profile, null);
     }
 
+    private String providerRejectionReason(HttpStatusCodeException exception) {
+        String body = exception.getResponseBodyAsString();
+        if (body != null && body.contains("IDG-00010445")) return "DOCUMENT_TYPE_INVALID";
+        return "PROVIDER_REJECTED";
+    }
+
     @Override
     @Transactional(readOnly = true)
-    public EkycDtos.OrganizerEligibility getOrganizerEligibility(String keycloakId) {
-        User user = requireUser(keycloakId);
-        return profileRepository.findByUserId(user.getId())
-                .filter(this::isVerified)
-                .map(profile -> new EkycDtos.OrganizerEligibility(
-                        true, user.getId(), profile.getIdentityVersion(), "ELIGIBLE"
-                ))
-                .orElse(new EkycDtos.OrganizerEligibility(
-                        false, user.getId(), null, "EKYC_NOT_STARTED"
-                ));
+    public EkycOrganizerEligibilityResponse getOrganizerEligibility(String keycloakId) {
+        if (keycloakId == null || keycloakId.isBlank()) {
+            return new EkycOrganizerEligibilityResponse(false, null, null, "EKYC_NOT_STARTED");
+        }
+        return userRepository.findByKeycloakId(keycloakId)
+                .map(user -> profileRepository.findByUserId(user.getId())
+                        .filter(this::isVerified)
+                        .map(profile -> new EkycOrganizerEligibilityResponse(
+                                true, user.getId(), profile.getIdentityVersion(), "ELIGIBLE"
+                        ))
+                        .orElse(new EkycOrganizerEligibilityResponse(
+                                false, user.getId(), null, "EKYC_NOT_STARTED"
+                        )))
+                .orElse(new EkycOrganizerEligibilityResponse(false, null, null, "USER_NOT_FOUND"));
     }
 
     private User requireUser(String keycloakId) {
@@ -268,15 +318,15 @@ public class EkycServiceImpl implements EkycService {
         return "*".repeat(Math.max(0, normalized.length() - visible)) + normalized.substring(normalized.length() - visible);
     }
 
-    private EkycDtos.SessionResponse toSession(EkycAttempt attempt) {
-        return new EkycDtos.SessionResponse(attempt.getId(), attempt.getStatus(), attempt.getExpiresAt());
+    private EkycSessionResponse toSession(EkycAttempt attempt) {
+        return new EkycSessionResponse(attempt.getId(), attempt.getStatus(), attempt.getExpiresAt());
     }
 
-    private EkycDtos.StatusResponse toStatus(EkycProfile profile, String reason) {
+    private EkycStatusResponse toStatus(EkycProfile profile, String reason) {
         Instant verifiedAt = profile.getApprovedAt() == null
                 ? null
                 : profile.getApprovedAt().toInstant(ZoneOffset.UTC);
-        return new EkycDtos.StatusResponse(
+        return new EkycStatusResponse(
                 profile.getStatus() == EkycVerificationStatus.APPROVED && !isVerified(profile)
                         ? EkycVerificationStatus.REQUIRES_UPDATE : profile.getStatus(),
                 profile.getLegalName(),
@@ -286,4 +336,5 @@ public class EkycServiceImpl implements EkycService {
                 reason
         );
     }
+
 }

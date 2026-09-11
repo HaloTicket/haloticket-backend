@@ -75,22 +75,25 @@ public class VnptEkycHttpClient implements VnptEkycClient {
         String token = session.replace("-", "");
         String frontHash = upload(frontImage, "cccd-front");
         String backHash = upload(backImage, "cccd-back");
+
+        JsonNode ocr = post(ocrPath, ocrRequest(frontHash, backHash, session, token));
+        if (faceImage == null || faceImage.isEmpty()) {
+            throw new ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST, "FACE_IMAGE_REQUIRED");
+        }
         String faceHash = upload(faceImage, "portrait");
-        JsonNode card = post(cardLivenessPath, Map.of(
-                "img", frontHash, "client_session", session
-        ));
+        JsonNode card = post(cardLivenessPath, Map.of("img", frontHash, "client_session", session));
         JsonNode cardBack = post(cardLivenessPath, Map.of("img", backHash, "client_session", session));
-        JsonNode ocr = post(ocrPath, Map.of(
-                "img_front", frontHash, "img_back", backHash, "type", -1,
-                "validate_postcode", true, "crop_param", "0,0", "client_session", session, "token", token
-        ));
-        JsonNode face = post(faceLivenessPath, Map.of(
-                "img", faceHash, "token", token, "client_session", session
-        ));
-        JsonNode compare = post(comparePath, Map.of(
-                "img_front", frontHash, "img_face", faceHash, "token", token, "client_session", session
-        ));
+        JsonNode face = post(faceLivenessPath, Map.of("img", faceHash, "token", token, "client_session", session));
+        JsonNode compare = post(comparePath, Map.of("img_front", frontHash, "img_face", faceHash, "token", token, "client_session", session));
+
         return responseMapper.map(session, ocr, card, cardBack, face, compare);
+    }
+
+    static Map<String, Object> ocrRequest(String frontHash, String backHash, String session, String token) {
+        return Map.of(
+                "img_front", frontHash, "img_back", backHash, "type", 9,
+                "validate_postcode", true, "crop_param", "0,0", "client_session", session, "token", token
+        );
     }
 
     private String upload(MultipartFile file, String title) {

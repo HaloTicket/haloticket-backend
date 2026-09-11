@@ -18,10 +18,11 @@ public class VnptEkycResponseMapper {
     public VnptEkycClient.VerificationResult map(String reference, JsonNode ocrResponse,
             JsonNode front, JsonNode back, JsonNode face, JsonNode compareResponse) {
         JsonNode ocr = object(ocrResponse);
-        JsonNode compare = object(compareResponse);
         String number = text(ocr, "id");
         String name = text(ocr, "name");
         LocalDate expires = date(text(ocr, "valid_date"));
+
+        JsonNode compare = object(compareResponse);
         boolean valid = success(ocrResponse) && "OK".equals(text(ocr, "msg"))
                 && "OK".equals(text(ocr, "msg_back"))
                 && ocr.path("type_id").isIntegralNumber() && ocr.path("type_id").asInt(-1) == 1
@@ -40,6 +41,7 @@ public class VnptEkycResponseMapper {
                 && "yes".equals(text(object(face), "is_eye_open"));
         boolean matched = success(compareResponse) && "MATCH".equals(text(compare, "msg"))
                 && (!compare.has("multiple_faces") || isFalse(compare.path("multiple_faces")));
+
         return new VnptEkycClient.VerificationResult(reference, EkycDocumentType.ID_CARD,
                 number, name, valid, liveCard(front) && liveCard(back), faceLive, matched, score, expires);
     }

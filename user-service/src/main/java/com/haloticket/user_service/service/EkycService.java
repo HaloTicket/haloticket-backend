@@ -1,18 +1,21 @@
 package com.haloticket.user_service.service;
 
+import com.haloticket.user_service.dto.response.EkycOrganizerEligibilityResponse;
+import com.haloticket.user_service.dto.response.EkycSessionResponse;
+import com.haloticket.user_service.dto.response.EkycStatusResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface EkycService {
-    EkycDtos.SessionResponse startSession(
+    EkycSessionResponse startSession(
             String keycloakId,
             boolean consentAccepted,
             String consentVersion,
             String idempotencyKey
     );
 
-    EkycDtos.StatusResponse getStatus(String keycloakId);
+    EkycStatusResponse getStatus(String keycloakId);
 
-    EkycDtos.StatusResponse verify(
+    EkycStatusResponse verify(
             String keycloakId,
             String sessionId,
             MultipartFile frontImage,
@@ -20,5 +23,6 @@ public interface EkycService {
             MultipartFile faceImage
     );
 
-    EkycDtos.OrganizerEligibility getOrganizerEligibility(String keycloakId);
+    EkycOrganizerEligibilityResponse getOrganizerEligibility(String keycloakId);
+
 }
