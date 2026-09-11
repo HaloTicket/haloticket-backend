@@ -97,4 +97,17 @@ class VnptEkycResponseMapperTest {
 
         assertThat(result.documentValid()).isTrue();
     }
+
+    @Test
+    void qualityWarningsDoNotRejectAnOtherwiseSuccessfulOcr() throws Exception {
+        var ocr = new ObjectMapper().readTree("""
+                {"message":"IDG-00000000","object":{"id":"079123456789","name":"NGUYEN VAN A",
+                "msg":"OK","msg_back":"OK","type_id":1,"back_type_id":1,
+                "warning":["anh_dau_vao_mo_nhoe"],"tampering":{"is_legal":"yes","warning":[]}}}
+                """);
+
+        var result = mapper.map("session-6", ocr, null, null, null, null);
+
+        assertThat(result.documentValid()).isTrue();
+    }
 }

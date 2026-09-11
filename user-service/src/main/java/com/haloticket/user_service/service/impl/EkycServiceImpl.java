@@ -179,6 +179,9 @@ public class EkycServiceImpl implements EkycService {
 
         EkycDecisionPolicy.Decision decision = decisionPolicy.evaluate(result);
         if (!decision.passed()) {
+            log.warn("VNPT eKYC decision REJECTED for user {}: reason={}, documentValid={}, docNum={}",
+                    user.getId(), decision.reasonCode(), result.documentValid(),
+                    result.documentNumber() == null ? "null" : "[present]");
             attempt.setStatus("PROVIDER_RESULT_INVALID".equals(decision.reasonCode())
                     ? EkycAttemptStatus.MANUAL_REVIEW
                     : EkycAttemptStatus.FAILED);
@@ -188,10 +191,7 @@ public class EkycServiceImpl implements EkycService {
                     attempt.getStatus() == EkycAttemptStatus.MANUAL_REVIEW
                             ? EkycVerificationStatus.PENDING
                             : EkycVerificationStatus.REJECTED,
-                    null,
-                    null,
-                    null,
-                    null,
+                    null, null, null, null,
                     decision.reasonCode()
             );
         }
@@ -240,7 +240,12 @@ public class EkycServiceImpl implements EkycService {
 
     private String providerRejectionReason(HttpStatusCodeException exception) {
         String body = exception.getResponseBodyAsString();
-        if (body != null && body.contains("IDG-00010445")) return "DOCUMENT_TYPE_INVALID";
+        if (body != null) {
+            if (body.contains("IDG-00010445")) return "DOCUMENT_TYPE_INVALID";
+            if (body.contains("IDG-00010")) return "DOCUMENT_INVALID";
+            if (body.contains("IDG-00020")) return "PROVIDER_QUOTA_EXCEEDED";
+            if (body.contains("IDG-00030") || body.contains("IDG-00031")) return "DOCUMENT_TYPE_INVALID";
+        }
         return "PROVIDER_REJECTED";
     }
 

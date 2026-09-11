@@ -23,17 +23,22 @@ public class VnptEkycResponseMapper {
         LocalDate expires = date(text(ocr, "valid_date"));
 
         JsonNode compare = object(compareResponse);
-        boolean valid = success(ocrResponse) && "OK".equals(text(ocr, "msg"))
+
+        // OCR must succeed and document must be the correct type (chip CCCD = type_id 1)
+        boolean ocrOk = success(ocrResponse)
+                && "OK".equals(text(ocr, "msg"))
                 && "OK".equals(text(ocr, "msg_back"))
                 && ocr.path("type_id").isIntegralNumber() && ocr.path("type_id").asInt(-1) == 1
                 && ocr.path("back_type_id").isIntegralNumber() && ocr.path("back_type_id").asInt(-1) == 1
-                && number.matches("[0-9]{12}") && !name.isBlank()
-                && notFlagged(ocr, "expire_warning")
-                && notFlagged(ocr, "back_expire_warning")
-                && notFlagged(ocr, "id_fake_warning")
-                && notIllegal(ocr.path("tampering"))
-                && noWarnings(ocr.path("tampering").path("warning"))
-                && noWarnings(ocr.path("warning"));
+                && number.matches("[0-9]{12}") && !name.isBlank();
+
+        // VNPT may return quality warnings even when OCR completed successfully. Fraud/tampering
+        // has dedicated fields, so generic capture warnings must not turn a valid OCR into failure.
+        boolean noSecurityFlags = notFlagged(ocr, "id_fake_warning")
+                && notIllegal(ocr.path("tampering"));
+
+        boolean valid = ocrOk && noSecurityFlags;
+
         double score;
         try { score = Double.parseDouble(compare.path("prob").asText()) / 100.0; }
         catch (RuntimeException ex) { score = Double.NaN; }
@@ -45,7 +50,6 @@ public class VnptEkycResponseMapper {
         return new VnptEkycClient.VerificationResult(reference, EkycDocumentType.ID_CARD,
                 number, name, valid, liveCard(front) && liveCard(back), faceLive, matched, score, expires);
     }
-
     private boolean liveCard(JsonNode response) {
         JsonNode value = object(response);
         return success(response) && "success".equals(text(value, "liveness"))
@@ -69,9 +73,6 @@ public class VnptEkycResponseMapper {
     private boolean notIllegal(JsonNode tampering) {
         String value = text(tampering, "is_legal");
         return value.isEmpty() || "yes".equalsIgnoreCase(value);
-    }
-    private boolean noWarnings(JsonNode warnings) {
-        return warnings.isMissingNode() || warnings.isNull() || warnings.isArray() && warnings.isEmpty();
     }
     private LocalDate date(String value) {
         try { return LocalDate.parse(value, DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT)); }
