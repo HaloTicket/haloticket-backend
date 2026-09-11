@@ -222,6 +222,7 @@ public class EkycServiceImpl implements EkycService {
         profile.setDocumentNumber(mask(result.documentNumber()));
         profile.setDocumentNumberHash(fingerprint);
         profile.setLegalName(result.legalName().trim());
+        user.setFullName(result.legalName().trim());
         profile.setStatus(EkycVerificationStatus.APPROVED);
         profile.setApprovedAt(clock.instant().atZone(ZoneOffset.UTC).toLocalDateTime());
         profile.setDocumentExpiresOn(result.documentExpiresOn());

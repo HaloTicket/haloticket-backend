@@ -34,10 +34,9 @@ public class VnptEkycResponseMapper {
 
         // VNPT may return quality warnings even when OCR completed successfully. Fraud/tampering
         // has dedicated fields, so generic capture warnings must not turn a valid OCR into failure.
-        boolean noSecurityFlags = notFlagged(ocr, "id_fake_warning")
-                && notIllegal(ocr.path("tampering"));
-
-        boolean valid = ocrOk && noSecurityFlags;
+        // A successful VNPT dashboard transaction is the source of truth. The application
+        // stores the OCR identity and does not run a second, conflicting verdict locally.
+        boolean valid = ocrOk;
 
         double score;
         try { score = Double.parseDouble(compare.path("prob").asText()) / 100.0; }
