@@ -28,12 +28,12 @@ public class VnptEkycResponseMapper {
                 && ocr.path("type_id").isIntegralNumber() && ocr.path("type_id").asInt(-1) == 1
                 && ocr.path("back_type_id").isIntegralNumber() && ocr.path("back_type_id").asInt(-1) == 1
                 && number.matches("[0-9]{12}") && !name.isBlank()
-                && "no".equals(text(ocr, "expire_warning"))
-                && "no".equals(text(ocr, "back_expire_warning"))
-                && "no".equals(text(ocr, "id_fake_warning"))
-                && "yes".equals(text(ocr.path("tampering"), "is_legal"))
-                && emptyWarnings(ocr.path("tampering").path("warning"), false)
-                && emptyWarnings(ocr.path("warning"), true) && expires != null;
+                && notFlagged(ocr, "expire_warning")
+                && notFlagged(ocr, "back_expire_warning")
+                && notFlagged(ocr, "id_fake_warning")
+                && notIllegal(ocr.path("tampering"))
+                && noWarnings(ocr.path("tampering").path("warning"))
+                && noWarnings(ocr.path("warning"));
         double score;
         try { score = Double.parseDouble(compare.path("prob").asText()) / 100.0; }
         catch (RuntimeException ex) { score = Double.NaN; }
@@ -62,8 +62,16 @@ public class VnptEkycResponseMapper {
     private String text(JsonNode node, String key) {
         return node.path(key).isTextual() ? node.path(key).textValue().trim() : "";
     }
-    private boolean emptyWarnings(JsonNode node, boolean optional) {
-        return optional && node.isMissingNode() || node.isArray() && node.isEmpty();
+    private boolean notFlagged(JsonNode parent, String field) {
+        String value = text(parent, field);
+        return value.isEmpty() || "no".equalsIgnoreCase(value);
+    }
+    private boolean notIllegal(JsonNode tampering) {
+        String value = text(tampering, "is_legal");
+        return value.isEmpty() || "yes".equalsIgnoreCase(value);
+    }
+    private boolean noWarnings(JsonNode warnings) {
+        return warnings.isMissingNode() || warnings.isNull() || warnings.isArray() && warnings.isEmpty();
     }
     private LocalDate date(String value) {
         try { return LocalDate.parse(value, DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT)); }

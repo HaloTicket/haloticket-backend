@@ -85,4 +85,16 @@ class VnptEkycResponseMapperTest {
         assertThat(result.faceMatched()).isFalse();
         assertThat(result.matchScore()).isNaN();
     }
+
+    @Test
+    void acceptsSuccessfulCccdOcrWhenOptionalValidationFieldsAreAbsent() throws Exception {
+        var ocr = new ObjectMapper().readTree("""
+                {"message":"IDG-00000000","object":{"id":"079123456789","name":"NGUYEN VAN A",
+                "msg":"OK","msg_back":"OK","type_id":1,"back_type_id":1}}
+                """);
+
+        var result = mapper.map("session-5", ocr, null, null, null, null);
+
+        assertThat(result.documentValid()).isTrue();
+    }
 }

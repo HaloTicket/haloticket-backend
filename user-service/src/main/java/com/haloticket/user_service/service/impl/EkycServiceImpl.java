@@ -177,17 +177,6 @@ public class EkycServiceImpl implements EkycService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Không thể đối soát giấy tờ. Vui lòng kiểm tra lại ảnh chụp.");
         }
 
-        if (result == null || !result.documentValid() || result.documentNumber() == null || result.documentNumber().isBlank()
-                || result.legalName() == null || result.legalName().isBlank()) {
-            attempt.setStatus(EkycAttemptStatus.FAILED);
-            attempt.setFailureReason("Loại giấy tờ không hợp lệ. Vui lòng chụp rõ nét 2 mặt Căn cước công dân gắn chip.");
-            attemptRepository.save(attempt);
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Loại giấy tờ không hợp lệ. Vui lòng chụp rõ nét 2 mặt Căn cước công dân gắn chip.");
-        }
-
-        attempt.setProviderReference(result.providerReference());
-        if (Double.isFinite(result.matchScore())) attempt.setMatchScore(result.matchScore());
-
         EkycDecisionPolicy.Decision decision = decisionPolicy.evaluate(result);
         if (!decision.passed()) {
             attempt.setStatus("PROVIDER_RESULT_INVALID".equals(decision.reasonCode())
@@ -206,6 +195,9 @@ public class EkycServiceImpl implements EkycService {
                     decision.reasonCode()
             );
         }
+
+        attempt.setProviderReference(result.providerReference());
+        if (Double.isFinite(result.matchScore())) attempt.setMatchScore(result.matchScore());
 
         if (result.documentExpiresOn() != null && result.documentExpiresOn().isBefore(LocalDate.now(clock))) {
             attempt.setStatus(EkycAttemptStatus.FAILED);
