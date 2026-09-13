@@ -1,5 +1,6 @@
 package com.haloticket.event_service.entity;
 
+import com.haloticket.event_service.enums.ApplyScope;
 import com.haloticket.event_service.enums.DiscountType;
 import com.haloticket.event_service.enums.VoucherStatus;
 import jakarta.persistence.*;
@@ -25,8 +26,10 @@ public class Voucher {
     @Column(nullable = false, unique = true)
     private String code;
 
-    private String name;
-    private String description;
+    private String title;
+
+    @Column(columnDefinition = "TEXT")
+    private String terms;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "discount_type")
@@ -35,14 +38,27 @@ public class Voucher {
     @Column(name = "discount_value")
     private Double discountValue;
 
-    @Column(name = "max_discount_amount")
-    private Double maxDiscountAmount;
+    @Column(name = "apply_ticket_limit_type")
+    private String applyTicketLimitType;
 
-    @Column(name = "min_order_amount")
-    private Double minOrderAmount;
+    @Column(name = "ticket_limit_count")
+    private Integer ticketLimitCount;
 
-    @Column(name = "usage_limit")
-    private Integer usageLimit;
+    @Column(name = "max_orders_per_buyer")
+    private Integer maxOrdersPerBuyer;
+
+    @Column(name = "min_tickets_per_order")
+    private Integer minTicketsPerOrder;
+
+    @Column(name = "max_tickets_per_order")
+    private Integer maxTicketsPerOrder;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "apply_scope")
+    private ApplyScope applyScope;
+
+    @Column(name = "applicable_showtimes", columnDefinition = "TEXT")
+    private String applicableShowtimes;
 
     @Column(name = "used_count")
     private Integer usedCount;
@@ -67,7 +83,8 @@ public class Voucher {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
         if (this.usedCount == null) this.usedCount = 0;
-        if (this.status == null) this.status = VoucherStatus.DRAFT;
+        if (this.status == null) this.status = VoucherStatus.ACTIVE;
+        if (this.applyScope == null) this.applyScope = ApplyScope.ALL;
     }
 
     @PreUpdate
