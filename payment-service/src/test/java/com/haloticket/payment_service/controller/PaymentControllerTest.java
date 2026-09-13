@@ -18,10 +18,11 @@ import static org.mockito.Mockito.when;
 class PaymentControllerTest {
     @Mock PaymentService paymentService;
     @Mock UserServiceClient userServiceClient;
+    @Mock com.haloticket.payment_service.service.VNPayService vnPayService;
 
     @Test
     void payoutAccountAlwaysUsesAuthenticatedInternalUserId() {
-        PaymentController controller = new PaymentController(paymentService, userServiceClient);
+        PaymentController controller = new PaymentController(paymentService, userServiceClient, vnPayService);
         OrganizerPayoutAccountRequest request = new OrganizerPayoutAccountRequest();
         request.setOrganizerUserId("spoofed-user");
         request.setAccountNumber("123456789");

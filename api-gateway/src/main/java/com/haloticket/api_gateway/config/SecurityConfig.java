@@ -60,7 +60,7 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
                         .pathMatchers("/eureka/**", "/actuator/**").permitAll()
                         .pathMatchers("/api/events/**", "/api/tickets/**", "/api/media/**", "/api/marketplace/**",
-                                "/api/v1/**")
+                                "/api/v1/**", "/ws-notifications/**")
                         .permitAll()
                         .pathMatchers("/api/users/me").authenticated()
                         .pathMatchers("/api/users/**", "/api/bookings/**", "/api/payments/**", "/api/notifications/**")

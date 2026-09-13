@@ -7,11 +7,16 @@ import com.haloticket.payment_service.dto.response.OrganizerPayoutAccountRespons
 import com.haloticket.payment_service.dto.response.OrganizerEligibilityResponse;
 import com.haloticket.payment_service.dto.response.PaymentResponse;
 import com.haloticket.payment_service.service.PaymentService;
+import com.haloticket.payment_service.service.VNPayService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -20,10 +25,44 @@ public class PaymentController {
 
     private final PaymentService paymentService;
     private final UserServiceClient userServiceClient;
+    private final VNPayService vnPayService;
 
     @PostMapping
     public ResponseEntity<PaymentResponse> createPayment(@RequestBody PaymentCreateRequest request) {
         return new ResponseEntity<>(paymentService.createPayment(request), HttpStatus.CREATED);
+    }
+
+    @PostMapping("/vnpay/create-url")
+    public ResponseEntity<Map<String, String>> createVnPayUrl(
+            @RequestParam("amount") long amount,
+            @RequestParam(value = "orderInfo", required = false) String orderInfo,
+            @RequestParam(value = "bookingId", required = false) String bookingId,
+            HttpServletRequest request) {
+        String paymentUrl = vnPayService.createPaymentUrl(request, amount, orderInfo, bookingId);
+        Map<String, String> response = new HashMap<>();
+        response.put("paymentUrl", paymentUrl);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/vnpay/ipn")
+    public ResponseEntity<Map<String, String>> vnpayIpn(@RequestParam Map<String, String> allParams) {
+        Map<String, String> response = new HashMap<>();
+        boolean isValidChecksum = vnPayService.verifyIpn(allParams);
+        if (!isValidChecksum) {
+            response.put("RspCode", "97");
+            response.put("Message", "Invalid Checksum");
+            return ResponseEntity.ok(response);
+        }
+
+        String vnp_ResponseCode = allParams.get("vnp_ResponseCode");
+        if ("00".equals(vnp_ResponseCode)) {
+            response.put("RspCode", "00");
+            response.put("Message", "Confirm Success");
+        } else {
+            response.put("RspCode", "01");
+            response.put("Message", "Transaction Failed");
+        }
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/organizer-payout-account")

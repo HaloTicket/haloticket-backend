@@ -5,6 +5,8 @@ x-logging: &logging
     max-file: "2"
 
 x-runtime: &runtime
+  env_file:
+    - .env
   restart: unless-stopped
   networks: [haloticket-network]
   mem_limit: ${SERVICE_MEMORY_LIMIT:-300m}
@@ -308,6 +310,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/booking_db
     depends_on:
       <<: *dependencies
+      redis:
+        condition: service_healthy
 
   payment-service:
     <<: *runtime
