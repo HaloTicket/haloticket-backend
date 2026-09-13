@@ -111,7 +111,10 @@ public class TicketServiceImpl implements TicketService {
             }
         }
 
+        String existingId = (req.getId() != null && !req.getId().startsWith("tier_") && !req.getId().isBlank()) ? req.getId() : null;
+
         return TicketType.builder()
+                .id(existingId)
                 .eventId(req.getEventId())
                 .name(req.getName() != null ? req.getName() : "Vé tiêu chuẩn")
                 .price(req.getPrice() != null ? req.getPrice() : 0.0)
