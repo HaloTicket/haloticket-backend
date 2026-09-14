@@ -213,7 +213,7 @@ services:
       SERVER_PORT: "8888"
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-haloticket-realm}/protocol/openid-connect/certs
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:5174}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:5174,https://haloticket-web.pages.dev}
     depends_on:
       discovery-server:
         condition: service_healthy
