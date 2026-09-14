@@ -240,12 +240,15 @@
       "redirectUris": [
         "http://localhost:3000/*",
         "http://localhost:5173/*",
-        "http://localhost:8888/*"
+        "http://localhost:8888/*",
+        "https://haloticket-web.pages.dev/*",
+        "https://haloticket-web.pages.dev"
       ],
       "webOrigins": [
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:8888",
+        "https://haloticket-web.pages.dev",
         "+"
       ],
       "notBefore": 0,
