@@ -137,7 +137,7 @@ services:
 
   # Keycloak IAM (Quarkus with Auto-Import Realm - Tối ưu SerialGC & Heap 256MB)
   keycloak:
-    image: quay.io/keycloak/keycloak:24.0.4
+    image: keycloak/keycloak:24.0.4
     mem_limit: ${KEYCLOAK_MEMORY_LIMIT:-420m}
     container_name: haloticket-keycloak
     restart: unless-stopped
