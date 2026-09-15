@@ -13,14 +13,23 @@ import java.util.Collections;
 @Configuration
 public class CorsConfig {
 
-    @Value("${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://localhost:5174}")
+    @Value("${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://localhost:5174,https://haloticket-web.pages.dev}")
     private String allowedOrigins;
 
     @Bean
     public CorsWebFilter corsWebFilter() {
         CorsConfiguration corsConfig = new CorsConfiguration();
-        corsConfig.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
+        
+        java.util.List<String> origins = new java.util.ArrayList<>(Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim).filter(origin -> !origin.isEmpty()).toList());
+        if (!origins.contains("https://haloticket-web.pages.dev")) {
+            origins.add("https://haloticket-web.pages.dev");
+        }
+        if (!origins.contains("https://*.pages.dev")) {
+            origins.add("https://*.pages.dev");
+        }
+
+        corsConfig.setAllowedOriginPatterns(origins);
         corsConfig.setMaxAge(3600L);
         corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         corsConfig.setAllowedHeaders(Collections.singletonList("*"));
