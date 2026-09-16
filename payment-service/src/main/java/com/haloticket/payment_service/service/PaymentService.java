@@ -5,8 +5,11 @@ import com.haloticket.payment_service.dto.request.PaymentCreateRequest;
 import com.haloticket.payment_service.dto.response.OrganizerPayoutAccountResponse;
 import com.haloticket.payment_service.dto.response.PaymentResponse;
 
+import java.util.Map;
+
 public interface PaymentService {
     PaymentResponse createPayment(PaymentCreateRequest request);
     OrganizerPayoutAccountResponse saveOrUpdatePayoutAccount(OrganizerPayoutAccountRequest request);
     OrganizerPayoutAccountResponse getPayoutAccountByUserId(String userId);
+    Map<String, String> processVnPayIpn(Map<String, String> allParams);
 }

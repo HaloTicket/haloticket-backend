@@ -33,7 +33,7 @@ public class SeatLayout {
     @Enumerated(EnumType.STRING)
     private SeatLayoutStatus status;
 
-    @OneToMany(mappedBy = "seatLayout", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "seatLayout", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<SeatZone> seatZones;
 
     @Column(name = "created_at", updatable = false)

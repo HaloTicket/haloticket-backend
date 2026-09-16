@@ -11,22 +11,40 @@ import com.haloticket.payment_service.enums.PayoutAccountVerificationStatus;
 import com.haloticket.payment_service.repository.OrganizerPayoutAccountRepository;
 import com.haloticket.payment_service.repository.PaymentRepository;
 import com.haloticket.payment_service.service.PaymentService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.haloticket.payment_service.entity.OutboxEvent;
+import com.haloticket.payment_service.enums.OutboxStatus;
+import com.haloticket.payment_service.repository.OutboxEventRepository;
+import com.haloticket.payment_service.service.VNPayService;
+import lombok.extern.slf4j.Slf4j;
+import java.util.HashMap;
+import java.util.Map;
+
 @Service
+@Slf4j
 public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentRepository paymentRepository;
     private final OrganizerPayoutAccountRepository organizerPayoutAccountRepository;
+    private final OutboxEventRepository outboxEventRepository;
+    private final VNPayService vnPayService;
+    private final ObjectMapper objectMapper;
 
     public PaymentServiceImpl(PaymentRepository paymentRepository,
-                              OrganizerPayoutAccountRepository organizerPayoutAccountRepository) {
+                               OrganizerPayoutAccountRepository organizerPayoutAccountRepository,
+                               OutboxEventRepository outboxEventRepository,
+                               VNPayService vnPayService,
+                               ObjectMapper objectMapper) {
         this.paymentRepository = paymentRepository;
         this.organizerPayoutAccountRepository = organizerPayoutAccountRepository;
+        this.outboxEventRepository = outboxEventRepository;
+        this.vnPayService = vnPayService;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -119,6 +137,91 @@ public class PaymentServiceImpl implements PaymentService {
                 .accountVersion(entity.getAccountVersion())
                 .identityVersion(entity.getIdentityVersion())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public Map<String, String> processVnPayIpn(Map<String, String> allParams) {
+        Map<String, String> response = new HashMap<>();
+        boolean isValidChecksum = vnPayService.verifyIpn(allParams);
+        if (!isValidChecksum) {
+            response.put("RspCode", "97");
+            response.put("Message", "Invalid Checksum");
+            return response;
+        }
+
+        String bookingId = allParams.get("vnp_TxnRef");
+        String vnp_ResponseCode = allParams.get("vnp_ResponseCode");
+        String amountStr = allParams.get("vnp_Amount");
+
+        Payment payment = paymentRepository.findByBookingId(bookingId)
+                .orElseGet(() -> Payment.builder()
+                        .bookingId(bookingId)
+                        .amount(amountStr != null ? Double.parseDouble(amountStr) / 100.0 : 0.0)
+                        .status(PaymentStatus.PENDING)
+                        .build());
+
+        if ("00".equals(vnp_ResponseCode)) {
+            payment.setStatus(PaymentStatus.SUCCESS);
+            paymentRepository.save(payment);
+
+            // Outbox event: PAYMENT_COMPLETED
+            try {
+                Map<String, Object> payloadMap = new HashMap<>();
+                payloadMap.put("paymentId", payment.getId());
+                payloadMap.put("bookingId", bookingId);
+                payloadMap.put("amount", payment.getAmount());
+                payloadMap.put("txnRef", bookingId);
+                payloadMap.put("vnpayResponseCode", vnp_ResponseCode);
+
+                OutboxEvent outboxEvent = OutboxEvent.builder()
+                        .aggregateType("PAYMENT")
+                        .aggregateId(payment.getId())
+                        .eventType("PAYMENT_COMPLETED")
+                        .topic("haloticket.payment.completed.v1")
+                        .payload(objectMapper.writeValueAsString(payloadMap))
+                        .status(OutboxStatus.PENDING)
+                        .retryCount(0)
+                        .build();
+
+                outboxEventRepository.save(outboxEvent);
+            } catch (Exception e) {
+                log.error("Failed to write OutboxEvent for payment success", e);
+            }
+
+            response.put("RspCode", "00");
+            response.put("Message", "Confirm Success");
+        } else {
+            payment.setStatus(PaymentStatus.FAILED);
+            paymentRepository.save(payment);
+
+            // Outbox event: PAYMENT_FAILED
+            try {
+                Map<String, Object> payloadMap = new HashMap<>();
+                payloadMap.put("paymentId", payment.getId());
+                payloadMap.put("bookingId", bookingId);
+                payloadMap.put("reason", "VNPay error code " + vnp_ResponseCode);
+
+                OutboxEvent outboxEvent = OutboxEvent.builder()
+                        .aggregateType("PAYMENT")
+                        .aggregateId(payment.getId())
+                        .eventType("PAYMENT_FAILED")
+                        .topic("haloticket.payment.failed.v1")
+                        .payload(objectMapper.writeValueAsString(payloadMap))
+                        .status(OutboxStatus.PENDING)
+                        .retryCount(0)
+                        .build();
+
+                outboxEventRepository.save(outboxEvent);
+            } catch (Exception e) {
+                log.error("Failed to write OutboxEvent for payment failure", e);
+            }
+
+            response.put("RspCode", "01");
+            response.put("Message", "Transaction Failed");
+        }
+
+        return response;
     }
 
     private boolean differs(String incoming, String existing) {

@@ -25,7 +25,7 @@ x-runtime: &runtime
     start_period: 60s
 
 x-environment: &environment
-  JAVA_TOOL_OPTIONS: ${SERVICE_JAVA_OPTIONS:--XX:+UseSerialGC -Xss256k -XX:InitialRAMPercentage=10 -XX:MaxRAMPercentage=50 -XX:MaxMetaspaceSize=112m -XX:+ExitOnOutOfMemoryError -Dfile.encoding=UTF-8}
+  JAVA_TOOL_OPTIONS: ${SERVICE_JAVA_OPTIONS:--XX:+UseSerialGC -Xss256k -XX:InitialRAMPercentage=10 -XX:MaxRAMPercentage=60 -XX:MaxMetaspaceSize=256m -XX:+ExitOnOutOfMemoryError -Dfile.encoding=UTF-8}
   EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
   EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
   EUREKA_CLIENT_REGISTRY_FETCH_INTERVAL_SECONDS: "5"
@@ -39,6 +39,7 @@ x-environment: &environment
   SPRING_DATA_REDIS_PORT: "6379"
   SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-secretpassword}
   KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
 
 x-dependencies: &dependencies
   discovery-server:
@@ -127,11 +128,11 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 9092 || /opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server 127.0.0.1:9092"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
     networks:
       - haloticket-network
 
@@ -277,7 +278,7 @@ services:
 
   ticket-service:
     <<: *runtime
-    mem_limit: ${TICKET_MEMORY_LIMIT:-300m}
+    mem_limit: ${TICKET_MEMORY_LIMIT:-450m}
     container_name: haloticket-ticket-service
     image: haloticket/ticket-service:${IMAGE_TAG:-local}
     build:

@@ -20,15 +20,21 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.haloticket.payment_service.repository.OutboxEventRepository;
+
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceImplTest {
 
     @Mock PaymentRepository paymentRepository;
     @Mock OrganizerPayoutAccountRepository accountRepository;
+    @Mock OutboxEventRepository outboxEventRepository;
+    @Mock VNPayService vnPayService;
+    @Mock ObjectMapper objectMapper;
 
     @Test
     void newPayoutAccountStartsUnverified() {
-        PaymentServiceImpl service = new PaymentServiceImpl(paymentRepository, accountRepository);
+        PaymentServiceImpl service = new PaymentServiceImpl(paymentRepository, accountRepository, outboxEventRepository, vnPayService, objectMapper);
         OrganizerPayoutAccountRequest request = request("123456789", "NGUYEN VAN A");
         when(accountRepository.findByOrganizerUserId("user-1")).thenReturn(Optional.empty());
         when(accountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -50,7 +56,7 @@ class PaymentServiceImplTest {
                 .isVerified(true)
                 .accountVersion(3L)
                 .build();
-        PaymentServiceImpl service = new PaymentServiceImpl(paymentRepository, accountRepository);
+        PaymentServiceImpl service = new PaymentServiceImpl(paymentRepository, accountRepository, outboxEventRepository, vnPayService, objectMapper);
         when(accountRepository.findByOrganizerUserId("user-1")).thenReturn(Optional.of(existing));
         when(accountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -77,7 +83,7 @@ class PaymentServiceImplTest {
                 .isVerified(true)
                 .accountVersion(3L)
                 .build();
-        PaymentServiceImpl service = new PaymentServiceImpl(paymentRepository, accountRepository);
+        PaymentServiceImpl service = new PaymentServiceImpl(paymentRepository, accountRepository, outboxEventRepository, vnPayService, objectMapper);
         when(accountRepository.findByOrganizerUserId("user-1")).thenReturn(Optional.of(existing));
         when(accountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 

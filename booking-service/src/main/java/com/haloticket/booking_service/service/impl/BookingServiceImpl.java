@@ -1,12 +1,16 @@
 package com.haloticket.booking_service.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haloticket.booking_service.dto.request.BookingCreateRequest;
 import com.haloticket.booking_service.dto.response.BookingResponse;
 import com.haloticket.booking_service.entity.Booking;
+import com.haloticket.booking_service.entity.OutboxEvent;
 import com.haloticket.booking_service.entity.SeatReservation;
 import com.haloticket.booking_service.enums.BookingStatus;
+import com.haloticket.booking_service.enums.OutboxStatus;
 import com.haloticket.booking_service.enums.SeatReservationStatus;
 import com.haloticket.booking_service.repository.BookingRepository;
+import com.haloticket.booking_service.repository.OutboxEventRepository;
 import com.haloticket.booking_service.repository.SeatReservationRepository;
 import com.haloticket.booking_service.service.BookingService;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -29,8 +35,10 @@ public class BookingServiceImpl implements BookingService {
 
     private final BookingRepository bookingRepository;
     private final SeatReservationRepository seatReservationRepository;
+    private final OutboxEventRepository outboxEventRepository;
     private final RedissonClient redissonClient;
     private final StringRedisTemplate stringRedisTemplate;
+    private final ObjectMapper objectMapper;
 
     @Override
     @Transactional
@@ -96,6 +104,32 @@ public class BookingServiceImpl implements BookingService {
                     stringRedisTemplate.opsForValue().set(seatHoldKey, savedBooking.getId(), 15, TimeUnit.MINUTES);
                 }
                 seatReservationRepository.saveAll(reservations);
+            }
+
+            // 5. Save Outbox Event (BOOKING_CREATED)
+            try {
+                Map<String, Object> eventPayload = new HashMap<>();
+                eventPayload.put("bookingId", savedBooking.getId());
+                eventPayload.put("bookingCode", savedBooking.getBookingCode());
+                eventPayload.put("customerId", savedBooking.getCustomerId());
+                eventPayload.put("eventId", savedBooking.getEventId());
+                eventPayload.put("totalAmount", savedBooking.getTotalAmount());
+                eventPayload.put("expiredAt", savedBooking.getExpiredAt() != null ? savedBooking.getExpiredAt().toString() : null);
+                eventPayload.put("seatIds", seatIds);
+
+                OutboxEvent outboxEvent = OutboxEvent.builder()
+                        .aggregateType("BOOKING")
+                        .aggregateId(savedBooking.getId())
+                        .eventType("BOOKING_CREATED")
+                        .topic("haloticket.booking.created.v1")
+                        .payload(objectMapper.writeValueAsString(eventPayload))
+                        .status(OutboxStatus.PENDING)
+                        .retryCount(0)
+                        .build();
+
+                outboxEventRepository.save(outboxEvent);
+            } catch (Exception e) {
+                log.error("Failed to create outbox event for booking {}", savedBooking.getId(), e);
             }
 
             log.info("Booking created successfully with Redisson Distributed Lock: bookingCode={}, id={}", bookingCode, savedBooking.getId());

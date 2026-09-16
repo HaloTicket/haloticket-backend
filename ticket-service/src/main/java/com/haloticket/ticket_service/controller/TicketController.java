@@ -1,6 +1,8 @@
 package com.haloticket.ticket_service.controller;
 
+import com.haloticket.ticket_service.dto.request.SeatLayoutRequest;
 import com.haloticket.ticket_service.dto.request.TicketTypeCreateRequest;
+import com.haloticket.ticket_service.dto.response.SeatLayoutResponse;
 import com.haloticket.ticket_service.dto.response.TicketTypeResponse;
 import com.haloticket.ticket_service.service.TicketService;
 import lombok.RequiredArgsConstructor;
@@ -8,10 +10,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.haloticket.ticket_service.dto.request.SeatLayoutRequest;
-import com.haloticket.ticket_service.dto.response.SeatLayoutResponse;
-
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/tickets")
@@ -64,5 +64,10 @@ public class TicketController {
                                                                   @RequestBody SeatLayoutRequest request) {
         SeatLayoutResponse response = ticketService.publishSeatLayout(eventId, request);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/seat-status")
+    public ResponseEntity<Map<String, String>> getSeatStatus(@RequestParam("eventId") String eventId) {
+        return ResponseEntity.ok(ticketService.getSeatStatusMap(eventId));
     }
 }

@@ -30,6 +30,15 @@ public class EventController {
         return new ResponseEntity<>(eventService.createEvent(request, authorization), HttpStatus.CREATED);
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<EventResponse> updateEvent(
+            @PathVariable String id,
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody EventCreateRequest request
+    ) {
+        return ResponseEntity.ok(eventService.updateEvent(id, request, authorization));
+    }
+
     @GetMapping("/organizer-profile")
     public ResponseEntity<OrganizerDto> getOrganizerProfile(
             @RequestHeader("Authorization") String authorization,

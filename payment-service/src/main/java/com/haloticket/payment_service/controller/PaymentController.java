@@ -46,23 +46,8 @@ public class PaymentController {
 
     @GetMapping("/vnpay/ipn")
     public ResponseEntity<Map<String, String>> vnpayIpn(@RequestParam Map<String, String> allParams) {
-        Map<String, String> response = new HashMap<>();
-        boolean isValidChecksum = vnPayService.verifyIpn(allParams);
-        if (!isValidChecksum) {
-            response.put("RspCode", "97");
-            response.put("Message", "Invalid Checksum");
-            return ResponseEntity.ok(response);
-        }
-
-        String vnp_ResponseCode = allParams.get("vnp_ResponseCode");
-        if ("00".equals(vnp_ResponseCode)) {
-            response.put("RspCode", "00");
-            response.put("Message", "Confirm Success");
-        } else {
-            response.put("RspCode", "01");
-            response.put("Message", "Transaction Failed");
-        }
-        return ResponseEntity.ok(response);
+        Map<String, String> result = paymentService.processVnPayIpn(allParams);
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/organizer-payout-account")

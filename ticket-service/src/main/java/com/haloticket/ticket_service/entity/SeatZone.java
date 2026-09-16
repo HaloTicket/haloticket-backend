@@ -52,6 +52,6 @@ public class SeatZone {
 
     private Integer capacity;
 
-    @OneToMany(mappedBy = "seatZone", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "seatZone", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<SeatRow> seatRows;
 }

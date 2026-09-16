@@ -14,13 +14,15 @@ import com.haloticket.ticket_service.repository.SeatZoneRepository;
 import com.haloticket.ticket_service.repository.TicketTypeRepository;
 import com.haloticket.ticket_service.service.TicketService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +31,7 @@ public class TicketServiceImpl implements TicketService {
     private final TicketTypeRepository ticketTypeRepository;
     private final SeatLayoutRepository seatLayoutRepository;
     private final SeatZoneRepository seatZoneRepository;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Override
     @Transactional
@@ -47,19 +50,61 @@ public class TicketServiceImpl implements TicketService {
             return List.of();
         }
 
-        // remove existing ticket types for event to synchronize fresh set
-        ticketTypeRepository.deleteByEventId(eventId);
-
-        if (requests == null || requests.isEmpty()) {
-            return List.of();
+        List<TicketType> existingTicketTypes = ticketTypeRepository.findByEventId(eventId);
+        Map<String, TicketType> existingMap = new HashMap<>();
+        for (TicketType tt : existingTicketTypes) {
+            existingMap.put(tt.getId(), tt);
         }
 
         List<TicketTypeResponse> responses = new ArrayList<>();
-        for (TicketTypeCreateRequest req : requests) {
-            req.setEventId(eventId);
-            TicketType entity = mapToEntity(req);
-            TicketType saved = ticketTypeRepository.save(entity);
-            responses.add(mapToResponse(saved));
+        Set<String> processedIds = new HashSet<>();
+
+        if (requests != null && !requests.isEmpty()) {
+            for (TicketTypeCreateRequest req : requests) {
+                req.setEventId(eventId);
+                String requestedId = req.getId();
+
+                if (requestedId != null && !requestedId.startsWith("tier_") && existingMap.containsKey(requestedId)) {
+                    TicketType entity = existingMap.get(requestedId);
+                    LocalDateTime startSale = parseDateTime(req.getStartSaleDate());
+                    LocalDateTime endSale = parseDateTime(req.getEndSaleDate());
+
+                    if (startSale != null && endSale != null && (endSale.isBefore(startSale) || endSale.isEqual(startSale))) {
+                        throw new IllegalArgumentException("Ngày kết thúc bán vé phải sau ngày bắt đầu bán vé cho loại vé: " + req.getName());
+                    }
+
+                    entity.setName(req.getName() != null ? req.getName() : "Vé tiêu chuẩn");
+                    entity.setPrice(req.getPrice() != null ? req.getPrice() : 0.0);
+                    entity.setIsFree(req.getIsFree() != null ? req.getIsFree() : (req.getPrice() != null && req.getPrice() == 0.0));
+                    entity.setTotalQuantity(req.getTotalQuantity() != null ? req.getTotalQuantity() : 100);
+                    entity.setMinPerOrder(req.getMinPerOrder() != null ? req.getMinPerOrder() : 1);
+                    entity.setMaxPerOrder(req.getMaxPerOrder() != null ? req.getMaxPerOrder() : 10);
+                    if (startSale != null) entity.setStartSaleDate(startSale);
+                    if (endSale != null) entity.setEndSaleDate(endSale);
+                    if (req.getDescription() != null) entity.setDescription(req.getDescription());
+
+                    TicketType saved = ticketTypeRepository.save(entity);
+                    processedIds.add(saved.getId());
+                    responses.add(mapToResponse(saved));
+                } else {
+                    req.setId(null);
+                    TicketType entity = mapToEntity(req);
+                    TicketType saved = ticketTypeRepository.save(entity);
+                    processedIds.add(saved.getId());
+                    responses.add(mapToResponse(saved));
+                }
+            }
+        }
+
+        for (TicketType tt : existingTicketTypes) {
+            if (!processedIds.contains(tt.getId())) {
+                try {
+                    ticketTypeRepository.delete(tt);
+                } catch (Exception e) {
+                    tt.setTicketTypeStatus(TicketTypeStatus.HIDDEN);
+                    ticketTypeRepository.save(tt);
+                }
+            }
         }
 
         return responses;
@@ -88,10 +133,10 @@ public class TicketServiceImpl implements TicketService {
                 return LocalDateTime.parse(s + ":00");
             } catch (Exception ex) {
                 try {
-                    return java.time.OffsetDateTime.parse(s).toLocalDateTime();
+                    return OffsetDateTime.parse(s).toLocalDateTime();
                 } catch (Exception ex2) {
                     try {
-                        return java.time.Instant.parse(s).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime();
+                        return Instant.parse(s).atZone(ZoneId.systemDefault()).toLocalDateTime();
                     } catch (Exception ex3) {
                         return null;
                     }
@@ -166,13 +211,16 @@ public class TicketServiceImpl implements TicketService {
         if (eventId == null || eventId.trim().isEmpty()) {
             return null;
         }
-        Optional<SeatLayout> layoutOpt = seatLayoutRepository.findByEventId(eventId);
-        if (layoutOpt.isEmpty()) {
+        List<SeatLayout> layouts = seatLayoutRepository.findByEventId(eventId);
+        if (layouts.isEmpty()) {
             return null;
         }
-        SeatLayout layout = layoutOpt.get();
-        layout.setSeatZones(seatZoneRepository.findBySeatLayoutId(layout.getId()));
-        return mapLayoutToResponse(layout);
+        SeatLayout layout = layouts.stream()
+                .max(Comparator.comparing(l -> l.getUpdatedAt() != null ? l.getUpdatedAt() : l.getCreatedAt()))
+                .orElse(layouts.get(0));
+
+        List<SeatZone> zones = seatZoneRepository.findBySeatLayoutId(layout.getId());
+        return mapLayoutToResponse(layout, zones);
     }
 
     private SeatLayoutResponse processSaveSeatLayout(String eventId, SeatLayoutRequest request, SeatLayoutStatus status) {
@@ -181,27 +229,43 @@ public class TicketServiceImpl implements TicketService {
             throw new IllegalArgumentException("eventId is required for SeatLayout");
         }
 
-        SeatLayout layout = seatLayoutRepository.findByEventId(targetEventId)
-                .orElseGet(() -> SeatLayout.builder()
-                        .eventId(targetEventId)
-                        .status(status)
-                        .build());
+        List<SeatLayout> existingLayouts = seatLayoutRepository.findByEventId(targetEventId);
+        SeatLayout layout;
+        if (!existingLayouts.isEmpty()) {
+            layout = existingLayouts.stream()
+                    .max(Comparator.comparing(l -> l.getUpdatedAt() != null ? l.getUpdatedAt() : l.getCreatedAt()))
+                    .orElse(existingLayouts.get(0));
+
+            for (SeatLayout old : existingLayouts) {
+                if (!old.getId().equals(layout.getId())) {
+                    try {
+                        seatLayoutRepository.delete(old);
+                    } catch (Exception ignored) {}
+                }
+            }
+        } else {
+            layout = SeatLayout.builder()
+                    .eventId(targetEventId)
+                    .status(status)
+                    .seatZones(new ArrayList<>())
+                    .build();
+        }
 
         layout.setStatus(status);
         if (request.getDraftJson() != null) layout.setDraftJson(request.getDraftJson());
         if (request.getSvgData() != null) layout.setSvgData(request.getSvgData());
         if (request.getImageUrl() != null) layout.setImageUrl(request.getImageUrl());
 
-        SeatLayout savedLayout = seatLayoutRepository.save(layout);
-
         if (request.getZones() != null) {
-            // Remove existing zones cleanly for layout
-            seatZoneRepository.deleteBySeatLayoutId(savedLayout.getId());
+            if (layout.getSeatZones() == null) {
+                layout.setSeatZones(new ArrayList<>());
+            } else {
+                layout.getSeatZones().clear();
+            }
 
-            List<SeatZone> zoneEntities = new ArrayList<>();
             for (SeatLayoutRequest.ZoneDto zDto : request.getZones()) {
                 SeatZone zone = SeatZone.builder()
-                        .seatLayout(savedLayout)
+                        .seatLayout(layout)
                         .name(zDto.getName() != null ? zDto.getName() : "Khu vực mới")
                         .ticketTypeId(zDto.getTicketTypeId())
                         .shapeType(zDto.getShapeType() != null ? zDto.getShapeType() : "RECTANGLE")
@@ -217,40 +281,40 @@ public class TicketServiceImpl implements TicketService {
                         .points(zDto.getPoints())
                         .capacity(zDto.getCapacity())
                         .build();
-                zoneEntities.add(zone);
+                layout.getSeatZones().add(zone);
             }
-            List<SeatZone> savedZones = seatZoneRepository.saveAll(zoneEntities);
-            savedLayout.setSeatZones(savedZones);
-        } else {
-            savedLayout.setSeatZones(seatZoneRepository.findBySeatLayoutId(savedLayout.getId()));
         }
 
-        return mapLayoutToResponse(savedLayout);
+        SeatLayout savedLayout = seatLayoutRepository.save(layout);
+        return mapLayoutToResponse(savedLayout, savedLayout.getSeatZones());
     }
 
     private SeatLayoutResponse mapLayoutToResponse(SeatLayout layout) {
+        return mapLayoutToResponse(layout, layout != null ? layout.getSeatZones() : null);
+    }
+
+    private SeatLayoutResponse mapLayoutToResponse(SeatLayout layout, List<SeatZone> zones) {
         if (layout == null) return null;
         List<SeatLayoutResponse.ZoneResponseDto> zoneDtos = new ArrayList<>();
-        if (layout.getSeatZones() != null) {
-            for (SeatZone z : layout.getSeatZones()) {
-                zoneDtos.add(SeatLayoutResponse.ZoneResponseDto.builder()
-                        .id(z.getId())
-                        .name(z.getName())
-                        .ticketTypeId(z.getTicketTypeId())
-                        .shapeType(z.getShapeType())
-                        .colorCode(z.getColorCode())
-                        .fillColor(z.getFillColor())
-                        .strokeColor(z.getStrokeColor())
-                        .curvature(z.getCurvature())
-                        .x(z.getX())
-                        .y(z.getY())
-                        .width(z.getWidth())
-                        .height(z.getHeight())
-                        .rotation(z.getRotation())
-                        .points(z.getPoints())
-                        .capacity(z.getCapacity())
-                        .build());
-            }
+        List<SeatZone> seatZones = zones != null ? zones : (layout.getSeatZones() != null ? layout.getSeatZones() : List.of());
+        for (SeatZone z : seatZones) {
+            zoneDtos.add(SeatLayoutResponse.ZoneResponseDto.builder()
+                    .id(z.getId())
+                    .name(z.getName())
+                    .ticketTypeId(z.getTicketTypeId())
+                    .shapeType(z.getShapeType())
+                    .colorCode(z.getColorCode())
+                    .fillColor(z.getFillColor())
+                    .strokeColor(z.getStrokeColor())
+                    .curvature(z.getCurvature())
+                    .x(z.getX())
+                    .y(z.getY())
+                    .width(z.getWidth())
+                    .height(z.getHeight())
+                    .rotation(z.getRotation())
+                    .points(z.getPoints())
+                    .capacity(z.getCapacity())
+                    .build());
         }
 
         return SeatLayoutResponse.builder()
@@ -262,5 +326,37 @@ public class TicketServiceImpl implements TicketService {
                 .status(layout.getStatus() != null ? layout.getStatus().name() : null)
                 .zones(zoneDtos)
                 .build();
+    }
+
+    @Override
+    public Map<String, String> getSeatStatusMap(String eventId) {
+        Map<String, String> statusMap = new HashMap<>();
+        if (eventId == null || eventId.isBlank()) {
+            return statusMap;
+        }
+
+        try {
+            // Check Redis for held seats
+            Set<String> holdKeys = stringRedisTemplate.keys("seat:hold:" + eventId + ":*");
+            if (holdKeys != null) {
+                for (String key : holdKeys) {
+                    String seatId = key.substring(("seat:hold:" + eventId + ":").length());
+                    statusMap.put(seatId, "HOLDING");
+                }
+            }
+
+            // Check Redis for sold seats
+            Set<String> soldKeys = stringRedisTemplate.keys("seat:sold:" + eventId + ":*");
+            if (soldKeys != null) {
+                for (String key : soldKeys) {
+                    String seatId = key.substring(("seat:sold:" + eventId + ":").length());
+                    statusMap.put(seatId, "SOLD");
+                }
+            }
+        } catch (Exception e) {
+            // Fallback if Redis keys search fails
+        }
+
+        return statusMap;
     }
 }

@@ -160,7 +160,16 @@ public class EventServiceImpl implements EventService {
 
         EventApprovalStatus oldApprovalStatus = eventToSave.getEventApprovalStatus();
 
-        if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
+        if (oldApprovalStatus == EventApprovalStatus.APPROVED || oldApprovalStatus == EventApprovalStatus.UPDATE_PENDING) {
+            boolean isDraft = "DRAFT".equalsIgnoreCase(request.getStatus());
+            if (isDraft) {
+                eventToSave.setEventStatus(EventStatus.DRAFT);
+                eventToSave.setEventApprovalStatus(EventApprovalStatus.DRAFT);
+            } else {
+                eventToSave.setEventStatus(EventStatus.APPROVED);
+                eventToSave.setEventApprovalStatus(EventApprovalStatus.UPDATE_PENDING);
+            }
+        } else if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
             boolean isDraft = "DRAFT".equalsIgnoreCase(request.getStatus());
             eventToSave.setEventStatus(isDraft ? EventStatus.DRAFT : EventStatus.PENDING);
             eventToSave.setEventApprovalStatus(isDraft ? EventApprovalStatus.DRAFT : EventApprovalStatus.PENDING);
@@ -178,14 +187,27 @@ public class EventServiceImpl implements EventService {
 
         boolean isNewlySubmitted = (oldApprovalStatus == null || oldApprovalStatus == EventApprovalStatus.DRAFT)
                 && saved.getEventApprovalStatus() == EventApprovalStatus.PENDING;
+        boolean isUpdatedApproval = (oldApprovalStatus == EventApprovalStatus.APPROVED || oldApprovalStatus == EventApprovalStatus.UPDATE_PENDING)
+                && saved.getEventApprovalStatus() == EventApprovalStatus.UPDATE_PENDING;
 
         if (isNewlySubmitted) {
             publishNotification("ADMIN", "NEW_EVENT_APPROVAL", "Sự kiện mới cần duyệt",
                     "Sự kiện \"" + saved.getTitle() + "\" vừa được gửi yêu cầu phê duyệt.");
+        } else if (isUpdatedApproval) {
+            publishNotification("ADMIN", "EVENT_UPDATED", "Sự kiện cập nhật thông tin",
+                    "Sự kiện \"" + saved.getTitle() + "\" đã được Ban tổ chức cập nhật thông tin và cần xem xét.");
         }
 
         return mapToEventResponse(saved);
+    }
 
+    @Override
+    public EventResponse updateEvent(String id, EventCreateRequest request, String authorization) {
+        if (request == null) {
+            request = new EventCreateRequest();
+        }
+        request.setEventId(id);
+        return createEvent(request, authorization);
     }
 
     private OrganizerEligibilityResponse requireEligibleOrganizer(String authorization) {
@@ -421,6 +443,7 @@ public class EventServiceImpl implements EventService {
         Event event = eventRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sự kiện với ID: " + id));
 
+        EventApprovalStatus prevStatus = event.getEventApprovalStatus();
         event.setEventApprovalStatus(EventApprovalStatus.APPROVED);
         event.setEventStatus(EventStatus.APPROVED);
         Event saved = eventRepository.save(event);
@@ -430,8 +453,13 @@ public class EventServiceImpl implements EventService {
                         ? saved.getOrganizers().get(0).getUserId()
                         : "user_default_id";
 
-        publishNotification(recipientUserId, "EVENT_APPROVED", "Sự kiện đã được phê duyệt!",
-                "Sự kiện \"" + saved.getTitle() + "\" của bạn đã được phê duyệt chính thức.");
+        if (prevStatus == EventApprovalStatus.UPDATE_PENDING) {
+            publishNotification(recipientUserId, "EVENT_UPDATE_APPROVED", "Sự kiện đã được phê duyệt cập nhật!",
+                    "Các thay đổi cập nhật cho sự kiện \"" + saved.getTitle() + "\" đã được phê duyệt.");
+        } else {
+            publishNotification(recipientUserId, "EVENT_APPROVED", "Sự kiện đã được phê duyệt!",
+                    "Sự kiện \"" + saved.getTitle() + "\" của bạn đã được phê duyệt chính thức.");
+        }
 
         return mapToEventResponse(saved);
     }
@@ -451,9 +479,9 @@ public class EventServiceImpl implements EventService {
                         ? saved.getOrganizers().get(0).getUserId()
                         : "user_default_id";
 
-        publishNotification(recipientUserId, "EVENT_REJECTED", "Sự kiện bị từ chối phê duyệt",
-                "Sự kiện \"" + saved.getTitle() + "\" của bạn bị từ chối. Lý do: "
-                        + (reason != null ? reason : "Cần bổ sung thông tin."));
+        publishNotification(recipientUserId, "EVENT_REJECTED", "Sự kiện đã bị từ chối, xem lý do.",
+                "Sự kiện \"" + saved.getTitle() + "\" của bạn bị từ chối phê duyệt. Lý do: "
+                        + (reason != null ? reason : "Cần chỉnh sửa lại thông tin.") + ". Nhấn vào để xem và khắc phục.");
 
         return mapToEventResponse(saved);
     }

@@ -6,6 +6,7 @@ import com.haloticket.ticket_service.dto.response.SeatLayoutResponse;
 import com.haloticket.ticket_service.dto.response.TicketTypeResponse;
 
 import java.util.List;
+import java.util.Map;
 
 public interface TicketService {
     TicketTypeResponse createTicketType(TicketTypeCreateRequest request);
@@ -15,4 +16,5 @@ public interface TicketService {
     SeatLayoutResponse saveSeatLayoutDraft(String eventId, SeatLayoutRequest request);
     SeatLayoutResponse publishSeatLayout(String eventId, SeatLayoutRequest request);
     SeatLayoutResponse getSeatLayoutByEventId(String eventId);
+    Map<String, String> getSeatStatusMap(String eventId);
 }
