@@ -35,7 +35,8 @@ class TicketListingServiceEligibilityTest {
         when(ticketClient.getResaleEligibility("Bearer token", "ticket-1"))
                 .thenReturn(new TicketServiceClient.ResaleEligibilityResponse(
                         "ticket-1", "event-1", true, null,
-                        new BigDecimal("120000"), null, null, null, null, null));
+                        new BigDecimal("120000"), null, null, null, null, null,
+                        "VIP", "A", "A1", "20"));
         when(eventClient.getResalePolicy("Bearer token", "event-1"))
                 .thenReturn(new EventServiceClient.ResalePolicyResponse(
                         true, new BigDecimal("80"), new BigDecimal("120"), closesAt, "terms-v3", 3L));

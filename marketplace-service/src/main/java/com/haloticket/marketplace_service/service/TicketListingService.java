@@ -45,7 +45,8 @@ public class TicketListingService {
             return new TicketServiceClient.ResaleEligibilityResponse(
                     ticket.ticketId(), ticket.eventId(), false, "RESALE_CLOSED", ticket.originalPrice(),
                     null, null, policy == null ? null : policy.version(),
-                    policy == null ? null : policy.closesAt(), policy == null ? null : policy.termsVersion());
+                    policy == null ? null : policy.closesAt(), policy == null ? null : policy.termsVersion(),
+                    ticket.ticketTypeName(), ticket.section(), ticket.row(), ticket.seat());
         }
 
         BigDecimal originalPrice = ticket.originalPrice() == null ? BigDecimal.ZERO : ticket.originalPrice();
@@ -55,7 +56,8 @@ public class TicketListingService {
                 .divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.FLOOR);
         return new TicketServiceClient.ResaleEligibilityResponse(
                 ticket.ticketId(), ticket.eventId(), true, null, originalPrice,
-                minPrice, maxPrice, policy.version(), policy.closesAt(), policy.termsVersion());
+                minPrice, maxPrice, policy.version(), policy.closesAt(), policy.termsVersion(),
+                ticket.ticketTypeName(), ticket.section(), ticket.row(), ticket.seat());
     }
 
     @Transactional
@@ -91,6 +93,8 @@ public class TicketListingService {
         payload.put("minPrice", minPrice); payload.put("maxPrice", maxPrice); payload.put("policyVersion", eligibility.policyVersion());
         payload.put("closesAt", eligibility.closesAt());
         payload.put("termsVersion", request.termsVersion() != null ? request.termsVersion() : eligibility.termsVersion());
+        payload.put("ticketTypeName", eligibility.ticketTypeName()); payload.put("section", eligibility.section());
+        payload.put("row", eligibility.row()); payload.put("seat", eligibility.seat());
         try {
             MarketplaceSaga saga = MarketplaceSaga.builder().id(sagaId).type("RESALE_LISTING").ticketId(request.ticketId()).actorId(actorId)
                     .state(SagaState.WAITING_LOCK).step("LOCK_REQUESTED").payload(objectMapper.writeValueAsString(payload))
@@ -117,6 +121,38 @@ public class TicketListingService {
 
     @Transactional(readOnly = true)
     public Page<ListingResponse> myListings(String actorId, Pageable pageable) { return listingRepository.findBySellerId(actorId, pageable).map(ListingResponse::from); }
+
+    @Transactional
+    public SagaResponse cancelListing(String actorId, String listingId) {
+        TicketListing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LISTING_NOT_FOUND"));
+        if (!listing.getSellerId().equals(actorId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "LISTING_NOT_OWNED");
+        if (listing.getStatus() != ListingStatus.ACTIVE) throw new ResponseStatusException(HttpStatus.CONFLICT, "LISTING_NOT_CANCELLABLE");
+
+        MarketplaceSaga saga = sagaRepository.findById(listing.getSagaId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "LISTING_SAGA_NOT_FOUND"));
+        listing.setStatus(ListingStatus.CANCELLED);
+        listingRepository.save(listing);
+        saga.setState(SagaState.COMPENSATING);
+        saga.setStep("SELLER_CANCELLATION_RELEASE_REQUESTED");
+        saga.setLastError("SELLER_CANCELLED");
+        saga.setNextRetryAt(Instant.now().plusSeconds(10));
+        sagaRepository.save(saga);
+
+        Map<String, Object> command = new LinkedHashMap<>();
+        command.put("messageId", UUID.randomUUID().toString());
+        command.put("sagaId", saga.getId());
+        command.put("operationId", saga.getId());
+        command.put("ticketId", listing.getTicketId());
+        try {
+            outboxRepository.save(OutboxEvent.builder().aggregateType("TICKET_LISTING").aggregateId(listingId)
+                    .eventType("TICKET_RELEASE_REQUESTED").topic("haloticket.ticket.release.requested.v1")
+                    .payload(objectMapper.writeValueAsString(command)).status(OutboxStatus.PENDING).retryCount(0).build());
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Could not create listing cancellation command", exception);
+        }
+        return toResponse(saga);
+    }
 
     @Transactional
     public void activateFromTicketLock(String sagaId) {
@@ -158,6 +194,8 @@ public class TicketListingService {
             TicketListing listing = TicketListing.builder().ticketId(node.get("ticketId").asText()).sellerId(node.get("sellerId").asText())
                     .price(new BigDecimal(node.get("price").asText())).originalPrice(decimal(node,"originalPrice")).minPriceSnapshot(decimal(node,"minPrice"))
                     .maxPriceSnapshot(decimal(node,"maxPrice")).eventId(text(node,"eventId")).status(ListingStatus.ACTIVE).expiresAt(expiry)
+                    .ticketTypeNameSnapshot(text(node,"ticketTypeName")).sectionSnapshot(text(node,"section"))
+                    .rowSnapshot(text(node,"row")).seatSnapshot(text(node,"seat"))
                     .publishedAt(Instant.now()).policyVersion(node.hasNonNull("policyVersion") ? node.get("policyVersion").asLong() : null)
                     .termsVersion(text(node,"termsVersion")).sagaId(sagaId).build();
             listingRepository.save(listing);
@@ -240,8 +278,10 @@ public class TicketListingService {
         listingRepository.findByTicketIdAndStatus(saga.getTicketId(), ListingStatus.ACTIVE).ifPresent(listing -> { listing.setStatus(ListingStatus.CANCELLED); listingRepository.save(listing); });
         transferRepository.findBySagaId(sagaId).ifPresent(transfer -> { transfer.setStatus(TransferStatus.CANCELLED); transfer.setCancellationReason(saga.getLastError()); transferRepository.save(transfer); });
         saga.setState(SagaState.COMPENSATED); saga.setStep("RELEASE_CONFIRMED"); saga.setNextRetryAt(null); sagaRepository.save(saga);
-        String eventType = "GIFT_TRANSFER".equals(saga.getType()) ? "GIFT_CANCELLED" : "RESALE_LISTING_FAILED";
-        String topic = "GIFT_TRANSFER".equals(saga.getType()) ? "haloticket.marketplace.gift.cancelled.v1" : "haloticket.marketplace.listing.failed.v1";
+        boolean gift = "GIFT_TRANSFER".equals(saga.getType());
+        boolean sellerCancelled = "SELLER_CANCELLED".equals(saga.getLastError());
+        String eventType = gift ? "GIFT_CANCELLED" : sellerCancelled ? "RESALE_LISTING_CANCELLED" : "RESALE_LISTING_FAILED";
+        String topic = gift ? "haloticket.marketplace.gift.cancelled.v1" : sellerCancelled ? "haloticket.marketplace.listing.cancelled.v1" : "haloticket.marketplace.listing.failed.v1";
         outboxRepository.save(OutboxEvent.builder().aggregateType("MARKETPLACE_SAGA").aggregateId(sagaId).eventType(eventType).topic(topic).payload(saga.getPayload()).status(OutboxStatus.PENDING).retryCount(0).build());
     }
 

@@ -46,4 +46,9 @@ public class TicketListingController {
 
     @GetMapping("/listings/me")
     public Page<ListingResponse> myListings(Pageable pageable, Authentication authentication) { return service.myListings(authentication.getName(), pageable); }
+
+    @PostMapping("/listings/{listingId}/cancel")
+    public SagaResponse cancelListing(@PathVariable String listingId, Authentication authentication) {
+        return service.cancelListing(authentication.getName(), listingId);
+    }
 }

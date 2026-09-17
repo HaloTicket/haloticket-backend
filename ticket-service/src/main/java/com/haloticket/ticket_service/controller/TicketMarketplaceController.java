@@ -44,11 +44,18 @@ public class TicketMarketplaceController {
         if (originalPrice == null && ticket.getTicketType() != null && ticket.getTicketType().getPrice() != null) {
             originalPrice = BigDecimal.valueOf(ticket.getTicketType().getPrice()).setScale(0, java.math.RoundingMode.HALF_UP);
         }
+        String ticketTypeName = ticket.getTicketType() == null ? null : ticket.getTicketType().getName();
+        String section = ticket.getSeat() == null || ticket.getSeat().getSeatRow() == null
+                || ticket.getSeat().getSeatRow().getSeatZone() == null ? null : ticket.getSeat().getSeatRow().getSeatZone().getName();
+        String row = ticket.getSeat() == null || ticket.getSeat().getSeatRow() == null ? null : ticket.getSeat().getSeatRow().getLabel();
+        String seat = ticket.getSeat() == null ? null : ticket.getSeat().getSeatNumber();
         return new ResaleEligibilityResponse(ticket.getId(), ticket.getEventId(), eligible,
-                eligible ? null : "TICKET_NOT_ELIGIBLE", originalPrice, null, null, null, null, null);
+                eligible ? null : "TICKET_NOT_ELIGIBLE", originalPrice, null, null, null, null, null,
+                ticketTypeName, section, row, seat);
     }
 
     public record ResaleEligibilityResponse(String ticketId, String eventId, boolean eligible, String reasonCode,
                                              BigDecimal originalPrice, BigDecimal minPrice, BigDecimal maxPrice,
-                                             Long policyVersion, Instant closesAt, String termsVersion) {}
+                                             Long policyVersion, Instant closesAt, String termsVersion,
+                                             String ticketTypeName, String section, String row, String seat) {}
 }

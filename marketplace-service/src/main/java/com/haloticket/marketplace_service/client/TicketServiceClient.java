@@ -12,5 +12,6 @@ public interface TicketServiceClient {
 
     record ResaleEligibilityResponse(String ticketId, String eventId, boolean eligible, String reasonCode,
                                      BigDecimal originalPrice, BigDecimal minPrice, BigDecimal maxPrice,
-                                     Long policyVersion, Instant closesAt, String termsVersion) {}
+                                     Long policyVersion, Instant closesAt, String termsVersion,
+                                     String ticketTypeName, String section, String row, String seat) {}
 }
