@@ -1,0 +1,37 @@
+package com.haloticket.marketplace_service.controller;
+
+import com.haloticket.marketplace_service.dto.*;
+import com.haloticket.marketplace_service.service.TicketListingService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.*;
+import org.springframework.http.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/marketplace")
+@RequiredArgsConstructor
+public class TicketListingController {
+    private final TicketListingService service;
+
+    @GetMapping("/tickets/{ticketId}/resale-eligibility")
+    public ResponseEntity<?> eligibility(@RequestHeader("Authorization") String authorization, @PathVariable String ticketId) {
+        return ResponseEntity.ok(service.eligibility(authorization, ticketId));
+    }
+
+    @PostMapping("/listings")
+    public ResponseEntity<SagaResponse> create(@RequestHeader(value = "Idempotency-Key", required = false) String key,
+                                                @RequestHeader(value = "Authorization", required = false) String authorization,
+                                                @RequestBody CreateListingRequest request, Authentication authentication) {
+        return ResponseEntity.accepted().body(service.startResale(authentication.getName(), authorization, key, request));
+    }
+
+    @GetMapping("/sagas/{id}")
+    public SagaResponse saga(@PathVariable String id, Authentication authentication) { return service.getSaga(authentication.getName(), id); }
+
+    @GetMapping("/listings")
+    public Page<ListingResponse> listings(Pageable pageable) { return service.publicListings(pageable); }
+
+    @GetMapping("/listings/me")
+    public Page<ListingResponse> myListings(Pageable pageable, Authentication authentication) { return service.myListings(authentication.getName(), pageable); }
+}

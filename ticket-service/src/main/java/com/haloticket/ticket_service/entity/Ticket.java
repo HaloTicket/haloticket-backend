@@ -34,6 +34,12 @@ public class Ticket {
     @Column(name = "owner_id", nullable = false)
     private String ownerId;
 
+    @Column(name = "original_price", precision = 19, scale = 0)
+    private java.math.BigDecimal originalPrice;
+
+    @Column(name = "lock_operation_id", unique = true)
+    private String lockOperationId;
+
     @Column(name = "qr_code_hash", unique = true)
     private String qrCodeHash;
 
@@ -51,6 +57,9 @@ public class Ticket {
 
     @Column(name = "used_at")
     private LocalDateTime usedAt;
+
+    @Version
+    private Long version;
 
     @PrePersist
     protected void onCreate() {

@@ -294,6 +294,28 @@ services:
     depends_on:
       <<: *dependencies
 
+  marketplace-service:
+    <<: *runtime
+    mem_limit: ${MARKETPLACE_MEMORY_LIMIT:-300m}
+    container_name: haloticket-marketplace-service
+    image: haloticket/marketplace-service:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: marketplace-service
+    ports: ["${SERVICE_BIND_ADDRESS:-127.0.0.1}:${MARKETPLACE_SERVICE_PORT:-8088}:8088"]
+    environment:
+      <<: *environment
+      SERVER_PORT: "8088"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/marketplace_db
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-haloticket-realm}/protocol/openid-connect/certs
+    depends_on:
+      <<: *dependencies
+      kafka:
+        condition: service_healthy
+
   booking-service:
     <<: *runtime
     mem_limit: ${BOOKING_MEMORY_LIMIT:-300m}

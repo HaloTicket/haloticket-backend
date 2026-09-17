@@ -1,0 +1,39 @@
+server:
+  port: ${SERVER_PORT:8088}
+
+spring:
+  application:
+    name: marketplace-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/marketplace_db}
+    username: ${POSTGRES_USER:haloticket}
+    password: ${POSTGRES_PASSWORD:secretpassword}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+marketplace:
+  saga:
+    lock-timeout-seconds: ${MARKETPLACE_SAGA_LOCK_TIMEOUT_SECONDS:30}
+    recovery-delay-ms: ${MARKETPLACE_SAGA_RECOVERY_DELAY_MS:5000}
