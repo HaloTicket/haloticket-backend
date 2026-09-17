@@ -28,7 +28,20 @@ public class MarketplaceEventListener {
             JsonNode payload = root.has("payload") && root.get("payload").isObject() ? root.get("payload") : root;
             String sagaId = payload.path("sagaId").asText();
             processedEvents.save(ProcessedEvent.builder().consumerName("marketplace-ticket-lock").messageId(messageId).processedAt(Instant.now()).build());
-            if (!sagaId.isBlank()) listingService.activateFromTicketLock(sagaId);
+            if (!sagaId.isBlank()) listingService.handleTicketLockResult(sagaId, "LOCKED".equals(root.path("state").asText()));
         } catch (Exception exception) { throw new IllegalStateException("Failed to process TICKET_LOCKED", exception); }
+    }
+
+    @KafkaListener(topics = "haloticket.ticket.ownership.transferred.v1", groupId = "marketplace-service")
+    @Transactional
+    public void onOwnershipTransferred(String message) {
+        try {
+            JsonNode root = objectMapper.readTree(message);
+            String messageId = root.path("messageId").asText(root.path("id").asText());
+            if (messageId.isBlank() || processedEvents.existsByConsumerNameAndMessageId("marketplace-ticket-transfer", messageId)) return;
+            String sagaId = root.path("sagaId").asText();
+            processedEvents.save(ProcessedEvent.builder().consumerName("marketplace-ticket-transfer").messageId(messageId).processedAt(Instant.now()).build());
+            if (!sagaId.isBlank()) listingService.handleOwnershipTransferred(sagaId);
+        } catch (Exception exception) { throw new IllegalStateException("Failed to process TICKET_OWNERSHIP_TRANSFERRED", exception); }
     }
 }

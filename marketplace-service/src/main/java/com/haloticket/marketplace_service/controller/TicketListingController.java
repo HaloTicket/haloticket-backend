@@ -26,6 +26,18 @@ public class TicketListingController {
         return ResponseEntity.accepted().body(service.startResale(authentication.getName(), authorization, key, request));
     }
 
+    @PostMapping("/gifts")
+    public ResponseEntity<SagaResponse> gift(@RequestHeader(value = "Idempotency-Key", required = false) String key,
+                                              @RequestHeader(value = "Authorization", required = false) String authorization,
+                                              @RequestBody CreateGiftRequest request, Authentication authentication) {
+        return ResponseEntity.accepted().body(service.startGift(authentication.getName(), authorization, key, request));
+    }
+
+    @PostMapping("/gifts/{sagaId}/accept")
+    public SagaResponse acceptGift(@PathVariable String sagaId, @RequestParam String token, Authentication authentication) {
+        return service.acceptGift(authentication.getName(), sagaId, token);
+    }
+
     @GetMapping("/sagas/{id}")
     public SagaResponse saga(@PathVariable String id, Authentication authentication) { return service.getSaga(authentication.getName(), id); }
 
