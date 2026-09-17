@@ -55,6 +55,15 @@ public class TicketListingController {
     @GetMapping("/listings/{listingId}")
     public ListingResponse listing(@PathVariable String listingId) { return service.publicListing(listingId); }
 
+    @PostMapping("/listings/{listingId}/reserve")
+    public ResponseEntity<ReservationResponse> reserve(
+            @PathVariable String listingId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String key,
+            Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(service.reserveListing(authentication.getName(), key, listingId));
+    }
+
     @GetMapping("/listings/me")
     public Page<ListingResponse> myListings(Pageable pageable, Authentication authentication) { return service.myListings(authentication.getName(), pageable); }
 

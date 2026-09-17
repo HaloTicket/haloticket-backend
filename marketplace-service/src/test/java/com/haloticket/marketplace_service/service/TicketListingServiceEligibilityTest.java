@@ -5,6 +5,7 @@ import com.haloticket.marketplace_service.client.EventServiceClient;
 import com.haloticket.marketplace_service.client.TicketServiceClient;
 import com.haloticket.marketplace_service.client.UserServiceClient;
 import com.haloticket.marketplace_service.repository.MarketplaceSagaRepository;
+import com.haloticket.marketplace_service.repository.MarketplaceTransactionRepository;
 import com.haloticket.marketplace_service.repository.OutboxEventRepository;
 import com.haloticket.marketplace_service.repository.TicketListingRepository;
 import com.haloticket.marketplace_service.repository.TicketTransferRepository;
@@ -27,7 +28,7 @@ class TicketListingServiceEligibilityTest {
                 mock(TicketListingRepository.class),
                 mock(MarketplaceSagaRepository.class),
                 mock(OutboxEventRepository.class),
-                mock(TicketTransferRepository.class),
+                mock(TicketTransferRepository.class), mock(MarketplaceTransactionRepository.class),
                 ticketClient,
                 eventClient,
                 mock(UserServiceClient.class),

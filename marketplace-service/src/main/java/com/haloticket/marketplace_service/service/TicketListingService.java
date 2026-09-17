@@ -28,6 +28,7 @@ public class TicketListingService {
     private final MarketplaceSagaRepository sagaRepository;
     private final OutboxEventRepository outboxRepository;
     private final TicketTransferRepository transferRepository;
+    private final MarketplaceTransactionRepository transactionRepository;
     private final TicketServiceClient ticketServiceClient;
     private final EventServiceClient eventServiceClient;
     private final UserServiceClient userServiceClient;
@@ -145,6 +146,60 @@ public class TicketListingService {
                         && (item.getExpiresAt() == null || item.getExpiresAt().isAfter(Instant.now())))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LISTING_NOT_AVAILABLE"));
         return ListingResponse.from(listing);
+    }
+
+    @Transactional
+    public ReservationResponse reserveListing(String buyerId, String idempotencyKey, String listingId) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency-Key is required");
+        }
+        Optional<MarketplaceTransaction> existing = transactionRepository.findByPaymentReference(idempotencyKey);
+        if (existing.isPresent()) {
+            MarketplaceTransaction transaction = existing.get();
+            if (!transaction.getBuyerId().equals(buyerId) || !transaction.getTicketListing().getId().equals(listingId)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency-Key was reused with a different request");
+            }
+            return reservationResponse(transaction);
+        }
+
+        TicketListing listing = listingRepository.findByIdForUpdate(listingId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LISTING_NOT_FOUND"));
+        Instant now = Instant.now();
+        if (listing.getStatus() != ListingStatus.ACTIVE || listing.getPublishedAt() == null
+                || (listing.getExpiresAt() != null && !listing.getExpiresAt().isAfter(now))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "LISTING_NOT_AVAILABLE");
+        }
+        if (listing.getSellerId().equals(buyerId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "BUYER_IS_SELLER");
+        }
+
+        Instant reservationExpiresAt = now.plusSeconds(10 * 60);
+        listing.setStatus(ListingStatus.RESERVED);
+        listing.setReservedBy(buyerId);
+        listing.setReservedUntil(reservationExpiresAt);
+        listingRepository.save(listing);
+        MarketplaceTransaction transaction = MarketplaceTransaction.builder()
+                .ticketListing(listing).buyerId(buyerId).sellerId(listing.getSellerId())
+                .amount(listing.getPrice()).currency("VND").status(MarketplaceTransactionStatus.PENDING_PAYMENT)
+                .paymentReference(idempotencyKey).reservationExpiresAt(reservationExpiresAt).build();
+        return reservationResponse(transactionRepository.save(transaction));
+    }
+
+    @Transactional
+    public void expireReservations() {
+        Instant now = Instant.now();
+        for (TicketListing listing : listingRepository.findByStatusAndReservedUntilBefore(ListingStatus.RESERVED, now)) {
+            transactionRepository.findByTicketListing_IdAndStatus(listing.getId(), MarketplaceTransactionStatus.PENDING_PAYMENT)
+                    .ifPresent(transaction -> {
+                        transaction.setStatus(MarketplaceTransactionStatus.EXPIRED);
+                        transaction.setCancelledAt(now);
+                        transactionRepository.save(transaction);
+                    });
+            listing.setStatus(ListingStatus.ACTIVE);
+            listing.setReservedBy(null);
+            listing.setReservedUntil(null);
+            listingRepository.save(listing);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -316,6 +371,10 @@ public class TicketListingService {
     private static String text(com.fasterxml.jackson.databind.JsonNode node, String field) { return node.hasNonNull(field) ? node.get(field).asText() : null; }
     private static BigDecimal decimal(com.fasterxml.jackson.databind.JsonNode node, String field) { return node.hasNonNull(field) ? new BigDecimal(node.get(field).asText()) : null; }
     private SagaResponse toResponse(MarketplaceSaga saga) { return new SagaResponse(saga.getId(), saga.getState(), saga.getBusinessId(), saga.getLastError()); }
+    private ReservationResponse reservationResponse(MarketplaceTransaction transaction) {
+        return new ReservationResponse(transaction.getId(), transaction.getTicketListing().getId(), transaction.getStatus(),
+                transaction.getAmount(), transaction.getCurrency(), transaction.getReservationExpiresAt());
+    }
     private String hash(CreateListingRequest request) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(request.toString().getBytes(StandardCharsets.UTF_8))); } catch (Exception exception) { throw new IllegalStateException(exception); } }
     private String hash(CreateGiftRequest request) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(request.toString().getBytes(StandardCharsets.UTF_8))); } catch (Exception exception) { throw new IllegalStateException(exception); } }
     private String hashToken(String token) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8))); } catch (Exception exception) { throw new IllegalStateException(exception); } }
