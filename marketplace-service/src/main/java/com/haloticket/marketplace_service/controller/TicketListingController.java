@@ -44,6 +44,17 @@ public class TicketListingController {
     @GetMapping("/listings")
     public Page<ListingResponse> listings(Pageable pageable) { return service.publicListings(pageable); }
 
+    @GetMapping("/events")
+    public java.util.List<ResaleEventSummary> events() { return service.publicEvents(); }
+
+    @GetMapping("/events/{eventId}/listings")
+    public Page<ListingResponse> eventListings(@PathVariable String eventId, Pageable pageable) {
+        return service.publicListingsByEvent(eventId, pageable);
+    }
+
+    @GetMapping("/listings/{listingId}")
+    public ListingResponse listing(@PathVariable String listingId) { return service.publicListing(listingId); }
+
     @GetMapping("/listings/me")
     public Page<ListingResponse> myListings(Pageable pageable, Authentication authentication) { return service.myListings(authentication.getName(), pageable); }
 

@@ -129,6 +129,25 @@ public class TicketListingService {
     }
 
     @Transactional(readOnly = true)
+    public Page<ListingResponse> publicListingsByEvent(String eventId, Pageable pageable) {
+        return listingRepository.findPublicActiveByEventId(eventId, ListingStatus.ACTIVE, Instant.now(), pageable).map(ListingResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ResaleEventSummary> publicEvents() {
+        return listingRepository.summarizePublicEvents(ListingStatus.ACTIVE, Instant.now());
+    }
+
+    @Transactional(readOnly = true)
+    public ListingResponse publicListing(String listingId) {
+        TicketListing listing = listingRepository.findById(listingId)
+                .filter(item -> item.getStatus() == ListingStatus.ACTIVE && item.getPublishedAt() != null
+                        && (item.getExpiresAt() == null || item.getExpiresAt().isAfter(Instant.now())))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LISTING_NOT_AVAILABLE"));
+        return ListingResponse.from(listing);
+    }
+
+    @Transactional(readOnly = true)
     public Page<ListingResponse> myListings(String actorId, Pageable pageable) { return listingRepository.findBySellerId(actorId, pageable).map(ListingResponse::from); }
 
     @Transactional

@@ -36,7 +36,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/**", "/health").permitAll()
                         .requestMatchers("/api/marketplace/listings/me", "/api/marketplace/sagas/**").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/marketplace/listings", "/api/marketplace/listings/*").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/marketplace/listings", "/api/marketplace/listings/*", "/api/marketplace/events", "/api/marketplace/events/**").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder())))
                 .build();
