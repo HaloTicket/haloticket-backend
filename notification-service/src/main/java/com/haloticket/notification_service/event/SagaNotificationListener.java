@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import com.haloticket.notification_service.service.NotificationService;
 
 @Component
 @RequiredArgsConstructor
@@ -14,6 +15,7 @@ public class SagaNotificationListener {
 
     private final ObjectMapper objectMapper;
     private final NotificationEmailSender emailSender;
+    private final NotificationService notificationService;
 
     @KafkaListener(topics = "haloticket.booking.created.v1", groupId = "notification-service-saga")
     public void handleBookingCreatedNotification(String payload) {
@@ -41,5 +43,41 @@ public class SagaNotificationListener {
         } catch (Exception e) {
             log.error("Failed to process TICKETS_ISSUED notification", e);
         }
+    }
+
+    @KafkaListener(topics = "haloticket.marketplace.gift.invited.v1", groupId = "notification-service-marketplace")
+    public void handleGiftInvitation(String payload) {
+        publishMarketplaceNotification(payload, "GIFT_INVITATION", "Lời mời tặng vé", "Bạn đã nhận được lời mời tặng vé trên HaloTicket.");
+    }
+
+    @KafkaListener(topics = "haloticket.marketplace.gift.completed.v1", groupId = "notification-service-marketplace")
+    public void handleGiftCompleted(String payload) {
+        publishMarketplaceNotification(payload, "GIFT_COMPLETED", "Tặng vé thành công", "Vé đã được chuyển quyền sở hữu thành công.");
+    }
+
+    @KafkaListener(topics = "haloticket.marketplace.gift.cancelled.v1", groupId = "notification-service-marketplace")
+    public void handleGiftCancelled(String payload) {
+        publishMarketplaceNotification(payload, "GIFT_CANCELLED", "Tặng vé đã hủy", "Lời mời tặng vé đã được hủy hoặc hết hạn.");
+    }
+
+    @KafkaListener(topics = {"haloticket.marketplace.listing.activated.v1", "haloticket.marketplace.listing.failed.v1"}, groupId = "notification-service-marketplace")
+    public void handleResaleListing(String payload) {
+        JsonNode node;
+        try { node = objectMapper.readTree(payload); } catch (Exception exception) { throw new IllegalStateException("Invalid marketplace notification payload", exception); }
+        String eventType = node.has("status") && "FAILED".equals(node.get("status").asText()) ? "RESALE_LISTING_FAILED" : "RESALE_LISTING_ACTIVATED";
+        String title = "RESALE_LISTING_FAILED".equals(eventType) ? "Đăng bán vé thất bại" : "Đăng bán vé thành công";
+        String message = "RESALE_LISTING_FAILED".equals(eventType) ? "Không thể đăng bán vé, hệ thống đang khôi phục trạng thái vé." : "Đăng bán vé thành công. Vé đã được đưa lên sàn.";
+        publishMarketplaceNotification(node, eventType, title, message);
+    }
+
+    private void publishMarketplaceNotification(String payload, String type, String title, String message) {
+        try { publishMarketplaceNotification(objectMapper.readTree(payload), type, title, message); }
+        catch (Exception exception) { throw new IllegalStateException("Invalid marketplace notification payload", exception); }
+    }
+
+    private void publishMarketplaceNotification(JsonNode node, String type, String title, String message) {
+        String recipient = node.hasNonNull("recipientEmail") ? node.get("recipientEmail").asText() : node.path("sellerId").asText(null);
+        if (recipient == null || recipient.isBlank()) return;
+        notificationService.publishDirectNotification(recipient, type, title, message);
     }
 }
