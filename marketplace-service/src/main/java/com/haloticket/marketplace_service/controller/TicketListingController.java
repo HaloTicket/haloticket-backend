@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class TicketListingController {
     private final TicketListingService service;
+    private final com.haloticket.marketplace_service.service.ResalePurchaseService purchaseService;
 
     @GetMapping("/tickets/{ticketId}/resale-eligibility")
     public ResponseEntity<?> eligibility(@RequestHeader("Authorization") String authorization, @PathVariable String ticketId) {
@@ -62,6 +63,11 @@ public class TicketListingController {
             Authentication authentication) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(service.reserveListing(authentication.getName(), key, listingId));
+    }
+
+    @PostMapping("/transactions/{transactionId}/payment")
+    public PaymentInitiationResponse startPayment(@PathVariable String transactionId, Authentication authentication) {
+        return purchaseService.startPayment(authentication.getName(), transactionId);
     }
 
     @GetMapping("/listings/me")

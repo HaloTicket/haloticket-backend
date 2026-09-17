@@ -79,10 +79,12 @@ public class TicketMarketplaceCommandListener {
             if (operationId.isBlank() || ticketId.isBlank() || fromUserId == null || toUserId == null) throw new IllegalArgumentException("Transfer command is incomplete");
             TicketOperation existing = operationRepository.findByOperationId(operationId).orElse(null);
             if (existing != null) { emitResult(existing, existing.getState() == TicketOperationState.TRANSFERRED ? "TICKET_OWNERSHIP_TRANSFERRED" : "TICKET_TRANSFER_REJECTED"); return; }
-            TicketOperation operation = TicketOperation.builder().operationId(operationId).sagaId(root.path("sagaId").asText()).ticketId(ticketId).actorId(fromUserId).expectedOwnerId(fromUserId).purpose("GIFT").state(TicketOperationState.REQUESTED).build();
+            String purpose = root.path("purpose").asText("GIFT");
+            TicketOperation operation = TicketOperation.builder().operationId(operationId).sagaId(root.path("sagaId").asText()).ticketId(ticketId).actorId(fromUserId).expectedOwnerId(fromUserId).purpose(purpose).state(TicketOperationState.REQUESTED).build();
             Ticket ticket = ticketRepository.findWithLockById(ticketId).orElse(null);
             String lockOperationId = text(root, "lockOperationId");
-            if (ticket == null || !fromUserId.equals(ticket.getOwnerId()) || ticket.getStatus() != TicketStatus.LOCKED_FOR_TRANSFER || !root.path("sagaId").asText().equals(lockOperationId) || !lockOperationId.equals(ticket.getLockOperationId())) {
+            TicketStatus requiredStatus = "RESALE".equals(purpose) ? TicketStatus.LOCKED_FOR_RESALE : TicketStatus.LOCKED_FOR_TRANSFER;
+            if (ticket == null || !fromUserId.equals(ticket.getOwnerId()) || ticket.getStatus() != requiredStatus || lockOperationId == null || !lockOperationId.equals(ticket.getLockOperationId())) {
                 operation.setState(TicketOperationState.REJECTED); operation.setLastError("TICKET_TRANSFER_NOT_ELIGIBLE"); operationRepository.save(operation); emitResult(operation, "TICKET_TRANSFER_REJECTED"); return;
             }
             ticket.setOwnerId(toUserId); ticket.setStatus(TicketStatus.VALID); ticket.setLockOperationId(null); ticket.setQrVersion((ticket.getQrVersion() == null ? 0 : ticket.getQrVersion()) + 1); ticket.setQrCodeHash(UUID.randomUUID().toString()); ticketRepository.save(ticket);
