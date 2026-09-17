@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class TicketOperation {
     @Id @GeneratedValue(strategy = GenerationType.UUID) private String id;
     @Column(name = "operation_id", nullable = false, unique = true) private String operationId;
+    @Column(name = "saga_id") private String sagaId;
     @Column(name = "ticket_id", nullable = false) private String ticketId;
     @Column(name = "actor_id") private String actorId;
     @Column(name = "expected_owner_id") private String expectedOwnerId;

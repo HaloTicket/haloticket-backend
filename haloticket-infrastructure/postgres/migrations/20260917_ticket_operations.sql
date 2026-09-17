@@ -6,6 +6,7 @@ ALTER TABLE IF EXISTS tickets ADD COLUMN IF NOT EXISTS version BIGINT;
 CREATE TABLE IF NOT EXISTS ticket_operations (
     id VARCHAR(255) PRIMARY KEY,
     operation_id VARCHAR(255) NOT NULL UNIQUE,
+    saga_id VARCHAR(255),
     ticket_id VARCHAR(255) NOT NULL,
     actor_id VARCHAR(255),
     expected_owner_id VARCHAR(255),

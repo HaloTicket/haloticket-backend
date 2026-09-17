@@ -37,7 +37,7 @@ public class TicketMarketplaceCommandListener {
             if (operationId.isBlank() || ticketId.isBlank()) throw new IllegalArgumentException("Lock command requires operationId and ticketId");
             TicketOperation existing = operationRepository.findByOperationId(operationId).orElse(null);
             if (existing != null) { emitResult(existing, existing.getState() == TicketOperationState.LOCKED ? "TICKET_LOCKED" : "TICKET_LOCK_REJECTED"); return; }
-            TicketOperation operation = TicketOperation.builder().operationId(operationId).ticketId(ticketId).actorId(text(root,"sellerId"))
+            TicketOperation operation = TicketOperation.builder().operationId(operationId).sagaId(root.path("sagaId").asText(operationId)).ticketId(ticketId).actorId(text(root,"sellerId"))
                     .expectedOwnerId(text(root,"sellerId")).purpose(root.path("purpose").asText("RESALE"))
                     .state(TicketOperationState.REQUESTED).build();
             Ticket ticket = ticketRepository.findWithLockById(ticketId).orElse(null);
@@ -74,15 +74,15 @@ public class TicketMarketplaceCommandListener {
     public void transfer(String message) {
         try {
             JsonNode root = objectMapper.readTree(message);
-            String operationId = root.path("operationId").asText(root.path("sagaId").asText());
+            String operationId = root.path("operationId").asText(root.path("sagaId").asText() + ":TRANSFER");
             String ticketId = root.path("ticketId").asText(); String fromUserId = text(root, "fromUserId"); String toUserId = text(root, "toUserId");
             if (operationId.isBlank() || ticketId.isBlank() || fromUserId == null || toUserId == null) throw new IllegalArgumentException("Transfer command is incomplete");
             TicketOperation existing = operationRepository.findByOperationId(operationId).orElse(null);
             if (existing != null) { emitResult(existing, existing.getState() == TicketOperationState.TRANSFERRED ? "TICKET_OWNERSHIP_TRANSFERRED" : "TICKET_TRANSFER_REJECTED"); return; }
-            TicketOperation operation = TicketOperation.builder().operationId(operationId).ticketId(ticketId).actorId(fromUserId).expectedOwnerId(fromUserId).purpose("GIFT").state(TicketOperationState.REQUESTED).build();
+            TicketOperation operation = TicketOperation.builder().operationId(operationId).sagaId(root.path("sagaId").asText()).ticketId(ticketId).actorId(fromUserId).expectedOwnerId(fromUserId).purpose("GIFT").state(TicketOperationState.REQUESTED).build();
             Ticket ticket = ticketRepository.findWithLockById(ticketId).orElse(null);
             String lockOperationId = text(root, "lockOperationId");
-            if (ticket == null || !fromUserId.equals(ticket.getOwnerId()) || ticket.getStatus() != TicketStatus.LOCKED_FOR_TRANSFER || !operationId.equals(lockOperationId) || !operationId.equals(ticket.getLockOperationId())) {
+            if (ticket == null || !fromUserId.equals(ticket.getOwnerId()) || ticket.getStatus() != TicketStatus.LOCKED_FOR_TRANSFER || !root.path("sagaId").asText().equals(lockOperationId) || !lockOperationId.equals(ticket.getLockOperationId())) {
                 operation.setState(TicketOperationState.REJECTED); operation.setLastError("TICKET_TRANSFER_NOT_ELIGIBLE"); operationRepository.save(operation); emitResult(operation, "TICKET_TRANSFER_REJECTED"); return;
             }
             ticket.setOwnerId(toUserId); ticket.setStatus(TicketStatus.VALID); ticket.setLockOperationId(null); ticket.setQrVersion((ticket.getQrVersion() == null ? 0 : ticket.getQrVersion()) + 1); ticket.setQrCodeHash(UUID.randomUUID().toString()); ticketRepository.save(ticket);
@@ -94,7 +94,7 @@ public class TicketMarketplaceCommandListener {
         try {
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("messageId", java.util.UUID.randomUUID().toString()); payload.put("operationId", operation.getOperationId());
-            payload.put("sagaId", operation.getOperationId()); payload.put("ticketId", operation.getTicketId()); payload.put("state", operation.getState().name());
+            payload.put("sagaId", operation.getSagaId() != null ? operation.getSagaId() : operation.getOperationId()); payload.put("ticketId", operation.getTicketId()); payload.put("state", operation.getState().name());
             payload.put("ticketStatus", operation.getState() == TicketOperationState.LOCKED ? "LOCKED" : operation.getState().name());
             String topic = eventType.startsWith("TICKET_LOCK") ? "haloticket.ticket.locked.v1" : eventType.startsWith("TICKET_RELEASE") ? "haloticket.ticket.released.v1" : eventType.startsWith("TICKET_OWNERSHIP") ? "haloticket.ticket.ownership.transferred.v1" : "haloticket.ticket.ownership.transferred.v1";
             outboxRepository.save(OutboxEvent.builder().aggregateType("TICKET_OPERATION").aggregateId(operation.getOperationId()).eventType(eventType)
