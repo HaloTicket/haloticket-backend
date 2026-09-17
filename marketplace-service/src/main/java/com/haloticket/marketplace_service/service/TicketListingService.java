@@ -3,6 +3,7 @@ package com.haloticket.marketplace_service.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haloticket.marketplace_service.client.TicketServiceClient;
+import com.haloticket.marketplace_service.client.EventServiceClient;
 import com.haloticket.marketplace_service.dto.*;
 import com.haloticket.marketplace_service.entity.*;
 import com.haloticket.marketplace_service.enums.*;
@@ -27,6 +28,7 @@ public class TicketListingService {
     private final OutboxEventRepository outboxRepository;
     private final TicketTransferRepository transferRepository;
     private final TicketServiceClient ticketServiceClient;
+    private final EventServiceClient eventServiceClient;
     private final ObjectMapper objectMapper;
 
     public TicketServiceClient.ResaleEligibilityResponse eligibility(String authorization, String ticketId) {
@@ -50,10 +52,19 @@ public class TicketListingService {
         try { eligibility = ticketServiceClient.getResaleEligibility(authorization, request.ticketId()); }
         catch (Exception exception) { throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "TICKET_SERVICE_UNAVAILABLE", exception); }
         if (eligibility == null || !eligibility.eligible()) throw new ResponseStatusException(HttpStatus.CONFLICT, "TICKET_NOT_ELIGIBLE");
-        if (eligibility.minPrice() != null && request.price().compareTo(eligibility.minPrice()) < 0 || eligibility.maxPrice() != null && request.price().compareTo(eligibility.maxPrice()) > 0) {
+        EventServiceClient.ResalePolicyResponse policy;
+        try { policy = eventServiceClient.getResalePolicy(authorization, eligibility.eventId()); }
+        catch (Exception exception) { throw new ResponseStatusException(HttpStatus.CONFLICT, "POLICY_NOT_CONFIGURED", exception); }
+        if (policy == null || !policy.enabled() || policy.minPricePercent() == null || policy.maxPricePercent() == null || (policy.closesAt() != null && policy.closesAt().isBefore(Instant.now()))) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "RESALE_CLOSED");
+        }
+        BigDecimal originalPrice = eligibility.originalPrice() == null ? BigDecimal.ZERO : eligibility.originalPrice();
+        BigDecimal minPrice = originalPrice.multiply(policy.minPricePercent()).divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.CEILING);
+        BigDecimal maxPrice = originalPrice.multiply(policy.maxPricePercent()).divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.FLOOR);
+        if (request.price().compareTo(minPrice) < 0 || request.price().compareTo(maxPrice) > 0) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "PRICE_OUT_OF_RANGE");
         }
-        if (request.policyVersion() != null && eligibility.policyVersion() != null && !request.policyVersion().equals(eligibility.policyVersion())) {
+        if (request.policyVersion() != null && policy.version() != null && !request.policyVersion().equals(policy.version())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "POLICY_CHANGED");
         }
         Instant now = Instant.now();
@@ -61,13 +72,13 @@ public class TicketListingService {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("sagaId", sagaId); payload.put("ticketId", request.ticketId()); payload.put("sellerId", actorId);
         payload.put("price", request.price()); payload.put("eventId", eligibility.eventId()); payload.put("originalPrice", eligibility.originalPrice());
-        payload.put("minPrice", eligibility.minPrice()); payload.put("maxPrice", eligibility.maxPrice()); payload.put("policyVersion", eligibility.policyVersion());
-        payload.put("closesAt", eligibility.closesAt());
-        payload.put("termsVersion", request.termsVersion() != null ? request.termsVersion() : eligibility.termsVersion());
+        payload.put("minPrice", minPrice); payload.put("maxPrice", maxPrice); payload.put("policyVersion", policy.version());
+        payload.put("closesAt", policy.closesAt());
+        payload.put("termsVersion", request.termsVersion() != null ? request.termsVersion() : policy.termsVersion());
         try {
             MarketplaceSaga saga = MarketplaceSaga.builder().id(sagaId).type("RESALE_LISTING").ticketId(request.ticketId()).actorId(actorId)
                     .state(SagaState.WAITING_LOCK).step("LOCK_REQUESTED").payload(objectMapper.writeValueAsString(payload))
-                    .idempotencyKey(idempotencyKey).requestHash(hash).deadlineAt(eligibility.closesAt()).nextRetryAt(now).retryCount(0).build();
+                    .idempotencyKey(idempotencyKey).requestHash(hash).deadlineAt(policy.closesAt()).nextRetryAt(now).retryCount(0).build();
             sagaRepository.save(saga);
             outboxRepository.save(OutboxEvent.builder().aggregateType("MARKETPLACE_SAGA").aggregateId(sagaId).eventType("TICKET_LOCK_REQUESTED")
                     .topic("haloticket.ticket.lock.requested.v1").payload(objectMapper.writeValueAsString(Map.of("messageId", UUID.randomUUID().toString(), "sagaId", sagaId, "ticketId", request.ticketId(), "sellerId", actorId, "purpose", "RESALE")))
