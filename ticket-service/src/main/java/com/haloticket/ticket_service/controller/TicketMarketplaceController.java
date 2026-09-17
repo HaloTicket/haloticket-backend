@@ -26,6 +26,14 @@ public class TicketMarketplaceController {
         return ticketRepository.findByOwnerIdOrderByIssuedAtDesc(jwt.getSubject()).stream().map(OwnedTicketResponse::from).toList();
     }
 
+    @GetMapping("/{ticketId}")
+    public OwnedTicketResponse myTicket(@PathVariable String ticketId, @AuthenticationPrincipal Jwt jwt) {
+        if (jwt == null || jwt.getSubject() == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        Ticket ticket = ticketRepository.findById(ticketId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!jwt.getSubject().equals(ticket.getOwnerId())) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        return OwnedTicketResponse.from(ticket);
+    }
+
     @GetMapping("/{ticketId}/resale-eligibility")
     public ResaleEligibilityResponse resaleEligibility(@PathVariable String ticketId, @AuthenticationPrincipal Jwt jwt) {
         Ticket ticket = ticketRepository.findById(ticketId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
