@@ -336,7 +336,15 @@ public class TicketServiceImpl implements TicketService {
         }
 
         try {
-            // Check Redis for held seats
+            // check Redis Set for held seats
+            Set<String> heldSeats = stringRedisTemplate.opsForSet().members("event:" + eventId + ":held_seats");
+            if (heldSeats != null && !heldSeats.isEmpty()) {
+                for (String seatId : heldSeats) {
+                    statusMap.put(seatId, "HOLDING");
+                }
+            }
+
+            // fallback for individual seat:hold keys
             Set<String> holdKeys = stringRedisTemplate.keys("seat:hold:" + eventId + ":*");
             if (holdKeys != null) {
                 for (String key : holdKeys) {
@@ -345,7 +353,15 @@ public class TicketServiceImpl implements TicketService {
                 }
             }
 
-            // Check Redis for sold seats
+            // check Redis Set for sold seats
+            Set<String> soldSeats = stringRedisTemplate.opsForSet().members("event:" + eventId + ":sold_seats");
+            if (soldSeats != null && !soldSeats.isEmpty()) {
+                for (String seatId : soldSeats) {
+                    statusMap.put(seatId, "SOLD");
+                }
+            }
+
+            // fallback for individual seat:sold keys
             Set<String> soldKeys = stringRedisTemplate.keys("seat:sold:" + eventId + ":*");
             if (soldKeys != null) {
                 for (String key : soldKeys) {
@@ -354,7 +370,7 @@ public class TicketServiceImpl implements TicketService {
                 }
             }
         } catch (Exception e) {
-            // Fallback if Redis keys search fails
+            // fallback if Redis fails
         }
 
         return statusMap;

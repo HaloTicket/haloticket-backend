@@ -102,6 +102,7 @@ public class BookingServiceImpl implements BookingService {
                     // Set hold TTL key in Redis (900 seconds = 15 mins)
                     String seatHoldKey = "seat:hold:" + eventId + ":" + seatId;
                     stringRedisTemplate.opsForValue().set(seatHoldKey, savedBooking.getId(), 15, TimeUnit.MINUTES);
+                    stringRedisTemplate.opsForSet().add("event:" + eventId + ":held_seats", seatId);
                 }
                 seatReservationRepository.saveAll(reservations);
             }

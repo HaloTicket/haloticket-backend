@@ -331,6 +331,22 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payment_db
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-haloticket-realm}/protocol/openid-connect/certs
+      VNPAY_TMN_CODE: ${VNPAY_TMN_CODE:-2QXUYB07}
+      VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-AXYZ12345678909876543210ABCDEFGH}
+      VNPAY_URL: ${VNPAY_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-http://localhost:5173/payment/callback}
+      SEPAY_API_KEY: ${SEPAY_API_KEY:-}
+      SEPAY_ACCOUNT_NO: ${SEPAY_ACCOUNT_NO:-}
+      SEPAY_BANK_NAME: ${SEPAY_BANK_NAME:-}
+      SEPAY_WEBHOOK_SECRET: ${SEPAY_WEBHOOK_SECRET:-}
+      MOMO_PARTNER_CODE: ${MOMO_PARTNER_CODE:-}
+      MOMO_ACCESS_KEY: ${MOMO_ACCESS_KEY:-}
+      MOMO_SECRET_KEY: ${MOMO_SECRET_KEY:-}
+      ZALOPAY_APP_ID: ${ZALOPAY_APP_ID:-}
+      ZALOPAY_KEY1: ${ZALOPAY_KEY1:-}
+      ZALOPAY_KEY2: ${ZALOPAY_KEY2:-}
+      SHOPEEPAY_PARTNER_ID: ${SHOPEEPAY_PARTNER_ID:-}
+      SHOPEEPAY_SECRET_KEY: ${SHOPEEPAY_SECRET_KEY:-}
     depends_on:
       <<: *dependencies
 

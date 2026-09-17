@@ -1,0 +1,25 @@
+package com.haloticket.payment_service.config;
+
+import lombok.Getter;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+@Getter
+public class SePayConfig {
+
+    @Value("${sepay.api_key:sepay_api_key_demo}")
+    private String apiKey;
+
+    @Value("${sepay.account_no:0901234567}")
+    private String accountNo;
+
+    @Value("${sepay.bank_name:MBBank}")
+    private String bankName;
+
+    @Value("${sepay.account_name:CONG TY TNHH HALOTICKET}")
+    private String accountName;
+
+    @Value("${sepay.webhook_secret:sepay_webhook_secret_demo}")
+    private String webhookSecret;
+}

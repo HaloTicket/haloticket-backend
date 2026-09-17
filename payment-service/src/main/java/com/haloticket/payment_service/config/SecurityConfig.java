@@ -35,7 +35,16 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/**", "/health").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/payments").permitAll()
+                        .requestMatchers(
+                                "/api/payments/vnpay/**",
+                                "/api/payments/vietqr/**",
+                                "/api/payments/sepay/**",
+                                "/api/payments/momo/**",
+                                "/api/payments/zalopay/**",
+                                "/api/payments/shopeepay/**",
+                                "/api/payments/verify/**",
+                                "/api/payments"
+                        ).permitAll()
                         .requestMatchers("/api/payments/**").authenticated()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder())))

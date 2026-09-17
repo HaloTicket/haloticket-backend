@@ -54,6 +54,7 @@ public class BookingExpirationScheduler {
                 res.setStatus(SeatReservationStatus.CANCELLED);
                 String holdKey = "seat:hold:" + booking.getEventId() + ":" + res.getSeatId();
                 stringRedisTemplate.delete(holdKey);
+                stringRedisTemplate.opsForSet().remove("event:" + booking.getEventId() + ":held_seats", res.getSeatId());
             }
             seatReservationRepository.saveAll(reservations);
 

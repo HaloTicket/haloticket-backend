@@ -32,6 +32,7 @@ public class PaymentController {
         return new ResponseEntity<>(paymentService.createPayment(request), HttpStatus.CREATED);
     }
 
+    // 1. VNPAY
     @PostMapping("/vnpay/create-url")
     public ResponseEntity<Map<String, String>> createVnPayUrl(
             @RequestParam("amount") long amount,
@@ -48,6 +49,72 @@ public class PaymentController {
     public ResponseEntity<Map<String, String>> vnpayIpn(@RequestParam Map<String, String> allParams) {
         Map<String, String> result = paymentService.processVnPayIpn(allParams);
         return ResponseEntity.ok(result);
+    }
+
+    // 2. SePay (VietQR 24/7)
+    @PostMapping("/vietqr/create-payload")
+    public ResponseEntity<Map<String, Object>> createVietQrPayload(
+            @RequestParam("amount") long amount,
+            @RequestParam(value = "bookingCode", required = false) String bookingCode,
+            @RequestParam("bookingId") String bookingId) {
+        return ResponseEntity.ok(paymentService.createVietQrPayload(amount, bookingCode, bookingId));
+    }
+
+    @PostMapping("/sepay/webhook")
+    public ResponseEntity<Map<String, String>> sepayWebhook(@RequestBody Map<String, Object> webhookData) {
+        return ResponseEntity.ok(paymentService.processSepayWebhook(webhookData));
+    }
+
+    // 3. MoMo
+    @PostMapping("/momo/create-url")
+    public ResponseEntity<Map<String, String>> createMoMoUrl(
+            @RequestParam("amount") long amount,
+            @RequestParam(value = "orderInfo", required = false) String orderInfo,
+            @RequestParam("bookingId") String bookingId) {
+        return ResponseEntity.ok(paymentService.createMoMoPaymentUrl(amount, orderInfo, bookingId));
+    }
+
+    @PostMapping("/momo/ipn")
+    public ResponseEntity<Map<String, String>> momoIpn(@RequestParam Map<String, String> allParams) {
+        return ResponseEntity.ok(paymentService.processMoMoIpn(allParams));
+    }
+
+    // 4. ZaloPay
+    @PostMapping("/zalopay/create-url")
+    public ResponseEntity<Map<String, String>> createZaloPayUrl(
+            @RequestParam("amount") long amount,
+            @RequestParam(value = "orderInfo", required = false) String orderInfo,
+            @RequestParam("bookingId") String bookingId) {
+        return ResponseEntity.ok(paymentService.createZaloPayPaymentUrl(amount, orderInfo, bookingId));
+    }
+
+    @PostMapping("/zalopay/ipn")
+    public ResponseEntity<Map<String, String>> zalopayIpn(@RequestBody Map<String, Object> callbackData) {
+        return ResponseEntity.ok(paymentService.processZaloPayIpn(callbackData));
+    }
+
+    // 5. ShopeePay
+    @PostMapping("/shopeepay/create-url")
+    public ResponseEntity<Map<String, String>> createShopeePayUrl(
+            @RequestParam("amount") long amount,
+            @RequestParam(value = "orderInfo", required = false) String orderInfo,
+            @RequestParam("bookingId") String bookingId) {
+        return ResponseEntity.ok(paymentService.createShopeePayPaymentUrl(amount, orderInfo, bookingId));
+    }
+
+    @PostMapping("/shopeepay/ipn")
+    public ResponseEntity<Map<String, String>> shopeepayIpn(@RequestBody Map<String, Object> callbackData) {
+        return ResponseEntity.ok(paymentService.processShopeePayIpn(callbackData));
+    }
+
+    // Payment verification for frontend polling/callback
+    @GetMapping("/verify/{bookingId}")
+    public ResponseEntity<PaymentResponse> getPaymentStatusByBookingId(@PathVariable("bookingId") String bookingId) {
+        PaymentResponse response = paymentService.getPaymentStatusByBookingId(bookingId);
+        if (response == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/organizer-payout-account")
