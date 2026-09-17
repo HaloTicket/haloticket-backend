@@ -11,6 +11,12 @@ public class EkycDecisionPolicy {
                 || result.legalName() == null || result.legalName().isBlank()) {
             return Decision.reject("OCR_DATA_INCOMPLETE");
         }
+        if (!result.faceLivenessPassed()) {
+            return Decision.reject("FACE_LIVENESS_FAILED");
+        }
+        if (!result.faceMatched()) {
+            return Decision.reject("FACE_MATCH_FAILED");
+        }
         return Decision.approve();
     }
 
