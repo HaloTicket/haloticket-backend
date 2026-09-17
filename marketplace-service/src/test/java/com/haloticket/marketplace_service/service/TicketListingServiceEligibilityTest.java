@@ -3,6 +3,7 @@ package com.haloticket.marketplace_service.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haloticket.marketplace_service.client.EventServiceClient;
 import com.haloticket.marketplace_service.client.TicketServiceClient;
+import com.haloticket.marketplace_service.client.UserServiceClient;
 import com.haloticket.marketplace_service.repository.MarketplaceSagaRepository;
 import com.haloticket.marketplace_service.repository.OutboxEventRepository;
 import com.haloticket.marketplace_service.repository.TicketListingRepository;
@@ -29,6 +30,7 @@ class TicketListingServiceEligibilityTest {
                 mock(TicketTransferRepository.class),
                 ticketClient,
                 eventClient,
+                mock(UserServiceClient.class),
                 new ObjectMapper()
         );
         Instant closesAt = Instant.parse("2026-09-20T09:26:00Z");

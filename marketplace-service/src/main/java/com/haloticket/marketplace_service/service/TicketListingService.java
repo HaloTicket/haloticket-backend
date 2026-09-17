@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haloticket.marketplace_service.client.TicketServiceClient;
 import com.haloticket.marketplace_service.client.EventServiceClient;
+import com.haloticket.marketplace_service.client.UserServiceClient;
 import com.haloticket.marketplace_service.dto.*;
 import com.haloticket.marketplace_service.entity.*;
 import com.haloticket.marketplace_service.enums.*;
@@ -29,6 +30,7 @@ public class TicketListingService {
     private final TicketTransferRepository transferRepository;
     private final TicketServiceClient ticketServiceClient;
     private final EventServiceClient eventServiceClient;
+    private final UserServiceClient userServiceClient;
     private final ObjectMapper objectMapper;
 
     public TicketServiceClient.ResaleEligibilityResponse eligibility(String authorization, String ticketId) {
@@ -71,6 +73,13 @@ public class TicketListingService {
         if (existing.isPresent()) {
             if (!existing.get().getRequestHash().equals(hash)) throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency-Key was reused with a different request");
             return toResponse(existing.get());
+        }
+
+        UserServiceClient.ResaleSellerEligibility sellerEligibility;
+        try { sellerEligibility = userServiceClient.getResaleEligibility(authorization); }
+        catch (Exception exception) { throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "EKYC_SERVICE_UNAVAILABLE", exception); }
+        if (sellerEligibility == null || !sellerEligibility.eligible()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "EKYC_REQUIRED");
         }
 
         TicketServiceClient.ResaleEligibilityResponse eligibility;

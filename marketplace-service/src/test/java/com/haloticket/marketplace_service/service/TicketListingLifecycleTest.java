@@ -3,6 +3,7 @@ package com.haloticket.marketplace_service.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haloticket.marketplace_service.client.EventServiceClient;
 import com.haloticket.marketplace_service.client.TicketServiceClient;
+import com.haloticket.marketplace_service.client.UserServiceClient;
 import com.haloticket.marketplace_service.dto.ListingResponse;
 import com.haloticket.marketplace_service.entity.MarketplaceSaga;
 import com.haloticket.marketplace_service.entity.OutboxEvent;
@@ -70,7 +71,7 @@ class TicketListingLifecycleTest {
 
     private static TicketListingService service(TicketListingRepository listings, MarketplaceSagaRepository sagas, OutboxEventRepository outbox) {
         return new TicketListingService(listings, sagas, outbox, mock(TicketTransferRepository.class),
-                mock(TicketServiceClient.class), mock(EventServiceClient.class), new ObjectMapper());
+                mock(TicketServiceClient.class), mock(EventServiceClient.class), mock(UserServiceClient.class), new ObjectMapper());
     }
 
     private static TicketListing listing(String sellerId, ListingStatus status) {
