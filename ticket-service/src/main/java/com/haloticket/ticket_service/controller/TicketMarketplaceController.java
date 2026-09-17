@@ -24,8 +24,12 @@ public class TicketMarketplaceController {
         String subject = jwt == null ? null : jwt.getSubject();
         if (subject == null || !subject.equals(ticket.getOwnerId())) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         boolean eligible = ticket.getStatus() == TicketStatus.VALID;
+        BigDecimal originalPrice = ticket.getOriginalPrice();
+        if (originalPrice == null && ticket.getTicketType() != null && ticket.getTicketType().getPrice() != null) {
+            originalPrice = BigDecimal.valueOf(ticket.getTicketType().getPrice()).setScale(0, java.math.RoundingMode.HALF_UP);
+        }
         return new ResaleEligibilityResponse(ticket.getId(), ticket.getEventId(), eligible,
-                eligible ? null : "TICKET_NOT_ELIGIBLE", ticket.getOriginalPrice(), null, null, null, null, null);
+                eligible ? null : "TICKET_NOT_ELIGIBLE", originalPrice, null, null, null, null, null);
     }
 
     public record ResaleEligibilityResponse(String ticketId, String eventId, boolean eligible, String reasonCode,
