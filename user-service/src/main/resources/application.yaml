@@ -55,7 +55,7 @@ keycloak:
   client-secret: ${KEYCLOAK_CLIENT_SECRET:user-service-secret}
 
 ekyc:
-  fingerprint-secret: ${EKYC_FINGERPRINT_SECRET:}
+  fingerprint-secret: ${EKYC_FINGERPRINT_SECRET:haloticket-ekyc-fingerprint-secret-2026}
   vnpt:
     enabled: ${VNPT_EKYC_ENABLED:false}
     base-url: ${VNPT_EKYC_BASE_URL:https://api.idg.vnpt.vn}
