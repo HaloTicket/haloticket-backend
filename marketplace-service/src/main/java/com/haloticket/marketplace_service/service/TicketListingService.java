@@ -61,6 +61,7 @@ public class TicketListingService {
         payload.put("sagaId", sagaId); payload.put("ticketId", request.ticketId()); payload.put("sellerId", actorId);
         payload.put("price", request.price()); payload.put("eventId", eligibility.eventId()); payload.put("originalPrice", eligibility.originalPrice());
         payload.put("minPrice", eligibility.minPrice()); payload.put("maxPrice", eligibility.maxPrice()); payload.put("policyVersion", eligibility.policyVersion());
+        payload.put("closesAt", eligibility.closesAt());
         payload.put("termsVersion", request.termsVersion() != null ? request.termsVersion() : eligibility.termsVersion());
         try {
             MarketplaceSaga saga = MarketplaceSaga.builder().id(sagaId).type("RESALE_LISTING").ticketId(request.ticketId()).actorId(actorId)
@@ -83,7 +84,7 @@ public class TicketListingService {
 
     @Transactional(readOnly = true)
     public Page<ListingResponse> publicListings(Pageable pageable) {
-        return listingRepository.findByStatusAndPublishedAtIsNotNullAndExpiresAtAfter(ListingStatus.ACTIVE, Instant.now(), pageable).map(ListingResponse::from);
+        return listingRepository.findPublicActive(ListingStatus.ACTIVE, Instant.now(), pageable).map(ListingResponse::from);
     }
 
     @Transactional(readOnly = true)
