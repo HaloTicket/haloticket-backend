@@ -24,9 +24,16 @@ public class TicketListing {
     @Column(name = "min_price_snapshot", precision = 19, scale = 0) private BigDecimal minPriceSnapshot;
     @Column(name = "max_price_snapshot", precision = 19, scale = 0) private BigDecimal maxPriceSnapshot;
     @Column(name = "event_id") private String eventId;
+    @Column(name = "ticket_type_name_snapshot") private String ticketTypeNameSnapshot;
+    @Column(name = "section_snapshot") private String sectionSnapshot;
+    @Column(name = "row_snapshot") private String rowSnapshot;
+    @Column(name = "seat_snapshot") private String seatSnapshot;
     @Enumerated(EnumType.STRING) @Column(nullable = false) private ListingStatus status;
+    @Column(name = "reserved_by") private String reservedBy;
+    @Column(name = "reserved_until") private Instant reservedUntil;
     @Column(name = "expires_at") private Instant expiresAt;
     @Column(name = "published_at") private Instant publishedAt;
+    @Column(name = "sold_at") private Instant soldAt;
     @Column(name = "policy_version") private Long policyVersion;
     @Column(name = "terms_version") private String termsVersion;
     @Column(name = "saga_id", nullable = false, unique = true) private String sagaId;
