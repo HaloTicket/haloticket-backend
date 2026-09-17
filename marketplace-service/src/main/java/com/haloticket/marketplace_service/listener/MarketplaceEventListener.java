@@ -44,4 +44,17 @@ public class MarketplaceEventListener {
             if (!sagaId.isBlank()) listingService.handleOwnershipTransferred(sagaId);
         } catch (Exception exception) { throw new IllegalStateException("Failed to process TICKET_OWNERSHIP_TRANSFERRED", exception); }
     }
+
+    @KafkaListener(topics = "haloticket.ticket.released.v1", groupId = "marketplace-service")
+    @Transactional
+    public void onTicketReleased(String message) {
+        try {
+            JsonNode root = objectMapper.readTree(message);
+            String messageId = root.path("messageId").asText(root.path("id").asText());
+            if (messageId.isBlank() || processedEvents.existsByConsumerNameAndMessageId("marketplace-ticket-release", messageId)) return;
+            String sagaId = root.path("sagaId").asText();
+            processedEvents.save(ProcessedEvent.builder().consumerName("marketplace-ticket-release").messageId(messageId).processedAt(Instant.now()).build());
+            if (!sagaId.isBlank()) listingService.handleTicketReleased(sagaId);
+        } catch (Exception exception) { throw new IllegalStateException("Failed to process TICKET_RELEASED", exception); }
+    }
 }

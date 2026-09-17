@@ -129,6 +129,7 @@ public class TicketListingService {
                 transfer.setInvitationTokenHash(hashToken(token));
                 transfer.setInvitationExpiresAt(Instant.now().plusSeconds(24 * 60 * 60));
                 transferRepository.save(transfer);
+                saga.setDeadlineAt(transfer.getInvitationExpiresAt());
                 saga.setState(SagaState.WAITING_RECIPIENT); saga.setStep("INVITATION_CREATED"); sagaRepository.save(saga);
                 Map<String, Object> invitation = new LinkedHashMap<>();
                 invitation.put("sagaId", sagaId); invitation.put("ticketId", transfer.getTicketId()); invitation.put("recipientEmail", transfer.getRecipientEmail());
@@ -204,6 +205,28 @@ public class TicketListingService {
         transfer.setStatus(TransferStatus.COMPLETED); transfer.setTransferredAt(Instant.now()); transferRepository.save(transfer);
         saga.setState(SagaState.COMPLETED); saga.setStep("TRANSFER_COMPLETED"); sagaRepository.save(saga);
         outboxRepository.save(OutboxEvent.builder().aggregateType("TICKET_TRANSFER").aggregateId(transfer.getId()).eventType("GIFT_COMPLETED").topic("haloticket.marketplace.gift.completed.v1").payload(saga.getPayload()).status(OutboxStatus.PENDING).retryCount(0).build());
+    }
+
+    @Transactional
+    public void requestRelease(String sagaId, String reason) {
+        MarketplaceSaga saga = sagaRepository.findById(sagaId).orElse(null);
+        if (saga == null || saga.getState() == SagaState.COMPENSATED || saga.getState() == SagaState.COMPLETED) return;
+        saga.setState(SagaState.COMPENSATING); saga.setStep("RELEASE_REQUESTED"); saga.setLastError(reason); saga.setNextRetryAt(Instant.now().plusSeconds(10)); sagaRepository.save(saga);
+        Map<String, Object> command = new LinkedHashMap<>(); command.put("messageId", UUID.randomUUID().toString()); command.put("sagaId", sagaId); command.put("operationId", sagaId); command.put("ticketId", saga.getTicketId());
+        try {
+            outboxRepository.save(OutboxEvent.builder().aggregateType("MARKETPLACE_SAGA").aggregateId(sagaId).eventType("TICKET_RELEASE_REQUESTED").topic("haloticket.ticket.release.requested.v1").payload(objectMapper.writeValueAsString(command)).status(OutboxStatus.PENDING).retryCount(0).build());
+        } catch (JsonProcessingException exception) { throw new IllegalStateException("Could not create release command", exception); }
+    }
+
+    @Transactional
+    public void handleTicketReleased(String sagaId) {
+        MarketplaceSaga saga = sagaRepository.findById(sagaId).orElse(null); if (saga == null || saga.getState() != SagaState.COMPENSATING) return;
+        listingRepository.findByTicketIdAndStatus(saga.getTicketId(), ListingStatus.ACTIVE).ifPresent(listing -> { listing.setStatus(ListingStatus.CANCELLED); listingRepository.save(listing); });
+        transferRepository.findBySagaId(sagaId).ifPresent(transfer -> { transfer.setStatus(TransferStatus.CANCELLED); transfer.setCancellationReason(saga.getLastError()); transferRepository.save(transfer); });
+        saga.setState(SagaState.COMPENSATED); saga.setStep("RELEASE_CONFIRMED"); saga.setNextRetryAt(null); sagaRepository.save(saga);
+        String eventType = "GIFT_TRANSFER".equals(saga.getType()) ? "GIFT_CANCELLED" : "RESALE_LISTING_FAILED";
+        String topic = "GIFT_TRANSFER".equals(saga.getType()) ? "haloticket.marketplace.gift.cancelled.v1" : "haloticket.marketplace.listing.failed.v1";
+        outboxRepository.save(OutboxEvent.builder().aggregateType("MARKETPLACE_SAGA").aggregateId(sagaId).eventType(eventType).topic(topic).payload(saga.getPayload()).status(OutboxStatus.PENDING).retryCount(0).build());
     }
 
     private static String text(com.fasterxml.jackson.databind.JsonNode node, String field) { return node.hasNonNull(field) ? node.get(field).asText() : null; }
