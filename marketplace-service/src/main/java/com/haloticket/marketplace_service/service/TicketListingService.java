@@ -32,7 +32,30 @@ public class TicketListingService {
     private final ObjectMapper objectMapper;
 
     public TicketServiceClient.ResaleEligibilityResponse eligibility(String authorization, String ticketId) {
-        return ticketServiceClient.getResaleEligibility(authorization, ticketId);
+        TicketServiceClient.ResaleEligibilityResponse ticket = ticketServiceClient.getResaleEligibility(authorization, ticketId);
+        if (ticket == null || !ticket.eligible()) return ticket;
+
+        EventServiceClient.ResalePolicyResponse policy = eventServiceClient.getResalePolicy(authorization, ticket.eventId());
+        boolean policyOpen = policy != null
+                && policy.enabled()
+                && policy.minPricePercent() != null
+                && policy.maxPricePercent() != null
+                && (policy.closesAt() == null || !policy.closesAt().isBefore(Instant.now()));
+        if (!policyOpen) {
+            return new TicketServiceClient.ResaleEligibilityResponse(
+                    ticket.ticketId(), ticket.eventId(), false, "RESALE_CLOSED", ticket.originalPrice(),
+                    null, null, policy == null ? null : policy.version(),
+                    policy == null ? null : policy.closesAt(), policy == null ? null : policy.termsVersion());
+        }
+
+        BigDecimal originalPrice = ticket.originalPrice() == null ? BigDecimal.ZERO : ticket.originalPrice();
+        BigDecimal minPrice = originalPrice.multiply(policy.minPricePercent())
+                .divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.CEILING);
+        BigDecimal maxPrice = originalPrice.multiply(policy.maxPricePercent())
+                .divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.FLOOR);
+        return new TicketServiceClient.ResaleEligibilityResponse(
+                ticket.ticketId(), ticket.eventId(), true, null, originalPrice,
+                minPrice, maxPrice, policy.version(), policy.closesAt(), policy.termsVersion());
     }
 
     @Transactional
@@ -49,22 +72,15 @@ public class TicketListingService {
         }
 
         TicketServiceClient.ResaleEligibilityResponse eligibility;
-        try { eligibility = ticketServiceClient.getResaleEligibility(authorization, request.ticketId()); }
-        catch (Exception exception) { throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "TICKET_SERVICE_UNAVAILABLE", exception); }
+        try { eligibility = eligibility(authorization, request.ticketId()); }
+        catch (Exception exception) { throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "ELIGIBILITY_SERVICE_UNAVAILABLE", exception); }
         if (eligibility == null || !eligibility.eligible()) throw new ResponseStatusException(HttpStatus.CONFLICT, "TICKET_NOT_ELIGIBLE");
-        EventServiceClient.ResalePolicyResponse policy;
-        try { policy = eventServiceClient.getResalePolicy(authorization, eligibility.eventId()); }
-        catch (Exception exception) { throw new ResponseStatusException(HttpStatus.CONFLICT, "POLICY_NOT_CONFIGURED", exception); }
-        if (policy == null || !policy.enabled() || policy.minPricePercent() == null || policy.maxPricePercent() == null || (policy.closesAt() != null && policy.closesAt().isBefore(Instant.now()))) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "RESALE_CLOSED");
-        }
-        BigDecimal originalPrice = eligibility.originalPrice() == null ? BigDecimal.ZERO : eligibility.originalPrice();
-        BigDecimal minPrice = originalPrice.multiply(policy.minPricePercent()).divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.CEILING);
-        BigDecimal maxPrice = originalPrice.multiply(policy.maxPricePercent()).divide(BigDecimal.valueOf(100), 0, java.math.RoundingMode.FLOOR);
+        BigDecimal minPrice = eligibility.minPrice();
+        BigDecimal maxPrice = eligibility.maxPrice();
         if (request.price().compareTo(minPrice) < 0 || request.price().compareTo(maxPrice) > 0) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "PRICE_OUT_OF_RANGE");
         }
-        if (request.policyVersion() != null && policy.version() != null && !request.policyVersion().equals(policy.version())) {
+        if (request.policyVersion() != null && eligibility.policyVersion() != null && !request.policyVersion().equals(eligibility.policyVersion())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "POLICY_CHANGED");
         }
         Instant now = Instant.now();
@@ -72,13 +88,13 @@ public class TicketListingService {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("sagaId", sagaId); payload.put("ticketId", request.ticketId()); payload.put("sellerId", actorId);
         payload.put("price", request.price()); payload.put("eventId", eligibility.eventId()); payload.put("originalPrice", eligibility.originalPrice());
-        payload.put("minPrice", minPrice); payload.put("maxPrice", maxPrice); payload.put("policyVersion", policy.version());
-        payload.put("closesAt", policy.closesAt());
-        payload.put("termsVersion", request.termsVersion() != null ? request.termsVersion() : policy.termsVersion());
+        payload.put("minPrice", minPrice); payload.put("maxPrice", maxPrice); payload.put("policyVersion", eligibility.policyVersion());
+        payload.put("closesAt", eligibility.closesAt());
+        payload.put("termsVersion", request.termsVersion() != null ? request.termsVersion() : eligibility.termsVersion());
         try {
             MarketplaceSaga saga = MarketplaceSaga.builder().id(sagaId).type("RESALE_LISTING").ticketId(request.ticketId()).actorId(actorId)
                     .state(SagaState.WAITING_LOCK).step("LOCK_REQUESTED").payload(objectMapper.writeValueAsString(payload))
-                    .idempotencyKey(idempotencyKey).requestHash(hash).deadlineAt(policy.closesAt()).nextRetryAt(now).retryCount(0).build();
+                    .idempotencyKey(idempotencyKey).requestHash(hash).deadlineAt(eligibility.closesAt()).nextRetryAt(now).retryCount(0).build();
             sagaRepository.save(saga);
             outboxRepository.save(OutboxEvent.builder().aggregateType("MARKETPLACE_SAGA").aggregateId(sagaId).eventType("TICKET_LOCK_REQUESTED")
                     .topic("haloticket.ticket.lock.requested.v1").payload(objectMapper.writeValueAsString(Map.of("messageId", UUID.randomUUID().toString(), "sagaId", sagaId, "ticketId", request.ticketId(), "sellerId", actorId, "purpose", "RESALE")))
