@@ -62,3 +62,7 @@ ekyc:
     token-id: ${VNPT_EKYC_TOKEN_ID:}
     token-key: ${VNPT_EKYC_TOKEN_KEY:}
     access-token: ${VNPT_EKYC_ACCESS_TOKEN:}
+    upload-path: ${VNPT_EKYC_UPLOAD_PATH:/file-service/v1/addFile}
+    ocr-path: ${VNPT_EKYC_OCR_PATH:/ai/v1/ocr/id}
+    face-liveness-path: ${VNPT_EKYC_FACE_LIVENESS_PATH:/ai/v1/face/liveness}
+    face-compare-path: ${VNPT_EKYC_FACE_COMPARE_PATH:/ai/v1/face/compare}

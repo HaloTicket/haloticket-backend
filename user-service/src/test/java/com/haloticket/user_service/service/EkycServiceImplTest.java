@@ -131,7 +131,7 @@ class EkycServiceImplTest {
         when(userRepository.findForEkycUpdateByKeycloakId("kc-1")).thenReturn(Optional.of(user));
         when(attemptRepository.findById("attempt-1")).thenReturn(Optional.of(attempt));
         when(profileRepository.findByUserId("user-1")).thenReturn(Optional.empty());
-        when(vnptClient.verify(any(), any())).thenReturn(new VnptEkycClient.VerificationResult(
+        when(vnptClient.verify(any(), any(), any())).thenReturn(new VnptEkycClient.VerificationResult(
                 "vnpt-123", EkycDocumentType.ID_CARD, "079123456789", "NGUYEN VAN A",
                 true, true, true, true, 0.97, LocalDate.of(2036, 1, 1)
         ));
@@ -141,7 +141,8 @@ class EkycServiceImplTest {
                 "kc-1",
                 "attempt-1",
                 file("front"),
-                file("back")
+                file("back"),
+                file("face")
         );
 
         assertThat(result.status()).isEqualTo(EkycVerificationStatus.APPROVED);
@@ -165,7 +166,7 @@ class EkycServiceImplTest {
         when(userRepository.findForEkycUpdateByKeycloakId("kc-1")).thenReturn(Optional.of(user));
         when(attemptRepository.findById("attempt-1")).thenReturn(Optional.of(attempt));
 
-        assertThatThrownBy(() -> service.verify("kc-1", "attempt-1", file("front"), file("back")))
+        assertThatThrownBy(() -> service.verify("kc-1", "attempt-1", file("front"), file("back"), file("face")))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("EKYC_SESSION_NOT_FOUND");
     }
@@ -180,13 +181,13 @@ class EkycServiceImplTest {
                 .build();
         when(userRepository.findForEkycUpdateByKeycloakId("kc-1")).thenReturn(Optional.of(user));
         when(attemptRepository.findById("attempt-1")).thenReturn(Optional.of(attempt));
-        when(vnptClient.verify(any(), any())).thenThrow(
+        when(vnptClient.verify(any(), any(), any())).thenThrow(
                 HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad request", null,
                         "{\"message\":\"IDG-00010445\",\"errors\":[\"Loại giấy tờ không hợp lệ\"]}".getBytes(), null)
         );
 
         EkycStatusResponse result = service.verify(
-                "kc-1", "attempt-1", file("front"), file("back")
+                "kc-1", "attempt-1", file("front"), file("back"), file("face")
         );
 
         assertThat(result.status()).isEqualTo(EkycVerificationStatus.REJECTED);
@@ -205,7 +206,7 @@ class EkycServiceImplTest {
         when(userRepository.findForEkycUpdateByKeycloakId("kc-1")).thenReturn(Optional.of(user));
         when(attemptRepository.findById("attempt-1")).thenReturn(Optional.of(attempt));
 
-        assertThatThrownBy(() -> service.verify("kc-1", "attempt-1", file("front"), file("back")))
+        assertThatThrownBy(() -> service.verify("kc-1", "attempt-1", file("front"), file("back"), file("face")))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("EKYC_SESSION_ALREADY_PROCESSED");
 
