@@ -1,6 +1,7 @@
 package com.haloticket.marketplace_service.domain;
 
 import com.haloticket.marketplace_service.entity.MarketplaceTransaction;
+import com.haloticket.marketplace_service.entity.MarketplaceSaga;
 import com.haloticket.marketplace_service.entity.TicketListing;
 import com.haloticket.marketplace_service.enums.ListingStatus;
 import com.haloticket.marketplace_service.enums.MarketplaceTransactionStatus;
@@ -15,6 +16,11 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ResaleDomainModelTest {
+    @Test
+    void marketplaceSagaUsesApplicationAssignedId() throws Exception {
+        var id = MarketplaceSaga.class.getDeclaredField("id");
+        assertNull(id.getAnnotation(jakarta.persistence.GeneratedValue.class));
+    }
 
     @Test
     void supportsReservationAndPurchaseLifecycleStates() {

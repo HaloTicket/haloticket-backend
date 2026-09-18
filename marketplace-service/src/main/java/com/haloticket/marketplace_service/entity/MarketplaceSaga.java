@@ -8,7 +8,7 @@ import java.time.Instant;
 @Entity @Table(name = "marketplace_sagas", indexes = @Index(name = "idx_saga_next_retry", columnList = "state,next_retry_at"))
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class MarketplaceSaga {
-    @Id @GeneratedValue(strategy = GenerationType.UUID) private String id;
+    @Id private String id;
     @Column(nullable = false) private String type;
     @Column(name = "ticket_id", nullable = false) private String ticketId;
     @Column(name = "actor_id", nullable = false) private String actorId;
