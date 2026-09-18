@@ -74,7 +74,9 @@ public class SecurityConfig {
                                 "/api/v1/**", "/ws-notifications/**")
                         .permitAll()
                         .pathMatchers("/api/marketplace/listings/me", "/api/marketplace/sagas/**").authenticated()
-                        .pathMatchers(HttpMethod.GET, "/api/marketplace/listings", "/api/marketplace/listings/*").permitAll()
+                        .pathMatchers(HttpMethod.GET,
+                                "/api/marketplace/events", "/api/marketplace/events/**",
+                                "/api/marketplace/listings", "/api/marketplace/listings/*").permitAll()
                         .pathMatchers("/api/marketplace/**").authenticated()
                         .pathMatchers("/api/users/me").authenticated()
                         .pathMatchers("/api/users/**", "/api/bookings/**", "/api/payments/**", "/api/notifications/**")

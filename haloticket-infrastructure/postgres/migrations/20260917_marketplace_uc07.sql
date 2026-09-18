@@ -96,3 +96,19 @@ CREATE TABLE IF NOT EXISTS processed_events (
 
 CREATE INDEX IF NOT EXISTS idx_marketplace_listing_public ON ticket_listings(status, published_at, expires_at);
 CREATE INDEX IF NOT EXISTS idx_marketplace_outbox_pending ON outbox_events(status, created_at);
+
+-- Keep database constraints aligned with the application enum when upgrading an
+-- existing marketplace database created by Hibernate.
+ALTER TABLE IF EXISTS marketplace_transactions
+    DROP CONSTRAINT IF EXISTS marketplace_transactions_status_check;
+ALTER TABLE IF EXISTS marketplace_transactions
+    ADD CONSTRAINT marketplace_transactions_status_check CHECK (status IN (
+        'PENDING_PAYMENT', 'PAYMENT_PROCESSING', 'TRANSFERRING', 'COMPLETED',
+        'REFUND_PENDING', 'REFUNDED', 'CANCELLED', 'EXPIRED'
+    ));
+ALTER TABLE IF EXISTS ticket_listings
+    DROP CONSTRAINT IF EXISTS ticket_listings_status_check;
+ALTER TABLE IF EXISTS ticket_listings
+    ADD CONSTRAINT ticket_listings_status_check CHECK (status IN (
+        'ACTIVE', 'RESERVED', 'SOLD', 'CANCELLED', 'EXPIRED'
+    ));

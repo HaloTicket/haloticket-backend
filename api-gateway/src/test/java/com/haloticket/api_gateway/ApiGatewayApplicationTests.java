@@ -32,7 +32,8 @@ class ApiGatewayApplicationTests {
 	void allowsUnauthenticatedRequestsToPublicApiRoutes() {
 		webTestClient.get().uri("/api/events/probe").exchange().expectStatus().isOk();
 		webTestClient.get().uri("/api/tickets/probe").exchange().expectStatus().isOk();
-		webTestClient.get().uri("/api/marketplace/probe").exchange().expectStatus().isOk();
+		webTestClient.get().uri("/api/marketplace/events").exchange().expectStatus().isOk();
+		webTestClient.get().uri("/api/marketplace/events/event-1/listings").exchange().expectStatus().isOk();
 		webTestClient.get().uri("/api/v1/probe").exchange().expectStatus().isOk();
 	}
 
@@ -51,7 +52,8 @@ class ApiGatewayApplicationTests {
 	static class ProbeController {
 
 		@GetMapping(value = {
-				"/api/events/probe", "/api/tickets/probe", "/api/marketplace/probe", "/api/v1/probe",
+				"/api/events/probe", "/api/tickets/probe", "/api/marketplace/events",
+				"/api/marketplace/events/event-1/listings", "/api/v1/probe",
 				"/api/users/me", "/api/users/probe", "/api/bookings/probe", "/api/payments/probe", "/api/notifications/probe"
 		}, produces = MediaType.TEXT_PLAIN_VALUE)
 		String probe() {
