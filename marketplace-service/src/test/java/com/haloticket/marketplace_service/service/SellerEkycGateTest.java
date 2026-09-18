@@ -27,7 +27,7 @@ class SellerEkycGateTest {
                 mock(TicketServiceClient.class), mock(EventServiceClient.class), users, new ObjectMapper());
 
         assertThatThrownBy(() -> service.startResale("user-1", "Bearer token", "key-1",
-                new CreateListingRequest("ticket-1", new BigDecimal("120000"), null, null)))
+                new CreateListingRequest("ticket-1", new BigDecimal("120000"), null, null, true)))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("EKYC_REQUIRED");
         verify(sagas, never()).save(any());

@@ -28,6 +28,8 @@ public class TicketListing {
     @Column(name = "section_snapshot") private String sectionSnapshot;
     @Column(name = "row_snapshot") private String rowSnapshot;
     @Column(name = "seat_snapshot") private String seatSnapshot;
+    @Column(nullable = false, columnDefinition = "integer default 1") @Builder.Default private Integer quantity = 1;
+    @Column(name = "allow_retail", nullable = false, columnDefinition = "boolean default true") @Builder.Default private Boolean allowRetail = true;
     @Enumerated(EnumType.STRING) @Column(nullable = false) private ListingStatus status;
     @Column(name = "reserved_by") private String reservedBy;
     @Column(name = "reserved_until") private Instant reservedUntil;

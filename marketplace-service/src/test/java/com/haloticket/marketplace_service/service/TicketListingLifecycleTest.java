@@ -66,7 +66,22 @@ class TicketListingLifecycleTest {
     void publicListingResponseDoesNotExposeSellerIdentity() {
         assertThat(Arrays.stream(ListingResponse.class.getRecordComponents()).map(component -> component.getName()))
                 .doesNotContain("sellerId")
-                .contains("eventId", "ticketTypeName", "section", "row", "seat");
+                .contains("eventId", "ticketTypeName", "section", "row", "seat", "ownedByCurrentUser");
+    }
+
+    @Test
+    void listingMarksOwnershipWithoutExposingSellerIdentity() {
+        TicketListing listing = listing("seller-1", ListingStatus.ACTIVE);
+
+        assertThat(ListingResponse.from(listing, "seller-1").ownedByCurrentUser()).isTrue();
+        assertThat(ListingResponse.from(listing, "buyer-1").ownedByCurrentUser()).isFalse();
+    }
+
+    @Test
+    void oneTicketIsAlwaysRetailWhileMultiTicketListingHonoursSellerChoice() {
+        assertThat(TicketListingService.retailAllowed(1, false)).isTrue();
+        assertThat(TicketListingService.retailAllowed(2, true)).isTrue();
+        assertThat(TicketListingService.retailAllowed(2, false)).isFalse();
     }
 
     private static TicketListingService service(TicketListingRepository listings, MarketplaceSagaRepository sagas, OutboxEventRepository outbox) {

@@ -43,18 +43,22 @@ public class TicketListingController {
     public SagaResponse saga(@PathVariable String id, Authentication authentication) { return service.getSaga(authentication.getName(), id); }
 
     @GetMapping("/listings")
-    public Page<ListingResponse> listings(Pageable pageable) { return service.publicListings(pageable); }
+    public Page<ListingResponse> listings(Pageable pageable, Authentication authentication) {
+        return service.publicListings(currentUserId(authentication), pageable);
+    }
 
     @GetMapping("/events")
     public java.util.List<ResaleEventSummary> events() { return service.publicEvents(); }
 
     @GetMapping("/events/{eventId}/listings")
-    public Page<ListingResponse> eventListings(@PathVariable String eventId, Pageable pageable) {
-        return service.publicListingsByEvent(eventId, pageable);
+    public Page<ListingResponse> eventListings(@PathVariable String eventId, Pageable pageable, Authentication authentication) {
+        return service.publicListingsByEvent(eventId, currentUserId(authentication), pageable);
     }
 
     @GetMapping("/listings/{listingId}")
-    public ListingResponse listing(@PathVariable String listingId) { return service.publicListing(listingId); }
+    public ListingResponse listing(@PathVariable String listingId, Authentication authentication) {
+        return service.publicListing(listingId, currentUserId(authentication));
+    }
 
     @PostMapping("/listings/{listingId}/reserve")
     public ResponseEntity<ReservationResponse> reserve(
@@ -76,5 +80,9 @@ public class TicketListingController {
     @PostMapping("/listings/{listingId}/cancel")
     public SagaResponse cancelListing(@PathVariable String listingId, Authentication authentication) {
         return service.cancelListing(authentication.getName(), listingId);
+    }
+
+    private static String currentUserId(Authentication authentication) {
+        return authentication == null ? null : authentication.getName();
     }
 }

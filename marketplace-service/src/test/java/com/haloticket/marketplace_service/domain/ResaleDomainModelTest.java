@@ -37,7 +37,7 @@ class ResaleDomainModelTest {
     void listingAndTransactionKeepTheSnapshotsNeededToRecoverAResalePurchase() {
         assertTrue(fieldNames(TicketListing.class).containsAll(Set.of(
                 "ticketTypeNameSnapshot", "sectionSnapshot", "rowSnapshot", "seatSnapshot",
-                "reservedBy", "reservedUntil", "soldAt")));
+                "reservedBy", "reservedUntil", "soldAt", "quantity", "allowRetail")));
         assertTrue(fieldNames(MarketplaceTransaction.class).containsAll(Set.of(
                 "sellerId", "currency", "paymentReference", "cancelledAt")));
     }

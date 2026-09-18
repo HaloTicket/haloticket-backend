@@ -105,6 +105,9 @@ public class TicketListingService {
         payload.put("termsVersion", request.termsVersion() != null ? request.termsVersion() : eligibility.termsVersion());
         payload.put("ticketTypeName", eligibility.ticketTypeName()); payload.put("section", eligibility.section());
         payload.put("row", eligibility.row()); payload.put("seat", eligibility.seat());
+        int quantity = 1;
+        payload.put("quantity", quantity);
+        payload.put("allowRetail", retailAllowed(quantity, request.allowRetail()));
         try {
             MarketplaceSaga saga = MarketplaceSaga.builder().id(sagaId).type("RESALE_LISTING").ticketId(request.ticketId()).actorId(actorId)
                     .state(SagaState.WAITING_LOCK).step("LOCK_REQUESTED").payload(objectMapper.writeValueAsString(payload))
@@ -126,12 +129,24 @@ public class TicketListingService {
 
     @Transactional(readOnly = true)
     public Page<ListingResponse> publicListings(Pageable pageable) {
-        return listingRepository.findPublicActive(ListingStatus.ACTIVE, Instant.now(), pageable).map(ListingResponse::from);
+        return publicListings(null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ListingResponse> publicListings(String currentUserId, Pageable pageable) {
+        return listingRepository.findPublicActive(ListingStatus.ACTIVE, Instant.now(), pageable)
+                .map(listing -> ListingResponse.from(listing, currentUserId));
     }
 
     @Transactional(readOnly = true)
     public Page<ListingResponse> publicListingsByEvent(String eventId, Pageable pageable) {
-        return listingRepository.findPublicActiveByEventId(eventId, ListingStatus.ACTIVE, Instant.now(), pageable).map(ListingResponse::from);
+        return publicListingsByEvent(eventId, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ListingResponse> publicListingsByEvent(String eventId, String currentUserId, Pageable pageable) {
+        return listingRepository.findPublicActiveByEventId(eventId, ListingStatus.ACTIVE, Instant.now(), pageable)
+                .map(listing -> ListingResponse.from(listing, currentUserId));
     }
 
     @Transactional(readOnly = true)
@@ -141,11 +156,16 @@ public class TicketListingService {
 
     @Transactional(readOnly = true)
     public ListingResponse publicListing(String listingId) {
+        return publicListing(listingId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public ListingResponse publicListing(String listingId, String currentUserId) {
         TicketListing listing = listingRepository.findById(listingId)
                 .filter(item -> item.getStatus() == ListingStatus.ACTIVE && item.getPublishedAt() != null
                         && (item.getExpiresAt() == null || item.getExpiresAt().isAfter(Instant.now())))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LISTING_NOT_AVAILABLE"));
-        return ListingResponse.from(listing);
+        return ListingResponse.from(listing, currentUserId);
     }
 
     @Transactional
@@ -204,6 +224,10 @@ public class TicketListingService {
 
     @Transactional(readOnly = true)
     public Page<ListingResponse> myListings(String actorId, Pageable pageable) { return listingRepository.findBySellerId(actorId, pageable).map(ListingResponse::from); }
+
+    static boolean retailAllowed(int quantity, Boolean requested) {
+        return quantity <= 1 || !Boolean.FALSE.equals(requested);
+    }
 
     @Transactional
     public SagaResponse cancelListing(String actorId, String listingId) {
@@ -279,6 +303,8 @@ public class TicketListingService {
                     .maxPriceSnapshot(decimal(node,"maxPrice")).eventId(text(node,"eventId")).status(ListingStatus.ACTIVE).expiresAt(expiry)
                     .ticketTypeNameSnapshot(text(node,"ticketTypeName")).sectionSnapshot(text(node,"section"))
                     .rowSnapshot(text(node,"row")).seatSnapshot(text(node,"seat"))
+                    .quantity(node.path("quantity").asInt(1))
+                    .allowRetail(node.path("quantity").asInt(1) == 1 || node.path("allowRetail").asBoolean(true))
                     .publishedAt(Instant.now()).policyVersion(node.hasNonNull("policyVersion") ? node.get("policyVersion").asLong() : null)
                     .termsVersion(text(node,"termsVersion")).sagaId(sagaId).build();
             listingRepository.save(listing);
