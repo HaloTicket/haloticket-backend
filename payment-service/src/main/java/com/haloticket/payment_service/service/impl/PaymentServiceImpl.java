@@ -174,7 +174,7 @@ public class PaymentServiceImpl implements PaymentService {
         String vnp_ResponseCode = allParams.get("vnp_ResponseCode");
         long amount = Long.parseLong(allParams.getOrDefault("vnp_Amount", "0")) / 100;
 
-        Payment payment = paymentRepository.findByBookingId(bookingId)
+        Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId)
                 .orElseGet(() -> Payment.builder()
                         .bookingId(bookingId)
                         .amount((double) amount)
@@ -211,7 +211,7 @@ public class PaymentServiceImpl implements PaymentService {
         Map<String, Object> payload = sePayService.createVietQrPayload(amount, bookingCode, bookingId);
 
         // track pending payment in DB
-        Payment payment = paymentRepository.findByBookingId(bookingId)
+        Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId)
                 .orElseGet(() -> Payment.builder()
                         .bookingId(bookingId)
                         .amount((double) amount)
@@ -243,8 +243,8 @@ public class PaymentServiceImpl implements PaymentService {
         // 1. try finding by 'code' field if provided by SePay VA
         if (code != null && !code.isBlank()) {
             String cleanCode = code.toUpperCase().startsWith("HALO") ? code.substring(4).trim() : code;
-            payment = paymentRepository.findByBookingId(cleanCode)
-                    .orElseGet(() -> paymentRepository.findByBookingId(code).orElse(null));
+            payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(cleanCode)
+                    .orElseGet(() -> paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(code).orElse(null));
         }
 
         // 2. try finding by content substring if HALO prefix is present
@@ -256,11 +256,11 @@ public class PaymentServiceImpl implements PaymentService {
                 if (bookingRef.contains(" ")) {
                     bookingRef = bookingRef.split(" ")[0];
                 }
-                payment = paymentRepository.findByBookingId(bookingRef).orElse(null);
+                payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingRef).orElse(null);
             }
 
             if (payment == null) {
-                payment = paymentRepository.findByBookingId(rawContent).orElse(null);
+                payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(rawContent).orElse(null);
             }
         }
 
@@ -293,7 +293,7 @@ public class PaymentServiceImpl implements PaymentService {
     public Map<String, String> createMoMoPaymentUrl(long amount, String orderInfo, String bookingId) {
         Map<String, String> result = moMoService.createPaymentUrl(amount, orderInfo, bookingId);
 
-        Payment payment = paymentRepository.findByBookingId(bookingId)
+        Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId)
                 .orElseGet(() -> Payment.builder()
                         .bookingId(bookingId)
                         .amount((double) amount)
@@ -315,7 +315,7 @@ public class PaymentServiceImpl implements PaymentService {
         String bookingId = allParams.get("orderId");
         String resultCode = allParams.get("resultCode");
 
-        Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
+        Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId).orElse(null);
         if (payment != null && ("0".equals(resultCode) || isValid)) {
             payment.setStatus(PaymentStatus.SUCCESS);
             paymentRepository.save(payment);
@@ -336,7 +336,7 @@ public class PaymentServiceImpl implements PaymentService {
     public Map<String, String> createZaloPayPaymentUrl(long amount, String orderInfo, String bookingId) {
         Map<String, String> result = zaloPayService.createPaymentUrl(amount, orderInfo, bookingId);
 
-        Payment payment = paymentRepository.findByBookingId(bookingId)
+        Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId)
                 .orElseGet(() -> Payment.builder()
                         .bookingId(bookingId)
                         .amount((double) amount)
@@ -371,7 +371,7 @@ public class PaymentServiceImpl implements PaymentService {
                         ? appTransId.substring(appTransId.indexOf("_") + 1) 
                         : appTransId;
 
-                Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
+                Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId).orElse(null);
                 if (payment != null) {
                     payment.setStatus(PaymentStatus.SUCCESS);
                     paymentRepository.save(payment);
@@ -393,7 +393,7 @@ public class PaymentServiceImpl implements PaymentService {
     public Map<String, String> createShopeePayPaymentUrl(long amount, String orderInfo, String bookingId) {
         Map<String, String> result = shopeePayService.createPaymentUrl(amount, orderInfo, bookingId);
 
-        Payment payment = paymentRepository.findByBookingId(bookingId)
+        Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId)
                 .orElseGet(() -> Payment.builder()
                         .bookingId(bookingId)
                         .amount((double) amount)
@@ -413,7 +413,7 @@ public class PaymentServiceImpl implements PaymentService {
         if (callbackData != null) {
             String referenceId = (String) callbackData.get("reference_id");
             if (referenceId != null) {
-                Payment payment = paymentRepository.findByBookingId(referenceId).orElse(null);
+                Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(referenceId).orElse(null);
                 if (payment != null) {
                     payment.setStatus(PaymentStatus.SUCCESS);
                     paymentRepository.save(payment);
@@ -430,7 +430,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public PaymentResponse getPaymentStatusByBookingId(String bookingId) {
         if (bookingId == null || bookingId.isBlank()) return null;
-        return paymentRepository.findByBookingId(bookingId)
+        return paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId)
                 .map(p -> PaymentResponse.builder()
                         .id(p.getId())
                         .bookingId(p.getBookingId())

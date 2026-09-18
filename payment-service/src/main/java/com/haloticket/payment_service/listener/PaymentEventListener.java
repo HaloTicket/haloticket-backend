@@ -33,7 +33,7 @@ public class PaymentEventListener {
                 return;
             }
 
-            if (paymentRepository.findByBookingId(bookingId).isPresent()) {
+            if (paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId).isPresent()) {
                 log.info("Payment record already exists for bookingId {}", bookingId);
                 return;
             }

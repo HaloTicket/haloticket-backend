@@ -41,6 +41,9 @@ public class Seat {
     @OneToOne(mappedBy = "seat", fetch = FetchType.LAZY)
     private Ticket ticket;
 
+    @Version
+    private Long version;
+
     @PrePersist
     protected void onCreate() {
         if (this.seatStatus == null) this.seatStatus = SeatStatus.AVAILABLE;

@@ -2,11 +2,19 @@ package com.haloticket.notification_service.event;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.haloticket.notification_service.enums.NotificationChannel;
+import com.haloticket.notification_service.enums.NotificationTemplateStatus;
+import com.haloticket.notification_service.enums.NotificationType;
+import com.haloticket.notification_service.entity.NotificationTemplate;
+import com.haloticket.notification_service.repository.NotificationTemplateRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import com.haloticket.notification_service.service.NotificationService;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -17,17 +25,45 @@ public class SagaNotificationListener {
     private final NotificationEmailSender emailSender;
     private final NotificationService notificationService;
 
-    @KafkaListener(topics = "haloticket.booking.created.v1", groupId = "notification-service-saga")
-    public void handleBookingCreatedNotification(String payload) {
+    private final NotificationTemplateRepository templateRepository;
+
+    @KafkaListener(topics = "haloticket.booking.confirmed.v1", groupId = "notification-service-saga")
+    public void handleBookingConfirmedNotification(String payload) {
         try {
-            log.info("NotificationService received BOOKING_CREATED event: {}", payload);
+            log.info("NotificationService received BOOKING_CONFIRMED event: {}", payload);
             JsonNode node = objectMapper.readTree(payload);
             String bookingCode = node.has("bookingCode") ? node.get("bookingCode").asText() : "";
             String customerId = node.has("customerId") ? node.get("customerId").asText() : "";
+            String customerEmail = node.has("customerEmail") ? node.get("customerEmail").asText() : "";
+            String customerName = node.has("customerName") ? node.get("customerName").asText() : "";
+            
+            if (customerEmail == null || customerEmail.isBlank()) {
+                log.warn("Cannot send confirmation email, missing customerEmail for booking: {}", bookingCode);
+                return;
+            }
 
-            log.info("Order created notification logged for bookingCode: {}, customer: {}", bookingCode, customerId);
+            NotificationTemplate template = templateRepository.findByTypeAndChannelAndStatus(
+                    NotificationType.TICKET_CONFIRMATION,
+                    NotificationChannel.EMAIL,
+                    NotificationTemplateStatus.ACTIVE
+            ).orElse(null);
+
+            if (template != null) {
+                Map<String, String> vars = new HashMap<>();
+                vars.put("fullName", customerName != null && !customerName.isBlank() ? customerName : "Quý khách");
+                vars.put("bookingCode", bookingCode);
+                
+                String eventId = node.has("eventId") ? node.get("eventId").asText() : "";
+                vars.put("eventId", eventId); // Just in case template uses it
+                
+                emailSender.send(template, customerEmail, vars);
+                log.info("Sent order confirmation email to {} for booking {}", customerEmail, bookingCode);
+            } else {
+                log.warn("TICKET_CONFIRMATION template not found in DB!");
+            }
+
         } catch (Exception e) {
-            log.error("Failed to process BOOKING_CREATED notification", e);
+            log.error("Failed to process BOOKING_CONFIRMED notification", e);
         }
     }
 

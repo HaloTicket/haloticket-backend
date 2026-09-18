@@ -250,16 +250,17 @@ CREATE TABLE IF NOT EXISTS ticket_types (
     description TEXT,
     ticket_type_status VARCHAR(50),
     created_at TIMESTAMP,
-    updated_at TIMESTAMP
+    updated_at TIMESTAMP,
+    version BIGINT DEFAULT 0
 );
 
-INSERT INTO ticket_types (id, event_id, name, price, is_free, total_quantity, min_per_order, max_per_order, description, ticket_type_status, created_at, updated_at)
+INSERT INTO ticket_types (id, event_id, name, price, is_free, total_quantity, min_per_order, max_per_order, description, ticket_type_status, created_at, updated_at, version)
 VALUES
-('tt-nxnx-vvip', 'nxnx37-hoc-vien-phep-thuat', 'VVIP', 400000.0, false, 100, 1, 10, 'Hạng vé VVIP vị trí đẹp nhất sát sân khấu', 'ACTIVE', NOW(), NOW()),
-('tt-nxnx-vip', 'nxnx37-hoc-vien-phep-thuat', 'VIP', 250000.0, false, 200, 1, 10, 'Hạng vé VIP khu vực khán đài trung tâm', 'ACTIVE', NOW(), NOW()),
-('tt-xoay-a2', 'xoay-tron-concert-hoang-dung', 'XOAY TRÒN A2 (SEATED)', 2499000.0, false, 80, 1, 4, 'Ghế ngồi chính diện sân khấu concert Hoàng Dũng', 'ACTIVE', NOW(), NOW()),
-('tt-xoay-ga', 'xoay-tron-concert-hoang-dung', 'XOAY TRÒN GA (STANDING)', 1399000.0, false, 500, 1, 6, 'Khu vực đứng gần sân khấu sôi động', 'ACTIVE', NOW(), NOW()),
-('tt-tc-std', 'idecaf-tam-cam-dai-chien', 'Khán Đài Thường', 220000.0, false, 300, 1, 10, 'Vé thường xem Tấm Cám Đại Chiến', 'ACTIVE', NOW(), NOW())
+('tt-nxnx-vvip', 'nxnx37-hoc-vien-phep-thuat', 'VVIP', 400000.0, false, 100, 1, 10, 'Hạng vé VVIP vị trí đẹp nhất sát sân khấu', 'ACTIVE', NOW(), NOW(), 0),
+('tt-nxnx-vip', 'nxnx37-hoc-vien-phep-thuat', 'VIP', 250000.0, false, 200, 1, 10, 'Hạng vé VIP khu vực khán đài trung tâm', 'ACTIVE', NOW(), NOW(), 0),
+('tt-xoay-a2', 'xoay-tron-concert-hoang-dung', 'XOAY TRÒN A2 (SEATED)', 2499000.0, false, 80, 1, 4, 'Ghế ngồi chính diện sân khấu concert Hoàng Dũng', 'ACTIVE', NOW(), NOW(), 0),
+('tt-xoay-ga', 'xoay-tron-concert-hoang-dung', 'XOAY TRÒN GA (STANDING)', 1399000.0, false, 500, 1, 6, 'Khu vực đứng gần sân khấu sôi động', 'ACTIVE', NOW(), NOW(), 0),
+('tt-tc-std', 'idecaf-tam-cam-dai-chien', 'Khán Đài Thường', 220000.0, false, 300, 1, 10, 'Vé thường xem Tấm Cám Đại Chiến', 'ACTIVE', NOW(), NOW(), 0)
 ON CONFLICT (id) DO NOTHING;
 
 -- 4. PAYMENT DB (payment_db)

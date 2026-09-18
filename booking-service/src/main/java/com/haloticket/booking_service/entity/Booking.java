@@ -24,6 +24,12 @@ public class Booking {
     @Column(name = "customer_id", nullable = false)
     private String customerId;
 
+    @Column(name = "customer_email")
+    private String customerEmail;
+
+    @Column(name = "customer_name")
+    private String customerName;
+
     @Column(name = "event_id", nullable = false)
     private String eventId;
 
