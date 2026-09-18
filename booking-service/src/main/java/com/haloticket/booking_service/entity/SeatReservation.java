@@ -24,6 +24,9 @@ public class SeatReservation {
     @Column(name = "seat_id", nullable = false)
     private String seatId;
 
+    @Version
+    private Long version;
+
     @Enumerated(EnumType.STRING)
     private SeatReservationStatus status;
 

@@ -13,6 +13,7 @@ import com.haloticket.booking_service.repository.BookingRepository;
 import com.haloticket.booking_service.repository.OutboxEventRepository;
 import com.haloticket.booking_service.repository.SeatReservationRepository;
 import com.haloticket.booking_service.service.BookingService;
+import org.redisson.api.RBucket;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -59,11 +60,15 @@ public class BookingServiceImpl implements BookingService {
 
             // 2. Check seat availability in Redis
             if (seatIds != null && !seatIds.isEmpty()) {
+                String currentCustomerId = request.getCustomerId() != null ? request.getCustomerId() : "ANONYMOUS";
                 for (String seatId : seatIds) {
                     String seatHoldKey = "seat:hold:" + eventId + ":" + seatId;
-                    Boolean alreadyHeld = stringRedisTemplate.hasKey(seatHoldKey);
-                    if (Boolean.TRUE.equals(alreadyHeld)) {
-                        throw new RuntimeException("Ghế " + seatId + " vừa mới được giữ bởi người dùng khác.");
+                    RBucket<String> bucket = redissonClient.getBucket(seatHoldKey);
+                    if (bucket.isExists()) {
+                        String heldBy = bucket.get();
+                        if (!currentCustomerId.equals(heldBy)) {
+                            throw new RuntimeException("Ghế " + seatId + " vừa mới được giữ bởi người dùng khác.");
+                        }
                     }
                 }
             }
@@ -76,6 +81,8 @@ public class BookingServiceImpl implements BookingService {
             Booking booking = Booking.builder()
                     .bookingCode(bookingCode)
                     .customerId(request.getCustomerId() != null ? request.getCustomerId() : "ANONYMOUS")
+                    .customerEmail(request.getCustomerEmail())
+                    .customerName(request.getCustomerName())
                     .eventId(eventId)
                     .voucherId(request.getVoucherId())
                     .subtotal(request.getTotalAmount())
