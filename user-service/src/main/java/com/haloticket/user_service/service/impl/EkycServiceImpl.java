@@ -134,7 +134,8 @@ public class EkycServiceImpl implements EkycService {
             String keycloakId,
             String sessionId,
             MultipartFile frontImage,
-            MultipartFile backImage
+            MultipartFile backImage,
+            MultipartFile faceImage
     ) {
         User user = requireUserForUpdate(keycloakId);
         EkycAttempt attempt = attemptRepository.findById(sessionId)
@@ -150,6 +151,7 @@ public class EkycServiceImpl implements EkycService {
         }
         validateImage(frontImage, "FRONT_IMAGE_INVALID");
         validateImage(backImage, "BACK_IMAGE_INVALID");
+        validateImage(faceImage, "FACE_IMAGE_INVALID");
 
         identityFingerprint.requireConfigured();
 
@@ -159,7 +161,7 @@ public class EkycServiceImpl implements EkycService {
         VnptEkycClient.VerificationResult result;
         try {
             vnptClient.requireReady();
-            result = vnptClient.verify(frontImage, backImage);
+            result = vnptClient.verify(frontImage, backImage, faceImage);
         } catch (HttpStatusCodeException ex) {
             String reasonCode = providerRejectionReason(ex);
             log.warn("VNPT verification rejected for user {}: status={}, reason={}", user.getId(), ex.getStatusCode(), reasonCode);

@@ -55,10 +55,11 @@ public class EkycController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String sessionId,
             @RequestPart MultipartFile frontImage,
-            @RequestPart MultipartFile backImage
+            @RequestPart MultipartFile backImage,
+            @RequestPart MultipartFile faceImage
     ) {
         return ResponseEntity.ok(ekycService.verify(
-                jwt.getSubject(), sessionId, frontImage, backImage
+                jwt.getSubject(), sessionId, frontImage, backImage, faceImage
         ));
     }
 
