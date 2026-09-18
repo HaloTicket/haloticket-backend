@@ -200,7 +200,8 @@ public class TicketListingService {
         listingRepository.save(listing);
         MarketplaceTransaction transaction = MarketplaceTransaction.builder()
                 .ticketListing(listing).buyerId(buyerId).sellerId(listing.getSellerId())
-                .amount(listing.getPrice()).currency("VND").status(MarketplaceTransactionStatus.PENDING_PAYMENT)
+                .amount(listing.getPrice().multiply(BigDecimal.valueOf(Math.max(1, listing.getQuantity() == null ? 1 : listing.getQuantity()))))
+                .currency("VND").status(MarketplaceTransactionStatus.PENDING_PAYMENT)
                 .paymentReference(idempotencyKey).reservationExpiresAt(reservationExpiresAt).build();
         return reservationResponse(transactionRepository.save(transaction));
     }
