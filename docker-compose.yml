@@ -248,7 +248,7 @@ services:
       VNPT_EKYC_TOKEN_ID: ${VNPT_EKYC_TOKEN_ID:-}
       VNPT_EKYC_TOKEN_KEY: ${VNPT_EKYC_TOKEN_KEY:-}
       VNPT_EKYC_ACCESS_TOKEN: ${VNPT_EKYC_ACCESS_TOKEN:-}
-      EKYC_FINGERPRINT_SECRET: ${EKYC_FINGERPRINT_SECRET:-}
+      EKYC_FINGERPRINT_SECRET: ${EKYC_FINGERPRINT_SECRET:-haloticket-ekyc-fingerprint-secret-2026}
     depends_on:
       <<: *dependencies
       keycloak:

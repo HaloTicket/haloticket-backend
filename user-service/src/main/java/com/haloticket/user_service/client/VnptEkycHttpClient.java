@@ -30,6 +30,8 @@ public class VnptEkycHttpClient implements VnptEkycClient {
     private final String accessToken;
     private final String uploadPath;
     private final String ocrPath;
+    private final String faceLivenessPath;
+    private final String faceComparePath;
     private final boolean enabled;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -40,6 +42,8 @@ public class VnptEkycHttpClient implements VnptEkycClient {
             @Value("${ekyc.vnpt.access-token:}") String accessToken,
             @Value("${ekyc.vnpt.upload-path:/file-service/v1/addFile}") String uploadPath,
             @Value("${ekyc.vnpt.ocr-path:/ai/v1/ocr/id}") String ocrPath,
+            @Value("${ekyc.vnpt.face-liveness-path:/ai/v1/face/liveness}") String faceLivenessPath,
+            @Value("${ekyc.vnpt.face-compare-path:/ai/v1/face/compare}") String faceComparePath,
             @Value("${ekyc.vnpt.enabled:false}") boolean enabled
     ) {
         var endpoint = URI.create(baseUrl);
@@ -57,18 +61,31 @@ public class VnptEkycHttpClient implements VnptEkycClient {
         this.accessToken = accessToken;
         this.uploadPath = uploadPath;
         this.ocrPath = ocrPath;
+        this.faceLivenessPath = faceLivenessPath;
+        this.faceComparePath = faceComparePath;
     }
 
     @Override
-    public VerificationResult verify(MultipartFile frontImage, MultipartFile backImage) {
+    public VerificationResult verify(MultipartFile frontImage, MultipartFile backImage, MultipartFile faceImage) {
         requireReady();
         String session = UUID.randomUUID().toString();
         String token = session.replace("-", "");
         String frontHash = upload(frontImage, "cccd-front");
         String backHash = upload(backImage, "cccd-back");
+        String faceHash = upload(faceImage, "face-portrait");
 
         JsonNode ocr = post(ocrPath, ocrRequest(frontHash, backHash, session, token));
-        return responseMapper.map(session, ocr, null, null, null, null);
+        JsonNode faceLiveness = post(faceLivenessPath, faceLivenessRequest(faceHash, session, token));
+        JsonNode faceCompare = post(faceComparePath, faceCompareRequest(frontHash, faceHash, session, token));
+        return responseMapper.map(session, ocr, null, null, faceLiveness, faceCompare);
+    }
+
+    static Map<String, Object> faceLivenessRequest(String faceHash, String session, String token) {
+        return Map.of("img", faceHash, "client_session", session, "token", token);
+    }
+
+    static Map<String, Object> faceCompareRequest(String frontHash, String faceHash, String session, String token) {
+        return Map.of("img_front", frontHash, "img_face", faceHash, "client_session", session, "token", token);
     }
 
     static Map<String, Object> ocrRequest(String frontHash, String backHash, String session, String token) {
