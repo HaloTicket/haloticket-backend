@@ -13,6 +13,32 @@ import static org.mockito.Mockito.*;
 
 class ResalePurchaseServiceTest {
     @Test
+    void buyerCanReadPurchaseCompletionStatus() {
+        Fixture fixture = new Fixture();
+        fixture.transaction.setStatus(MarketplaceTransactionStatus.COMPLETED);
+        fixture.transaction.setSagaId("purchase-saga");
+        when(fixture.transactions.findById("tx-1")).thenReturn(Optional.of(fixture.transaction));
+
+        var result = fixture.service.getStatus("buyer-1", "tx-1");
+
+        assertThat(result.status()).isEqualTo(MarketplaceTransactionStatus.COMPLETED);
+        assertThat(result.sagaId()).isEqualTo("purchase-saga");
+    }
+
+    @Test
+    void startingPaymentAgainReturnsTheSamePayableTransaction() {
+        Fixture fixture = new Fixture();
+        fixture.transaction.setStatus(MarketplaceTransactionStatus.PAYMENT_PROCESSING);
+        when(fixture.transactions.findById("tx-1")).thenReturn(Optional.of(fixture.transaction));
+
+        var result = fixture.service.startPayment("buyer-1", "tx-1");
+
+        assertThat(result.transactionId()).isEqualTo("tx-1");
+        assertThat(result.amount()).isEqualByComparingTo("120000");
+        assertThat(fixture.transaction.getStatus()).isEqualTo(MarketplaceTransactionStatus.PAYMENT_PROCESSING);
+    }
+
+    @Test
     void paidReservationStartsOwnershipTransferExactlyOnce() {
         Fixture fixture = new Fixture();
         fixture.transaction.setStatus(MarketplaceTransactionStatus.PAYMENT_PROCESSING);

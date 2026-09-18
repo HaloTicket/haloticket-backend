@@ -68,6 +68,28 @@ class ResaleReservationTest {
     }
 
     @Test
+    void returnsTheBuyersExistingReservationWhenCheckoutIsRetried() {
+        TicketListingRepository listings = mock(TicketListingRepository.class);
+        MarketplaceTransactionRepository transactions = mock(MarketplaceTransactionRepository.class);
+        TicketListing listing = listing("seller-1", ListingStatus.RESERVED);
+        listing.setReservedBy("buyer-1");
+        listing.setReservedUntil(Instant.now().plusSeconds(300));
+        MarketplaceTransaction transaction = MarketplaceTransaction.builder().id("transaction-1")
+                .ticketListing(listing).buyerId("buyer-1").sellerId("seller-1")
+                .amount(listing.getPrice()).currency("VND")
+                .status(MarketplaceTransactionStatus.PENDING_PAYMENT)
+                .reservationExpiresAt(listing.getReservedUntil()).build();
+        when(listings.findByIdForUpdate("listing-1")).thenReturn(Optional.of(listing));
+        when(transactions.findFirstByTicketListing_IdAndBuyerIdAndStatusIn(eq("listing-1"), eq("buyer-1"), any()))
+                .thenReturn(Optional.of(transaction));
+
+        var result = service(listings, transactions).reserveListing("buyer-1", "new-browser-key", "listing-1");
+
+        assertThat(result.transactionId()).isEqualTo("transaction-1");
+        verify(transactions, never()).save(any());
+    }
+
+    @Test
     void releasesAnExpiredReservationBackToTheMarketplace() {
         TicketListingRepository listings = mock(TicketListingRepository.class);
         MarketplaceTransactionRepository transactions = mock(MarketplaceTransactionRepository.class);

@@ -69,9 +69,20 @@ public class TicketListingController {
                 .body(service.reserveListing(authentication.getName(), key, listingId));
     }
 
+    @PostMapping("/listings/{listingId}/cancel-reservation")
+    public ResponseEntity<Void> cancelReservation(@PathVariable String listingId, Authentication authentication) {
+        service.cancelReservation(currentUserId(authentication), listingId);
+        return ResponseEntity.ok().build();
+    }
+
     @PostMapping("/transactions/{transactionId}/payment")
     public PaymentInitiationResponse startPayment(@PathVariable String transactionId, Authentication authentication) {
         return purchaseService.startPayment(authentication.getName(), transactionId);
+    }
+
+    @GetMapping("/transactions/{transactionId}")
+    public ResalePurchaseStatusResponse transaction(@PathVariable String transactionId, Authentication authentication) {
+        return purchaseService.getStatus(authentication.getName(), transactionId);
     }
 
     @GetMapping("/listings/me")

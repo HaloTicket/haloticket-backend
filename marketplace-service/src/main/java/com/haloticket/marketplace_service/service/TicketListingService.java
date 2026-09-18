@@ -185,6 +185,17 @@ public class TicketListingService {
         TicketListing listing = listingRepository.findByIdForUpdate(listingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LISTING_NOT_FOUND"));
         Instant now = Instant.now();
+        if (listing.getStatus() == ListingStatus.RESERVED
+                && buyerId.equals(listing.getReservedBy())
+                && listing.getReservedUntil() != null
+                && listing.getReservedUntil().isAfter(now)) {
+            return transactionRepository.findFirstByTicketListing_IdAndBuyerIdAndStatusIn(
+                            listingId, buyerId, List.of(
+                                    MarketplaceTransactionStatus.PENDING_PAYMENT,
+                                    MarketplaceTransactionStatus.PAYMENT_PROCESSING))
+                    .map(this::reservationResponse)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "RESERVATION_TRANSACTION_NOT_FOUND"));
+        }
         if (listing.getStatus() != ListingStatus.ACTIVE || listing.getPublishedAt() == null
                 || (listing.getExpiresAt() != null && !listing.getExpiresAt().isAfter(now))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "LISTING_NOT_AVAILABLE");
@@ -213,6 +224,28 @@ public class TicketListingService {
             transactionRepository.findByTicketListing_IdAndStatus(listing.getId(), MarketplaceTransactionStatus.PENDING_PAYMENT)
                     .ifPresent(transaction -> {
                         transaction.setStatus(MarketplaceTransactionStatus.EXPIRED);
+                        transaction.setCancelledAt(now);
+                        transactionRepository.save(transaction);
+                    });
+            listing.setStatus(ListingStatus.ACTIVE);
+            listing.setReservedBy(null);
+            listing.setReservedUntil(null);
+            listingRepository.save(listing);
+        }
+    }
+
+    @Transactional
+    public void cancelReservation(String buyerId, String listingId) {
+        TicketListing listing = listingRepository.findByIdForUpdate(listingId)
+                .orElse(null);
+        if (listing != null && listing.getStatus() == ListingStatus.RESERVED) {
+            if (buyerId != null && !buyerId.equals(listing.getReservedBy())) {
+                return;
+            }
+            Instant now = Instant.now();
+            transactionRepository.findByTicketListing_IdAndStatus(listing.getId(), MarketplaceTransactionStatus.PENDING_PAYMENT)
+                    .ifPresent(transaction -> {
+                        transaction.setStatus(MarketplaceTransactionStatus.CANCELLED);
                         transaction.setCancelledAt(now);
                         transactionRepository.save(transaction);
                     });

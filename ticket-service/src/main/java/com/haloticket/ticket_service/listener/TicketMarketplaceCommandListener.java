@@ -87,7 +87,13 @@ public class TicketMarketplaceCommandListener {
             if (ticket == null || !fromUserId.equals(ticket.getOwnerId()) || ticket.getStatus() != requiredStatus || lockOperationId == null || !lockOperationId.equals(ticket.getLockOperationId())) {
                 operation.setState(TicketOperationState.REJECTED); operation.setLastError("TICKET_TRANSFER_NOT_ELIGIBLE"); operationRepository.save(operation); emitResult(operation, "TICKET_TRANSFER_REJECTED"); return;
             }
-            ticket.setOwnerId(toUserId); ticket.setStatus(TicketStatus.VALID); ticket.setLockOperationId(null); ticket.setQrVersion((ticket.getQrVersion() == null ? 0 : ticket.getQrVersion()) + 1); ticket.setQrCodeHash(UUID.randomUUID().toString()); ticketRepository.save(ticket);
+            ticket.setOwnerId(toUserId); ticket.setStatus(TicketStatus.VALID); ticket.setLockOperationId(null); ticket.setQrVersion((ticket.getQrVersion() == null ? 0 : ticket.getQrVersion()) + 1); ticket.setQrCodeHash(UUID.randomUUID().toString());
+            if ("RESALE".equals(purpose)) {
+                ticket.setPurchasePrice(root.hasNonNull("purchasePrice") ? root.get("purchasePrice").decimalValue() : ticket.getOriginalPrice());
+                ticket.setAcquisitionType(root.path("acquisitionType").asText("RESALE"));
+                ticket.setBookingId(root.path("purchaseReference").asText(ticket.getBookingId()));
+            }
+            ticketRepository.save(ticket);
             operation.setState(TicketOperationState.TRANSFERRED); operationRepository.save(operation); emitResult(operation, "TICKET_OWNERSHIP_TRANSFERRED");
         } catch (Exception exception) { throw new IllegalStateException("Failed to process ticket ownership transfer command", exception); }
     }

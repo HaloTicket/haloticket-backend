@@ -68,3 +68,6 @@ shopeepay:
   redirect_url: ${SHOPEEPAY_REDIRECT_URL:http://localhost:5173/payment/callback}
   ipn_url: ${SHOPEEPAY_IPN_URL:http://localhost:8888/api/payments/shopeepay/ipn}
 
+payment:
+  sandbox-return-confirmation-enabled: ${PAYMENT_SANDBOX_RETURN_CONFIRMATION_ENABLED:false}
+

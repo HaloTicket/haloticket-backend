@@ -2,6 +2,7 @@ package com.haloticket.marketplace_service.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haloticket.marketplace_service.dto.PaymentInitiationResponse;
+import com.haloticket.marketplace_service.dto.ResalePurchaseStatusResponse;
 import com.haloticket.marketplace_service.entity.*;
 import com.haloticket.marketplace_service.enums.*;
 import com.haloticket.marketplace_service.repository.*;
@@ -24,17 +25,28 @@ public class ResalePurchaseService {
     private final OutboxEventRepository outbox;
     private final ObjectMapper objectMapper;
 
+    @Transactional(readOnly = true)
+    public ResalePurchaseStatusResponse getStatus(String buyerId, String transactionId) {
+        MarketplaceTransaction transaction = transactions.findById(transactionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "TRANSACTION_NOT_FOUND"));
+        if (!transaction.getBuyerId().equals(buyerId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        return new ResalePurchaseStatusResponse(transaction.getId(), transaction.getStatus(), transaction.getSagaId());
+    }
+
     @Transactional
     public PaymentInitiationResponse startPayment(String buyerId, String transactionId) {
         MarketplaceTransaction transaction = transactions.findById(transactionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "TRANSACTION_NOT_FOUND"));
         if (!transaction.getBuyerId().equals(buyerId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
-        if (transaction.getStatus() != MarketplaceTransactionStatus.PENDING_PAYMENT
+        if ((transaction.getStatus() != MarketplaceTransactionStatus.PENDING_PAYMENT
+                && transaction.getStatus() != MarketplaceTransactionStatus.PAYMENT_PROCESSING)
                 || transaction.getReservationExpiresAt().isBefore(Instant.now())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "RESERVATION_NOT_PAYABLE");
         }
-        transaction.setStatus(MarketplaceTransactionStatus.PAYMENT_PROCESSING);
-        transactions.save(transaction);
+        if (transaction.getStatus() == MarketplaceTransactionStatus.PENDING_PAYMENT) {
+            transaction.setStatus(MarketplaceTransactionStatus.PAYMENT_PROCESSING);
+            transactions.save(transaction);
+        }
         return new PaymentInitiationResponse(transaction.getId(), transaction.getAmount(), transaction.getCurrency(),
                 transaction.getReservationExpiresAt());
     }
@@ -70,6 +82,8 @@ public class ResalePurchaseService {
             command.put("operationId", sagaId + ":TRANSFER"); command.put("ticketId", listing.getTicketId());
             command.put("fromUserId", listing.getSellerId()); command.put("toUserId", transaction.getBuyerId());
             command.put("lockOperationId", listing.getSagaId()); command.put("purpose", "RESALE");
+            command.put("purchasePrice", transaction.getAmount()); command.put("acquisitionType", "RESALE");
+            command.put("purchaseReference", "RSL-" + transaction.getId());
             outbox.save(OutboxEvent.builder().aggregateType("MARKETPLACE_TRANSACTION").aggregateId(transaction.getId())
                     .eventType("TICKET_OWNERSHIP_TRANSFER_REQUESTED").topic("haloticket.ticket.ownership.transfer.requested.v1")
                     .payload(objectMapper.writeValueAsString(command)).status(OutboxStatus.PENDING).retryCount(0).build());

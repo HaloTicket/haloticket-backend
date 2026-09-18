@@ -440,6 +440,26 @@ public class PaymentServiceImpl implements PaymentService {
                 .orElse(null);
     }
 
+    @Override
+    @Transactional
+    public PaymentResponse confirmSandboxReturn(String bookingId, String provider) {
+        if (bookingId == null || bookingId.isBlank()) return null;
+        Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
+        if (payment == null) return null;
+
+        if (payment.getStatus() != PaymentStatus.SUCCESS) {
+            payment.setStatus(PaymentStatus.SUCCESS);
+            paymentRepository.save(payment);
+            publishPaymentCompletedOutbox(payment, provider == null ? "SANDBOX" : provider.toUpperCase());
+        }
+        return PaymentResponse.builder()
+                .id(payment.getId())
+                .bookingId(payment.getBookingId())
+                .amount(payment.getAmount())
+                .status(payment.getStatus())
+                .build();
+    }
+
     private void publishPaymentCompletedOutbox(Payment payment, String provider) {
         try {
             Map<String, Object> payloadMap = new HashMap<>();

@@ -10,6 +10,7 @@ import com.haloticket.payment_service.service.PaymentService;
 import com.haloticket.payment_service.service.VNPayService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +27,9 @@ public class PaymentController {
     private final PaymentService paymentService;
     private final UserServiceClient userServiceClient;
     private final VNPayService vnPayService;
+
+    @Value("${payment.sandbox-return-confirmation-enabled:false}")
+    private boolean sandboxReturnConfirmationEnabled;
 
     @PostMapping
     public ResponseEntity<PaymentResponse> createPayment(@RequestBody PaymentCreateRequest request) {
@@ -115,6 +119,17 @@ public class PaymentController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/sandbox/confirm-return")
+    public ResponseEntity<PaymentResponse> confirmSandboxReturn(
+            @RequestParam("bookingId") String bookingId,
+            @RequestParam("provider") String provider) {
+        if (!sandboxReturnConfirmationEnabled) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        PaymentResponse response = paymentService.confirmSandboxReturn(bookingId, provider);
+        return response == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(response);
     }
 
     @PostMapping("/organizer-payout-account")
