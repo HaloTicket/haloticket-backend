@@ -287,15 +287,14 @@ public class EkycServiceImpl implements EkycService {
     private User requireUserForUpdate(String keycloakId) {
         User user = userRepository.findForEkycUpdateByKeycloakId(keycloakId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
-        if (!Boolean.TRUE.equals(user.getIsActive()) || user.getStatus() != UserStatus.ACTIVE) {
+        if (user.getStatus() != UserStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "USER_INACTIVE");
         }
         return user;
     }
 
     private boolean isVerified(EkycProfile profile) {
-        return Boolean.TRUE.equals(profile.getUser().getIsActive())
-                && profile.getUser().getStatus() == UserStatus.ACTIVE
+        return profile.getUser().getStatus() == UserStatus.ACTIVE
                 && profile.getStatus() == EkycVerificationStatus.APPROVED
                 && profile.getAcceptedAttempt() != null && profile.getAcceptedAttempt().getStatus() == EkycAttemptStatus.PASSED
                 && profile.getIdentityVersion() != null && profile.getIdentityVersion() > 0

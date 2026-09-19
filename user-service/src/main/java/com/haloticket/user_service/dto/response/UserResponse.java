@@ -18,7 +18,6 @@ public class UserResponse {
     private String fullName;
     private String phoneNumber;
     private String avatarUrl;
-    private Boolean isActive;
     private Gender gender;
     private UserStatus status;
     private Set<Role> roles;
