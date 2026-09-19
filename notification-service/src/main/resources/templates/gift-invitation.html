@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="x-apple-disable-message-reformatting">
+  <meta name="format-detection" content="telephone=no,address=no,email=no,date=no,url=no">
+
+  <title>Lời mời nhận vé - HaloTicket</title>
+
+  <style>
+    /* =========================================================
+       RESET
+    ========================================================= */
+
+    html,
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+      min-height: 100% !important;
+    }
+
+    body {
+      background-color: #F3F6FA;
+      color: #172033;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        Helvetica,
+        Arial,
+        sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    table {
+      border-collapse: collapse;
+      border-spacing: 0;
+    }
+
+    td {
+      padding: 0;
+    }
+
+    img {
+      display: block;
+      border: 0;
+      outline: none;
+      text-decoration: none;
+      max-width: 100%;
+    }
+
+    a {
+      text-decoration: none;
+    }
+
+    /* =========================================================
+       HALOTICKET DESIGN TOKENS
+    ========================================================= */
+
+    /*
+      Primary Blue:
+      #2166F3
+
+      Dark Blue:
+      #1557D6
+
+      Light Blue:
+      #EEF4FF
+
+      Page Background:
+      #F3F6FA
+    */
+
+    /* =========================================================
+       OUTER WRAPPER
+    ========================================================= */
+
+    .email-wrapper {
+      width: 100%;
+      padding: 36px 16px;
+      background-color: #F3F6FA;
+    }
+
+    .email-container {
+      width: 100%;
+      max-width: 620px;
+      margin: 0 auto;
+      background-color: #FFFFFF;
+      border: 1px solid #DCE3ED;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    /* =========================================================
+       HEADER
+    ========================================================= */
+
+    .header {
+      padding: 22px 32px;
+      background-color: #FFFFFF;
+      border-bottom: 1px solid #E5EAF1;
+    }
+
+    .brand {
+      margin: 0;
+      color: #2166F3;
+      font-size: 24px;
+      line-height: 30px;
+      font-weight: 700;
+      letter-spacing: -0.8px;
+    }
+
+    .brand-subtitle {
+      margin: 4px 0 0;
+      color: #718096;
+      font-size: 11px;
+      line-height: 17px;
+    }
+
+    /* =========================================================
+       CONTENT
+    ========================================================= */
+
+    .content {
+      padding: 38px 40px 40px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: #2166F3;
+      font-size: 12px;
+      line-height: 18px;
+      font-weight: 700;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+
+    .title {
+      margin: 0 0 12px;
+      color: #172033;
+      font-size: 27px;
+      line-height: 36px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .intro {
+      margin: 0 0 30px;
+      color: #5F6B7A;
+      font-size: 15px;
+      line-height: 24px;
+    }
+
+    .intro strong {
+      color: #172033;
+      font-weight: 600;
+    }
+
+    /* =========================================================
+       EVENT / TICKET CARD
+    ========================================================= */
+
+    .section-title {
+      margin: 0 0 11px;
+      color: #172033;
+      font-size: 14px;
+      line-height: 20px;
+      font-weight: 600;
+    }
+
+    .ticket-card {
+      width: 100%;
+      margin-bottom: 26px;
+      background-color: #FFFFFF;
+      border: 1px solid #DCE3ED;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .event-header {
+      padding: 20px;
+      background-color: #F7F9FC;
+      border-bottom: 1px solid #E5EAF1;
+    }
+
+    .event-label {
+      margin: 0 0 6px;
+      color: #7A8699;
+      font-size: 11px;
+      line-height: 17px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .event-title {
+      margin: 0;
+      color: #172033;
+      font-size: 17px;
+      line-height: 24px;
+      font-weight: 650;
+    }
+
+    /* =========================================================
+       INFO ROWS
+    ========================================================= */
+
+    .info-row td {
+      padding: 11px 20px;
+      border-bottom: 1px solid #EEF1F5;
+      font-size: 13px;
+      line-height: 20px;
+    }
+
+    .info-row:last-child td {
+      border-bottom: none;
+    }
+
+    .info-label {
+      width: 38%;
+      color: #748094;
+      font-weight: 400;
+    }
+
+    .info-value {
+      color: #273247;
+      font-weight: 600;
+      text-align: right;
+      word-break: break-word;
+    }
+
+    /* =========================================================
+       OPTIONAL MESSAGE
+    ========================================================= */
+
+    .message-box {
+      margin: 0 0 26px;
+      padding: 15px 17px;
+      background-color: #F7F9FC;
+      border-left: 3px solid #2166F3;
+      border-radius: 4px;
+    }
+
+    .message-label {
+      display: block;
+      margin: 0 0 5px;
+      color: #354052;
+      font-size: 12px;
+      line-height: 18px;
+      font-weight: 600;
+    }
+
+    .message-text {
+      margin: 0;
+      color: #667085;
+      font-size: 13px;
+      line-height: 21px;
+      font-style: italic;
+    }
+
+    /* =========================================================
+       EXPIRY
+    ========================================================= */
+
+    .expiry-box {
+      margin: 0 0 28px;
+      padding: 14px 16px;
+      background-color: #FFF9E8;
+      border: 1px solid #F4DFA3;
+      border-radius: 6px;
+    }
+
+    .expiry-title {
+      margin: 0 0 3px;
+      color: #8A6200;
+      font-size: 13px;
+      line-height: 20px;
+      font-weight: 600;
+    }
+
+    .expiry-text {
+      margin: 0;
+      color: #856B24;
+      font-size: 12px;
+      line-height: 19px;
+    }
+
+    /* =========================================================
+       CTA
+    ========================================================= */
+
+    .cta-wrapper {
+      margin: 0 0 30px;
+      text-align: center;
+    }
+
+    .cta-button {
+      display: inline-block;
+      padding: 13px 30px;
+      background-color: #2166F3;
+      color: #FFFFFF !important;
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 20px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .cta-button:hover {
+      background-color: #1557D6;
+    }
+
+    .cta-description {
+      margin: 10px 0 0;
+      color: #98A2B3;
+      font-size: 11px;
+      line-height: 17px;
+    }
+
+    /* =========================================================
+       NOTICE
+    ========================================================= */
+
+    .notice {
+      padding-top: 23px;
+      border-top: 1px solid #E5EAF1;
+    }
+
+    .notice-title {
+      margin: 0 0 9px;
+      color: #344054;
+      font-size: 12px;
+      line-height: 18px;
+      font-weight: 600;
+    }
+
+    .notice-list {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .notice-list li {
+      margin: 0 0 6px;
+      color: #697586;
+      font-size: 12px;
+      line-height: 19px;
+    }
+
+    .notice-list li:last-child {
+      margin-bottom: 0;
+    }
+
+    .notice-list strong {
+      color: #475467;
+      font-weight: 600;
+    }
+
+    /* =========================================================
+       FOOTER
+    ========================================================= */
+
+    .footer {
+      padding: 22px 32px;
+      background-color: #F8FAFC;
+      border-top: 1px solid #E5EAF1;
+      text-align: center;
+    }
+
+    .footer-text {
+      margin: 0 0 5px;
+      color: #98A2B3;
+      font-size: 11px;
+      line-height: 18px;
+    }
+
+    .footer-text:last-child {
+      margin-bottom: 0;
+    }
+
+    .footer-link {
+      color: #2166F3;
+      text-decoration: none;
+    }
+
+    /* =========================================================
+       MOBILE
+    ========================================================= */
+
+    @media only screen and (max-width: 620px) {
+
+      .email-wrapper {
+        padding: 0;
+      }
+
+      .email-container {
+        width: 100% !important;
+        border-left: 0;
+        border-right: 0;
+        border-radius: 0;
+      }
+
+      .header {
+        padding: 20px;
+      }
+
+      .content {
+        padding: 30px 20px 32px;
+      }
+
+      .title {
+        font-size: 24px;
+        line-height: 32px;
+      }
+
+      .intro {
+        font-size: 14px;
+        line-height: 22px;
+      }
+
+      .event-header {
+        padding: 17px;
+      }
+
+      .info-row td {
+        padding: 10px 17px;
+      }
+
+      .info-label {
+        width: 42%;
+      }
+
+      .footer {
+        padding: 21px 20px;
+      }
+    }
+  </style>
+</head>
+
+
+<body>
+
+  <div class="email-wrapper">
+
+    <table
+      class="email-container"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      role="presentation"
+    >
+
+      <!-- =====================================================
+           HEADER
+      ====================================================== -->
+
+      <tr>
+        <td class="header">
+
+          <p class="brand">
+            HaloTicket
+          </p>
+
+          <p class="brand-subtitle">
+            Nền tảng vé sự kiện
+          </p>
+
+        </td>
+      </tr>
+
+
+      <!-- =====================================================
+           CONTENT
+      ====================================================== -->
+
+      <tr>
+        <td class="content">
+
+          <!-- Eyebrow -->
+
+          <p class="eyebrow">
+            Lời mời nhận vé
+          </p>
+
+
+          <!-- Title -->
+
+          <h1 class="title">
+            Bạn được tặng vé
+          </h1>
+
+
+          <!-- Intro -->
+
+          <p class="intro">
+            <strong>{{senderName}}</strong>
+            đã gửi tặng bạn vé tham gia sự kiện trên HaloTicket.
+          </p>
+
+
+          <!-- =================================================
+               TICKET INFORMATION
+          ================================================== -->
+
+          <p class="section-title">
+            Thông tin vé
+          </p>
+
+
+          <table
+            class="ticket-card"
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            role="presentation"
+          >
+
+            <!-- Event -->
+
+            <tr>
+              <td class="event-header">
+
+                <p class="event-label">
+                  Sự kiện
+                </p>
+
+                <p class="event-title">
+                  {{eventTitle}}
+                </p>
+
+              </td>
+            </tr>
+
+
+            <!-- Ticket Type -->
+
+            <tr class="info-row">
+              <td>
+
+                <table
+                  width="100%"
+                  cellpadding="0"
+                  cellspacing="0"
+                  role="presentation"
+                >
+
+                  <tr>
+
+                    <td class="info-label">
+                      Loại vé
+                    </td>
+
+                    <td class="info-value">
+                      {{ticketTypeName}}
+                    </td>
+
+                  </tr>
+
+                </table>
+
+              </td>
+            </tr>
+
+
+            <!-- Seat -->
+
+            <tr class="info-row">
+              <td>
+
+                <table
+                  width="100%"
+                  cellpadding="0"
+                  cellspacing="0"
+                  role="presentation"
+                >
+
+                  <tr>
+
+                    <td class="info-label">
+                      Vị trí
+                    </td>
+
+                    <td class="info-value">
+                      {{seatInfo}}
+                    </td>
+
+                  </tr>
+
+                </table>
+
+              </td>
+            </tr>
+
+
+            <!-- Sender -->
+
+            <tr class="info-row">
+              <td>
+
+                <table
+                  width="100%"
+                  cellpadding="0"
+                  cellspacing="0"
+                  role="presentation"
+                >
+
+                  <tr>
+
+                    <td class="info-label">
+                      Người tặng
+                    </td>
+
+                    <td class="info-value">
+                      {{senderName}}
+                    </td>
+
+                  </tr>
+
+                </table>
+
+              </td>
+            </tr>
+
+
+            <!-- Recipient -->
+
+            <tr class="info-row">
+              <td>
+
+                <table
+                  width="100%"
+                  cellpadding="0"
+                  cellspacing="0"
+                  role="presentation"
+                >
+
+                  <tr>
+
+                    <td class="info-label">
+                      Tài khoản nhận
+                    </td>
+
+                    <td class="info-value">
+                      {{recipientEmail}}
+                    </td>
+
+                  </tr>
+
+                </table>
+
+              </td>
+            </tr>
+
+          </table>
+
+
+          <!-- =================================================
+               OPTIONAL MESSAGE
+          ================================================== -->
+
+          {{messageBlock}}
+
+
+          <!-- =================================================
+               EXPIRY
+          ================================================== -->
+
+          <div class="expiry-box">
+
+            <p class="expiry-title">
+              Thời hạn nhận vé
+            </p>
+
+            <p class="expiry-text">
+              Lời mời có hiệu lực đến
+              <strong>{{expiresAtFormatted}}</strong>.
+              Sau thời hạn này, lời mời sẽ hết hiệu lực
+              và vé sẽ được giữ lại trong tài khoản người tặng.
+            </p>
+
+          </div>
+
+
+          <!-- =================================================
+               CTA
+          ================================================== -->
+
+          <div class="cta-wrapper">
+
+            <a
+              href="{{acceptUrl}}"
+              class="cta-button"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Xem lời mời
+            </a>
+
+            <p class="cta-description">
+              Bạn sẽ được yêu cầu đăng nhập để tiếp tục.
+            </p>
+
+          </div>
+
+
+          <!-- =================================================
+               NOTICE
+          ================================================== -->
+
+          <div class="notice">
+
+            <p class="notice-title">
+              Lưu ý
+            </p>
+
+            <ul class="notice-list">
+
+              <li>
+                Vui lòng đăng nhập bằng đúng tài khoản
+                <strong>{{recipientEmail}}</strong>
+                để nhận vé.
+              </li>
+
+              <li>
+                Bạn có thể kiểm tra thông tin vé trước khi
+                xác nhận nhận vé.
+              </li>
+
+              <li>
+                Sau khi xác nhận thành công, vé sẽ được chuyển
+                vào mục <strong>Vé của tôi</strong>.
+              </li>
+
+              <li>
+                Vé trong tài khoản người tặng sẽ không còn hiệu lực
+                sau khi việc chuyển vé hoàn tất.
+              </li>
+
+            </ul>
+
+          </div>
+
+        </td>
+      </tr>
+
+
+      <!-- =====================================================
+           FOOTER
+      ====================================================== -->
+
+      <tr>
+        <td class="footer">
+
+          <p class="footer-text">
+            Email này được gửi tự động từ hệ thống HaloTicket.
+          </p>
+
+          <p class="footer-text">
+            Cần hỗ trợ?
+            <a
+              href="mailto:support@haloticket.vn"
+              class="footer-link"
+            >
+              support@haloticket.vn
+            </a>
+          </p>
+
+          <p class="footer-text">
+            © 2026 HaloTicket. Mọi quyền được bảo lưu.
+          </p>
+
+        </td>
+      </tr>
+
+    </table>
+
+  </div>
+
+</body>
+</html>
