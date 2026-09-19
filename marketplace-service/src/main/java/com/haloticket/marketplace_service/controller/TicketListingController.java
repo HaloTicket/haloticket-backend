@@ -35,8 +35,9 @@ public class TicketListingController {
     }
 
     @PostMapping("/gifts/{sagaId}/accept")
-    public SagaResponse acceptGift(@PathVariable String sagaId, @RequestParam String token, Authentication authentication) {
-        return service.acceptGift(authentication.getName(), sagaId, token);
+    public SagaResponse acceptGift(@PathVariable String sagaId, @RequestParam(required = false) String token,
+                                   @RequestHeader("Authorization") String authorization, Authentication authentication) {
+        return service.acceptGift(authentication.getName(), authorization, sagaId, token);
     }
 
     @GetMapping("/sagas/{id}")
@@ -45,6 +46,16 @@ public class TicketListingController {
     @GetMapping("/listings")
     public Page<ListingResponse> listings(Pageable pageable, Authentication authentication) {
         return service.publicListings(currentUserId(authentication), pageable);
+    }
+
+    @GetMapping("/gifts/{sagaId}/invitation")
+    public java.util.Map<String, Object> giftInvitation(@PathVariable String sagaId, @RequestParam(required = false) String token, Authentication authentication) {
+        return service.giftInvitation(authentication.getName(), sagaId, token);
+    }
+
+    @GetMapping("/gifts/mine")
+    public java.util.List<java.util.Map<String, Object>> myGiftInvitations(Authentication authentication) {
+        return service.myGiftInvitations(authentication.getName());
     }
 
     @GetMapping("/events")

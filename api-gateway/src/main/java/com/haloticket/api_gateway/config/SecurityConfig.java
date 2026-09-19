@@ -69,6 +69,7 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
+                        .pathMatchers("/ws/**", "/api/payments/vnpay/ipn", "/api/payments/momo/ipn", "/api/payments/zalopay/ipn", "/api/payments/sepay/webhook").permitAll()
                         .pathMatchers("/eureka/**", "/actuator/**").permitAll()
                         .pathMatchers("/api/events/**", "/api/tickets/**", "/api/media/**",
                                 "/api/v1/**", "/ws-notifications/**")

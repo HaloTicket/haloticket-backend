@@ -325,8 +325,27 @@ public class TicketListingService {
                 saga.setDeadlineAt(transfer.getInvitationExpiresAt());
                 saga.setState(SagaState.WAITING_RECIPIENT); saga.setStep("INVITATION_CREATED"); sagaRepository.save(saga);
                 Map<String, Object> invitation = new LinkedHashMap<>();
-                invitation.put("sagaId", sagaId); invitation.put("ticketId", transfer.getTicketId()); invitation.put("recipientEmail", transfer.getRecipientEmail());
-                invitation.put("message", transfer.getMessage()); invitation.put("invitationToken", token); invitation.put("expiresAt", transfer.getInvitationExpiresAt());
+                invitation.put("sagaId", sagaId);
+                invitation.put("ticketId", transfer.getTicketId());
+                invitation.put("recipientEmail", transfer.getRecipientEmail());
+                invitation.put("recipientUserId", transfer.getToUserId());
+                invitation.put("message", transfer.getMessage());
+                invitation.put("invitationToken", token);
+                invitation.put("expiresAt", transfer.getInvitationExpiresAt());
+                invitation.put("senderUserId", transfer.getFromUserId());
+                String senderName = "Một người bạn trên HaloTicket";
+                try {
+                    var sender = userServiceClient.getUserDisplayName(transfer.getFromUserId());
+                    if (sender != null && sender.fullName() != null && !sender.fullName().isBlank()) {
+                        senderName = sender.fullName();
+                    }
+                } catch (Exception ignored) {}
+                invitation.put("senderName", senderName);
+                invitation.put("ticketTypeName", node.path("ticketTypeName").asText(""));
+                invitation.put("section", node.path("section").asText(""));
+                invitation.put("row", node.path("row").asText(""));
+                invitation.put("seat", node.path("seat").asText(""));
+                invitation.put("eventId", node.path("eventId").asText(""));
                 outboxRepository.save(OutboxEvent.builder().aggregateType("TICKET_TRANSFER").aggregateId(transfer.getId()).eventType("GIFT_INVITATION_CREATED")
                         .topic("haloticket.marketplace.gift.invited.v1").payload(objectMapper.writeValueAsString(invitation)).status(OutboxStatus.PENDING).retryCount(0).build());
                 return;
@@ -361,18 +380,37 @@ public class TicketListingService {
             if (!existing.get().getRequestHash().equals(hash)) throw new ResponseStatusException(HttpStatus.CONFLICT, "Idempotency-Key was reused with a different request");
             return toResponse(existing.get());
         }
+        String recipientEmail = request.recipientEmail().trim().toLowerCase(java.util.Locale.ROOT);
+        UserServiceClient.GiftRecipient recipient;
+        try { recipient = userServiceClient.getGiftRecipient(authorization, recipientEmail); }
+        catch (Exception exception) { throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "RECIPIENT_NOT_FOUND", exception); }
+        if (recipient == null || recipient.userId() == null || recipient.userId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "RECIPIENT_NOT_FOUND");
+        }
+        if (actorId.equals(recipient.userId())) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "CANNOT_GIFT_SELF");
         TicketServiceClient.ResaleEligibilityResponse eligibility;
         try { eligibility = ticketServiceClient.getResaleEligibility(authorization, request.ticketId()); }
         catch (Exception exception) { throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "TICKET_SERVICE_UNAVAILABLE", exception); }
         if (eligibility == null || !eligibility.eligible()) throw new ResponseStatusException(HttpStatus.CONFLICT, "TICKET_NOT_ELIGIBLE");
         String sagaId = UUID.randomUUID().toString();
         Instant now = Instant.now();
-        Map<String, Object> payload = new LinkedHashMap<>(); payload.put("sagaId", sagaId); payload.put("ticketId", request.ticketId()); payload.put("fromUserId", actorId); payload.put("recipientEmail", request.recipientEmail()); payload.put("message", request.message());
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("sagaId", sagaId);
+        payload.put("ticketId", request.ticketId());
+        payload.put("fromUserId", actorId);
+        payload.put("recipientEmail", recipientEmail);
+        payload.put("recipientUserId", recipient.userId());
+        payload.put("message", request.message());
+        payload.put("eventId", eligibility.eventId());
+        payload.put("ticketTypeName", eligibility.ticketTypeName());
+        payload.put("section", eligibility.section());
+        payload.put("row", eligibility.row());
+        payload.put("seat", eligibility.seat());
         try {
             MarketplaceSaga saga = MarketplaceSaga.builder().id(sagaId).type("GIFT_TRANSFER").ticketId(request.ticketId()).actorId(actorId).state(SagaState.WAITING_LOCK).step("LOCK_REQUESTED")
                     .payload(objectMapper.writeValueAsString(payload)).idempotencyKey(idempotencyKey).requestHash(hash).deadlineAt(eligibility.closesAt()).nextRetryAt(now).retryCount(0).build();
             sagaRepository.save(saga);
-            TicketTransfer transfer = TicketTransfer.builder().ticketId(request.ticketId()).fromUserId(actorId).recipientEmail(request.recipientEmail()).message(request.message()).type(TransferType.GIFT).status(TransferStatus.PENDING).sagaId(sagaId).build();
+            TicketTransfer transfer = TicketTransfer.builder().ticketId(request.ticketId()).fromUserId(actorId).toUserId(recipient.userId()).recipientEmail(recipientEmail).message(request.message()).type(TransferType.GIFT).status(TransferStatus.PENDING).sagaId(sagaId).build();
             transferRepository.save(transfer); saga.setBusinessId(transfer.getId()); sagaRepository.save(saga);
             Map<String, Object> command = new LinkedHashMap<>(); command.put("messageId", UUID.randomUUID().toString()); command.put("sagaId", sagaId); command.put("operationId", sagaId); command.put("ticketId", request.ticketId()); command.put("sellerId", actorId); command.put("purpose", "GIFT");
             outboxRepository.save(OutboxEvent.builder().aggregateType("MARKETPLACE_SAGA").aggregateId(sagaId).eventType("TICKET_LOCK_REQUESTED").topic("haloticket.ticket.lock.requested.v1").payload(objectMapper.writeValueAsString(command)).status(OutboxStatus.PENDING).retryCount(0).build());
@@ -381,18 +419,75 @@ public class TicketListingService {
     }
 
     @Transactional
-    public SagaResponse acceptGift(String actorId, String sagaId, String token) {
+    public SagaResponse acceptGift(String actorId, String authorization, String sagaId, String token) {
         TicketTransfer transfer = transferRepository.findBySagaId(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         MarketplaceSaga saga = sagaRepository.findById(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (saga.getState() != SagaState.WAITING_RECIPIENT || token == null || transfer.getInvitationExpiresAt() == null || transfer.getInvitationExpiresAt().isBefore(Instant.now()) || !hashToken(token).equals(transfer.getInvitationTokenHash())) {
+        if (saga.getState() != SagaState.WAITING_RECIPIENT || transfer.getInvitationExpiresAt() == null || transfer.getInvitationExpiresAt().isBefore(Instant.now())
+                || (token != null && !hashToken(token).equals(transfer.getInvitationTokenHash()))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "GIFT_INVITATION_INVALID");
         }
+        if (!actorId.equals(transfer.getToUserId())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GIFT_RECIPIENT_MISMATCH");
+        UserServiceClient.CurrentUser currentUser = userServiceClient.getCurrentUser(authorization);
+        if (currentUser == null || !transfer.getRecipientEmail().equalsIgnoreCase(currentUser.email())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GIFT_RECIPIENT_MISMATCH");
         transfer.setToUserId(actorId); transferRepository.save(transfer); saga.setState(SagaState.WAITING_TRANSFER); saga.setStep("TRANSFER_REQUESTED"); sagaRepository.save(saga);
         Map<String, Object> command = new LinkedHashMap<>(); command.put("messageId", UUID.randomUUID().toString()); command.put("sagaId", sagaId); command.put("operationId", sagaId + ":TRANSFER"); command.put("ticketId", transfer.getTicketId()); command.put("fromUserId", transfer.getFromUserId()); command.put("toUserId", actorId); command.put("lockOperationId", sagaId);
         try {
             outboxRepository.save(OutboxEvent.builder().aggregateType("TICKET_TRANSFER").aggregateId(transfer.getId()).eventType("TICKET_OWNERSHIP_TRANSFER_REQUESTED").topic("haloticket.ticket.ownership.transfer.requested.v1").payload(objectMapper.writeValueAsString(command)).status(OutboxStatus.PENDING).retryCount(0).build());
         } catch (JsonProcessingException exception) { throw new IllegalStateException("Could not create transfer command", exception); }
         return toResponse(saga);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> giftInvitation(String actorId, String sagaId, String token) {
+        TicketTransfer transfer = transferRepository.findBySagaId(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        MarketplaceSaga saga = sagaRepository.findById(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!actorId.equals(transfer.getToUserId()) || (token != null && !hashToken(token).equals(transfer.getInvitationTokenHash()))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GIFT_RECIPIENT_MISMATCH");
+        }
+        try {
+            var payload = objectMapper.readTree(saga.getPayload());
+            Map<String, Object> result = new LinkedHashMap<>();
+            for (String key : java.util.List.of("ticketId", "eventId", "ticketTypeName", "section", "row", "seat", "message")) {
+                result.put(key, payload.path(key).asText(""));
+            }
+            result.put("recipientEmail", transfer.getRecipientEmail());
+            result.put("expiresAt", transfer.getInvitationExpiresAt());
+            result.put("state", saga.getState());
+            String fromUserId = transfer.getFromUserId();
+            result.put("senderUserId", fromUserId);
+            try {
+                var sender = userServiceClient.getUserDisplayName(fromUserId);
+                result.put("senderName", sender != null ? sender.fullName() : null);
+            } catch (Exception ignored) { result.put("senderName", null); }
+            return result;
+        } catch (JsonProcessingException exception) { throw new IllegalStateException(exception); }
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.List<Map<String, Object>> myGiftInvitations(String actorId) {
+        java.util.List<Map<String, Object>> result = new java.util.ArrayList<>();
+        for (TicketTransfer transfer : transferRepository.findByToUserIdAndStatusOrderByCreatedAtDesc(actorId, TransferStatus.PENDING)) {
+            if (transfer.getInvitationExpiresAt() == null || transfer.getInvitationExpiresAt().isBefore(Instant.now())) continue;
+            MarketplaceSaga saga = sagaRepository.findById(transfer.getSagaId()).orElse(null);
+            if (saga == null || saga.getState() != SagaState.WAITING_RECIPIENT) continue;
+            try {
+                var payload = objectMapper.readTree(saga.getPayload());
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("sagaId", saga.getId());
+                item.put("eventId", payload.path("eventId").asText(""));
+                item.put("ticketTypeName", payload.path("ticketTypeName").asText("Vé sự kiện"));
+                item.put("section", payload.path("section").asText(""));
+                item.put("row", payload.path("row").asText(""));
+                item.put("seat", payload.path("seat").asText(""));
+                item.put("expiresAt", transfer.getInvitationExpiresAt());
+                try {
+                    var sender = userServiceClient.getUserDisplayName(transfer.getFromUserId());
+                    item.put("senderName", sender != null ? sender.fullName() : null);
+                } catch (Exception ignored) { item.put("senderName", null); }
+                result.add(item);
+            } catch (JsonProcessingException exception) { throw new IllegalStateException(exception); }
+        }
+        return result;
     }
 
     @Transactional
