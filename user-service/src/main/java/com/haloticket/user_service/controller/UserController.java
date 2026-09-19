@@ -34,7 +34,7 @@ public class UserController {
     public GiftRecipient giftRecipient(@RequestParam String email) {
         var user = users.findByEmail(email.trim().toLowerCase(java.util.Locale.ROOT))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "RECIPIENT_NOT_FOUND"));
-        if (!Boolean.TRUE.equals(user.getIsActive())) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "RECIPIENT_NOT_FOUND");
+        if (!com.haloticket.user_service.enums.UserStatus.ACTIVE.equals(user.getStatus())) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "RECIPIENT_NOT_FOUND");
         return new GiftRecipient(user.getKeycloakId(), user.getEmail(), user.getFullName());
     }
 

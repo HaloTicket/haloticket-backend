@@ -7,6 +7,7 @@ import com.haloticket.event_service.repository.*;
 import com.haloticket.event_service.service.impl.EventServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
@@ -27,12 +28,11 @@ class EventServiceImplTest {
     @Mock UserServiceClient userClient;
     @Mock StaffAssignmentRepository staffAssignmentRepository;
 
+    @InjectMocks
+    EventServiceImpl service;
+
     @Test
     void createEventRejectsUnverifiedOrganizerBeforeWritingAnything() {
-        EventServiceImpl service = new EventServiceImpl(
-                eventRepository, categoryRepository, organizerRepository, searchLogRepository,
-                ticketClient, paymentClient, userClient, staffAssignmentRepository
-        );
         EventCreateRequest request = new EventCreateRequest();
         request.setUserId("spoofed-user");
         when(userClient.getOrganizerEligibility("Bearer token"))

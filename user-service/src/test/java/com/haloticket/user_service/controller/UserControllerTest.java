@@ -5,6 +5,7 @@ import com.haloticket.user_service.dto.response.UserResponse;
 import com.haloticket.user_service.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mock;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -34,9 +35,12 @@ class UserControllerTest {
             .build();
     private MockMvc mockMvc;
 
+    @Mock
+    private com.haloticket.user_service.repository.UserRepository userRepository;
+
     @BeforeEach
     void setUp() {
-        UserController controller = new UserController(userService);
+        UserController controller = new UserController(userService, userRepository);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setCustomArgumentResolvers(new JwtArgumentResolver(jwt))
                 .build();
