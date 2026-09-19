@@ -36,9 +36,6 @@ public class User {
     @Column(name = "avatar_url")
     private String avatarUrl;
 
-    @Column(name = "is_active")
-    private Boolean isActive;
-
     @Enumerated(EnumType.STRING)
     private Gender gender;
 

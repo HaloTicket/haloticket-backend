@@ -15,12 +15,16 @@ import com.haloticket.event_service.entity.Event;
 import com.haloticket.event_service.entity.EventCategory;
 import com.haloticket.event_service.entity.EventOrganizer;
 import com.haloticket.event_service.entity.SearchLog;
+import com.haloticket.event_service.entity.StaffAssignment;
 import com.haloticket.event_service.enums.EventApprovalStatus;
 import com.haloticket.event_service.enums.EventStatus;
+import com.haloticket.event_service.enums.StaffRole;
+import com.haloticket.event_service.enums.StaffAssignmentStatus;
 import com.haloticket.event_service.repository.EventCategoryRepository;
 import com.haloticket.event_service.repository.EventOrganizerRepository;
 import com.haloticket.event_service.repository.EventRepository;
 import com.haloticket.event_service.repository.SearchLogRepository;
+import com.haloticket.event_service.repository.StaffAssignmentRepository;
 import com.haloticket.event_service.service.EventService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -49,6 +53,7 @@ public class EventServiceImpl implements EventService {
     private final TicketServiceClient ticketServiceClient;
     private final PaymentServiceClient paymentServiceClient;
     private final UserServiceClient userServiceClient;
+    private final StaffAssignmentRepository staffAssignmentRepository;
 
     @Autowired(required = false)
     private NotificationServiceClient notificationServiceClient;
@@ -99,6 +104,21 @@ public class EventServiceImpl implements EventService {
 
         organizer = eventOrganizerRepository.save(organizer);
         organizers.add(organizer);
+
+        // auto create OWNER StaffAssignment
+        if (eventToSave.getId() == null) {
+            StaffAssignment staff = StaffAssignment.builder()
+                    .event(eventToSave)
+                    .userId(uid)
+                    .name(request.getOrganizerName())
+                    .role(StaffRole.OWNER)
+                    .status(StaffAssignmentStatus.ACTIVE)
+                    .build();
+            if (eventToSave.getStaffAssignments() == null) {
+                eventToSave.setStaffAssignments(new java.util.ArrayList<>());
+            }
+            eventToSave.getStaffAssignments().add(staff);
+        }
 
         // find category
         EventCategory category = null;
@@ -415,6 +435,15 @@ public class EventServiceImpl implements EventService {
                 .tickets(ticketsObj)
                 .customQuestions(customQuestionsObj)
                 .organizer(organizerDto)
+                .staffAssignments(staffAssignmentRepository.findByEventId(event.getId()).stream()
+                        .map(a -> com.haloticket.event_service.dto.response.EventMemberResponse.builder()
+                                .id(a.getId())
+                                .name(a.getName())
+                                .email(a.getEmail())
+                                .role(a.getRole())
+                                .status(a.getStatus().name())
+                                .build())
+                        .collect(Collectors.toList()))
                 .build();
     }
 

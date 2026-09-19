@@ -25,12 +25,13 @@ class EventServiceImplTest {
     @Mock TicketServiceClient ticketClient;
     @Mock PaymentServiceClient paymentClient;
     @Mock UserServiceClient userClient;
+    @Mock StaffAssignmentRepository staffAssignmentRepository;
 
     @Test
     void createEventRejectsUnverifiedOrganizerBeforeWritingAnything() {
         EventServiceImpl service = new EventServiceImpl(
                 eventRepository, categoryRepository, organizerRepository, searchLogRepository,
-                ticketClient, paymentClient, userClient
+                ticketClient, paymentClient, userClient, staffAssignmentRepository
         );
         EventCreateRequest request = new EventCreateRequest();
         request.setUserId("spoofed-user");

@@ -9,11 +9,14 @@ import com.haloticket.user_service.enums.Role;
 import com.haloticket.user_service.enums.UserStatus;
 import com.haloticket.user_service.repository.UserRepository;
 import com.haloticket.user_service.service.UserService;
+import com.haloticket.user_service.dto.request.UserInviteRequest;
+import com.haloticket.user_service.dto.response.UserInviteResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import com.haloticket.user_service.service.KeycloakAuthPort;
 
 import java.net.URI;
 import java.time.LocalDateTime;
@@ -28,6 +31,7 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final JwtRoleConverter jwtRoleConverter;
+    private final KeycloakAuthPort keycloakAuthPort;
 
     @Override
     public UserResponse createUser(UserCreateRequest request) {
@@ -45,7 +49,6 @@ public class UserServiceImpl implements UserService {
                 .phoneNumber(request.getPhoneNumber())
                 .gender(request.getGender())
                 .roles(request.getRoles())
-                .isActive(true)
                 .status(UserStatus.ACTIVE)
                 .build();
         return toResponse(userRepository.save(user));
@@ -103,7 +106,6 @@ public class UserServiceImpl implements UserService {
                 user = User.builder()
                         .keycloakId(keycloakId)
                         .email(targetEmail)
-                        .isActive(true)
                         .status(UserStatus.ACTIVE)
                         .build();
             }
@@ -143,8 +145,8 @@ public class UserServiceImpl implements UserService {
         }
 
         user.setLastLoginAt(LocalDateTime.now());
-        if (user.getIsActive() == null) {
-            user.setIsActive(true);
+        if (user.getStatus() == null) {
+            user.setStatus(UserStatus.ACTIVE);
         }
         if (user.getStatus() == null) {
             user.setStatus(UserStatus.ACTIVE);
@@ -173,6 +175,67 @@ public class UserServiceImpl implements UserService {
         return toResponse(userRepository.save(user));
     }
 
+    private UserResponse mapToUserResponse(User user) {
+        return UserResponse.builder()
+                .id(user.getId())
+                .keycloakId(user.getKeycloakId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .phoneNumber(user.getPhoneNumber())
+                .gender(user.getGender())
+                .roles(user.getRoles())
+                .avatarUrl(user.getAvatarUrl())
+                .status(user.getStatus())
+                .createdAt(user.getCreatedAt())
+                .build();
+    }
+
+    @Override
+    public UserResponse getUserById(String id) {
+        return userRepository.findById(id)
+                .map(this::mapToUserResponse)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+    }
+
+    @Override
+    public UserInviteResponse inviteUser(UserInviteRequest request) {
+        Optional<User> existingUser = userRepository.findByEmail(request.getEmail());
+        if (existingUser.isPresent()) {
+            User user = existingUser.get();
+            return UserInviteResponse.builder()
+                    .userId(user.getId())
+                    .email(user.getEmail())
+                    .name(user.getFullName())
+                    .avatar(user.getAvatarUrl())
+                    .isNewUser(false)
+                    .build();
+        }
+
+        // generate a random password
+        String generatedPassword = request.getEmail().split("@")[0] + "@123";
+        
+        // register in Keycloak
+        try {
+            keycloakAuthPort.register(request.getEmail(), generatedPassword);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to create user in Keycloak: " + e.getMessage());
+        }
+
+        // fetch the newly created user
+        User newUser = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User creation failed"));
+        
+        // return response
+        return UserInviteResponse.builder()
+                .userId(newUser.getId())
+                .email(newUser.getEmail())
+                .name(newUser.getFullName())
+                .avatar(newUser.getAvatarUrl())
+                .isNewUser(true)
+                .generatedPassword(generatedPassword)
+                .build();
+    }
+
     private UserResponse toResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())
@@ -181,7 +244,6 @@ public class UserServiceImpl implements UserService {
                 .fullName(user.getFullName())
                 .phoneNumber(user.getPhoneNumber())
                 .avatarUrl(user.getAvatarUrl())
-                .isActive(user.getIsActive())
                 .gender(user.getGender())
                 .status(user.getStatus())
                 .roles(user.getRoles())

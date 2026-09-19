@@ -44,7 +44,6 @@ class UserServiceApplicationTests {
 				.keycloakId(identityId)
 				.email(email)
 				.fullName("Original Name")
-				.isActive(true)
 				.status(UserStatus.ACTIVE)
 				.build());
 

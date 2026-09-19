@@ -4,5 +4,6 @@ public enum NotificationType {
     TICKET_CONFIRMATION,
     EVENT_REMINDER,
     SYSTEM_ALERT,
-    EKYC_RESULT
+    EKYC_RESULT,
+    EVENT_MEMBER_INVITATION
 }

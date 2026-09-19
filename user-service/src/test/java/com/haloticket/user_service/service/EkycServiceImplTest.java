@@ -72,7 +72,7 @@ class EkycServiceImplTest {
         user = User.builder()
                 .id("user-1")
                 .keycloakId("kc-1")
-                .isActive(true)
+                .status(UserStatus.ACTIVE)
                 .status(UserStatus.ACTIVE)
                 .roles(new HashSet<>(Set.of(Role.CUSTOMER)))
                 .build();

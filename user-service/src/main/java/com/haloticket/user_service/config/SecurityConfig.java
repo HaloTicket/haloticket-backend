@@ -29,7 +29,7 @@ public class SecurityConfig {
 
     @Bean
     JwtDecoder jwtDecoder() {
-        // Containers fetch keys internally while tokens retain their public issuer.
+        // containers fetch keys internally while tokens retain their public issuer.
         NimbusJwtDecoder decoder = StringUtils.hasText(jwkSetUri)
                 ? NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build()
                 : NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
@@ -47,6 +47,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/**", "/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/v1/internal/**").permitAll() // Internal calls from other microservices
                         .requestMatchers("/api/users/me").authenticated()
                         .anyRequest().authenticated()
                 )

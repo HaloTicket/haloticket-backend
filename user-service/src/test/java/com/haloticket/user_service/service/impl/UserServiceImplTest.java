@@ -12,6 +12,7 @@ import com.haloticket.user_service.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.server.ResponseStatusException;
+import com.haloticket.user_service.service.KeycloakAuthPort;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +27,9 @@ import static org.mockito.Mockito.when;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class UserServiceImplTest {
+    private final UserRepository userRepository = mock(UserRepository.class);
+    private final KeycloakAuthPort keycloakAuthPort = mock(KeycloakAuthPort.class);
+    private final UserServiceImpl service = new UserServiceImpl(userRepository, new JwtRoleConverter(), keycloakAuthPort);
 
     @Test
     void googlePictureIsDefaultButDoesNotReplaceUploadedAvatar() {
@@ -51,8 +55,7 @@ class UserServiceImplTest {
         assertThat(service.syncCurrentUser(jwt).getAvatarUrl()).isNull();
     }
 
-    private final UserRepository userRepository = mock(UserRepository.class);
-    private final UserServiceImpl service = new UserServiceImpl(userRepository, new JwtRoleConverter());
+    
 
     @Test
     void syncCurrentUserCreatesUserFromJwtWhenMissing() {
@@ -75,7 +78,7 @@ class UserServiceImplTest {
         assertThat(response.getFullName()).isEqualTo("Customer HaloTicket");
         assertThat(response.getRoles()).containsExactly(Role.CUSTOMER);
         assertThat(response.getStatus()).isEqualTo(UserStatus.ACTIVE);
-        assertThat(response.getIsActive()).isTrue();
+        assertThat(response.getStatus()).isEqualTo(UserStatus.ACTIVE);
     }
 
     @Test
@@ -140,7 +143,7 @@ class UserServiceImplTest {
                 .keycloakId("kc-123")
                 .email("user@example.com")
                 .fullName("Manually Updated Name")
-                .isActive(true)
+                .status(UserStatus.ACTIVE)
                 .status(UserStatus.ACTIVE)
                 .build();
 
@@ -167,7 +170,7 @@ class UserServiceImplTest {
                 .keycloakId("kc-123")
                 .email("user@example.com")
                 .fullName("Name Saved From Profile")
-                .isActive(true)
+                .status(UserStatus.ACTIVE)
                 .status(UserStatus.ACTIVE)
                 .build();
 
@@ -193,7 +196,7 @@ class UserServiceImplTest {
                 .keycloakId("kc-123")
                 .email("user@example.com")
                 .fullName("Old Name")
-                .isActive(true)
+                .status(UserStatus.ACTIVE)
                 .status(UserStatus.ACTIVE)
                 .roles(Set.of(Role.CUSTOMER))
                 .build();
@@ -230,7 +233,7 @@ class UserServiceImplTest {
 
         assertThat(response.getKeycloakId()).isEqualTo("kc-123");
         assertThat(response.getStatus()).isEqualTo(UserStatus.ACTIVE);
-        assertThat(response.getIsActive()).isTrue();
+        assertThat(response.getStatus()).isEqualTo(UserStatus.ACTIVE);
     }
 
     @Test

@@ -12,7 +12,6 @@ import com.haloticket.user_service.enums.Role;
 import com.haloticket.user_service.enums.UserStatus;
 import com.haloticket.user_service.repository.UserRepository;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.LinkedMultiValueMap;
@@ -352,7 +351,6 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
                 .keycloakId(keycloakId)
                 .email(email)
                 .fullName(fullName)
-                .isActive(true)
                 .status(UserStatus.ACTIVE)
                 .roles(Set.of(Role.CUSTOMER))
                 .build();

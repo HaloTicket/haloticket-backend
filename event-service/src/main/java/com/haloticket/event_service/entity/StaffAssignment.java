@@ -1,5 +1,6 @@
 package com.haloticket.event_service.entity;
 
+import com.haloticket.event_service.enums.StaffRole;
 import com.haloticket.event_service.enums.StaffAssignmentStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -23,6 +24,13 @@ public class StaffAssignment {
 
     @Column(name = "user_id", nullable = false)
     private String userId; // Link sang User Service
+
+    private String email;
+
+    private String name;
+
+    @Enumerated(EnumType.STRING)
+    private StaffRole role;
 
     @Enumerated(EnumType.STRING)
     private StaffAssignmentStatus status;

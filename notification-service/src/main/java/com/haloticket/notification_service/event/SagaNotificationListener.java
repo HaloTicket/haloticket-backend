@@ -35,13 +35,14 @@ public class SagaNotificationListener {
     private final NotificationService notificationService;
     private final JavaMailSender mailSender;
     private final EmailTemplateRenderer templateRenderer;
+    private final NotificationTemplateRepository templateRepository;
 
     @Value("${notification.gift-accept-base-url:http://localhost:5173/gifts/accept}")
     private String giftAcceptBaseUrl;
     @Value("${notification.mail.from:no-reply@haloticket.local}")
     private String mailFrom;
-
-    private final NotificationTemplateRepository templateRepository;
+    @Value("${notification.mail.from:no-reply@haloticket.local}")
+    private String fromAddress;
 
     @KafkaListener(topics = "haloticket.booking.confirmed.v1", groupId = "notification-service-saga")
     public void handleBookingConfirmedNotification(String payload) {
@@ -51,6 +52,7 @@ public class SagaNotificationListener {
             String bookingCode = node.has("bookingCode") ? node.get("bookingCode").asText() : "";
             String customerEmail = node.has("customerEmail") ? node.get("customerEmail").asText() : "";
             String customerName = node.has("customerName") ? node.get("customerName").asText() : "";
+            String customerId = node.has("customerId") ? node.get("customerId").asText() : "";
             
             if (customerEmail == null || customerEmail.isBlank()) {
                 log.warn("Cannot send confirmation email, missing customerEmail for booking: {}", bookingCode);
@@ -67,9 +69,10 @@ public class SagaNotificationListener {
                 Map<String, String> vars = new HashMap<>();
                 vars.put("fullName", customerName != null && !customerName.isBlank() ? customerName : "Quý khách");
                 vars.put("bookingCode", bookingCode);
+                vars.put("customerId", customerId);
                 
                 String eventId = node.has("eventId") ? node.get("eventId").asText() : "";
-                vars.put("eventId", eventId);
+                vars.put("eventId", eventId); // just in case template uses it
                 
                 emailSender.send(template, customerEmail, vars);
                 log.info("Sent order confirmation email to {} for booking {}", customerEmail, bookingCode);
@@ -109,7 +112,7 @@ public class SagaNotificationListener {
                 return;
             }
 
-            // 1. Save notification to DB + broadcast via STOMP (most important)
+            // 1. save notification to DB + broadcast via STOMP (most important)
             try {
                 notificationService.publishDirectNotification(recipientUserId, "GIFT_INVITATION",
                         "Lời mời tặng vé", "Bạn có lời mời nhận vé. Mã lời mời: " + sagaId);
@@ -118,7 +121,7 @@ public class SagaNotificationListener {
                 log.error("Failed to save gift notification for saga {}", sagaId, notifError);
             }
 
-            // 2. Send beautiful HTML email (best-effort, failure does not block notification)
+            // 2. send beautiful HTML email (best-effort, failure does not block notification)
             try {
                 String link = giftAcceptBaseUrl + "?sagaId=" + URLEncoder.encode(sagaId, StandardCharsets.UTF_8)
                         + "&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
@@ -154,7 +157,7 @@ public class SagaNotificationListener {
                             + giftMessage.replace("<", "&lt;").replace(">", "&gt;") + "\"</p></div>";
                 }
 
-                // Format expiresAt nicely (e.g. 15:30 ngày 20/09/2026)
+                // format expiresAt nicely (e.g. 15:30 ngày 20/09/2026)
                 String expiresAtRaw = node.path("expiresAt").asText("");
                 String expiresAtFormatted = expiresAtRaw;
                 try {
@@ -179,7 +182,7 @@ public class SagaNotificationListener {
                 MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, false, "UTF-8");
                 helper.setFrom(mailFrom);
                 helper.setTo(email);
-                helper.setSubject("🎁 Bạn có lời mời nhận vé từ " + senderName + " trên HaloTicket");
+                helper.setSubject("Bạn có lời mời nhận vé từ " + senderName + " trên HaloTicket");
                 helper.setText(html, true);
 
                 mailSender.send(mimeMessage);
@@ -188,7 +191,6 @@ public class SagaNotificationListener {
                 log.error("Gift invitation email failed for saga {}", sagaId, emailError);
             }
         } catch (Exception exception) {
-            // Do NOT throw — let Kafka commit the offset to avoid infinite retry loop
             log.error("Could not process gift invitation event, skipping", exception);
         }
     }
@@ -222,5 +224,58 @@ public class SagaNotificationListener {
         String recipient = node.hasNonNull("recipientEmail") ? node.get("recipientEmail").asText() : node.path("sellerId").asText(null);
         if (recipient == null || recipient.isBlank()) return;
         notificationService.publishDirectNotification(recipient, type, title, message);
+    }
+
+    @KafkaListener(topics = "notification.event.member.invitation", groupId = "notification-service-saga")
+    public void onEventMemberInvitation(String payloadStr) {
+        try {
+            Map<String, Object> payload = objectMapper.readValue(payloadStr, Map.class);
+            
+            String email = (String) payload.get("email");
+            if (email == null) return;
+            
+            // build variables map for EmailTemplateRenderer
+            Map<String, String> variables = new HashMap<>();
+            variables.put("name", String.valueOf(payload.get("name")));
+            variables.put("eventTitle", String.valueOf(payload.get("eventTitle")));
+            variables.put("eventId", String.valueOf(payload.get("eventId")));
+            
+            String role = (String) payload.get("role");
+            String roleDisplayName = role;
+            if ("OWNER".equals(role)) roleDisplayName = "Chủ sự kiện";
+            else if ("ADMIN".equals(role)) roleDisplayName = "Quản trị viên";
+            else if ("MANAGER".equals(role)) roleDisplayName = "Quản lý";
+            else if ("CHECKIN_STAFF".equals(role)) roleDisplayName = "Nhân viên Check-in";
+            variables.put("role", roleDisplayName);
+            
+            Boolean isNewUser = (Boolean) payload.get("isNewUser");
+            if (isNewUser != null && isNewUser) {
+                String generatedPassword = String.valueOf(payload.get("generatedPassword"));
+                String newUserContent = "<div style=\"margin-top:20px;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e3eaf4;\">\n" +
+                        "    <p style=\"margin-top:0;\">Hệ thống đã tự động tạo tài khoản cho bạn để có thể tham gia quản lý sự kiện này.</p>\n" +
+                        "    <p style=\"margin-bottom:0;\"><strong>Mật khẩu đăng nhập tạm thời:</strong> <span style=\"font-family:monospace;font-size:16px;background:#e3eaf4;padding:2px 6px;border-radius:4px;\">" + generatedPassword + "</span></p>\n" +
+                        "    <p style=\"font-size:12px;color:#667085;margin-bottom:0;\">(Vui lòng đăng nhập và đổi mật khẩu sau khi truy cập)</p>\n" +
+                        "</div>";
+                variables.put("newUserContent", newUserContent);
+            } else {
+                variables.put("newUserContent", "");
+            }
+
+            // process template
+            String htmlContent = templateRenderer.render("event-member-invitation.html", variables);
+
+            // send email
+            jakarta.mail.internet.MimeMessage message = mailSender.createMimeMessage();
+            org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(message, true, "UTF-8");
+            
+            helper.setFrom(fromAddress);
+            helper.setTo(email);
+            helper.setSubject("Lời mời tham gia Ban tổ chức sự kiện - HaloTicket");
+            helper.setText(htmlContent, true);
+            
+            mailSender.send(message);
+        } catch (Exception e) {
+            log.error("Failed to process event member invitation: {}", e.getMessage(), e);
+        }
     }
 }
