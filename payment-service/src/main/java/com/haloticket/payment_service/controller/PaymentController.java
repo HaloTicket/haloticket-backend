@@ -1,6 +1,7 @@
 package com.haloticket.payment_service.controller;
 
 import com.haloticket.payment_service.client.UserServiceClient;
+import com.haloticket.payment_service.config.SePayConfig;
 import com.haloticket.payment_service.dto.request.OrganizerPayoutAccountRequest;
 import com.haloticket.payment_service.dto.request.PaymentCreateRequest;
 import com.haloticket.payment_service.dto.response.OrganizerPayoutAccountResponse;
@@ -10,6 +11,7 @@ import com.haloticket.payment_service.service.PaymentService;
 import com.haloticket.payment_service.service.VNPayService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +28,10 @@ public class PaymentController {
     private final PaymentService paymentService;
     private final UserServiceClient userServiceClient;
     private final VNPayService vnPayService;
+    private final SePayConfig sePayConfig;
+
+    @Value("${payment.sandbox-return-confirmation-enabled:false}")
+    private boolean sandboxReturnConfirmationEnabled;
 
     @PostMapping
     public ResponseEntity<PaymentResponse> createPayment(@RequestBody PaymentCreateRequest request) {
@@ -61,7 +67,15 @@ public class PaymentController {
     }
 
     @PostMapping("/sepay/webhook")
-    public ResponseEntity<Map<String, String>> sepayWebhook(@RequestBody Map<String, Object> webhookData) {
+    public ResponseEntity<Map<String, String>> sepayWebhook(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody Map<String, Object> webhookData) {
+        String expected = "Apikey " + sePayConfig.getApiKey();
+        if (authorization == null || !java.security.MessageDigest.isEqual(
+                authorization.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                expected.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
         return ResponseEntity.ok(paymentService.processSepayWebhook(webhookData));
     }
 
@@ -75,8 +89,10 @@ public class PaymentController {
     }
 
     @PostMapping("/momo/ipn")
-    public ResponseEntity<Map<String, String>> momoIpn(@RequestParam Map<String, String> allParams) {
-        return ResponseEntity.ok(paymentService.processMoMoIpn(allParams));
+    public ResponseEntity<Map<String, String>> momoIpn(@RequestBody Map<String, Object> callbackData) {
+        Map<String, String> params = new HashMap<>();
+        callbackData.forEach((key, value) -> params.put(key, value == null ? "" : String.valueOf(value)));
+        return ResponseEntity.ok(paymentService.processMoMoIpn(params));
     }
 
     // 4. ZaloPay
@@ -115,6 +131,17 @@ public class PaymentController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/sandbox/confirm-return")
+    public ResponseEntity<PaymentResponse> confirmSandboxReturn(
+            @RequestParam("bookingId") String bookingId,
+            @RequestParam("provider") String provider) {
+        if (!sandboxReturnConfirmationEnabled) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        PaymentResponse response = paymentService.confirmSandboxReturn(bookingId, provider);
+        return response == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(response);
     }
 
     @PostMapping("/organizer-payout-account")

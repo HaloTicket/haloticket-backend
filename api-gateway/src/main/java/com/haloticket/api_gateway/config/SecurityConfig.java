@@ -69,10 +69,16 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
+                        .pathMatchers("/ws/**", "/api/payments/vnpay/ipn", "/api/payments/momo/ipn", "/api/payments/zalopay/ipn", "/api/payments/sepay/webhook").permitAll()
                         .pathMatchers("/eureka/**", "/actuator/**").permitAll()
-                        .pathMatchers("/api/events/**", "/api/tickets/**", "/api/media/**", "/api/marketplace/**",
+                        .pathMatchers("/api/events/**", "/api/tickets/**", "/api/media/**",
                                 "/api/v1/**", "/ws-notifications/**")
                         .permitAll()
+                        .pathMatchers("/api/marketplace/listings/me", "/api/marketplace/sagas/**").authenticated()
+                        .pathMatchers(HttpMethod.GET,
+                                "/api/marketplace/events", "/api/marketplace/events/**",
+                                "/api/marketplace/listings", "/api/marketplace/listings/*").permitAll()
+                        .pathMatchers("/api/marketplace/**").authenticated()
                         .pathMatchers("/api/users/me").authenticated()
                         .pathMatchers("/api/users/**", "/api/bookings/**", "/api/payments/**", "/api/notifications/**")
                         .authenticated()

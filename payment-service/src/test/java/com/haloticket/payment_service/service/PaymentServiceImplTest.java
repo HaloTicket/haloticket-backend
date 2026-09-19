@@ -3,6 +3,10 @@ package com.haloticket.payment_service.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haloticket.payment_service.dto.request.OrganizerPayoutAccountRequest;
 import com.haloticket.payment_service.entity.OrganizerPayoutAccount;
+import com.haloticket.payment_service.entity.Payment;
+import com.haloticket.payment_service.enums.PaymentMethod;
+import com.haloticket.payment_service.enums.PaymentProvider;
+import com.haloticket.payment_service.enums.PaymentStatus;
 import com.haloticket.payment_service.enums.PayoutAccountVerificationStatus;
 import com.haloticket.payment_service.repository.OrganizerPayoutAccountRepository;
 import com.haloticket.payment_service.repository.OutboxEventRepository;
@@ -20,6 +24,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -111,6 +116,29 @@ class PaymentServiceImplTest {
         assertThat(existing.getVerificationReference()).isNull();
         assertThat(existing.getVerifiedAt()).isNull();
         assertThat(existing.getAccountVersion()).isEqualTo(4L);
+    }
+
+    @Test
+    void sandboxReturnConfirmsPendingPaymentAndPublishesCompletionOnce() throws Exception {
+        Payment payment = Payment.builder()
+                .id("payment-1")
+                .bookingId("transaction-1")
+                .amount(320000D)
+                .method(PaymentMethod.MOMO)
+                .provider(PaymentProvider.MOMO_GATEWAY)
+                .status(PaymentStatus.PENDING)
+                .build();
+        when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc("transaction-1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        PaymentServiceImpl service = createService();
+
+        var first = service.confirmSandboxReturn("transaction-1", "momo");
+        var second = service.confirmSandboxReturn("transaction-1", "momo");
+
+        assertThat(first.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        assertThat(second.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(outboxEventRepository, times(1)).save(any());
     }
 
     private OrganizerPayoutAccountRequest request(String number, String holder) {

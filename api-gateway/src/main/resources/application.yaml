@@ -44,6 +44,11 @@ spring:
           predicates:
             - Path=/api/tickets/**
 
+        - id: marketplace-service
+          uri: lb://MARKETPLACE-SERVICE
+          predicates:
+            - Path=/api/marketplace/**
+
         - id: booking-service
           uri: lb://BOOKING-SERVICE
           predicates:
@@ -53,6 +58,11 @@ spring:
           uri: lb://BOOKING-SERVICE
           predicates:
             - Path=/api/seats/**
+
+        - id: booking-service-websocket
+          uri: lb://BOOKING-SERVICE
+          predicates:
+            - Path=/ws/**
 
         - id: payment-service
           uri: lb://PAYMENT-SERVICE

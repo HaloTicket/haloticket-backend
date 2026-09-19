@@ -26,4 +26,5 @@ public interface PaymentService {
     Map<String, String> processShopeePayIpn(Map<String, Object> callbackData);
 
     PaymentResponse getPaymentStatusByBookingId(String bookingId);
+    PaymentResponse confirmSandboxReturn(String bookingId, String provider);
 }

@@ -291,8 +291,32 @@ services:
       <<: *environment
       SERVER_PORT: "8083"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ticket_db
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-haloticket-realm}/protocol/openid-connect/certs
     depends_on:
       <<: *dependencies
+
+  marketplace-service:
+    <<: *runtime
+    mem_limit: ${MARKETPLACE_MEMORY_LIMIT:-300m}
+    container_name: haloticket-marketplace-service
+    image: haloticket/marketplace-service:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: marketplace-service
+    ports: ["${SERVICE_BIND_ADDRESS:-127.0.0.1}:${MARKETPLACE_SERVICE_PORT:-8088}:8088"]
+    environment:
+      <<: *environment
+      SERVER_PORT: "8088"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/marketplace_db
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-haloticket-realm}/protocol/openid-connect/certs
+    depends_on:
+      <<: *dependencies
+      kafka:
+        condition: service_healthy
 
   booking-service:
     <<: *runtime
@@ -335,9 +359,18 @@ services:
       VNPAY_HASH_SECRET: ${VNPAY_HASH_SECRET:-AXYZ12345678909876543210ABCDEFGH}
       VNPAY_URL: ${VNPAY_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
       VNPAY_RETURN_URL: ${VNPAY_RETURN_URL:-http://localhost:5173/payment/callback}
+      MOMO_ENDPOINT: ${MOMO_ENDPOINT:-https://test-payment.momo.vn/v2/gateway/api/create}
+      MOMO_REDIRECT_URL: ${MOMO_REDIRECT_URL:-http://localhost:5173/payment/callback}
+      MOMO_IPN_URL: ${MOMO_IPN_URL:-http://localhost:8888/api/payments/momo/ipn}
+      ZALOPAY_ENDPOINT: ${ZALOPAY_ENDPOINT:-https://sb-openapi.zalopay.vn/v2/create}
+      ZALOPAY_REDIRECT_URL: ${ZALOPAY_REDIRECT_URL:-http://localhost:5173/payment/callback}
+      ZALOPAY_IPN_URL: ${ZALOPAY_IPN_URL:-http://localhost:8888/api/payments/zalopay/ipn}
+      SHOPEEPAY_REDIRECT_URL: ${SHOPEEPAY_REDIRECT_URL:-http://localhost:5173/payment/callback}
+      SHOPEEPAY_IPN_URL: ${SHOPEEPAY_IPN_URL:-http://localhost:8888/api/payments/shopeepay/ipn}
       SEPAY_API_KEY: ${SEPAY_API_KEY:-}
-      SEPAY_ACCOUNT_NO: ${SEPAY_ACCOUNT_NO:-}
-      SEPAY_BANK_NAME: ${SEPAY_BANK_NAME:-}
+      SEPAY_ACCOUNT_NO: ${SEPAY_ACCOUNT_NO:-0901234567}
+      SEPAY_BANK_NAME: ${SEPAY_BANK_NAME:-MB}
+      SEPAY_ACCOUNT_NAME: ${SEPAY_ACCOUNT_NAME:-CONG TY TNHH HALOTICKET}
       SEPAY_WEBHOOK_SECRET: ${SEPAY_WEBHOOK_SECRET:-}
       MOMO_PARTNER_CODE: ${MOMO_PARTNER_CODE:-}
       MOMO_ACCESS_KEY: ${MOMO_ACCESS_KEY:-}
@@ -347,6 +380,7 @@ services:
       ZALOPAY_KEY2: ${ZALOPAY_KEY2:-}
       SHOPEEPAY_PARTNER_ID: ${SHOPEEPAY_PARTNER_ID:-}
       SHOPEEPAY_SECRET_KEY: ${SHOPEEPAY_SECRET_KEY:-}
+      PAYMENT_SANDBOX_RETURN_CONFIRMATION_ENABLED: ${PAYMENT_SANDBOX_RETURN_CONFIRMATION_ENABLED:-false}
     depends_on:
       <<: *dependencies
 
@@ -372,6 +406,7 @@ services:
       SMTP_FROM: ${SMTP_FROM:-no-reply@haloticket.local}
       SMTP_AUTH: ${SMTP_AUTH:-true}
       SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+      NOTIFICATION_GIFT_ACCEPT_BASE_URL: ${GIFT_ACCEPT_BASE_URL:-http://localhost:5173/gifts/accept}
     depends_on:
       <<: *dependencies
       kafka:
