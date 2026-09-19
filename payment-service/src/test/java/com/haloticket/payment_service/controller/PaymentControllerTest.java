@@ -19,10 +19,11 @@ class PaymentControllerTest {
     @Mock PaymentService paymentService;
     @Mock UserServiceClient userServiceClient;
     @Mock com.haloticket.payment_service.service.VNPayService vnPayService;
+    @Mock com.haloticket.payment_service.config.SePayConfig sePayConfig;
 
     @Test
     void payoutAccountAlwaysUsesAuthenticatedInternalUserId() {
-        PaymentController controller = new PaymentController(paymentService, userServiceClient, vnPayService);
+        PaymentController controller = new PaymentController(paymentService, userServiceClient, vnPayService, sePayConfig);
         OrganizerPayoutAccountRequest request = new OrganizerPayoutAccountRequest();
         request.setOrganizerUserId("spoofed-user");
         request.setAccountNumber("123456789");

@@ -85,11 +85,7 @@ public class ZaloPayService {
             log.warn("Call to ZaloPay API endpoint failed or returned sandbox fallback", e);
         }
 
-        // Production-ready fallback redirect
-        String fallbackUrl = zaloPayConfig.getRedirectUrl() + "?bookingId=" + bookingId + "&provider=zalopay&status=success";
-        result.put("paymentUrl", fallbackUrl);
-        result.put("appTransId", appTransId);
-        return result;
+        throw new IllegalStateException("ZaloPay did not create a payment URL");
     }
 
     public boolean verifyCallback(String data, String requestMac) {

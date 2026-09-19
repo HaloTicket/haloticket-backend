@@ -28,6 +28,7 @@ public class MoMoService {
         String info = orderInfo != null ? orderInfo : "Thanh toan don hang HaloTicket " + orderId;
         String extraData = "";
         String requestType = "captureWallet";
+        String redirectUrl = moMoConfig.getRedirectUrl() + "?bookingId=" + orderId + "&provider=momo";
 
         String rawSignature = String.format(
                 "accessKey=%s&amount=%d&extraData=%s&ipnUrl=%s&orderId=%s&orderInfo=%s&partnerCode=%s&redirectUrl=%s&requestId=%s&requestType=%s",
@@ -38,7 +39,7 @@ public class MoMoService {
                 orderId,
                 info,
                 moMoConfig.getPartnerCode(),
-                moMoConfig.getRedirectUrl(),
+                redirectUrl,
                 requestId,
                 requestType
         );
@@ -53,7 +54,7 @@ public class MoMoService {
         requestBody.put("amount", amount);
         requestBody.put("orderId", orderId);
         requestBody.put("orderInfo", info);
-        requestBody.put("redirectUrl", moMoConfig.getRedirectUrl() + "?bookingId=" + orderId + "&provider=momo");
+        requestBody.put("redirectUrl", redirectUrl);
         requestBody.put("ipnUrl", moMoConfig.getIpnUrl());
         requestBody.put("lang", "vi");
         requestBody.put("requestType", requestType);
@@ -87,11 +88,7 @@ public class MoMoService {
             log.warn("Call to MoMo API endpoint failed or returned sandbox simulation fallback", e);
         }
 
-        // Production-ready fallback redirect to callback page with signed token
-        String fallbackUrl = moMoConfig.getRedirectUrl() + "?bookingId=" + orderId + "&provider=momo&status=success";
-        result.put("paymentUrl", fallbackUrl);
-        result.put("orderId", orderId);
-        return result;
+        throw new IllegalStateException("MoMo did not create a payment URL");
     }
 
     public boolean verifySignature(Map<String, String> params) {

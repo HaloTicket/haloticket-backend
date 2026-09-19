@@ -264,15 +264,19 @@ public class PaymentServiceImpl implements PaymentService {
             }
         }
 
-        // 3. fallback to latest PENDING payment if test Webhook has generic content
-        if (payment == null) {
-            payment = paymentRepository.findAll().stream()
-                    .filter(p -> p.getStatus() == PaymentStatus.PENDING)
-                    .findFirst()
-                    .orElse(null);
-        }
-
-        if (payment != null) {
+        if (payment != null && payment.getStatus() == PaymentStatus.PENDING) {
+            Object transferred = webhookData.get("transferAmount");
+            double transferredAmount;
+            try {
+                transferredAmount = Double.parseDouble(String.valueOf(transferred));
+            } catch (NumberFormatException e) {
+                res.put("status", "invalid_amount");
+                return res;
+            }
+            if (payment.getAmount() == null || Double.compare(transferredAmount, payment.getAmount()) != 0) {
+                res.put("status", "invalid_amount");
+                return res;
+            }
             payment.setStatus(PaymentStatus.SUCCESS);
             paymentRepository.save(payment);
 
@@ -316,7 +320,9 @@ public class PaymentServiceImpl implements PaymentService {
         String resultCode = allParams.get("resultCode");
 
         Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId).orElse(null);
-        if (payment != null && ("0".equals(resultCode) || isValid)) {
+        if (payment != null && payment.getStatus() == PaymentStatus.PENDING
+                && "0".equals(resultCode) && isValid
+                && String.valueOf(payment.getAmount().longValue()).equals(allParams.get("amount"))) {
             payment.setStatus(PaymentStatus.SUCCESS);
             paymentRepository.save(payment);
 
@@ -363,7 +369,7 @@ public class PaymentServiceImpl implements PaymentService {
         String mac = (String) callbackData.get("mac");
 
         boolean isValid = zaloPayService.verifyCallback(data, mac);
-        if (isValid || data != null) {
+        if (isValid) {
             try {
                 Map<String, Object> dataMap = objectMapper.readValue(data, Map.class);
                 String appTransId = (String) dataMap.get("app_trans_id");
@@ -372,7 +378,8 @@ public class PaymentServiceImpl implements PaymentService {
                         : appTransId;
 
                 Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId).orElse(null);
-                if (payment != null) {
+                if (payment != null && payment.getStatus() == PaymentStatus.PENDING
+                        && String.valueOf(payment.getAmount().longValue()).equals(String.valueOf(dataMap.get("amount")))) {
                     payment.setStatus(PaymentStatus.SUCCESS);
                     paymentRepository.save(payment);
 
@@ -409,22 +416,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public Map<String, String> processShopeePayIpn(Map<String, Object> callbackData) {
-        Map<String, String> res = new HashMap<>();
-        if (callbackData != null) {
-            String referenceId = (String) callbackData.get("reference_id");
-            if (referenceId != null) {
-                Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(referenceId).orElse(null);
-                if (payment != null) {
-                    payment.setStatus(PaymentStatus.SUCCESS);
-                    paymentRepository.save(payment);
-
-                    publishPaymentCompletedOutbox(payment, "SHOPEEPAY");
-                }
-            }
-        }
-        res.put("err_code", "0");
-        res.put("err_msg", "success");
-        return res;
+        return Map.of("err_code", "1", "err_msg", "ShopeePay callback verification is not configured");
     }
 
     @Override
@@ -444,7 +436,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public PaymentResponse confirmSandboxReturn(String bookingId, String provider) {
         if (bookingId == null || bookingId.isBlank()) return null;
-        Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
+        Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId).orElse(null);
         if (payment == null) return null;
 
         if (payment.getStatus() != PaymentStatus.SUCCESS) {

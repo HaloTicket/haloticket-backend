@@ -128,7 +128,7 @@ class PaymentServiceImplTest {
                 .provider(PaymentProvider.MOMO_GATEWAY)
                 .status(PaymentStatus.PENDING)
                 .build();
-        when(paymentRepository.findByBookingId("transaction-1")).thenReturn(Optional.of(payment));
+        when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc("transaction-1")).thenReturn(Optional.of(payment));
         when(paymentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(objectMapper.writeValueAsString(any())).thenReturn("{}");
         PaymentServiceImpl service = createService();
