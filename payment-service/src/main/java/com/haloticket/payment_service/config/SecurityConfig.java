@@ -43,6 +43,7 @@ public class SecurityConfig {
                                 "/api/payments/zalopay/**",
                                 "/api/payments/shopeepay/**",
                                 "/api/payments/verify/**",
+                                "/api/payments/methods/bulk",
                                 "/api/payments"
                         ).permitAll()
                         .requestMatchers("/api/payments/**").authenticated()

@@ -12,18 +12,24 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import com.haloticket.ticket_service.service.TicketService;
 
 @RestController
 @RequestMapping("/api/tickets")
 @RequiredArgsConstructor
 public class TicketMarketplaceController {
     private final TicketRepository ticketRepository;
+    private final TicketService ticketService;
 
     @GetMapping("/mine")
-    public List<OwnedTicketResponse> myTickets(@AuthenticationPrincipal Jwt jwt) {
+    public Page<OwnedTicketResponse> myTickets(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal Jwt jwt) {
         if (jwt == null || jwt.getSubject() == null || jwt.getSubject().isBlank()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-        return ticketRepository.findByOwnerIdOrderByIssuedAtDesc(jwt.getSubject()).stream().map(OwnedTicketResponse::from).toList();
+        return ticketService.getMyTickets(jwt.getSubject(), PageRequest.of(page, size));
     }
 
     @GetMapping("/{ticketId}")

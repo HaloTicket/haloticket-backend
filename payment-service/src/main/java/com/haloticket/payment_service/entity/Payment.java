@@ -23,6 +23,9 @@ public class Payment {
     @Column(name = "booking_id", nullable = false)
     private String bookingId;
 
+    @Column(name = "booking_code")
+    private String bookingCode;
+
     private Double amount;
 
     @Enumerated(EnumType.STRING)

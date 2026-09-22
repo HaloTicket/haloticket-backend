@@ -3,12 +3,14 @@ package com.haloticket.ticket_service.controller;
 import com.haloticket.ticket_service.entity.*;
 import com.haloticket.ticket_service.enums.TicketStatus;
 import com.haloticket.ticket_service.repository.TicketRepository;
+import com.haloticket.ticket_service.service.TicketService;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -20,7 +22,8 @@ class TicketMarketplaceControllerTest {
     @Test
     void resaleEligibilityIncludesSafeTicketDisplaySnapshot() throws Exception {
         TicketRepository tickets = mock(TicketRepository.class);
-        TicketMarketplaceController controller = new TicketMarketplaceController(tickets);
+        TicketService ticketService = mock(TicketService.class);
+        TicketMarketplaceController controller = new TicketMarketplaceController(tickets, ticketService);
         SeatZone zone = SeatZone.builder().name("Khán đài A").build();
         SeatRow row = SeatRow.builder().label("A1").seatZone(zone).build();
         Seat seat = Seat.builder().seatNumber("20").seatRow(row).build();
@@ -29,7 +32,7 @@ class TicketMarketplaceControllerTest {
                 .seat(seat).originalPrice(new BigDecimal("120000")).status(TicketStatus.VALID).build();
         when(tickets.findById("ticket-1")).thenReturn(Optional.of(ticket));
         Jwt jwt = new Jwt("token", Instant.now(), Instant.now().plusSeconds(60),
-                java.util.Map.of("alg", "none"), java.util.Map.of("sub", "seller-1"));
+                Map.of("alg", "none"), Map.of("sub", "seller-1"));
 
         Object response = controller.resaleEligibility("ticket-1", jwt);
 

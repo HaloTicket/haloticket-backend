@@ -22,8 +22,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @Slf4j
@@ -214,11 +217,16 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId)
                 .orElseGet(() -> Payment.builder()
                         .bookingId(bookingId)
+                        .bookingCode(bookingCode)
                         .amount((double) amount)
                         .method(PaymentMethod.VIETQR)
                         .provider(PaymentProvider.SEPAY)
                         .status(PaymentStatus.PENDING)
                         .build());
+                        
+        if (bookingCode != null && !bookingCode.isBlank() && payment.getBookingCode() == null) {
+            payment.setBookingCode(bookingCode);
+        }
         paymentRepository.save(payment);
 
         return payload;
@@ -249,18 +257,11 @@ public class PaymentServiceImpl implements PaymentService {
 
         // 2. try finding by content substring if HALO prefix is present
         if (payment == null && content != null && !content.isBlank()) {
-            String rawContent = content.trim();
-            if (rawContent.toUpperCase().contains("HALO")) {
-                int haloIdx = rawContent.toUpperCase().indexOf("HALO");
-                String bookingRef = rawContent.substring(haloIdx + 4).trim();
-                if (bookingRef.contains(" ")) {
-                    bookingRef = bookingRef.split(" ")[0];
-                }
-                payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingRef).orElse(null);
-            }
-
-            if (payment == null) {
-                payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(rawContent).orElse(null);
+            Matcher matcher = Pattern.compile("HALO[- ]?(\\d+)").matcher(content.toUpperCase());
+            if (matcher.find()) {
+                String bookingCodeRef = "HALO-" + matcher.group(1);
+                payment = paymentRepository.findFirstByBookingCodeOrderByCreatedAtDesc(bookingCodeRef)
+                        .orElseGet(() -> paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingCodeRef).orElse(null));
             }
         }
 
@@ -422,14 +423,35 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public PaymentResponse getPaymentStatusByBookingId(String bookingId) {
         if (bookingId == null || bookingId.isBlank()) return null;
-        return paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId)
-                .map(p -> PaymentResponse.builder()
-                        .id(p.getId())
-                        .bookingId(p.getBookingId())
-                        .amount(p.getAmount())
-                        .status(p.getStatus())
-                        .build())
-                .orElse(null);
+        Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId).orElse(null);
+        if (payment == null) return null;
+
+        if (payment.getMethod() == PaymentMethod.VIETQR && payment.getStatus() == PaymentStatus.PENDING) {
+            boolean isPaid = sePayService.checkPaymentActively(bookingId, payment.getBookingCode(), payment.getAmount());
+            if (isPaid) {
+                payment.setStatus(PaymentStatus.SUCCESS);
+                paymentRepository.save(payment);
+                publishPaymentCompletedOutbox(payment, "SEPAY");
+            }
+        }
+
+        return PaymentResponse.builder()
+                .id(payment.getId())
+                .bookingId(payment.getBookingId())
+                .amount(payment.getAmount())
+                .status(payment.getStatus())
+                .build();
+    }
+
+    @Override
+    public Map<String, String> getPaymentMethodsByBookingIds(List<String> bookingIds) {
+        if (bookingIds == null || bookingIds.isEmpty()) return new HashMap<>();
+        List<Payment> payments = paymentRepository.findAllByBookingIdIn(bookingIds);
+        Map<String, String> result = new HashMap<>();
+        for (Payment payment : payments) {
+            result.put(payment.getBookingId(), payment.getMethod() != null ? payment.getMethod().name() : null);
+        }
+        return result;
     }
 
     @Override

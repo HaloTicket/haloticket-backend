@@ -1,5 +1,6 @@
 package com.haloticket.booking_service.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.haloticket.booking_service.enums.SeatReservationStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -19,6 +20,7 @@ public class SeatReservation {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "booking_id", nullable = false)
+    @JsonIgnore
     private Booking booking;
 
     @Column(name = "seat_id", nullable = false)

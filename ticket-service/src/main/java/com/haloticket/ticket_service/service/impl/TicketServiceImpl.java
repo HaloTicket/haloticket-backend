@@ -2,21 +2,27 @@ package com.haloticket.ticket_service.service.impl;
 
 import com.haloticket.ticket_service.dto.request.SeatLayoutRequest;
 import com.haloticket.ticket_service.dto.request.TicketTypeCreateRequest;
+import com.haloticket.ticket_service.dto.response.OwnedTicketResponse;
 import com.haloticket.ticket_service.dto.response.SeatLayoutResponse;
 import com.haloticket.ticket_service.dto.response.TicketTypeResponse;
 import com.haloticket.ticket_service.entity.SeatLayout;
 import com.haloticket.ticket_service.entity.SeatZone;
+import com.haloticket.ticket_service.entity.Ticket;
 import com.haloticket.ticket_service.entity.TicketType;
 import com.haloticket.ticket_service.enums.SeatLayoutStatus;
 import com.haloticket.ticket_service.enums.TicketTypeStatus;
 import com.haloticket.ticket_service.repository.SeatLayoutRepository;
 import com.haloticket.ticket_service.repository.SeatZoneRepository;
+import com.haloticket.ticket_service.repository.TicketRepository;
 import com.haloticket.ticket_service.repository.TicketTypeRepository;
 import com.haloticket.ticket_service.service.TicketService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -26,9 +32,11 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class TicketServiceImpl implements TicketService {
 
     private final TicketTypeRepository ticketTypeRepository;
+    private final TicketRepository ticketRepository;
     private final SeatLayoutRepository seatLayoutRepository;
     private final SeatZoneRepository seatZoneRepository;
     private final StringRedisTemplate stringRedisTemplate;
@@ -289,10 +297,6 @@ public class TicketServiceImpl implements TicketService {
         return mapLayoutToResponse(savedLayout, savedLayout.getSeatZones());
     }
 
-    private SeatLayoutResponse mapLayoutToResponse(SeatLayout layout) {
-        return mapLayoutToResponse(layout, layout != null ? layout.getSeatZones() : null);
-    }
-
     private SeatLayoutResponse mapLayoutToResponse(SeatLayout layout, List<SeatZone> zones) {
         if (layout == null) return null;
         List<SeatLayoutResponse.ZoneResponseDto> zoneDtos = new ArrayList<>();
@@ -374,5 +378,22 @@ public class TicketServiceImpl implements TicketService {
         }
 
         return statusMap;
+    }
+
+    @Override
+    public Page<OwnedTicketResponse> getMyTickets(String userId, Pageable pageable) {
+        if (userId == null || userId.isBlank()) return Page.empty();
+        return ticketRepository.findByOwnerIdOrderByIssuedAtDesc(userId, pageable)
+                .map(OwnedTicketResponse::from);
+    }
+
+    @Override
+    public OwnedTicketResponse getMyTicket(String ticketId, String userId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new RuntimeException("Ticket not found"));
+        if (!userId.equals(ticket.getOwnerId())) {
+            throw new RuntimeException("Unauthorized");
+        }
+        return OwnedTicketResponse.from(ticket);
     }
 }

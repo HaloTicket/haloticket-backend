@@ -11,7 +11,7 @@ public class SePayConfig {
     @Value("${sepay.api_key:sepay_api_key_demo}")
     private String apiKey;
 
-    @Value("${sepay.account_no:0901234567}")
+    @Value("${sepay.account_no:0915020803}")
     private String accountNo;
 
     @Value("${sepay.bank_name:MBBank}")
@@ -20,6 +20,9 @@ public class SePayConfig {
     @Value("${sepay.account_name:CONG TY TNHH HALOTICKET}")
     private String accountName;
 
-    @Value("${sepay.webhook_secret:sepay_webhook_secret_demo}")
+    @Value("${sepay.webhook_secret:halo_sepay_secret_2026}")
     private String webhookSecret;
+
+    @Value("${sepay.user_token:}")
+    private String userToken;
 }

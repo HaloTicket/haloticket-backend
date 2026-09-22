@@ -6,6 +6,7 @@ import com.haloticket.payment_service.dto.response.OrganizerPayoutAccountRespons
 import com.haloticket.payment_service.dto.response.PaymentResponse;
 
 import java.util.Map;
+import java.util.List;
 
 public interface PaymentService {
     PaymentResponse createPayment(PaymentCreateRequest request);
@@ -27,4 +28,5 @@ public interface PaymentService {
 
     PaymentResponse getPaymentStatusByBookingId(String bookingId);
     PaymentResponse confirmSandboxReturn(String bookingId, String provider);
+    Map<String, String> getPaymentMethodsByBookingIds(List<String> bookingIds);
 }

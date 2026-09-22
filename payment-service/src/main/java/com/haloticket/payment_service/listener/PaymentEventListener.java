@@ -26,6 +26,7 @@ public class PaymentEventListener {
             log.info("Received BOOKING_CREATED event in payment-service: {}", message);
             JsonNode node = objectMapper.readTree(message);
             String bookingId = node.has("bookingId") ? node.get("bookingId").asText() : null;
+            String bookingCode = node.has("bookingCode") ? node.get("bookingCode").asText() : null;
             Double totalAmount = node.has("totalAmount") ? node.get("totalAmount").asDouble() : 0.0;
 
             if (bookingId == null || bookingId.isBlank()) {
@@ -40,6 +41,7 @@ public class PaymentEventListener {
 
             Payment payment = Payment.builder()
                     .bookingId(bookingId)
+                    .bookingCode(bookingCode)
                     .amount(totalAmount)
                     .status(PaymentStatus.PENDING)
                     .build();

@@ -17,7 +17,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -71,9 +74,9 @@ public class PaymentController {
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody Map<String, Object> webhookData) {
         String expected = "Apikey " + sePayConfig.getApiKey();
-        if (authorization == null || !java.security.MessageDigest.isEqual(
-                authorization.getBytes(java.nio.charset.StandardCharsets.UTF_8),
-                expected.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
+        if (authorization == null || !MessageDigest.isEqual(
+                authorization.getBytes(StandardCharsets.UTF_8),
+                expected.getBytes(StandardCharsets.UTF_8))) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
         return ResponseEntity.ok(paymentService.processSepayWebhook(webhookData));
@@ -142,6 +145,11 @@ public class PaymentController {
         }
         PaymentResponse response = paymentService.confirmSandboxReturn(bookingId, provider);
         return response == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/methods/bulk")
+    public ResponseEntity<Map<String, String>> getPaymentMethodsByBookingIds(@RequestBody List<String> bookingIds) {
+        return ResponseEntity.ok(paymentService.getPaymentMethodsByBookingIds(bookingIds));
     }
 
     @PostMapping("/organizer-payout-account")

@@ -9,7 +9,9 @@ public class BookingCreateRequest {
     private String customerEmail;
     private String customerName;
     private String eventId;
+
     private String voucherId;
     private Double totalAmount;
     private List<String> seatIds;
+    private List<BookingItemRequest> items;
 }

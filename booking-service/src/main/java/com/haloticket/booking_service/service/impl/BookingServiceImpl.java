@@ -2,8 +2,10 @@ package com.haloticket.booking_service.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haloticket.booking_service.dto.request.BookingCreateRequest;
+import com.haloticket.booking_service.dto.request.BookingItemRequest;
 import com.haloticket.booking_service.dto.response.BookingResponse;
 import com.haloticket.booking_service.entity.Booking;
+import com.haloticket.booking_service.entity.BookingItem;
 import com.haloticket.booking_service.entity.OutboxEvent;
 import com.haloticket.booking_service.entity.SeatReservation;
 import com.haloticket.booking_service.enums.BookingStatus;
@@ -13,9 +15,12 @@ import com.haloticket.booking_service.repository.BookingRepository;
 import com.haloticket.booking_service.repository.OutboxEventRepository;
 import com.haloticket.booking_service.repository.SeatReservationRepository;
 import com.haloticket.booking_service.service.BookingService;
-import org.redisson.api.RBucket;
+import org.redisson.client.codec.StringCodec;
+
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RBucket;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -47,36 +52,58 @@ public class BookingServiceImpl implements BookingService {
         String eventId = request.getEventId();
         List<String> seatIds = request.getSeatIds();
 
-        // 1. Acquire Redisson Distributed Lock for Event
+        // 1. acquire Redisson Distributed Lock for Event
         String lockKey = "lock:event:" + eventId + ":booking";
         RLock lock = redissonClient.getLock(lockKey);
 
         try {
-            // Wait up to 3 seconds for lock, auto-release after 5 seconds to prevent deadlocks
+            // wait up to 3 seconds for lock, auto-release after 5 seconds to prevent deadlocks
             boolean isLocked = lock.tryLock(3, 5, TimeUnit.SECONDS);
             if (!isLocked) {
                 throw new RuntimeException("Khu vực đặt vé đang bận, vui lòng thử lại sau giây lát.");
             }
 
-            // 2. Check seat availability in Redis
+            // 2. check seat availability in Redis
             if (seatIds != null && !seatIds.isEmpty()) {
                 String currentCustomerId = request.getCustomerId() != null ? request.getCustomerId() : "ANONYMOUS";
                 for (String seatId : seatIds) {
                     String seatHoldKey = "seat:hold:" + eventId + ":" + seatId;
-                    RBucket<String> bucket = redissonClient.getBucket(seatHoldKey);
+                    RBucket<String> bucket = redissonClient.getBucket(seatHoldKey, new StringCodec());
                     if (bucket.isExists()) {
                         String heldBy = bucket.get();
                         if (!currentCustomerId.equals(heldBy)) {
-                            throw new RuntimeException("Ghế " + seatId + " vừa mới được giữ bởi người dùng khác.");
+                            if (heldBy != null && heldBy.startsWith("session_")) {
+                                log.info("Seat {} held by session {}, allowing user {} to book it", seatId, heldBy, currentCustomerId);
+                            } else {
+                                throw new RuntimeException("Ghế " + seatId + " vừa mới được giữ bởi người dùng khác.");
+                            }
                         }
                     }
                 }
             }
 
-            // 3. Create Booking DB record with 15-min expiration TTL
+            // 3. create Booking DB record with 15-min expiration TTL
             LocalDateTime now = LocalDateTime.now();
             LocalDateTime expiresAt = now.plusMinutes(15);
             String bookingCode = "HALO-" + System.currentTimeMillis();
+
+            double subtotal = 0.0;
+            List<BookingItem> bookingItems = new ArrayList<>();
+            if (request.getItems() != null && !request.getItems().isEmpty()) {
+                for (BookingItemRequest itemReq : request.getItems()) {
+                    double itemSubtotal = (itemReq.getUnitPrice() != null ? itemReq.getUnitPrice() : 0.0) * (itemReq.getQuantity() != null ? itemReq.getQuantity() : 1);
+                    subtotal += itemSubtotal;
+                    BookingItem bItem = BookingItem.builder()
+                            .ticketTypeId(itemReq.getTicketTypeId())
+                            .quantity(itemReq.getQuantity())
+                            .unitPrice(itemReq.getUnitPrice() != null ? itemReq.getUnitPrice() : 0.0)
+                            .subTotal(itemSubtotal)
+                            .build();
+                    bookingItems.add(bItem);
+                }
+            } else {
+                subtotal = request.getTotalAmount() != null ? request.getTotalAmount() : 0.0;
+            }
 
             Booking booking = Booking.builder()
                     .bookingCode(bookingCode)
@@ -85,16 +112,22 @@ public class BookingServiceImpl implements BookingService {
                     .customerName(request.getCustomerName())
                     .eventId(eventId)
                     .voucherId(request.getVoucherId())
-                    .subtotal(request.getTotalAmount())
+                    .subtotal(subtotal)
                     .discountAmount(0.0)
                     .totalAmount(request.getTotalAmount())
                     .status(BookingStatus.PENDING)
                     .expiredAt(expiresAt)
+                    .items(new ArrayList<>())
                     .build();
+                    
+            for (BookingItem bItem : bookingItems) {
+                bItem.setBooking(booking);
+                booking.getItems().add(bItem);
+            }
 
             Booking savedBooking = bookingRepository.save(booking);
 
-            // 4. Reserve seats & set 15-min hold TTL in Redis
+            // 4. reserve seats & set 15-min hold TTL in Redis
             List<SeatReservation> reservations = new ArrayList<>();
             if (seatIds != null && !seatIds.isEmpty()) {
                 for (String seatId : seatIds) {

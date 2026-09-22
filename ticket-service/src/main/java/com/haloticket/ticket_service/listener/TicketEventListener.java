@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haloticket.ticket_service.entity.OutboxEvent;
 import com.haloticket.ticket_service.entity.Ticket;
 import com.haloticket.ticket_service.enums.OutboxStatus;
+import com.haloticket.ticket_service.enums.SeatStatus;
 import com.haloticket.ticket_service.entity.TicketType;
 import com.haloticket.ticket_service.entity.Seat;
 import com.haloticket.ticket_service.enums.TicketStatus;
@@ -18,6 +19,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -64,71 +66,52 @@ public class TicketEventListener {
                     seatIds.add(sn.asText());
                 }
             }
-            if (seatIds.isEmpty()) {
+
+            Map<String, Integer> ticketTypeQuantities = new HashMap<>();
+            if (node.has("items") && node.get("items").isArray()) {
+                for (JsonNode itemNode : node.get("items")) {
+                    String tType = itemNode.has("ticketTypeId") && !itemNode.get("ticketTypeId").isNull() ? itemNode.get("ticketTypeId").asText() : null;
+                    int qty = itemNode.has("quantity") ? itemNode.get("quantity").asInt() : 1;
+                    if (tType != null) {
+                        ticketTypeQuantities.put(tType, ticketTypeQuantities.getOrDefault(tType, 0) + qty);
+                    }
+                }
+            } else if (seatIds.isEmpty()) {
                 seatIds.add("GENERAL_ADMISSION"); // fallback for 1 ticket
             }
 
             for (String seatId : seatIds) {
-                String qrToken = generateQrToken(bookingId, customerId, seatId);
+                if ("GENERAL_ADMISSION".equals(seatId)) {
+                    issueSingleTicket(bookingId, customerId, eventId, defaultType, null, seatId);
+                    continue;
+                }
 
-                Seat seat = null;
+                Seat seat = seatRepository.findById(seatId).orElse(null);
                 TicketType actualType = defaultType;
 
-                if (!"GENERAL_ADMISSION".equals(seatId)) {
-                    seat = seatRepository.findById(seatId).orElse(null);
-                    if (seat != null && seat.getSeatRow() != null && seat.getSeatRow().getSeatZone() != null) {
-                        String ticketTypeId = seat.getSeatRow().getSeatZone().getTicketTypeId();
-                        if (ticketTypeId != null) {
-                            actualType = ticketTypeRepository.findById(ticketTypeId).orElse(defaultType);
-                        }
+                if (seat != null && seat.getSeatRow() != null && seat.getSeatRow().getSeatZone() != null) {
+                    String ticketTypeId = seat.getSeatRow().getSeatZone().getTicketTypeId();
+                    if (ticketTypeId != null) {
+                        actualType = ticketTypeRepository.findById(ticketTypeId).orElse(defaultType);
                     }
                 }
 
-                Ticket ticket = Ticket.builder()
-                        .bookingId(bookingId)
-                        .ownerId(customerId)
-                        .eventId(eventId)
-                        .ticketType(actualType)
-                        .seat(seat)
-                        .qrCodeHash(qrToken)
-                        .qrVersion(1)
-                        .status(TicketStatus.VALID)
-                        .issuedAt(LocalDateTime.now())
-                        .build();
+                issueSingleTicket(bookingId, customerId, eventId, actualType, seat, seatId);
 
-                Ticket savedTicket = ticketRepository.save(ticket);
-                log.info("Issued ticket {} for bookingId {}, seat {}", savedTicket.getId(), bookingId, seatId);
-
-                if (seat != null) {
-                    seat.setSeatStatus(com.haloticket.ticket_service.enums.SeatStatus.SOLD);
-                    seatRepository.save(seat);
+                if (actualType != null && ticketTypeQuantities.containsKey(actualType.getId())) {
+                    ticketTypeQuantities.put(actualType.getId(), ticketTypeQuantities.get(actualType.getId()) - 1);
                 }
+            }
 
-                if (actualType != null) {
-                    actualType.setTotalQuantity(Math.max(0, actualType.getTotalQuantity() - 1));
-                    ticketTypeRepository.save(actualType);
+            for (Map.Entry<String, Integer> entry : ticketTypeQuantities.entrySet()) {
+                String typeId = entry.getKey();
+                int remainingQty = entry.getValue();
+                if (remainingQty > 0) {
+                    TicketType type = ticketTypeRepository.findById(typeId).orElse(defaultType);
+                    for (int i = 0; i < remainingQty; i++) {
+                        issueSingleTicket(bookingId, customerId, eventId, type, null, "GENERAL_ADMISSION_" + typeId + "_" + i);
+                    }
                 }
-
-                // outbox event for TICKETS_ISSUED
-                Map<String, Object> payloadMap = new HashMap<>();
-                payloadMap.put("bookingId", bookingId);
-                payloadMap.put("customerId", customerId);
-                payloadMap.put("eventId", eventId);
-                payloadMap.put("ticketId", savedTicket.getId());
-                payloadMap.put("seatId", seatId);
-                payloadMap.put("qrToken", qrToken);
-
-                OutboxEvent outboxEvent = OutboxEvent.builder()
-                        .aggregateType("TICKET")
-                        .aggregateId(savedTicket.getId())
-                        .eventType("TICKETS_ISSUED")
-                        .topic("haloticket.tickets.issued.v1")
-                        .payload(objectMapper.writeValueAsString(payloadMap))
-                        .status(OutboxStatus.PENDING)
-                        .retryCount(0)
-                        .build();
-
-                outboxEventRepository.save(outboxEvent);
             }
 
         } catch (Exception e) {
@@ -136,11 +119,61 @@ public class TicketEventListener {
         }
     }
 
+    private void issueSingleTicket(String bookingId, String customerId, String eventId, TicketType type, Seat seat, String seatIdRef) {
+        String qrToken = generateQrToken(bookingId, customerId, seatIdRef);
+        Ticket ticket = Ticket.builder()
+                .bookingId(bookingId)
+                .ownerId(customerId)
+                .eventId(eventId)
+                .ticketType(type)
+                .seat(seat)
+                .qrCodeHash(qrToken)
+                .qrVersion(1)
+                .status(TicketStatus.VALID)
+                .issuedAt(LocalDateTime.now())
+                .build();
+        Ticket savedTicket = ticketRepository.save(ticket);
+        log.info("Issued ticket {} for bookingId {}, seat {}", savedTicket.getId(), bookingId, seatIdRef);
+
+        if (seat != null) {
+            seat.setSeatStatus(SeatStatus.SOLD);
+            seatRepository.save(seat);
+        }
+
+        if (type != null) {
+            type.setTotalQuantity(Math.max(0, type.getTotalQuantity() - 1));
+            ticketTypeRepository.save(type);
+        }
+
+        try {
+            Map<String, Object> payloadMap = new HashMap<>();
+            payloadMap.put("bookingId", bookingId);
+            payloadMap.put("customerId", customerId);
+            payloadMap.put("eventId", eventId);
+            payloadMap.put("ticketId", savedTicket.getId());
+            payloadMap.put("seatId", seatIdRef);
+            payloadMap.put("qrToken", qrToken);
+
+            OutboxEvent outboxEvent = OutboxEvent.builder()
+                    .aggregateType("TICKET")
+                    .aggregateId(savedTicket.getId())
+                    .eventType("TICKETS_ISSUED")
+                    .topic("haloticket.tickets.issued.v1")
+                    .payload(objectMapper.writeValueAsString(payloadMap))
+                    .status(OutboxStatus.PENDING)
+                    .retryCount(0)
+                    .build();
+            outboxEventRepository.save(outboxEvent);
+        } catch (Exception e) {
+            log.error("Failed to write outbox event TICKETS_ISSUED", e);
+        }
+    }
+
     private String generateQrToken(String bookingId, String customerId, String seatId) {
         try {
             String raw = bookingId + ":" + customerId + ":" + seatId + ":" + System.currentTimeMillis() + ":" + UUID.randomUUID();
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (Exception e) {
             return UUID.randomUUID().toString();

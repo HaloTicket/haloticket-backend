@@ -1,0 +1,72 @@
+package com.haloticket.booking_service.controller;
+
+import com.haloticket.booking_service.client.PaymentServiceClient;
+import com.haloticket.booking_service.dto.response.BookingDetailDto;
+import com.haloticket.booking_service.entity.Booking;
+import com.haloticket.booking_service.repository.BookingRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@RestController
+@RequestMapping("/api/bookings/events/{eventId}/organizer")
+@RequiredArgsConstructor
+public class OrganizerBookingController {
+
+    private final BookingRepository bookingRepository;
+    private final PaymentServiceClient paymentServiceClient;
+
+    @GetMapping
+    public ResponseEntity<Page<BookingDetailDto>> getEventBookings(
+            @PathVariable String eventId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String showtimeId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        if (search == null) {
+            search = "";
+        }
+        
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Booking> bookings = bookingRepository.findByEventIdAndSearchAndShowtimeId(eventId, search, showtimeId, pageRequest);
+        
+        List<String> bookingIds = bookings.getContent().stream()
+                .map(Booking::getId)
+                .collect(Collectors.toList());
+                
+        Map<String, String> paymentMethods = Map.of();
+        if (!bookingIds.isEmpty()) {
+            try {
+                paymentMethods = paymentServiceClient.getPaymentMethodsByBookingIds(bookingIds);
+            } catch (Exception e) {
+                // ignore or log exception
+            }
+        }
+        
+        Map<String, String> finalPaymentMethods = paymentMethods;
+        Page<BookingDetailDto> dtoPage = bookings.map(b -> BookingDetailDto.builder()
+                .id(b.getId())
+                .bookingCode(b.getBookingCode())
+                .customerId(b.getCustomerId())
+                .customerName(b.getCustomerName())
+                .customerEmail(b.getCustomerEmail())
+                .eventId(b.getEventId())
+                .totalAmount(b.getTotalAmount())
+                .status(b.getStatus())
+                .paymentMethod(finalPaymentMethods.get(b.getId()))
+                .createdAt(b.getCreatedAt())
+                .updatedAt(b.getUpdatedAt())
+                .items(b.getItems())
+                .build());
+                
+        return ResponseEntity.ok(dtoPage);
+    }
+}

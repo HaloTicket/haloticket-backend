@@ -9,6 +9,7 @@ import com.haloticket.booking_service.enums.SeatReservationStatus;
 import com.haloticket.booking_service.repository.BookingRepository;
 import com.haloticket.booking_service.repository.SeatReservationRepository;
 import com.haloticket.booking_service.entity.OutboxEvent;
+import com.haloticket.booking_service.entity.BookingItem;
 import com.haloticket.booking_service.enums.OutboxStatus;
 import com.haloticket.booking_service.repository.OutboxEventRepository;
 import com.haloticket.booking_service.service.SeatWebsocketService;
@@ -49,13 +50,15 @@ public class BookingEventListener {
                 return;
             }
 
+            String provider = node.has("provider") ? node.get("provider").asText() : "UNKNOWN";
+
             Booking booking = bookingRepository.findById(bookingId).orElse(null);
             if (booking == null) {
                 log.warn("Booking not found for payment completed event: {}", bookingId);
                 return;
             }
 
-            booking.setStatus(BookingStatus.CONFIRMED);
+            booking.setStatus(BookingStatus.PAID);
             bookingRepository.save(booking);
 
             List<SeatReservation> reservations = seatReservationRepository.findByBooking(booking);
@@ -89,6 +92,17 @@ public class BookingEventListener {
             payloadMap.put("eventId", booking.getEventId());
             payloadMap.put("amount", booking.getTotalAmount());
             payloadMap.put("seatIds", seatIds);
+            
+            List<Map<String, Object>> itemsList = new ArrayList<>();
+            if (booking.getItems() != null) {
+                for (BookingItem item : booking.getItems()) {
+                    Map<String, Object> itemMap = new HashMap<>();
+                    itemMap.put("ticketTypeId", item.getTicketTypeId());
+                    itemMap.put("quantity", item.getQuantity());
+                    itemsList.add(itemMap);
+                }
+            }
+            payloadMap.put("items", itemsList);
             
             OutboxEvent outboxEvent = OutboxEvent.builder()
                     .aggregateType("BOOKING")
