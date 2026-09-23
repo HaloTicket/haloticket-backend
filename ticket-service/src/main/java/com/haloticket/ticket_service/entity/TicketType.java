@@ -20,6 +20,9 @@ public class TicketType {
     @Column(name = "event_id", nullable = false)
     private String eventId;
 
+    @Column(name = "showtime_id")
+    private String showtimeId;
+
     @Column(nullable = false)
     private String name;
 
@@ -32,17 +35,14 @@ public class TicketType {
     @Column(name = "total_quantity")
     private Integer totalQuantity;
 
+    @Column(name = "initial_quantity")
+    private Integer initialQuantity;
+
     @Column(name = "min_per_order")
     private Integer minPerOrder;
 
     @Column(name = "max_per_order")
     private Integer maxPerOrder;
-
-    @Column(name = "start_sale_date")
-    private LocalDateTime startSaleDate;
-
-    @Column(name = "end_sale_date")
-    private LocalDateTime endSaleDate;
 
     @Column(columnDefinition = "TEXT")
     private String description;

@@ -21,7 +21,7 @@ public class RedisConfig {
         try {
             redisTemplate.getConnectionFactory().getConnection().setConfig("notify-keyspace-events", "Ex");
         } catch (Exception e) {
-            // Might fail in some managed Redis environments, but we try anyway
+            // might fail in some managed Redis environments, but we try anyway
             System.err.println("Could not configure Redis Keyspace notifications programmatically: " + e.getMessage());
         }
     }

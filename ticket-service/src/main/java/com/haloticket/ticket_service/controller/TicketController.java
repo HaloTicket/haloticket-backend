@@ -28,14 +28,21 @@ public class TicketController {
 
     @PostMapping("/types/sync/{eventId}")
     public ResponseEntity<List<TicketTypeResponse>> syncTicketTypesForEvent(@PathVariable("eventId") String eventId,
+                                                                             @RequestParam(value = "showtimeId", required = false) String showtimeId,
                                                                              @RequestBody List<TicketTypeCreateRequest> requests) {
-        List<TicketTypeResponse> response = ticketService.syncTicketTypesForEvent(eventId, requests);
+        List<TicketTypeResponse> response = ticketService.syncTicketTypesForEvent(eventId, showtimeId, requests);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/types/event/{eventId}")
     public ResponseEntity<List<TicketTypeResponse>> getTicketTypesByEventId(@PathVariable("eventId") String eventId) {
         List<TicketTypeResponse> response = ticketService.getTicketTypesByEventId(eventId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/types/showtime/{showtimeId}")
+    public ResponseEntity<List<TicketTypeResponse>> getTicketTypesByShowtimeId(@PathVariable("showtimeId") String showtimeId) {
+        List<TicketTypeResponse> response = ticketService.getTicketTypesByShowtimeId(showtimeId);
         return ResponseEntity.ok(response);
     }
 
@@ -67,7 +74,7 @@ public class TicketController {
     }
 
     @GetMapping("/seat-status")
-    public ResponseEntity<Map<String, String>> getSeatStatus(@RequestParam("eventId") String eventId) {
-        return ResponseEntity.ok(ticketService.getSeatStatusMap(eventId));
+    public ResponseEntity<Map<String, String>> getSeatStatus(@RequestParam("eventId") String eventId, @RequestParam(value = "showtimeId", required = false) String showtimeId) {
+        return ResponseEntity.ok(ticketService.getSeatStatusMap(eventId, showtimeId));
     }
 }

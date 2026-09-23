@@ -35,7 +35,10 @@ public class EventCreateRequest {
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm[:ss]")
     private LocalDateTime endTime;
 
-    // tickets list
+    // showtimes
+    private List<EventShowtimeRequest> showtimes;
+
+    // (legacy) tickets list
     private List<TicketCreateRequest> tickets;
 
     // settings
@@ -56,6 +59,20 @@ public class EventCreateRequest {
     private String taxAddress;
 
     @Data
+    public static class EventShowtimeRequest {
+        private String name;
+        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm[:ss]")
+        private LocalDateTime startTime;
+        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm[:ss]")
+        private LocalDateTime endTime;
+        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm[:ss]")
+        private LocalDateTime saleStartTime;
+        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm[:ss]")
+        private LocalDateTime saleEndTime;
+        private List<TicketCreateRequest> tickets;
+    }
+
+    @Data
     public static class TicketCreateRequest {
         private String name;
         private Double price;
@@ -63,8 +80,6 @@ public class EventCreateRequest {
         private Integer totalQuantity;
         private Integer minPerOrder;
         private Integer maxPerOrder;
-        private String startSaleDate;
-        private String endSaleDate;
         private String description;
     }
 

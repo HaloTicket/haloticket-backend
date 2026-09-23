@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class SeatStatusMessage {
     private String eventId;
+    private String showtimeId;
     private String seatId; // or seat label "A-1"
     private String status; // e.g. "AVAILABLE", "HELD", "SOLD"
 }

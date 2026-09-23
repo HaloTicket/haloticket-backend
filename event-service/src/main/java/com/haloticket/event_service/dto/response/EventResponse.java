@@ -43,6 +43,7 @@ public class EventResponse {
     private String confirmationMessage;
     private Boolean enableCustomQuestions;
     private String questionScope;
+    private List<EventShowtimeDto> showtimes;
     private Object tickets;
     private Object customQuestions;
     private String accountHolder;

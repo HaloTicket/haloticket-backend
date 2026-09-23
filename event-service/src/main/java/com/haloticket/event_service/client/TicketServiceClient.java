@@ -11,6 +11,7 @@ public interface TicketServiceClient {
 
     @PostMapping("/types/sync/{eventId}")
     Object syncTicketTypesForEvent(@PathVariable("eventId") String eventId,
+                                   @RequestParam(value = "showtimeId", required = false) String showtimeId,
                                    @RequestBody List<EventCreateRequest.TicketCreateRequest> requests);
 
     @GetMapping("/types/event/{eventId}")

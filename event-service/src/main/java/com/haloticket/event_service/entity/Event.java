@@ -93,6 +93,9 @@ public class Event {
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<StaffAssignment> staffAssignments;
 
+    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<EventShowtime> showtimes;
+
     @Column(name = "is_private")
     private Boolean isPrivate;
 

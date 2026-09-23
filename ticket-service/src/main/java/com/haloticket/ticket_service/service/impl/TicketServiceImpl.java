@@ -53,12 +53,17 @@ public class TicketServiceImpl implements TicketService {
 
     @Override
     @Transactional
-    public List<TicketTypeResponse> syncTicketTypesForEvent(String eventId, List<TicketTypeCreateRequest> requests) {
+    public List<TicketTypeResponse> syncTicketTypesForEvent(String eventId, String showtimeId, List<TicketTypeCreateRequest> requests) {
         if (eventId == null || eventId.trim().isEmpty()) {
             return List.of();
         }
 
-        List<TicketType> existingTicketTypes = ticketTypeRepository.findByEventId(eventId);
+        List<TicketType> existingTicketTypes;
+        if (showtimeId != null) {
+            existingTicketTypes = ticketTypeRepository.findByEventIdAndShowtimeId(eventId, showtimeId);
+        } else {
+            existingTicketTypes = ticketTypeRepository.findByEventId(eventId);
+        }
         Map<String, TicketType> existingMap = new HashMap<>();
         for (TicketType tt : existingTicketTypes) {
             existingMap.put(tt.getId(), tt);
@@ -70,16 +75,11 @@ public class TicketServiceImpl implements TicketService {
         if (requests != null && !requests.isEmpty()) {
             for (TicketTypeCreateRequest req : requests) {
                 req.setEventId(eventId);
+                if (showtimeId != null) req.setShowtimeId(showtimeId);
                 String requestedId = req.getId();
 
                 if (requestedId != null && !requestedId.startsWith("tier_") && existingMap.containsKey(requestedId)) {
                     TicketType entity = existingMap.get(requestedId);
-                    LocalDateTime startSale = parseDateTime(req.getStartSaleDate());
-                    LocalDateTime endSale = parseDateTime(req.getEndSaleDate());
-
-                    if (startSale != null && endSale != null && (endSale.isBefore(startSale) || endSale.isEqual(startSale))) {
-                        throw new IllegalArgumentException("Ngày kết thúc bán vé phải sau ngày bắt đầu bán vé cho loại vé: " + req.getName());
-                    }
 
                     entity.setName(req.getName() != null ? req.getName() : "Vé tiêu chuẩn");
                     entity.setPrice(req.getPrice() != null ? req.getPrice() : 0.0);
@@ -87,8 +87,9 @@ public class TicketServiceImpl implements TicketService {
                     entity.setTotalQuantity(req.getTotalQuantity() != null ? req.getTotalQuantity() : 100);
                     entity.setMinPerOrder(req.getMinPerOrder() != null ? req.getMinPerOrder() : 1);
                     entity.setMaxPerOrder(req.getMaxPerOrder() != null ? req.getMaxPerOrder() : 10);
-                    if (startSale != null) entity.setStartSaleDate(startSale);
-                    if (endSale != null) entity.setEndSaleDate(endSale);
+                    if (entity.getInitialQuantity() == null && entity.getTotalQuantity() != null) {
+                        entity.setInitialQuantity(entity.getTotalQuantity());
+                    }
                     if (req.getDescription() != null) entity.setDescription(req.getDescription());
 
                     TicketType saved = ticketTypeRepository.save(entity);
@@ -127,6 +128,15 @@ public class TicketServiceImpl implements TicketService {
                 .toList();
     }
 
+    @Override
+    public List<TicketTypeResponse> getTicketTypesByShowtimeId(String showtimeId) {
+        if (showtimeId == null || showtimeId.trim().isEmpty())
+            return List.of();
+        return ticketTypeRepository.findByShowtimeId(showtimeId).stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
     private LocalDateTime parseDateTime(String str) {
         if (str == null || str.trim().isEmpty())
             return null;
@@ -154,29 +164,20 @@ public class TicketServiceImpl implements TicketService {
     }
 
     private TicketType mapToEntity(TicketTypeCreateRequest req) {
-        LocalDateTime startSale = parseDateTime(req.getStartSaleDate());
-        LocalDateTime endSale = parseDateTime(req.getEndSaleDate());
-
-        if (startSale != null && endSale != null) {
-            if (endSale.isBefore(startSale) || endSale.isEqual(startSale)) {
-                throw new IllegalArgumentException(
-                        "Ngày kết thúc bán vé phải sau ngày bắt đầu bán vé cho loại vé: " + req.getName());
-            }
-        }
 
         String existingId = (req.getId() != null && !req.getId().startsWith("tier_") && !req.getId().isBlank()) ? req.getId() : null;
 
         return TicketType.builder()
                 .id(existingId)
                 .eventId(req.getEventId())
+                .showtimeId(req.getShowtimeId())
                 .name(req.getName() != null ? req.getName() : "Vé tiêu chuẩn")
                 .price(req.getPrice() != null ? req.getPrice() : 0.0)
                 .isFree(req.getIsFree() != null ? req.getIsFree() : (req.getPrice() != null && req.getPrice() == 0.0))
                 .totalQuantity(req.getTotalQuantity() != null ? req.getTotalQuantity() : 100)
+                .initialQuantity(req.getTotalQuantity() != null ? req.getTotalQuantity() : 100)
                 .minPerOrder(req.getMinPerOrder() != null ? req.getMinPerOrder() : 1)
                 .maxPerOrder(req.getMaxPerOrder() != null ? req.getMaxPerOrder() : 10)
-                .startSaleDate(startSale)
-                .endSaleDate(endSale)
                 .description(req.getDescription())
                 .ticketTypeStatus(TicketTypeStatus.ACTIVE)
                 .build();
@@ -188,14 +189,14 @@ public class TicketServiceImpl implements TicketService {
         return TicketTypeResponse.builder()
                 .id(entity.getId())
                 .eventId(entity.getEventId())
+                .showtimeId(entity.getShowtimeId())
                 .name(entity.getName())
                 .price(entity.getPrice())
                 .isFree(entity.getIsFree())
                 .totalQuantity(entity.getTotalQuantity())
+                .initialQuantity(entity.getInitialQuantity())
                 .minPerOrder(entity.getMinPerOrder())
                 .maxPerOrder(entity.getMaxPerOrder())
-                .startSaleDate(entity.getStartSaleDate() != null ? entity.getStartSaleDate().toString() : null)
-                .endSaleDate(entity.getEndSaleDate() != null ? entity.getEndSaleDate().toString() : null)
                 .description(entity.getDescription())
                 .status(entity.getTicketTypeStatus())
                 .build();
@@ -333,15 +334,16 @@ public class TicketServiceImpl implements TicketService {
     }
 
     @Override
-    public Map<String, String> getSeatStatusMap(String eventId) {
+    public Map<String, String> getSeatStatusMap(String eventId, String showtimeId) {
         Map<String, String> statusMap = new HashMap<>();
         if (eventId == null || eventId.isBlank()) {
             return statusMap;
         }
 
         try {
+            String showtimePrefix = showtimeId != null ? "showtime:" + showtimeId : "event:" + eventId;
             // check Redis Set for held seats
-            Set<String> heldSeats = stringRedisTemplate.opsForSet().members("event:" + eventId + ":held_seats");
+            Set<String> heldSeats = stringRedisTemplate.opsForSet().members(showtimePrefix + ":held_seats");
             if (heldSeats != null && !heldSeats.isEmpty()) {
                 for (String seatId : heldSeats) {
                     statusMap.put(seatId, "HOLDING");
@@ -349,16 +351,16 @@ public class TicketServiceImpl implements TicketService {
             }
 
             // fallback for individual seat:hold keys
-            Set<String> holdKeys = stringRedisTemplate.keys("seat:hold:" + eventId + ":*");
+            Set<String> holdKeys = stringRedisTemplate.keys("seat:hold:" + showtimePrefix + ":*");
             if (holdKeys != null) {
                 for (String key : holdKeys) {
-                    String seatId = key.substring(("seat:hold:" + eventId + ":").length());
+                    String seatId = key.substring(("seat:hold:" + showtimePrefix + ":").length());
                     statusMap.put(seatId, "HOLDING");
                 }
             }
 
             // check Redis Set for sold seats
-            Set<String> soldSeats = stringRedisTemplate.opsForSet().members("event:" + eventId + ":sold_seats");
+            Set<String> soldSeats = stringRedisTemplate.opsForSet().members(showtimePrefix + ":sold_seats");
             if (soldSeats != null && !soldSeats.isEmpty()) {
                 for (String seatId : soldSeats) {
                     statusMap.put(seatId, "SOLD");
@@ -366,10 +368,10 @@ public class TicketServiceImpl implements TicketService {
             }
 
             // fallback for individual seat:sold keys
-            Set<String> soldKeys = stringRedisTemplate.keys("seat:sold:" + eventId + ":*");
+            Set<String> soldKeys = stringRedisTemplate.keys("seat:sold:" + showtimePrefix + ":*");
             if (soldKeys != null) {
                 for (String key : soldKeys) {
-                    String seatId = key.substring(("seat:sold:" + eventId + ":").length());
+                    String seatId = key.substring(("seat:sold:" + showtimePrefix + ":").length());
                     statusMap.put(seatId, "SOLD");
                 }
             }

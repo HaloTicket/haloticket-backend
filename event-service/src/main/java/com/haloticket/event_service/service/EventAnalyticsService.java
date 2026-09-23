@@ -62,7 +62,9 @@ public class EventAnalyticsService {
         
         try {
             int showtimesCount = 1;
-            if (event.getStartTime() != null && event.getEndTime() != null) {
+            if (event.getShowtimes() != null && !event.getShowtimes().isEmpty()) {
+                showtimesCount = event.getShowtimes().size();
+            } else if (event.getStartTime() != null && event.getEndTime() != null) {
                 showtimesCount = (int) ChronoUnit.DAYS.between(
                         event.getStartTime().toLocalDate(),
                         event.getEndTime().toLocalDate()
@@ -74,13 +76,17 @@ public class EventAnalyticsService {
                 for (Object t : types) {
                     if (t instanceof Map) {
                         Map<?, ?> map = (Map<?, ?>) t;
-                        Number quantity = (Number) map.get("totalQuantity");
+                        Number initialQty = (Number) map.get("initialQuantity");
+                        Number totalQty = (Number) map.get("totalQuantity");
+                        long quantity = (initialQty != null) ? initialQty.longValue() : ((totalQty != null) ? totalQty.longValue() : 0L);
+                        
                         Double price = null;
                         if (map.get("price") instanceof Number) {
                             price = ((Number) map.get("price")).doubleValue();
                         }
-                        if (quantity != null) {
-                            long totalQuantityForType = quantity.longValue() * showtimesCount;
+                        
+                        if (quantity > 0) {
+                            long totalQuantityForType = quantity * showtimesCount;
                             totalTicketsTarget += totalQuantityForType;
                             if (price != null) {
                                 totalRevenueTarget += (totalQuantityForType * price);
@@ -108,7 +114,7 @@ public class EventAnalyticsService {
                 .pageViews(pageViews)
                 .uniqueUsers(uniqueUsers)
                 .buyers(buyers)
-                .totalTicketsTarget(totalTicketsTarget) // Will update if we fetch from ticket-service
+                .totalTicketsTarget(totalTicketsTarget) // will update if we fetch from ticket-service
                 .currentTicketsSold(currentTicketsSold)
                 .currentRevenue(currentRevenue)
                 .totalRevenueTarget(totalRevenueTarget)

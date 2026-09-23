@@ -26,6 +26,9 @@ public class SeatReservation {
     @Column(name = "seat_id", nullable = false)
     private String seatId;
 
+    @Column(name = "showtime_id")
+    private String showtimeId;
+
     @Version
     private Long version;
 

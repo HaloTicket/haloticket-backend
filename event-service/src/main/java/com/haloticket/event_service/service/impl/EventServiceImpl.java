@@ -9,11 +9,14 @@ import com.haloticket.event_service.dto.request.OrganizerPayoutAccountRequest;
 import com.haloticket.event_service.dto.response.EventCategoryResponse;
 import com.haloticket.event_service.dto.response.EventResponse;
 import com.haloticket.event_service.dto.response.OrganizerDto;
+import com.haloticket.event_service.dto.response.EventMemberResponse;
+import com.haloticket.event_service.dto.response.EventShowtimeDto;
 import com.haloticket.event_service.dto.response.OrganizerPayoutAccountResponse;
 import com.haloticket.event_service.dto.response.OrganizerEligibilityResponse;
 import com.haloticket.event_service.entity.Event;
 import com.haloticket.event_service.entity.EventCategory;
 import com.haloticket.event_service.entity.EventOrganizer;
+import com.haloticket.event_service.entity.EventShowtime;
 import com.haloticket.event_service.entity.SearchLog;
 import com.haloticket.event_service.entity.StaffAssignment;
 import com.haloticket.event_service.enums.EventApprovalStatus;
@@ -168,7 +171,26 @@ public class EventServiceImpl implements EventService {
         eventToSave.setQuestionScope(request.getQuestionScope());
 
         try {
-            if (request.getTickets() != null) {
+            if (request.getShowtimes() != null && !request.getShowtimes().isEmpty()) {
+                if (eventToSave.getShowtimes() == null) {
+                    eventToSave.setShowtimes(new ArrayList<>());
+                } else {
+                    eventToSave.getShowtimes().clear();
+                }
+                for (EventCreateRequest.EventShowtimeRequest stReq : request.getShowtimes()) {
+                    EventShowtime st = EventShowtime.builder()
+                            .event(eventToSave)
+                            .name(stReq.getName())
+                            .startTime(stReq.getStartTime() != null ? stReq.getStartTime() : startEvt)
+                            .endTime(stReq.getEndTime() != null ? stReq.getEndTime() : endEvt)
+                            .saleStartTime(stReq.getSaleStartTime())
+                            .saleEndTime(stReq.getSaleEndTime())
+                            .build();
+                    eventToSave.getShowtimes().add(st);
+                }
+                // convert showtimes to JSON for backward compatibility / ticket syncing
+                eventToSave.setTicketsData(objectMapper.writeValueAsString(request.getShowtimes()));
+            } else if (request.getTickets() != null) {
                 eventToSave.setTicketsData(objectMapper.writeValueAsString(request.getTickets()));
             }
             if (request.getCustomQuestions() != null) {
@@ -202,7 +224,23 @@ public class EventServiceImpl implements EventService {
         eventToSave.setOrganizers(organizers);
 
         Event saved = eventRepository.save(eventToSave);
-        syncTicketsToTicketService(saved.getId(), request.getTickets());
+        if (saved.getShowtimes() != null && !saved.getShowtimes().isEmpty() && request.getShowtimes() != null) {
+            for (EventShowtime st : saved.getShowtimes()) {
+                List<EventCreateRequest.TicketCreateRequest> stTickets = null;
+                for (EventCreateRequest.EventShowtimeRequest stReq : request.getShowtimes()) {
+                    if (stReq.getName().equals(st.getName())) {
+                        stTickets = stReq.getTickets();
+                        break;
+                    }
+                }
+                if (stTickets == null || stTickets.isEmpty()) {
+                    stTickets = request.getTickets();
+                }
+                syncTicketsToTicketService(saved.getId(), st.getId(), stTickets);
+            }
+        } else {
+            syncTicketsToTicketService(saved.getId(), null, request.getTickets());
+        }
         syncPayoutAccountToPaymentService(uid, request, authorization);
 
         boolean isNewlySubmitted = (oldApprovalStatus == null || oldApprovalStatus == EventApprovalStatus.DRAFT)
@@ -249,11 +287,11 @@ public class EventServiceImpl implements EventService {
                 .anyMatch(organizer -> userId.equals(organizer.getUserId()));
     }
 
-    private void syncTicketsToTicketService(String eventId, List<EventCreateRequest.TicketCreateRequest> tickets) {
+    private void syncTicketsToTicketService(String eventId, String showtimeId, List<EventCreateRequest.TicketCreateRequest> tickets) {
         if (eventId == null || tickets == null || tickets.isEmpty())
             return;
         try {
-            ticketServiceClient.syncTicketTypesForEvent(eventId, tickets);
+            ticketServiceClient.syncTicketTypesForEvent(eventId, showtimeId, tickets);
         } catch (Exception e) {
             System.err.println("Warning: Could not sync tickets to ticket-service: " + e.getMessage());
         }
@@ -400,6 +438,20 @@ public class EventServiceImpl implements EventService {
             }
         }
 
+        List<EventShowtimeDto> showtimesDto = null;
+        if (event.getShowtimes() != null && !event.getShowtimes().isEmpty()) {
+            showtimesDto = event.getShowtimes().stream()
+                    .map(st -> EventShowtimeDto.builder()
+                            .id(st.getId())
+                            .name(st.getName())
+                            .startTime(st.getStartTime())
+                            .endTime(st.getEndTime())
+                            .saleStartTime(st.getSaleStartTime())
+                            .saleEndTime(st.getSaleEndTime())
+                            .build())
+                    .collect(Collectors.toList());
+        }
+
         return EventResponse.builder()
                 .id(event.getId())
                 .title(event.getTitle())
@@ -432,11 +484,12 @@ public class EventServiceImpl implements EventService {
                 .confirmationMessage(event.getConfirmationMessage())
                 .enableCustomQuestions(event.getEnableCustomQuestions())
                 .questionScope(event.getQuestionScope())
+                .showtimes(showtimesDto)
                 .tickets(ticketsObj)
                 .customQuestions(customQuestionsObj)
                 .organizer(organizerDto)
                 .staffAssignments(staffAssignmentRepository.findByEventId(event.getId()).stream()
-                        .map(a -> com.haloticket.event_service.dto.response.EventMemberResponse.builder()
+                        .map(a -> EventMemberResponse.builder()
                                 .id(a.getId())
                                 .name(a.getName())
                                 .email(a.getEmail())

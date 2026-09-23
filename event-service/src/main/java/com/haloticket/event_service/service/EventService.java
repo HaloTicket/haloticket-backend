@@ -6,6 +6,7 @@ import com.haloticket.event_service.dto.response.EventResponse;
 import com.haloticket.event_service.dto.response.OrganizerDto;
 
 import java.util.List;
+import java.util.Map;
 
 public interface EventService {
     EventResponse createEvent(EventCreateRequest request, String authorization);

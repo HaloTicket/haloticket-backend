@@ -52,9 +52,10 @@ public class BookingExpirationScheduler {
             List<SeatReservation> reservations = seatReservationRepository.findByBooking(booking);
             for (SeatReservation res : reservations) {
                 res.setStatus(SeatReservationStatus.CANCELLED);
-                String holdKey = "seat:hold:" + booking.getEventId() + ":" + res.getSeatId();
+                String showtimePrefix = booking.getShowtimeId() != null ? "showtime:" + booking.getShowtimeId() : "event:" + booking.getEventId();
+                String holdKey = "seat:hold:" + showtimePrefix + ":" + res.getSeatId();
                 stringRedisTemplate.delete(holdKey);
-                stringRedisTemplate.opsForSet().remove("event:" + booking.getEventId() + ":held_seats", res.getSeatId());
+                stringRedisTemplate.opsForSet().remove(showtimePrefix + ":held_seats", res.getSeatId());
             }
             seatReservationRepository.saveAll(reservations);
 

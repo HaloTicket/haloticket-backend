@@ -11,6 +11,8 @@ import java.util.List;
 @Repository
 public interface TicketTypeRepository extends JpaRepository<TicketType, String> {
     List<TicketType> findByEventId(String eventId);
+    List<TicketType> findByShowtimeId(String showtimeId);
+    List<TicketType> findByEventIdAndShowtimeId(String eventId, String showtimeId);
 
     @Modifying
     @Transactional

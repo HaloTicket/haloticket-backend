@@ -28,6 +28,9 @@ public class Ticket {
     @Column(name = "event_id", nullable = false)
     private String eventId;
 
+    @Column(name = "showtime_id")
+    private String showtimeId;
+
     @Column(name = "booking_id")
     private String bookingId;
 

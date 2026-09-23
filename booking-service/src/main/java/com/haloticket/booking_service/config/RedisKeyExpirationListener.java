@@ -18,15 +18,20 @@ public class RedisKeyExpirationListener implements MessageListener {
     public void onMessage(Message message, byte[] pattern) {
         String expiredKey = message.toString();
 
-        // key format: seat_hold:{eventId}:{seatId}
-        if (expiredKey.startsWith("seat_hold:")) {
+        // key format: seat:hold:event:{eventId}:{seatId} or seat:hold:showtime:{showtimeId}:{seatId}
+        if (expiredKey.startsWith("seat:hold:")) {
             log.info("Seat hold expired: {}", expiredKey);
             String[] parts = expiredKey.split(":");
-            if (parts.length >= 3) {
-                String eventId = parts[1];
-                String seatId = parts[2];
+            if (parts.length >= 5) {
+                String type = parts[2]; // "event" or "showtime"
+                String id = parts[3];
+                String seatId = parts[4];
+                
+                String showtimeId = "showtime".equals(type) ? id : null;
+                String broadcastTargetEventId = "event".equals(type) ? id : "showtime-" + id; 
+
                 // broadcast seat available
-                websocketService.broadcastSeatStatus(eventId, seatId, "AVAILABLE");
+                websocketService.broadcastSeatStatus(broadcastTargetEventId, showtimeId, seatId, "AVAILABLE");
             }
         }
     }

@@ -17,10 +17,11 @@ public class SeatWebsocketService {
      * broadcasts a seat status change to all clients subscribed to a specific event.
      * clients should subscribe to /topic/seats/{eventId}
      */
-    public void broadcastSeatStatus(String eventId, String seatId, String status) {
+    public void broadcastSeatStatus(String eventId, String showtimeId, String seatId, String status) {
         String destination = "/topic/seats/" + eventId;
         SeatStatusMessage message = SeatStatusMessage.builder()
                 .eventId(eventId)
+                .showtimeId(showtimeId)
                 .seatId(seatId)
                 .status(status)
                 .build();

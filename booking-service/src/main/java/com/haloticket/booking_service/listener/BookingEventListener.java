@@ -67,18 +67,20 @@ public class BookingEventListener {
                 res.setStatus(SeatReservationStatus.SOLD);
                 seatIds.add(res.getSeatId());
                 
+                String showtimePrefix = booking.getShowtimeId() != null ? "showtime:" + booking.getShowtimeId() : "event:" + booking.getEventId();
+                
                 // mark seat as sold in Redis
-                String soldKey = "seat:sold:" + booking.getEventId() + ":" + res.getSeatId();
+                String soldKey = "seat:sold:" + showtimePrefix + ":" + res.getSeatId();
                 stringRedisTemplate.opsForValue().set(soldKey, booking.getId());
-                stringRedisTemplate.opsForSet().add("event:" + booking.getEventId() + ":sold_seats", res.getSeatId());
+                stringRedisTemplate.opsForSet().add(showtimePrefix + ":sold_seats", res.getSeatId());
 
                 // remove hold key and remove from held_seats set
-                String holdKey = "seat:hold:" + booking.getEventId() + ":" + res.getSeatId();
+                String holdKey = "seat:hold:" + showtimePrefix + ":" + res.getSeatId();
                 stringRedisTemplate.delete(holdKey);
-                stringRedisTemplate.opsForSet().remove("event:" + booking.getEventId() + ":held_seats", res.getSeatId());
+                stringRedisTemplate.opsForSet().remove(showtimePrefix + ":held_seats", res.getSeatId());
                 
                 // broadcast websocket
-                websocketService.broadcastSeatStatus(booking.getEventId(), res.getSeatId(), "SOLD");
+                websocketService.broadcastSeatStatus(booking.getEventId(), booking.getShowtimeId(), res.getSeatId(), "SOLD");
             }
             seatReservationRepository.saveAll(reservations);
             
@@ -143,12 +145,13 @@ public class BookingEventListener {
             List<SeatReservation> reservations = seatReservationRepository.findByBooking(booking);
             for (SeatReservation res : reservations) {
                 res.setStatus(SeatReservationStatus.CANCELLED);
-                String holdKey = "seat:hold:" + booking.getEventId() + ":" + res.getSeatId();
+                String showtimePrefix = booking.getShowtimeId() != null ? "showtime:" + booking.getShowtimeId() : "event:" + booking.getEventId();
+                String holdKey = "seat:hold:" + showtimePrefix + ":" + res.getSeatId();
                 stringRedisTemplate.delete(holdKey);
-                stringRedisTemplate.opsForSet().remove("event:" + booking.getEventId() + ":held_seats", res.getSeatId());
+                stringRedisTemplate.opsForSet().remove(showtimePrefix + ":held_seats", res.getSeatId());
                 
                 // broadcast WebSocket
-                websocketService.broadcastSeatStatus(booking.getEventId(), res.getSeatId(), "AVAILABLE");
+                websocketService.broadcastSeatStatus(booking.getEventId(), booking.getShowtimeId(), res.getSeatId(), "AVAILABLE");
             }
             seatReservationRepository.saveAll(reservations);
             log.info("Booking {} cancelled after payment failed", bookingId);

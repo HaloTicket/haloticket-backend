@@ -1,0 +1,18 @@
+package com.haloticket.booking_service.client;
+
+import com.haloticket.booking_service.dto.response.EventResponse;
+import com.haloticket.booking_service.dto.response.VoucherResponse;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+
+import java.util.List;
+
+@FeignClient(name = "event-service")
+public interface EventServiceClient {
+    @GetMapping("/api/v1/events/{id}")
+    EventResponse getEventById(@PathVariable("id") String id);
+
+    @GetMapping("/api/events/{id}/vouchers")
+    List<VoucherResponse> getVouchersByEventId(@PathVariable("id") String id);
+}

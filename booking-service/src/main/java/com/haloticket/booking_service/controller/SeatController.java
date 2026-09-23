@@ -16,7 +16,7 @@ public class SeatController {
 
     @PostMapping("/hold")
     public ResponseEntity<String> holdSeat(@RequestBody SeatHoldRequest request) {
-        boolean success = seatHoldService.holdSeat(request.getEventId(), request.getSeatId(), request.getUserId());
+        boolean success = seatHoldService.holdSeat(request.getEventId(), request.getShowtimeId(), request.getSeatId(), request.getUserId());
         if (success) {
             return ResponseEntity.ok("Seat held successfully");
         } else {
@@ -26,7 +26,7 @@ public class SeatController {
 
     @PostMapping("/release")
     public ResponseEntity<String> releaseSeat(@RequestBody SeatHoldRequest request) {
-        seatHoldService.releaseSeat(request.getEventId(), request.getSeatId(), request.getUserId());
+        seatHoldService.releaseSeat(request.getEventId(), request.getShowtimeId(), request.getSeatId(), request.getUserId());
         return ResponseEntity.ok("Seat released successfully");
     }
 }

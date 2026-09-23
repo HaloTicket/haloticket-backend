@@ -17,7 +17,10 @@ import com.haloticket.booking_service.repository.SeatReservationRepository;
 import com.haloticket.booking_service.service.BookingService;
 import org.redisson.client.codec.StringCodec;
 
-
+import com.haloticket.booking_service.client.EventServiceClient;
+import com.haloticket.booking_service.dto.response.EventResponse;
+import com.haloticket.booking_service.dto.response.VoucherResponse;
+import com.haloticket.booking_service.dto.response.EventShowtimeDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBucket;
@@ -45,6 +48,7 @@ public class BookingServiceImpl implements BookingService {
     private final RedissonClient redissonClient;
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
+    private final EventServiceClient eventServiceClient;
 
     @Override
     @Transactional
@@ -57,7 +61,27 @@ public class BookingServiceImpl implements BookingService {
         RLock lock = redissonClient.getLock(lockKey);
 
         try {
-            // wait up to 3 seconds for lock, auto-release after 5 seconds to prevent deadlocks
+            // validate showtime sale time
+            if (request.getShowtimeId() != null) {
+                EventResponse eventResp = eventServiceClient.getEventById(eventId);
+                if (eventResp != null && eventResp.getShowtimes() != null) {
+                    EventShowtimeDto showtime = eventResp.getShowtimes().stream()
+                            .filter(st -> request.getShowtimeId().equals(st.getId()))
+                            .findFirst().orElse(null);
+                    if (showtime != null) {
+                        LocalDateTime now = LocalDateTime.now();
+                        if (showtime.getSaleStartTime() != null && now.isBefore(showtime.getSaleStartTime())) {
+                            throw new RuntimeException("Suất diễn chưa mở bán!");
+                        }
+                        if (showtime.getSaleEndTime() != null && now.isAfter(showtime.getSaleEndTime())) {
+                            throw new RuntimeException("Suất diễn đã kết thúc mở bán!");
+                        }
+                    }
+                }
+            }
+
+            // wait up to 3 seconds for lock, auto-release after 5 seconds to prevent
+            // deadlocks
             boolean isLocked = lock.tryLock(3, 5, TimeUnit.SECONDS);
             if (!isLocked) {
                 throw new RuntimeException("Khu vực đặt vé đang bận, vui lòng thử lại sau giây lát.");
@@ -66,14 +90,17 @@ public class BookingServiceImpl implements BookingService {
             // 2. check seat availability in Redis
             if (seatIds != null && !seatIds.isEmpty()) {
                 String currentCustomerId = request.getCustomerId() != null ? request.getCustomerId() : "ANONYMOUS";
+                String showtimePrefix = request.getShowtimeId() != null ? "showtime:" + request.getShowtimeId()
+                        : "event:" + eventId;
                 for (String seatId : seatIds) {
-                    String seatHoldKey = "seat:hold:" + eventId + ":" + seatId;
+                    String seatHoldKey = "seat:hold:" + showtimePrefix + ":" + seatId;
                     RBucket<String> bucket = redissonClient.getBucket(seatHoldKey, new StringCodec());
                     if (bucket.isExists()) {
                         String heldBy = bucket.get();
                         if (!currentCustomerId.equals(heldBy)) {
                             if (heldBy != null && heldBy.startsWith("session_")) {
-                                log.info("Seat {} held by session {}, allowing user {} to book it", seatId, heldBy, currentCustomerId);
+                                log.info("Seat {} held by session {}, allowing user {} to book it", seatId, heldBy,
+                                        currentCustomerId);
                             } else {
                                 throw new RuntimeException("Ghế " + seatId + " vừa mới được giữ bởi người dùng khác.");
                             }
@@ -91,7 +118,8 @@ public class BookingServiceImpl implements BookingService {
             List<BookingItem> bookingItems = new ArrayList<>();
             if (request.getItems() != null && !request.getItems().isEmpty()) {
                 for (BookingItemRequest itemReq : request.getItems()) {
-                    double itemSubtotal = (itemReq.getUnitPrice() != null ? itemReq.getUnitPrice() : 0.0) * (itemReq.getQuantity() != null ? itemReq.getQuantity() : 1);
+                    double itemSubtotal = (itemReq.getUnitPrice() != null ? itemReq.getUnitPrice() : 0.0)
+                            * (itemReq.getQuantity() != null ? itemReq.getQuantity() : 1);
                     subtotal += itemSubtotal;
                     BookingItem bItem = BookingItem.builder()
                             .ticketTypeId(itemReq.getTicketTypeId())
@@ -105,6 +133,30 @@ public class BookingServiceImpl implements BookingService {
                 subtotal = request.getTotalAmount() != null ? request.getTotalAmount() : 0.0;
             }
 
+            double discountAmount = 0.0;
+            if (request.getVoucherId() != null && !request.getVoucherId().isEmpty()) {
+                List<VoucherResponse> vouchers = eventServiceClient.getVouchersByEventId(eventId);
+                VoucherResponse appliedVoucher = null;
+                if (vouchers != null) {
+                    appliedVoucher = vouchers.stream()
+                            .filter(v -> request.getVoucherId().equals(v.getId()))
+                            .findFirst()
+                            .orElse(null);
+                }
+
+                if (appliedVoucher != null && (appliedVoucher.getIsActive() != null && appliedVoucher.getIsActive())) {
+                    if ("PERCENTAGE".equals(appliedVoucher.getDiscountType())) {
+                        discountAmount = Math.round(subtotal * (appliedVoucher.getDiscountValue() / 100.0));
+                    } else {
+                        discountAmount = appliedVoucher.getDiscountValue() != null ? appliedVoucher.getDiscountValue()
+                                : 0.0;
+                    }
+                    discountAmount = Math.min(discountAmount, subtotal);
+                }
+            }
+
+            double finalTotal = Math.max(0.0, subtotal - discountAmount);
+
             Booking booking = Booking.builder()
                     .bookingCode(bookingCode)
                     .customerId(request.getCustomerId() != null ? request.getCustomerId() : "ANONYMOUS")
@@ -113,13 +165,13 @@ public class BookingServiceImpl implements BookingService {
                     .eventId(eventId)
                     .voucherId(request.getVoucherId())
                     .subtotal(subtotal)
-                    .discountAmount(0.0)
-                    .totalAmount(request.getTotalAmount())
+                    .discountAmount(discountAmount)
+                    .totalAmount(finalTotal)
                     .status(BookingStatus.PENDING)
                     .expiredAt(expiresAt)
                     .items(new ArrayList<>())
                     .build();
-                    
+
             for (BookingItem bItem : bookingItems) {
                 bItem.setBooking(booking);
                 booking.getItems().add(bItem);
@@ -139,15 +191,17 @@ public class BookingServiceImpl implements BookingService {
                             .build();
                     reservations.add(reservation);
 
-                    // Set hold TTL key in Redis (900 seconds = 15 mins)
-                    String seatHoldKey = "seat:hold:" + eventId + ":" + seatId;
+                    // set hold TTL key in Redis (900 seconds = 15 mins)
+                    String showtimePrefix = request.getShowtimeId() != null ? "showtime:" + request.getShowtimeId()
+                            : "event:" + eventId;
+                    String seatHoldKey = "seat:hold:" + showtimePrefix + ":" + seatId;
                     stringRedisTemplate.opsForValue().set(seatHoldKey, savedBooking.getId(), 15, TimeUnit.MINUTES);
-                    stringRedisTemplate.opsForSet().add("event:" + eventId + ":held_seats", seatId);
+                    stringRedisTemplate.opsForSet().add(showtimePrefix + ":held_seats", seatId);
                 }
                 seatReservationRepository.saveAll(reservations);
             }
 
-            // 5. Save Outbox Event (BOOKING_CREATED)
+            // 5. save Outbox Event (BOOKING_CREATED)
             try {
                 Map<String, Object> eventPayload = new HashMap<>();
                 eventPayload.put("bookingId", savedBooking.getId());
@@ -155,7 +209,8 @@ public class BookingServiceImpl implements BookingService {
                 eventPayload.put("customerId", savedBooking.getCustomerId());
                 eventPayload.put("eventId", savedBooking.getEventId());
                 eventPayload.put("totalAmount", savedBooking.getTotalAmount());
-                eventPayload.put("expiredAt", savedBooking.getExpiredAt() != null ? savedBooking.getExpiredAt().toString() : null);
+                eventPayload.put("expiredAt",
+                        savedBooking.getExpiredAt() != null ? savedBooking.getExpiredAt().toString() : null);
                 eventPayload.put("seatIds", seatIds);
 
                 OutboxEvent outboxEvent = OutboxEvent.builder()
@@ -173,7 +228,8 @@ public class BookingServiceImpl implements BookingService {
                 log.error("Failed to create outbox event for booking {}", savedBooking.getId(), e);
             }
 
-            log.info("Booking created successfully with Redisson Distributed Lock: bookingCode={}, id={}", bookingCode, savedBooking.getId());
+            log.info("Booking created successfully with Redisson Distributed Lock: bookingCode={}, id={}", bookingCode,
+                    savedBooking.getId());
 
             return BookingResponse.builder()
                     .id(savedBooking.getId())

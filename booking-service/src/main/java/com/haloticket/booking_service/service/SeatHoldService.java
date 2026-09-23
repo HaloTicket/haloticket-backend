@@ -20,10 +20,11 @@ public class SeatHoldService {
 
     private static final long HOLD_TTL_MINUTES = 15;
 
-    public boolean holdSeat(String eventId, String seatId, String userId) {
-        String lockKey = "lock:seat:" + eventId + ":" + seatId;
-        String holdKey = "seat:hold:" + eventId + ":" + seatId; // fixed prefix to match TicketService
-        String eventHeldSetKey = "event:" + eventId + ":held_seats";
+    public boolean holdSeat(String eventId, String showtimeId, String seatId, String userId) {
+        String showtimePrefix = showtimeId != null ? "showtime:" + showtimeId : "event:" + eventId;
+        String lockKey = "lock:seat:" + showtimePrefix + ":" + seatId;
+        String holdKey = "seat:hold:" + showtimePrefix + ":" + seatId; // fixed prefix to match TicketService
+        String eventHeldSetKey = showtimePrefix + ":held_seats";
 
         RLock lock = redissonClient.getLock(lockKey);
         try {
@@ -37,7 +38,7 @@ public class SeatHoldService {
                     bucket.set(userId, HOLD_TTL_MINUTES, TimeUnit.MINUTES);
                     redissonClient.getSet(eventHeldSetKey).add(seatId); // add to set for TicketService
                     
-                    websocketService.broadcastSeatStatus(eventId, seatId, "HELD");
+                    websocketService.broadcastSeatStatus(eventId, showtimeId, seatId, "HELD");
                     return true;
                 } finally {
                     if (lock.isHeldByCurrentThread()) {
@@ -52,16 +53,17 @@ public class SeatHoldService {
         return false;
     }
 
-    public void releaseSeat(String eventId, String seatId, String userId) {
-        String holdKey = "seat:hold:" + eventId + ":" + seatId;
-        String eventHeldSetKey = "event:" + eventId + ":held_seats";
+    public void releaseSeat(String eventId, String showtimeId, String seatId, String userId) {
+        String showtimePrefix = showtimeId != null ? "showtime:" + showtimeId : "event:" + eventId;
+        String holdKey = "seat:hold:" + showtimePrefix + ":" + seatId;
+        String eventHeldSetKey = showtimePrefix + ":held_seats";
         
         var bucket = redissonClient.getBucket(holdKey, StringCodec.INSTANCE);
         
         if (bucket.isExists() && userId.equals(bucket.get())) {
             bucket.delete();
             redissonClient.getSet(eventHeldSetKey).remove(seatId); // remove from set
-            websocketService.broadcastSeatStatus(eventId, seatId, "AVAILABLE");
+            websocketService.broadcastSeatStatus(eventId, showtimeId, seatId, "AVAILABLE");
         }
     }
 }

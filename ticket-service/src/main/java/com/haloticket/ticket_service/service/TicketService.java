@@ -13,13 +13,14 @@ import java.util.Map;
 
 public interface TicketService {
     TicketTypeResponse createTicketType(TicketTypeCreateRequest request);
-    List<TicketTypeResponse> syncTicketTypesForEvent(String eventId, List<TicketTypeCreateRequest> requests);
+    List<TicketTypeResponse> syncTicketTypesForEvent(String eventId, String showtimeId, List<TicketTypeCreateRequest> requests);
     List<TicketTypeResponse> getTicketTypesByEventId(String eventId);
+    List<TicketTypeResponse> getTicketTypesByShowtimeId(String showtimeId);
 
     SeatLayoutResponse saveSeatLayoutDraft(String eventId, SeatLayoutRequest request);
     SeatLayoutResponse publishSeatLayout(String eventId, SeatLayoutRequest request);
     SeatLayoutResponse getSeatLayoutByEventId(String eventId);
-    Map<String, String> getSeatStatusMap(String eventId);
+    Map<String, String> getSeatStatusMap(String eventId, String showtimeId);
     
     Page<OwnedTicketResponse> getMyTickets(String userId, Pageable pageable);
     OwnedTicketResponse getMyTicket(String ticketId, String userId);
