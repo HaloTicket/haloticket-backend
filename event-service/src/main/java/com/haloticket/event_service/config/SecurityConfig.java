@@ -40,7 +40,6 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/**", "/health").permitAll()
                         .requestMatchers("/api/events/organizer-profile").authenticated()
                         .requestMatchers("/api/events/approvals", "/api/events/*/approve", "/api/events/*/reject").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/events/*/resale-policy").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/events/**").permitAll()
                         .requestMatchers("/api/events/**").authenticated()
                         .anyRequest().authenticated())

@@ -34,6 +34,7 @@ public class TicketListingService {
     private final EventServiceClient eventServiceClient;
     private final UserServiceClient userServiceClient;
     private final ObjectMapper objectMapper;
+    private final EventTransferPolicyService policyGate;
 
     public TicketServiceClient.ResaleEligibilityResponse eligibility(String authorization, String ticketId) {
         TicketServiceClient.ResaleEligibilityResponse ticket = ticketServiceClient.getResaleEligibility(authorization, ticketId);
@@ -98,6 +99,7 @@ public class TicketListingService {
         try { eligibility = eligibility(authorization, request.ticketId()); }
         catch (Exception exception) { throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "ELIGIBILITY_SERVICE_UNAVAILABLE", exception); }
         if (eligibility == null || !eligibility.eligible()) throw new ResponseStatusException(HttpStatus.CONFLICT, "TICKET_NOT_ELIGIBLE");
+        if (eligibility.eventId() != null) policyGate.requireResaleEnabled(eligibility.eventId());
         BigDecimal minPrice = eligibility.minPrice();
         BigDecimal maxPrice = eligibility.maxPrice();
         if (request.price().compareTo(minPrice) < 0 || request.price().compareTo(maxPrice) > 0) {
@@ -211,6 +213,9 @@ public class TicketListingService {
                 || (listing.getExpiresAt() != null && !listing.getExpiresAt().isAfter(now))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "LISTING_NOT_AVAILABLE");
         }
+        if (listing.getEventId() != null) {
+            policyGate.requireResaleEnabled(listing.getEventId());
+        }
         if (listing.getSellerId().equals(buyerId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "BUYER_IS_SELLER");
         }
@@ -228,6 +233,22 @@ public class TicketListingService {
         return reservationResponse(transactionRepository.save(transaction));
     }
 
+    private ListingStatus resolveStatusAfterReservation(TicketListing listing, Instant now) {
+        if (listing.getExpiresAt() != null && !listing.getExpiresAt().isAfter(now)) {
+            return ListingStatus.EXPIRED;
+        }
+        if (listing.getEventId() != null) {
+            try {
+                policyGate.requireResaleEnabled(listing.getEventId());
+            } catch (Exception e) {
+                listing.setPauseReason("ORGANIZER_DISABLED_RESALE");
+                return ListingStatus.PAUSED_BY_EVENT;
+            }
+        }
+        listing.setPauseReason(null);
+        return ListingStatus.ACTIVE;
+    }
+
     @Transactional
     public void expireReservations() {
         Instant now = Instant.now();
@@ -238,7 +259,7 @@ public class TicketListingService {
                         transaction.setCancelledAt(now);
                         transactionRepository.save(transaction);
                     });
-            listing.setStatus(ListingStatus.ACTIVE);
+            listing.setStatus(resolveStatusAfterReservation(listing, now));
             listing.setReservedBy(null);
             listing.setReservedUntil(null);
             listingRepository.save(listing);
@@ -260,7 +281,7 @@ public class TicketListingService {
                         transaction.setCancelledAt(now);
                         transactionRepository.save(transaction);
                     });
-            listing.setStatus(ListingStatus.ACTIVE);
+            listing.setStatus(resolveStatusAfterReservation(listing, now));
             listing.setReservedBy(null);
             listing.setReservedUntil(null);
             listingRepository.save(listing);
@@ -279,7 +300,7 @@ public class TicketListingService {
         TicketListing listing = listingRepository.findById(listingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LISTING_NOT_FOUND"));
         if (!listing.getSellerId().equals(actorId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "LISTING_NOT_OWNED");
-        if (listing.getStatus() != ListingStatus.ACTIVE) throw new ResponseStatusException(HttpStatus.CONFLICT, "LISTING_NOT_CANCELLABLE");
+        if (listing.getStatus() != ListingStatus.ACTIVE && listing.getStatus() != ListingStatus.PAUSED_BY_EVENT) throw new ResponseStatusException(HttpStatus.CONFLICT, "LISTING_NOT_CANCELLABLE");
 
         MarketplaceSaga saga = sagaRepository.findById(listing.getSagaId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "LISTING_SAGA_NOT_FOUND"));
@@ -362,9 +383,16 @@ public class TicketListingService {
                 return;
             }
             Instant expiry = node.hasNonNull("closesAt") ? Instant.parse(node.get("closesAt").asText()) : saga.getDeadlineAt();
+            String eventId = text(node, "eventId");
+            boolean resaleAllowed = true;
+            if (eventId != null) {
+                try { policyGate.requireResaleEnabled(eventId); } catch (Exception e) { resaleAllowed = false; }
+            }
+            ListingStatus initialStatus = resaleAllowed ? ListingStatus.ACTIVE : ListingStatus.PAUSED_BY_EVENT;
+            String pauseReason = resaleAllowed ? null : "ORGANIZER_DISABLED_RESALE";
             TicketListing listing = TicketListing.builder().ticketId(node.get("ticketId").asText()).sellerId(node.get("sellerId").asText())
                     .price(new BigDecimal(node.get("price").asText())).originalPrice(decimal(node,"originalPrice")).minPriceSnapshot(decimal(node,"minPrice"))
-                    .maxPriceSnapshot(decimal(node,"maxPrice")).eventId(text(node,"eventId")).status(ListingStatus.ACTIVE).expiresAt(expiry)
+                    .maxPriceSnapshot(decimal(node,"maxPrice")).eventId(eventId).status(initialStatus).pauseReason(pauseReason).expiresAt(expiry)
                     .ticketTypeNameSnapshot(text(node,"ticketTypeName")).sectionSnapshot(text(node,"section"))
                     .rowSnapshot(text(node,"row")).seatSnapshot(text(node,"seat"))
                     .quantity(node.path("quantity").asInt(1))
@@ -403,6 +431,7 @@ public class TicketListingService {
         try { eligibility = ticketServiceClient.getResaleEligibility(authorization, request.ticketId()); }
         catch (Exception exception) { throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "TICKET_SERVICE_UNAVAILABLE", exception); }
         if (eligibility == null || !eligibility.eligible()) throw new ResponseStatusException(HttpStatus.CONFLICT, "TICKET_NOT_ELIGIBLE");
+        if (eligibility.eventId() != null) policyGate.requireGiftEnabled(eligibility.eventId());
         String sagaId = UUID.randomUUID().toString();
         Instant now = Instant.now();
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -421,7 +450,7 @@ public class TicketListingService {
             MarketplaceSaga saga = MarketplaceSaga.builder().id(sagaId).type("GIFT_TRANSFER").ticketId(request.ticketId()).actorId(actorId).state(SagaState.WAITING_LOCK).step("LOCK_REQUESTED")
                     .payload(objectMapper.writeValueAsString(payload)).idempotencyKey(idempotencyKey).requestHash(hash).deadlineAt(eligibility.closesAt()).nextRetryAt(now).retryCount(0).build();
             sagaRepository.save(saga);
-            TicketTransfer transfer = TicketTransfer.builder().ticketId(request.ticketId()).fromUserId(actorId).toUserId(recipient.userId()).recipientEmail(recipientEmail).message(request.message()).type(TransferType.GIFT).status(TransferStatus.PENDING).sagaId(sagaId).build();
+            TicketTransfer transfer = TicketTransfer.builder().ticketId(request.ticketId()).fromUserId(actorId).toUserId(recipient.userId()).recipientEmail(recipientEmail).message(request.message()).type(TransferType.GIFT).status(TransferStatus.PENDING).sagaId(sagaId).eventId(eligibility.eventId()).ticketTypeName(eligibility.ticketTypeName()).build();
             transferRepository.save(transfer); saga.setBusinessId(transfer.getId()); sagaRepository.save(saga);
             Map<String, Object> command = new LinkedHashMap<>(); command.put("messageId", UUID.randomUUID().toString()); command.put("sagaId", sagaId); command.put("operationId", sagaId); command.put("ticketId", request.ticketId()); command.put("sellerId", actorId); command.put("purpose", "GIFT");
             outboxRepository.save(OutboxEvent.builder().aggregateType("MARKETPLACE_SAGA").aggregateId(sagaId).eventType("TICKET_LOCK_REQUESTED").topic("haloticket.ticket.lock.requested.v1").payload(objectMapper.writeValueAsString(command)).status(OutboxStatus.PENDING).retryCount(0).build());

@@ -24,7 +24,8 @@ class SellerEkycGateTest {
                 .thenReturn(new UserServiceClient.ResaleSellerEligibility(false, "user-1", null, "EKYC_NOT_STARTED"));
         TicketListingService service = new TicketListingService(mock(TicketListingRepository.class), sagas,
                 mock(OutboxEventRepository.class), mock(TicketTransferRepository.class), mock(MarketplaceTransactionRepository.class),
-                mock(TicketServiceClient.class), mock(EventServiceClient.class), users, new ObjectMapper());
+                mock(TicketServiceClient.class), mock(EventServiceClient.class), users, new ObjectMapper(),
+                mock(EventTransferPolicyService.class));
 
         assertThatThrownBy(() -> service.startResale("user-1", "Bearer token", "key-1",
                 new CreateListingRequest("ticket-1", new BigDecimal("120000"), null, null, true)))

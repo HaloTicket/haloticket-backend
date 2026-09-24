@@ -12,6 +12,8 @@ public class TicketTransfer {
     @Id @GeneratedValue(strategy = GenerationType.UUID) private String id;
     @OneToOne(fetch = FetchType.LAZY) @JoinColumn(name = "marketplace_transaction_id", unique = true) private MarketplaceTransaction transaction;
     @Column(name = "ticket_id", nullable = false) private String ticketId;
+    @Column(name = "event_id") private String eventId;
+    @Column(name = "ticket_type_name") private String ticketTypeName;
     @Column(name = "from_user_id", nullable = false) private String fromUserId;
     @Column(name = "to_user_id") private String toUserId;
     @Column(name = "recipient_email") private String recipientEmail;

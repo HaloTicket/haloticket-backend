@@ -25,4 +25,8 @@ public interface TicketListingRepository extends JpaRepository<TicketListing,Str
             "group by l.eventId order by min(l.price) asc")
     List<ResaleEventSummary> summarizePublicEvents(@Param("status") ListingStatus status, @Param("now") java.time.Instant now);
     List<TicketListing> findByStatusAndReservedUntilBefore(ListingStatus status, java.time.Instant now);
+    Page<TicketListing> findByEventId(String eventId, Pageable pageable);
+    Page<TicketListing> findByEventIdAndStatus(String eventId, ListingStatus status, Pageable pageable);
+    long countByEventIdAndStatus(String eventId, ListingStatus status);
+    List<TicketListing> findByEventIdAndStatus(String eventId, ListingStatus status);
 }

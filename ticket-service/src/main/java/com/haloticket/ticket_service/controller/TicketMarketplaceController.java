@@ -57,11 +57,15 @@ public class TicketMarketplaceController {
         String seat = ticket.getSeat() == null ? null : ticket.getSeat().getSeatNumber();
         return new ResaleEligibilityResponse(ticket.getId(), ticket.getEventId(), eligible,
                 eligible ? null : "TICKET_NOT_ELIGIBLE", originalPrice, null, null, null, null, null,
-                ticketTypeName, section, row, seat);
+                ticketTypeName, section, row, seat,
+                ticket.getTicketType() == null ? null : ticket.getTicketType().getId(),
+                ticket.getShowtimeId() != null ? ticket.getShowtimeId()
+                        : ticket.getTicketType() == null ? null : ticket.getTicketType().getShowtimeId());
     }
 
     public record ResaleEligibilityResponse(String ticketId, String eventId, boolean eligible, String reasonCode,
                                              BigDecimal originalPrice, BigDecimal minPrice, BigDecimal maxPrice,
                                              Long policyVersion, Instant closesAt, String termsVersion,
-                                             String ticketTypeName, String section, String row, String seat) {}
+                                             String ticketTypeName, String section, String row, String seat,
+                                             String ticketTypeId, String showtimeId) {}
 }

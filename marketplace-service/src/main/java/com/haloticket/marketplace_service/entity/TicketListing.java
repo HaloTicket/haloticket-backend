@@ -39,6 +39,7 @@ public class TicketListing {
     @Column(name = "policy_version") private Long policyVersion;
     @Column(name = "terms_version") private String termsVersion;
     @Column(name = "saga_id", nullable = false, unique = true) private String sagaId;
+    @Column(name = "pause_reason") private String pauseReason;
     @Version private Long version;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;

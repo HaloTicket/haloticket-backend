@@ -291,6 +291,7 @@ services:
       <<: *environment
       SERVER_PORT: "8083"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ticket_db
+      TRANSFER_INTERNAL_TOKEN: ${TRANSFER_INTERNAL_TOKEN:-}
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-haloticket-realm}/protocol/openid-connect/certs
     depends_on:
@@ -311,6 +312,7 @@ services:
       <<: *environment
       SERVER_PORT: "8088"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/marketplace_db
+      TRANSFER_INTERNAL_TOKEN: ${TRANSFER_INTERNAL_TOKEN:-}
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-haloticket-realm}/protocol/openid-connect/certs
     depends_on:

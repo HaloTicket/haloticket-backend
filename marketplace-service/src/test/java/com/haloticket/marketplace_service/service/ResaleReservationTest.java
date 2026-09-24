@@ -113,7 +113,8 @@ class ResaleReservationTest {
     private static TicketListingService service(TicketListingRepository listings, MarketplaceTransactionRepository transactions) {
         return new TicketListingService(listings, mock(MarketplaceSagaRepository.class), mock(OutboxEventRepository.class),
                 mock(TicketTransferRepository.class), transactions, mock(TicketServiceClient.class),
-                mock(EventServiceClient.class), mock(UserServiceClient.class), new ObjectMapper());
+                mock(EventServiceClient.class), mock(UserServiceClient.class), new ObjectMapper(),
+                mock(EventTransferPolicyService.class));
     }
 
     private static TicketListing listing(String sellerId, ListingStatus status) {

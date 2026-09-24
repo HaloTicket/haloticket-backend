@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Set;
 
 @Entity
 @Table(name = "resale_policies", uniqueConstraints = @UniqueConstraint(name = "uk_resale_policy_event", columnNames = "event_id"))
@@ -15,6 +16,11 @@ public class ResalePolicy {
     @Column(name = "min_price_percent", precision = 7, scale = 3, nullable = false) private BigDecimal minPricePercent;
     @Column(name = "max_price_percent", precision = 7, scale = 3, nullable = false) private BigDecimal maxPricePercent;
     @Column(name = "closes_at") private Instant closesAt;
+    @Column(name = "opens_at") private Instant opensAt;
+    @Column(name = "ticket_type_scope", nullable = false) private String ticketTypeScope = "ALL";
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "resale_policy_ticket_types", joinColumns = @JoinColumn(name = "policy_id"))
+    @Column(name = "ticket_type_id") private Set<String> allowedTicketTypeIds = Set.of();
     @Column(name = "terms_version") private String termsVersion;
     @Version private Long version;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;

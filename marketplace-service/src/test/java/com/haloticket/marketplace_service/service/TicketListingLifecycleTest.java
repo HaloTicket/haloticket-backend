@@ -86,7 +86,8 @@ class TicketListingLifecycleTest {
 
     private static TicketListingService service(TicketListingRepository listings, MarketplaceSagaRepository sagas, OutboxEventRepository outbox) {
         return new TicketListingService(listings, sagas, outbox, mock(TicketTransferRepository.class), mock(MarketplaceTransactionRepository.class),
-                mock(TicketServiceClient.class), mock(EventServiceClient.class), mock(UserServiceClient.class), new ObjectMapper());
+                mock(TicketServiceClient.class), mock(EventServiceClient.class), mock(UserServiceClient.class), new ObjectMapper(),
+                mock(EventTransferPolicyService.class));
     }
 
     private static TicketListing listing(String sellerId, ListingStatus status) {

@@ -29,7 +29,7 @@ class TicketListingServiceEligibilityTest {
                 mock(TicketListingRepository.class), mock(MarketplaceSagaRepository.class),
                 mock(OutboxEventRepository.class), mock(TicketTransferRepository.class),
                 mock(MarketplaceTransactionRepository.class), ticketClient, eventClient,
-                mock(UserServiceClient.class), new ObjectMapper());
+                mock(UserServiceClient.class), new ObjectMapper(), mock(EventTransferPolicyService.class));
         when(ticketClient.getResaleEligibility("Bearer token", "ticket-1"))
                 .thenReturn(new TicketServiceClient.ResaleEligibilityResponse(
                         "ticket-1", "event-1", true, null, new BigDecimal("10000"),
@@ -55,7 +55,8 @@ class TicketListingServiceEligibilityTest {
                 ticketClient,
                 eventClient,
                 mock(UserServiceClient.class),
-                new ObjectMapper()
+                new ObjectMapper(),
+                mock(EventTransferPolicyService.class)
         );
         Instant closesAt = Instant.now().plusSeconds(3600);
         when(ticketClient.getResaleEligibility("Bearer token", "ticket-1"))
