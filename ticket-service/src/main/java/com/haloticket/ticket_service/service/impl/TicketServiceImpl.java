@@ -78,27 +78,45 @@ public class TicketServiceImpl implements TicketService {
                 if (showtimeId != null) req.setShowtimeId(showtimeId);
                 String requestedId = req.getId();
 
+                TicketType entity = null;
+                // 1. Try to match by explicit DB ID
                 if (requestedId != null && !requestedId.startsWith("tier_") && existingMap.containsKey(requestedId)) {
-                    TicketType entity = existingMap.get(requestedId);
+                    entity = existingMap.get(requestedId);
+                }
 
+                // 2. If not matched by ID, match by name (case-insensitive) among existing types
+                if (entity == null && req.getName() != null && !req.getName().trim().isEmpty()) {
+                    String normName = req.getName().trim().toLowerCase();
+                    entity = existingTicketTypes.stream()
+                            .filter(tt -> !processedIds.contains(tt.getId())
+                                    && tt.getName() != null
+                                    && tt.getName().trim().equalsIgnoreCase(normName))
+                            .findFirst()
+                            .orElse(null);
+                }
+
+                if (entity != null) {
                     entity.setName(req.getName() != null ? req.getName() : "Vé tiêu chuẩn");
                     entity.setPrice(req.getPrice() != null ? req.getPrice() : 0.0);
                     entity.setIsFree(req.getIsFree() != null ? req.getIsFree() : (req.getPrice() != null && req.getPrice() == 0.0));
                     entity.setTotalQuantity(req.getTotalQuantity() != null ? req.getTotalQuantity() : 100);
                     entity.setMinPerOrder(req.getMinPerOrder() != null ? req.getMinPerOrder() : 1);
                     entity.setMaxPerOrder(req.getMaxPerOrder() != null ? req.getMaxPerOrder() : 10);
+                    entity.setTicketTypeStatus(TicketTypeStatus.ACTIVE);
                     if (entity.getInitialQuantity() == null && entity.getTotalQuantity() != null) {
                         entity.setInitialQuantity(entity.getTotalQuantity());
                     }
                     if (req.getDescription() != null) entity.setDescription(req.getDescription());
+                    if (showtimeId != null) entity.setShowtimeId(showtimeId);
 
                     TicketType saved = ticketTypeRepository.save(entity);
                     processedIds.add(saved.getId());
                     responses.add(mapToResponse(saved));
                 } else {
                     req.setId(null);
-                    TicketType entity = mapToEntity(req);
-                    TicketType saved = ticketTypeRepository.save(entity);
+                    TicketType newEntity = mapToEntity(req);
+                    newEntity.setTicketTypeStatus(TicketTypeStatus.ACTIVE);
+                    TicketType saved = ticketTypeRepository.save(newEntity);
                     processedIds.add(saved.getId());
                     responses.add(mapToResponse(saved));
                 }
@@ -123,7 +141,25 @@ public class TicketServiceImpl implements TicketService {
     public List<TicketTypeResponse> getTicketTypesByEventId(String eventId) {
         if (eventId == null || eventId.trim().isEmpty())
             return List.of();
-        return ticketTypeRepository.findByEventId(eventId).stream()
+        List<TicketType> list = ticketTypeRepository.findByEventId(eventId);
+        Map<String, TicketType> distinctMap = new LinkedHashMap<>();
+        for (TicketType tt : list) {
+            if (tt.getTicketTypeStatus() == TicketTypeStatus.HIDDEN) {
+                continue;
+            }
+            String key = tt.getName() != null ? tt.getName().trim().toLowerCase() : tt.getId();
+            if (!distinctMap.containsKey(key)) {
+                distinctMap.put(key, tt);
+            } else {
+                TicketType existing = distinctMap.get(key);
+                if (existing.getShowtimeId() != null && tt.getShowtimeId() == null) {
+                    distinctMap.put(key, tt);
+                } else if (tt.getUpdatedAt() != null && (existing.getUpdatedAt() == null || tt.getUpdatedAt().isAfter(existing.getUpdatedAt()))) {
+                    distinctMap.put(key, tt);
+                }
+            }
+        }
+        return distinctMap.values().stream()
                 .map(this::mapToResponse)
                 .toList();
     }
@@ -132,7 +168,16 @@ public class TicketServiceImpl implements TicketService {
     public List<TicketTypeResponse> getTicketTypesByShowtimeId(String showtimeId) {
         if (showtimeId == null || showtimeId.trim().isEmpty())
             return List.of();
-        return ticketTypeRepository.findByShowtimeId(showtimeId).stream()
+        List<TicketType> list = ticketTypeRepository.findByShowtimeId(showtimeId);
+        Map<String, TicketType> distinctMap = new LinkedHashMap<>();
+        for (TicketType tt : list) {
+            if (tt.getTicketTypeStatus() == TicketTypeStatus.HIDDEN) {
+                continue;
+            }
+            String key = tt.getName() != null ? tt.getName().trim().toLowerCase() : tt.getId();
+            distinctMap.putIfAbsent(key, tt);
+        }
+        return distinctMap.values().stream()
                 .map(this::mapToResponse)
                 .toList();
     }

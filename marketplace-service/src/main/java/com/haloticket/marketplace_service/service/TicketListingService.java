@@ -10,6 +10,7 @@ import com.haloticket.marketplace_service.entity.*;
 import com.haloticket.marketplace_service.enums.*;
 import com.haloticket.marketplace_service.repository.*;
 import lombok.RequiredArgsConstructor;
+import feign.FeignException;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -38,15 +39,25 @@ public class TicketListingService {
         TicketServiceClient.ResaleEligibilityResponse ticket = ticketServiceClient.getResaleEligibility(authorization, ticketId);
         if (ticket == null || !ticket.eligible()) return ticket;
 
-        EventServiceClient.ResalePolicyResponse policy = eventServiceClient.getResalePolicy(authorization, ticket.eventId());
+        EventServiceClient.ResalePolicyResponse policy;
+        try {
+            policy = eventServiceClient.getResalePolicy(authorization, ticket.eventId());
+        } catch (FeignException.NotFound exception) {
+            return new TicketServiceClient.ResaleEligibilityResponse(
+                    ticket.ticketId(), ticket.eventId(), false, "RESALE_POLICY_NOT_CONFIGURED", ticket.originalPrice(),
+                    null, null, null, null, null,
+                    ticket.ticketTypeName(), ticket.section(), ticket.row(), ticket.seat());
+        }
         boolean policyOpen = policy != null
                 && policy.enabled()
                 && policy.minPricePercent() != null
                 && policy.maxPricePercent() != null
                 && (policy.closesAt() == null || !policy.closesAt().isBefore(Instant.now()));
         if (!policyOpen) {
+            String reasonCode = policy != null && policy.enabled() && policy.closesAt() != null
+                    && policy.closesAt().isBefore(Instant.now()) ? "RESALE_DEADLINE_PASSED" : "RESALE_DISABLED";
             return new TicketServiceClient.ResaleEligibilityResponse(
-                    ticket.ticketId(), ticket.eventId(), false, "RESALE_CLOSED", ticket.originalPrice(),
+                    ticket.ticketId(), ticket.eventId(), false, reasonCode, ticket.originalPrice(),
                     null, null, policy == null ? null : policy.version(),
                     policy == null ? null : policy.closesAt(), policy == null ? null : policy.termsVersion(),
                     ticket.ticketTypeName(), ticket.section(), ticket.row(), ticket.seat());
