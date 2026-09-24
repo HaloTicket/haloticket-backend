@@ -34,13 +34,18 @@ public class OrganizerTransferService {
         }
         try {
             String role = eventServiceClient.getMyRole(authorization, eventId);
+            if (role != null) {
+                role = role.replace("\"", "").trim().toUpperCase();
+            }
+            log.info("requireOrganizerAccess for event {}: normalized role='{}'", eventId, role);
             if (role == null || (!"OWNER".equals(role) && !"ADMIN".equals(role) && !"MANAGER".equals(role))) {
+                log.warn("Access denied for event {}: role '{}' is not OWNER/ADMIN/MANAGER", eventId, role);
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE");
             }
         } catch (ResponseStatusException e) {
             throw e;
         } catch (Exception e) {
-            log.warn("Failed to check organizer role for event {}: {}", eventId, e.getMessage());
+            log.warn("Failed to check organizer role for event {}: {}", eventId, e.getMessage(), e);
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE");
         }
     }
