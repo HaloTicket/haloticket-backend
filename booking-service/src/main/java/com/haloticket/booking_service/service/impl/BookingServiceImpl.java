@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -102,7 +103,23 @@ public class BookingServiceImpl implements BookingService {
                                 log.info("Seat {} held by session {}, allowing user {} to book it", seatId, heldBy,
                                         currentCustomerId);
                             } else {
-                                throw new RuntimeException("Ghế " + seatId + " vừa mới được giữ bởi người dùng khác.");
+                                boolean isOwnPendingBooking = false;
+                                if (heldBy != null) {
+                                    Optional<Booking> previousBooking = bookingRepository.findById(heldBy);
+                                    if (previousBooking.isPresent()
+                                            && previousBooking.get().getStatus() == BookingStatus.PENDING
+                                            && currentCustomerId.equals(previousBooking.get().getCustomerId())) {
+                                        log.info("Seat {} held by previous pending booking {} of same customer {}, superseding old booking",
+                                                seatId, heldBy, currentCustomerId);
+                                        Booking oldBooking = previousBooking.get();
+                                        oldBooking.setStatus(BookingStatus.CANCELLED);
+                                        bookingRepository.save(oldBooking);
+                                        isOwnPendingBooking = true;
+                                    }
+                                }
+                                if (!isOwnPendingBooking) {
+                                    throw new IllegalArgumentException("Ghế " + seatId + " vừa mới được giữ bởi người dùng khác.");
+                                }
                             }
                         }
                     }
@@ -163,6 +180,7 @@ public class BookingServiceImpl implements BookingService {
                     .customerEmail(request.getCustomerEmail())
                     .customerName(request.getCustomerName())
                     .eventId(eventId)
+                    .showtimeId(request.getShowtimeId())
                     .voucherId(request.getVoucherId())
                     .subtotal(subtotal)
                     .discountAmount(discountAmount)
@@ -186,6 +204,7 @@ public class BookingServiceImpl implements BookingService {
                     SeatReservation reservation = SeatReservation.builder()
                             .booking(savedBooking)
                             .seatId(seatId)
+                            .showtimeId(request.getShowtimeId())
                             .status(SeatReservationStatus.HOLDING)
                             .lockExpiresAt(expiresAt)
                             .build();

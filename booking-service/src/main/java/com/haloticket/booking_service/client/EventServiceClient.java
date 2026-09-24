@@ -10,7 +10,7 @@ import java.util.List;
 
 @FeignClient(name = "event-service")
 public interface EventServiceClient {
-    @GetMapping("/api/v1/events/{id}")
+    @GetMapping("/api/events/{id}")
     EventResponse getEventById(@PathVariable("id") String id);
 
     @GetMapping("/api/events/{id}/vouchers")
