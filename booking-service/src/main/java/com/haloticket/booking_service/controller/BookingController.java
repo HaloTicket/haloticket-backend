@@ -19,4 +19,9 @@ public class BookingController {
     public ResponseEntity<BookingResponse> createBooking(@RequestBody BookingCreateRequest request) {
         return new ResponseEntity<>(bookingService.createBooking(request), HttpStatus.CREATED);
     }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<BookingResponse> getBooking(@PathVariable String id) {
+        return ResponseEntity.ok(bookingService.getBookingById(id));
+    }
 }

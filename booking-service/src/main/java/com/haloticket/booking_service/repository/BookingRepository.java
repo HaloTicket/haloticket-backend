@@ -14,8 +14,11 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.Optional;
+
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, String> {
+       Optional<Booking> findByBookingCode(String bookingCode);
        List<Booking> findByStatusAndExpiredAtBefore(BookingStatus status, LocalDateTime dateTime);
 
        @Query("SELECT COUNT(DISTINCT b.customerId) FROM Booking b WHERE b.eventId = :eventId AND b.status = 'PAID'")
