@@ -22,6 +22,15 @@ public class EventController {
 
     private final EventService eventService;
 
+    @PostMapping("/test-questions")
+    public ResponseEntity<String> testQuestions(@RequestBody EventCreateRequest request) {
+        try {
+            return ResponseEntity.ok(new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(request.getCustomQuestions()));
+        } catch (Exception e) {
+            return ResponseEntity.ok("Error: " + e.getMessage());
+        }
+    }
+
     @PostMapping
     public ResponseEntity<EventResponse> createEvent(
             @RequestHeader("Authorization") String authorization,

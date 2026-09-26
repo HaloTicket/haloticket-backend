@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 
 @Data
 public class EventCreateRequest {
-    private String eventId; // ID of existing draft event to update
+    private String eventId; // id of existing draft event to update
     private String status; // "DRAFT" | "PENDING"
     private String title;
     private String categoryName;
@@ -60,6 +60,7 @@ public class EventCreateRequest {
 
     @Data
     public static class EventShowtimeRequest {
+        private String id;
         private String name;
         @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm[:ss]")
         private LocalDateTime startTime;
@@ -74,6 +75,8 @@ public class EventCreateRequest {
 
     @Data
     public static class TicketCreateRequest {
+        private String id;
+        private String showtimeId;
         private String name;
         private Double price;
         private Boolean isFree;
@@ -85,9 +88,11 @@ public class EventCreateRequest {
 
     @Data
     public static class CustomQuestionRequest {
+        private String id;
         private String title;
         private String description;
         private String type;
         private Boolean isRequired;
+        private List<String> options;
     }
 }

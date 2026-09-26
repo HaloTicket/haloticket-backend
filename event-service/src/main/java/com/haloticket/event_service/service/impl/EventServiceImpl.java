@@ -64,7 +64,7 @@ public class EventServiceImpl implements EventService {
     @Autowired(required = false)
     private KafkaTemplate<String, Object> kafkaTemplate;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     @Override
     public EventResponse createEvent(EventCreateRequest request, String authorization) {
@@ -170,34 +170,73 @@ public class EventServiceImpl implements EventService {
         eventToSave.setEnableCustomQuestions(request.getEnableCustomQuestions());
         eventToSave.setQuestionScope(request.getQuestionScope());
 
-        try {
+
             if (request.getShowtimes() != null && !request.getShowtimes().isEmpty()) {
                 if (eventToSave.getShowtimes() == null) {
                     eventToSave.setShowtimes(new ArrayList<>());
-                } else {
-                    eventToSave.getShowtimes().clear();
                 }
+                
+                Map<String, EventShowtime> existingShowtimes = new java.util.HashMap<>();
+                for (EventShowtime st : eventToSave.getShowtimes()) {
+                    existingShowtimes.put(st.getId(), st);
+                }
+                
+                List<EventShowtime> updatedShowtimes = new ArrayList<>();
+                
                 for (EventCreateRequest.EventShowtimeRequest stReq : request.getShowtimes()) {
-                    EventShowtime st = EventShowtime.builder()
-                            .event(eventToSave)
-                            .name(stReq.getName())
-                            .startTime(stReq.getStartTime() != null ? stReq.getStartTime() : startEvt)
-                            .endTime(stReq.getEndTime() != null ? stReq.getEndTime() : endEvt)
-                            .saleStartTime(stReq.getSaleStartTime())
-                            .saleEndTime(stReq.getSaleEndTime())
-                            .build();
-                    eventToSave.getShowtimes().add(st);
+                    EventShowtime st = null;
+                    if (stReq.getId() != null && existingShowtimes.containsKey(stReq.getId())) {
+                        st = existingShowtimes.get(stReq.getId());
+                    } else {
+                        // fallback to name matching
+                        for (EventShowtime existing : existingShowtimes.values()) {
+                            if (existing.getName() != null && existing.getName().equals(stReq.getName())) {
+                                st = existing;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (st != null) {
+                        st.setName(stReq.getName());
+                        st.setStartTime(stReq.getStartTime() != null ? stReq.getStartTime() : startEvt);
+                        st.setEndTime(stReq.getEndTime() != null ? stReq.getEndTime() : endEvt);
+                        st.setSaleStartTime(stReq.getSaleStartTime());
+                        st.setSaleEndTime(stReq.getSaleEndTime());
+                    } else {
+                        st = EventShowtime.builder()
+                                .event(eventToSave)
+                                .name(stReq.getName())
+                                .startTime(stReq.getStartTime() != null ? stReq.getStartTime() : startEvt)
+                                .endTime(stReq.getEndTime() != null ? stReq.getEndTime() : endEvt)
+                                .saleStartTime(stReq.getSaleStartTime())
+                                .saleEndTime(stReq.getSaleEndTime())
+                                .build();
+                    }
+                    updatedShowtimes.add(st);
                 }
-                // convert showtimes to JSON for backward compatibility / ticket syncing
+                eventToSave.getShowtimes().clear();
+                eventToSave.getShowtimes().addAll(updatedShowtimes);
+            }
+        try {
+            if (request.getShowtimes() != null && !request.getShowtimes().isEmpty()) {
                 eventToSave.setTicketsData(objectMapper.writeValueAsString(request.getShowtimes()));
             } else if (request.getTickets() != null) {
                 eventToSave.setTicketsData(objectMapper.writeValueAsString(request.getTickets()));
             }
+        } catch (Exception e) {
+            System.out.println("DEBUG: Exception serializing tickets/showtimes: " + e.getMessage());
+        }
+
+        try {
             if (request.getCustomQuestions() != null) {
+                System.out.println("DEBUG: Custom questions received: " + request.getCustomQuestions());
                 eventToSave.setCustomQuestionsData(objectMapper.writeValueAsString(request.getCustomQuestions()));
+            } else {
+                System.out.println("DEBUG: Custom questions is NULL!");
             }
         } catch (Exception e) {
-            // ignore JSON serialization exceptions
+            System.out.println("DEBUG: Exception serializing questions: " + e.getMessage());
         }
 
         EventApprovalStatus oldApprovalStatus = eventToSave.getEventApprovalStatus();
@@ -223,9 +262,19 @@ public class EventServiceImpl implements EventService {
         eventToSave.setCategory(category);
         eventToSave.setOrganizers(organizers);
 
+        List<String> deletedShowtimeIds = new ArrayList<>();
+        if (eventToSave.getShowtimes() != null) {
+            for (EventShowtime st : eventToSave.getShowtimes()) {
+                if (st.getId() != null) {
+                    deletedShowtimeIds.add(st.getId());
+                }
+            }
+        }
+
         Event saved = eventRepository.save(eventToSave);
         if (saved.getShowtimes() != null && !saved.getShowtimes().isEmpty() && request.getShowtimes() != null) {
             for (EventShowtime st : saved.getShowtimes()) {
+                deletedShowtimeIds.remove(st.getId());
                 List<EventCreateRequest.TicketCreateRequest> stTickets = null;
                 for (EventCreateRequest.EventShowtimeRequest stReq : request.getShowtimes()) {
                     if (stReq.getName().equals(st.getName())) {
@@ -233,10 +282,20 @@ public class EventServiceImpl implements EventService {
                         break;
                     }
                 }
-                if (stTickets == null || stTickets.isEmpty()) {
-                    stTickets = request.getTickets();
+                if (stTickets != null && !stTickets.isEmpty()) {
+                    stTickets = stTickets.stream()
+                        .filter(t -> t.getShowtimeId() == null || t.getShowtimeId().equals(st.getId()))
+                        .collect(java.util.stream.Collectors.toList());
+                } else if (request.getTickets() != null) {
+                    stTickets = request.getTickets().stream()
+                        .filter(t -> t.getShowtimeId() == null || t.getShowtimeId().equals(st.getId()))
+                        .collect(java.util.stream.Collectors.toList());
                 }
                 syncTicketsToTicketService(saved.getId(), st.getId(), stTickets);
+            }
+            
+            for (String deletedId : deletedShowtimeIds) {
+                syncTicketsToTicketService(saved.getId(), deletedId, new ArrayList<>());
             }
         } else {
             syncTicketsToTicketService(saved.getId(), null, request.getTickets());
@@ -341,15 +400,19 @@ public class EventServiceImpl implements EventService {
 
     @Override
     public OrganizerDto getOrganizerProfile(String authorization) {
-        String userId = requireEligibleOrganizer(authorization).userId();
-        return eventOrganizerRepository.findFirstByUserIdOrderByCreatedAtDesc(userId)
-                .map(org -> OrganizerDto.builder()
-                        .id(org.getId())
-                        .name(org.getName())
-                        .avatar(org.getAvatarUrl())
-                        .description(org.getDescription())
-                        .build())
-                .orElse(null);
+        try {
+            String userId = requireEligibleOrganizer(authorization).userId();
+            return eventOrganizerRepository.findFirstByUserIdOrderByCreatedAtDesc(userId)
+                    .map(org -> OrganizerDto.builder()
+                            .id(org.getId())
+                            .name(org.getName())
+                            .avatar(org.getAvatarUrl())
+                            .description(org.getDescription())
+                            .build())
+                    .orElse(null);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     @Override
