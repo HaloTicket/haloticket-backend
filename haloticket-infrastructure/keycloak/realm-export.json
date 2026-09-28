@@ -143,8 +143,20 @@
       "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
-        { "authenticator": "idp-confirm-link", "requirement": "REQUIRED", "priority": 10, "authenticatorFlow": false, "userSetupAllowed": false },
-        { "authenticator": "idp-email-verification", "requirement": "REQUIRED", "priority": 20, "authenticatorFlow": false, "userSetupAllowed": false }
+        {
+          "authenticator": "idp-confirm-link",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "idp-email-verification",
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "authenticatorFlow": false,
+          "userSetupAllowed": false
+        }
       ]
     }
   ],
@@ -153,7 +165,11 @@
       "name": "google picture",
       "identityProviderAlias": "google",
       "identityProviderMapper": "google-user-attribute-mapper",
-      "config": { "syncMode": "FORCE", "jsonField": "picture", "userAttribute": "picture" }
+      "config": {
+        "syncMode": "FORCE",
+        "jsonField": "picture",
+        "userAttribute": "picture"
+      }
     }
   ],
   "clients": [
@@ -171,7 +187,9 @@
       "secret": "user-service-secret",
       "redirectUris": [
         "http://localhost:8081/*",
-        "http://localhost:8888/*"
+        "http://localhost:8099/*",
+        "http://localhost:8888/*",
+        "exp://*"
       ],
       "webOrigins": [
         "*"
@@ -241,13 +259,18 @@
         "http://localhost:3000/*",
         "http://localhost:5173/*",
         "http://localhost:8888/*",
+        "http://localhost:8081/*",
+        "http://localhost:8099/*",
         "https://haloticket-web.pages.dev/*",
-        "https://haloticket-web.pages.dev"
+        "https://haloticket-web.pages.dev",
+        "haloticket://*"
       ],
       "webOrigins": [
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:8888",
+        "http://localhost:8081",
+        "http://localhost:8099",
         "https://haloticket-web.pages.dev",
         "+"
       ],

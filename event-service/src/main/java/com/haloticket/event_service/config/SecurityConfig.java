@@ -39,8 +39,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/**", "/health").permitAll()
                         .requestMatchers("/api/events/organizer-profile").authenticated()
+                        .requestMatchers("/api/events/my-events").authenticated()
                         .requestMatchers("/api/events/approvals", "/api/events/*/approve", "/api/events/*/reject").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/events/**").permitAll()
+                        .requestMatchers("/api/events/test-questions").permitAll()
                         .requestMatchers("/api/events/**").authenticated()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt

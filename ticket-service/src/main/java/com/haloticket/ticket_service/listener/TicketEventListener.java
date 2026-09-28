@@ -44,6 +44,7 @@ public class TicketEventListener {
             String bookingId = node.has("bookingId") ? node.get("bookingId").asText() : null;
             String customerId = node.has("customerId") ? node.get("customerId").asText() : "ANONYMOUS";
             String eventId = node.has("eventId") ? node.get("eventId").asText() : "UNKNOWN";
+            String showtimeId = node.has("showtimeId") && !node.get("showtimeId").isNull() ? node.get("showtimeId").asText() : null;
 
             if (bookingId == null || bookingId.isBlank()) {
                 log.warn("BOOKING_CONFIRMED event missing bookingId: {}", message);
@@ -58,7 +59,13 @@ public class TicketEventListener {
             }
 
             // fetch default ticket type for event
-            TicketType defaultType = ticketTypeRepository.findByEventId(eventId).stream().findFirst().orElse(null);
+            TicketType defaultType = null;
+            if (showtimeId != null) {
+                defaultType = ticketTypeRepository.findByShowtimeId(showtimeId).stream().findFirst().orElse(null);
+            }
+            if (defaultType == null) {
+                defaultType = ticketTypeRepository.findByEventId(eventId).stream().findFirst().orElse(null);
+            }
 
             List<String> seatIds = new ArrayList<>();
             if (node.has("seatIds") && node.get("seatIds").isArray()) {
@@ -67,42 +74,74 @@ public class TicketEventListener {
                 }
             }
 
+            // 1. parse items and map them to the correct showtime ticket type
             Map<String, Integer> ticketTypeQuantities = new HashMap<>();
             if (node.has("items") && node.get("items").isArray()) {
                 for (JsonNode itemNode : node.get("items")) {
                     String tType = itemNode.has("ticketTypeId") && !itemNode.get("ticketTypeId").isNull() ? itemNode.get("ticketTypeId").asText() : null;
                     int qty = itemNode.has("quantity") ? itemNode.get("quantity").asInt() : 1;
                     if (tType != null) {
-                        ticketTypeQuantities.put(tType, ticketTypeQuantities.getOrDefault(tType, 0) + qty);
+                        // resolve actual ticket type ID for this showtime to avoid cross-showtime issues
+                        TicketType resolvedType = ticketTypeRepository.findById(tType).orElse(null);
+                        if (resolvedType != null && showtimeId != null) {
+                            final String typeName = resolvedType.getName().trim();
+                            resolvedType = ticketTypeRepository.findByShowtimeId(showtimeId).stream()
+                                    .filter(t -> t.getName().trim().equalsIgnoreCase(typeName))
+                                    .findFirst()
+                                    .orElse(resolvedType);
+                        }
+                        String finalTypeId = resolvedType != null ? resolvedType.getId() : tType;
+                        ticketTypeQuantities.put(finalTypeId, ticketTypeQuantities.getOrDefault(finalTypeId, 0) + qty);
                     }
                 }
             } else if (seatIds.isEmpty()) {
                 seatIds.add("GENERAL_ADMISSION"); // fallback for 1 ticket
             }
 
+            // 2. process Seat IDs
             for (String seatId : seatIds) {
-                if ("GENERAL_ADMISSION".equals(seatId)) {
-                    issueSingleTicket(bookingId, customerId, eventId, defaultType, null, seatId);
-                    continue;
-                }
-
-                Seat seat = seatRepository.findById(seatId).orElse(null);
+                Seat seat = null;
                 TicketType actualType = defaultType;
 
-                if (seat != null && seat.getSeatRow() != null && seat.getSeatRow().getSeatZone() != null) {
-                    String ticketTypeId = seat.getSeatRow().getSeatZone().getTicketTypeId();
-                    if (ticketTypeId != null) {
-                        actualType = ticketTypeRepository.findById(ticketTypeId).orElse(defaultType);
+                if (!"GENERAL_ADMISSION".equals(seatId) && !seatId.contains("-GA-")) {
+                    seat = seatRepository.findById(seatId).orElse(null);
+                    if (seat != null && seat.getSeatRow() != null && seat.getSeatRow().getSeatZone() != null) {
+                        String ticketTypeId = seat.getSeatRow().getSeatZone().getTicketTypeId();
+                        if (ticketTypeId != null) {
+                            TicketType layoutType = ticketTypeRepository.findById(ticketTypeId).orElse(null);
+                            if (layoutType != null && showtimeId != null) {
+                                actualType = ticketTypeRepository.findByShowtimeId(showtimeId).stream()
+                                        .filter(t -> t.getName().trim().equalsIgnoreCase(layoutType.getName().trim()))
+                                        .findFirst()
+                                        .orElse(layoutType);
+                            } else if (layoutType != null) {
+                                actualType = layoutType;
+                            }
+                        }
+                    }
+                } else {
+                    // it's a GA ticket. Find the first available ticket type from items to fulfill it.
+                    if (!ticketTypeQuantities.isEmpty()) {
+                        String matchTypeId = ticketTypeQuantities.entrySet().stream()
+                                .filter(e -> e.getValue() > 0)
+                                .map(Map.Entry::getKey)
+                                .findFirst()
+                                .orElse(null);
+                        if (matchTypeId != null) {
+                            actualType = ticketTypeRepository.findById(matchTypeId).orElse(defaultType);
+                        }
                     }
                 }
 
                 issueSingleTicket(bookingId, customerId, eventId, actualType, seat, seatId);
 
+                // decrement the quantity so we don't issue duplicates
                 if (actualType != null && ticketTypeQuantities.containsKey(actualType.getId())) {
                     ticketTypeQuantities.put(actualType.getId(), ticketTypeQuantities.get(actualType.getId()) - 1);
                 }
             }
 
+            // 3. issue remaining tickets for GA that had no seat IDs assigned
             for (Map.Entry<String, Integer> entry : ticketTypeQuantities.entrySet()) {
                 String typeId = entry.getKey();
                 int remainingQty = entry.getValue();

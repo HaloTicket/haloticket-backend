@@ -77,41 +77,48 @@ public class TicketServiceImpl implements TicketService {
                 req.setEventId(eventId);
                 if (showtimeId != null) req.setShowtimeId(showtimeId);
                 String requestedId = req.getId();
-
-                TicketType entity = null;
-                // 1. Try to match by explicit DB ID
+                List<TicketType> matchedEntities = new ArrayList<>();
                 if (requestedId != null && !requestedId.startsWith("tier_") && existingMap.containsKey(requestedId)) {
-                    entity = existingMap.get(requestedId);
-                }
-
-                // 2. If not matched by ID, match by name (case-insensitive) among existing types
-                if (entity == null && req.getName() != null && !req.getName().trim().isEmpty()) {
-                    String normName = req.getName().trim().toLowerCase();
-                    entity = existingTicketTypes.stream()
-                            .filter(tt -> !processedIds.contains(tt.getId())
-                                    && tt.getName() != null
-                                    && tt.getName().trim().equalsIgnoreCase(normName))
-                            .findFirst()
-                            .orElse(null);
-                }
-
-                if (entity != null) {
-                    entity.setName(req.getName() != null ? req.getName() : "Vé tiêu chuẩn");
-                    entity.setPrice(req.getPrice() != null ? req.getPrice() : 0.0);
-                    entity.setIsFree(req.getIsFree() != null ? req.getIsFree() : (req.getPrice() != null && req.getPrice() == 0.0));
-                    entity.setTotalQuantity(req.getTotalQuantity() != null ? req.getTotalQuantity() : 100);
-                    entity.setMinPerOrder(req.getMinPerOrder() != null ? req.getMinPerOrder() : 1);
-                    entity.setMaxPerOrder(req.getMaxPerOrder() != null ? req.getMaxPerOrder() : 10);
-                    entity.setTicketTypeStatus(TicketTypeStatus.ACTIVE);
-                    if (entity.getInitialQuantity() == null && entity.getTotalQuantity() != null) {
-                        entity.setInitialQuantity(entity.getTotalQuantity());
+                    matchedEntities.add(existingMap.get(requestedId));
+                } else if (req.getName() != null && !req.getName().trim().isEmpty()) {
+                    String normName = req.getName().trim();
+                    // fallback to match by name to apply across all showtimes if needed
+                    for (TicketType existing : existingTicketTypes) {
+                        if (existing.getName() != null && existing.getName().trim().equalsIgnoreCase(normName)) {
+                            matchedEntities.add(existing);
+                        }
                     }
-                    if (req.getDescription() != null) entity.setDescription(req.getDescription());
-                    if (showtimeId != null) entity.setShowtimeId(showtimeId);
+                }
 
-                    TicketType saved = ticketTypeRepository.save(entity);
-                    processedIds.add(saved.getId());
-                    responses.add(mapToResponse(saved));
+                if (!matchedEntities.isEmpty()) {
+                    for (TicketType entity : matchedEntities) {
+                        entity.setName(req.getName() != null ? req.getName() : "Vé tiêu chuẩn");
+                        entity.setPrice(req.getPrice() != null ? req.getPrice() : 0.0);
+                        entity.setIsFree(req.getIsFree() != null ? req.getIsFree() : (req.getPrice() != null && req.getPrice() == 0.0));
+                        entity.setTotalQuantity(req.getTotalQuantity() != null ? req.getTotalQuantity() : 100);
+                        entity.setMinPerOrder(req.getMinPerOrder() != null ? req.getMinPerOrder() : 1);
+                        entity.setMaxPerOrder(req.getMaxPerOrder() != null ? req.getMaxPerOrder() : 10);
+                        entity.setTicketTypeStatus(TicketTypeStatus.ACTIVE);
+                        if (entity.getInitialQuantity() == null && entity.getTotalQuantity() != null) {
+                            entity.setInitialQuantity(entity.getTotalQuantity());
+                        }
+                        if (req.getDescription() != null) entity.setDescription(req.getDescription());
+                        if (showtimeId != null) entity.setShowtimeId(showtimeId);
+
+                        TicketType saved = ticketTypeRepository.save(entity);
+                        processedIds.add(saved.getId());
+                        // only add to response if we haven't already added this name to avoid duplicating in frontend response
+                        boolean nameAlreadyInResponse = false;
+                        for (TicketTypeResponse res : responses) {
+                            if (res.getName() != null && res.getName().equalsIgnoreCase(saved.getName())) {
+                                nameAlreadyInResponse = true;
+                                break;
+                            }
+                        }
+                        if (!nameAlreadyInResponse) {
+                            responses.add(mapToResponse(saved));
+                        }
+                    }
                 } else {
                     req.setId(null);
                     TicketType newEntity = mapToEntity(req);
@@ -125,6 +132,10 @@ public class TicketServiceImpl implements TicketService {
 
         for (TicketType tt : existingTicketTypes) {
             if (!processedIds.contains(tt.getId())) {
+                if (showtimeId == null && tt.getShowtimeId() != null) {
+                    continue; // leave showtime-specific tickets alone when doing a global sync
+                }
+
                 try {
                     ticketTypeRepository.delete(tt);
                 } catch (Exception e) {
