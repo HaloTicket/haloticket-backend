@@ -43,6 +43,7 @@ public class EventAnalyticsService {
         try {
             bookingStats = bookingClient.getEventBookingStats(eventId);
         } catch (Exception e) {
+            e.printStackTrace();
             // fallback if booking service is down or no bookings
             bookingStats = new BookingStatsResponse();
             bookingStats.setBuyersCount(0);
@@ -110,7 +111,7 @@ public class EventAnalyticsService {
             }
         }
 
-        return EventAnalyticsResponse.builder()
+        EventAnalyticsResponse response = EventAnalyticsResponse.builder()
                 .pageViews(pageViews)
                 .uniqueUsers(uniqueUsers)
                 .buyers(buyers)
@@ -121,5 +122,7 @@ public class EventAnalyticsService {
                 .conversionRate(Math.round(conversionRate * 100.0) / 100.0)
                 .growthMetrics(growthMetrics)
                 .build();
+        System.out.println("EventAnalyticsService Returning: " + response);
+        return response;
     }
 }
