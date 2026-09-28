@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
 import java.util.Map;
@@ -63,6 +64,23 @@ public class EventController {
     @GetMapping
     public ResponseEntity<List<EventResponse>> getAllEvents() {
         return ResponseEntity.ok(eventService.getAllEvents());
+    }
+
+    @GetMapping("/test-auth")
+    public ResponseEntity<String> testAuth(@AuthenticationPrincipal Jwt jwt) {
+        if (jwt == null) return ResponseEntity.status(401).body("JWT is NULL");
+        return ResponseEntity.ok("JWT is VALID: " + jwt.getSubject());
+    }
+
+    @GetMapping("/my-events")
+    public ResponseEntity<List<EventResponse>> getMyEvents(@RequestHeader("Authorization") String authorization, @AuthenticationPrincipal Jwt jwt, Authentication auth) {
+        System.out.println("DEBUG: getMyEvents called. auth=" + auth);
+        if (jwt == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        List<EventResponse> res = eventService.getMyEvents(authorization);
+        System.out.println("DEBUG: getMyEvents returned " + (res != null ? res.size() : "null") + " events for user " + jwt.getSubject());
+        return ResponseEntity.ok(res);
     }
 
     @GetMapping("/categories")

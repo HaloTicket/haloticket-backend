@@ -388,16 +388,6 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-    private OrganizerPayoutAccountResponse fetchPayoutAccountFromPaymentService(String userId) {
-        if (userId == null)
-            return null;
-        try {
-            return null;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
     @Override
     public OrganizerDto getOrganizerProfile(String authorization) {
         try {
@@ -420,6 +410,21 @@ public class EventServiceImpl implements EventService {
         return eventRepository.findAll().stream()
                 .map(this::mapToEventResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<EventResponse> getMyEvents(String authorization) {
+        try {
+            OrganizerEligibilityResponse eligibility = userServiceClient.getOrganizerEligibility(authorization);
+            if (eligibility != null && eligibility.userId() != null) {
+                return eventRepository.findMyEvents(eligibility.userId()).stream()
+                        .map(this::mapToEventResponse)
+                        .collect(Collectors.toList());
+            }
+        } catch (Exception e) {
+            System.out.println("DEBUG: Failed to get user eligibility for my-events: " + e.getMessage());
+        }
+        return new ArrayList<>();
     }
 
     @Override
