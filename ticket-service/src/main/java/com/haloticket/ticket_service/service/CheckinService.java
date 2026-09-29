@@ -61,18 +61,18 @@ public class CheckinService {
 
         if (ticket == null) {
             // cannot record attempt without ticket, but we just throw
-            throw new RuntimeException("Ticket not found");
+            throw new IllegalArgumentException("Ticket not found");
         }
 
         if (!ticket.getEventId().equals(request.getEventId())) {
             recordAttempt(ticket, request, CheckInAttemptResult.FAILED_SIGNATURE, "Ticket does not belong to this event");
-            throw new RuntimeException("Ticket does not belong to this event");
+            throw new IllegalArgumentException("Ticket does not belong to this event");
         }
         
         if (request.getShowtimeId() != null && !request.getShowtimeId().isBlank()) {
             if (ticket.getShowtimeId() != null && !ticket.getShowtimeId().equals(request.getShowtimeId())) {
                 recordAttempt(ticket, request, CheckInAttemptResult.FAILED_SIGNATURE, "Ticket does not belong to this showtime");
-                throw new RuntimeException("Ticket does not belong to this showtime");
+                throw new IllegalArgumentException("Ticket does not belong to this showtime");
             }
         }
 
@@ -137,7 +137,14 @@ public class CheckinService {
     public List<TicketCheckinDTO> getCheckinsByEvent(String eventId, String showtimeId) {
         List<Checkin> checkins;
         if (showtimeId != null && !showtimeId.isBlank()) {
-            checkins = checkinRepository.findByEventIdAndTicket_ShowtimeIdOrderByCheckedInAtDesc(eventId, showtimeId);
+            checkins = checkinRepository.findByEventIdOrderByCheckedInAtDesc(eventId).stream()
+                    .filter(c -> {
+                        String tShowtimeId = c.getTicket().getShowtimeId() != null 
+                            ? c.getTicket().getShowtimeId() 
+                            : (c.getTicket().getTicketType() != null ? c.getTicket().getTicketType().getShowtimeId() : null);
+                        return showtimeId.equals(tShowtimeId);
+                    })
+                    .collect(Collectors.toList());
         } else {
             checkins = checkinRepository.findByEventIdOrderByCheckedInAtDesc(eventId);
         }
@@ -153,13 +160,23 @@ public class CheckinService {
             SeatRow row = seat.getSeatRow();
             SeatZone zone = row != null ? row.getSeatZone() : null;
             
-            if (zone != null && row != null) {
-                seatName = String.format("Khu %s - Hàng %s - Ghế %s", zone.getName(), row.getLabel(), seat.getSeatNumber());
-            } else if (row != null) {
-                seatName = String.format("Hàng %s - Ghế %s", row.getLabel(), seat.getSeatNumber());
+            boolean hasValidRow = row != null && row.getLabel() != null && !row.getLabel().trim().isEmpty() && !row.getLabel().equalsIgnoreCase("STANDING");
+            
+            if (!hasValidRow) {
+                // Standing zone
+                seatName = "Số thứ tự vé/ghế: " + seat.getSeatNumber();
+            } else if (zone != null) {
+                if (row.getLabel().toUpperCase().contains("BÀN")) {
+                    seatName = String.format("Khu %s - %s - Ghế %s", zone.getName(), row.getLabel(), seat.getSeatNumber());
+                } else {
+                    seatName = String.format("Khu %s - Hàng %s - Ghế %s", zone.getName(), row.getLabel(), seat.getSeatNumber());
+                }
             } else {
-                seatName = "Ghế " + seat.getSeatNumber();
+                seatName = String.format("Hàng %s - Ghế %s", row.getLabel(), seat.getSeatNumber());
             }
+        } else {
+            // Unassigned seat or standing without Seat entity
+            seatName = "Số thứ tự vé: " + ticket.getId().split("-")[0].toUpperCase();
         }
 
         return TicketCheckinDTO.builder()
@@ -170,7 +187,7 @@ public class CheckinService {
                 .ticketTypeName(ticket.getTicketType() != null ? ticket.getTicketType().getName() : null)
                 .status(overrideStatus != null ? overrideStatus.name() : checkin.getStatus().name())
                 .checkedInAt(checkin.getCheckedInAt())
-                .showtimeId(ticket.getShowtimeId())
+                .showtimeId(ticket.getShowtimeId() != null ? ticket.getShowtimeId() : (ticket.getTicketType() != null ? ticket.getTicketType().getShowtimeId() : null))
                 .ownerId(ticket.getOwnerId())
                 .build();
     }
