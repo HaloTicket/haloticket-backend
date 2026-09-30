@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+langchain
+langchain_google_genai
+google-generativeai
+sqlalchemy
+pgvector
+pydantic-settings
+py-eureka-client
+confluent-kafka
+psycopg2-binary

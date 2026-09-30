@@ -52,7 +52,7 @@ services:
 
   # PostgreSQL Database
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     mem_limit: ${POSTGRES_MEMORY_LIMIT:-256m}
     container_name: haloticket-postgres
     restart: unless-stopped
@@ -433,6 +433,29 @@ services:
     depends_on:
       discovery-server:
         condition: service_healthy
+
+  ai-assistant-service:
+    image: haloticket/ai-assistant-service:local
+    build:
+      context: ./ai-assistant-service
+      dockerfile: Dockerfile
+    container_name: haloticket-ai-assistant
+    ports:
+      - "8089:8089"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://haloticket:secretpassword@postgres:5432/event_db
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - EUREKA_SERVER=http://discovery-server:8761/eureka
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - haloticket-network
 
 volumes:
   postgres_data:
