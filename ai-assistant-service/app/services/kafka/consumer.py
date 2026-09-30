@@ -50,7 +50,7 @@ def start_kafka_consumer():
         if msg is None:
             continue
         if msg.error():
-            if msg.error().code() == KafkaError._PARTITION_EOF:
+            if msg.error().code() in [KafkaError._PARTITION_EOF, KafkaError.UNKNOWN_TOPIC_OR_PART]:
                 continue
             else:
                 print(f"Kafka error: {msg.error()}")
