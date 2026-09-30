@@ -38,7 +38,7 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
        long sumTicketsSoldByEventId(@Param("eventId") String eventId);
 
        @Query("SELECT DISTINCT b FROM Booking b WHERE b.eventId = :eventId AND " +
-                     "(:showtimeId IS NULL OR :showtimeId = '' OR CAST(b.createdAt AS text) LIKE CONCAT(:showtimeId, '%')) AND " +
+                     "(:showtimeId IS NULL OR :showtimeId = '' OR b.showtimeId = :showtimeId) AND " +
                      "(LOWER(b.bookingCode) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
                      "LOWER(b.customerName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
                      "LOWER(b.customerEmail) LIKE LOWER(CONCAT('%', :search, '%')))")

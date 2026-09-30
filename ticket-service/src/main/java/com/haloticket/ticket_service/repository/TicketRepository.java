@@ -14,6 +14,8 @@ import java.util.List;
 @Repository
 public interface TicketRepository extends JpaRepository<Ticket, String> {
     List<Ticket> findByBookingId(String bookingId);
+    
+    Optional<Ticket> findByQrCodeHash(String qrCodeHash);
 
     Page<Ticket> findByOwnerIdOrderByIssuedAtDesc(String ownerId, Pageable pageable);
 

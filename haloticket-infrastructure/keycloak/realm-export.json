@@ -186,7 +186,6 @@
       "clientAuthenticatorType": "client-secret",
       "secret": "user-service-secret",
       "redirectUris": [
-        "http://localhost:8081/*",
         "http://localhost:8099/*",
         "http://localhost:8888/*",
         "exp://*"
@@ -259,7 +258,6 @@
         "http://localhost:3000/*",
         "http://localhost:5173/*",
         "http://localhost:8888/*",
-        "http://localhost:8081/*",
         "http://localhost:8099/*",
         "https://haloticket-web.pages.dev/*",
         "https://haloticket-web.pages.dev",
@@ -269,7 +267,6 @@
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:8888",
-        "http://localhost:8081",
         "http://localhost:8099",
         "https://haloticket-web.pages.dev",
         "+"
