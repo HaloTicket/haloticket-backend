@@ -6,6 +6,7 @@ import com.haloticket.marketplace_service.client.TicketServiceClient;
 import com.haloticket.marketplace_service.client.UserServiceClient;
 import com.haloticket.marketplace_service.entity.MarketplaceTransaction;
 import com.haloticket.marketplace_service.entity.TicketListing;
+import com.haloticket.marketplace_service.entity.TicketMemberSnapshot;
 import com.haloticket.marketplace_service.enums.ListingStatus;
 import com.haloticket.marketplace_service.enums.MarketplaceTransactionStatus;
 import com.haloticket.marketplace_service.repository.*;
@@ -21,6 +22,57 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ResaleReservationTest {
+    @Test
+    void paymentFailureReleasesReservationWithoutChangingTicketLock() {
+        TicketListingRepository listings = mock(TicketListingRepository.class);
+        MarketplaceTransactionRepository transactions = mock(MarketplaceTransactionRepository.class);
+        TicketListing listing = listing("seller-1", ListingStatus.RESERVED);
+        listing.setReservedBy("buyer-1");
+        MarketplaceTransaction transaction = MarketplaceTransaction.builder().id("tx-1").ticketListing(listing)
+                .buyerId("buyer-1").status(MarketplaceTransactionStatus.PAYMENT_PROCESSING).build();
+        when(transactions.findById("tx-1")).thenReturn(Optional.of(transaction));
+        when(listings.findByIdForUpdate("listing-1")).thenReturn(Optional.of(listing));
+
+        service(listings, transactions).paymentFailed("tx-1");
+
+        assertThat(transaction.getStatus()).isEqualTo(MarketplaceTransactionStatus.CANCELLED);
+        assertThat(listing.getStatus()).isEqualTo(ListingStatus.ACTIVE);
+        assertThat(listing.getReservedBy()).isNull();
+    }
+    @Test
+    void retailSubsetPersistsExactIdsAndMultipliesUnitPrice() {
+        TicketListingRepository listings = mock(TicketListingRepository.class);
+        MarketplaceTransactionRepository transactions = mock(MarketplaceTransactionRepository.class);
+        TicketListing listing = listing("seller-1", ListingStatus.ACTIVE);
+        listing.setMembers(List.of(member("t1"), member("t2"), member("t3")));
+        listing.setQuantity(3);
+        when(listings.findByIdForUpdate("listing-1")).thenReturn(Optional.of(listing));
+        when(transactions.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var response = service(listings, transactions).reserveListing("buyer-1", "subset-key", "listing-1", List.of("t1", "t3"));
+
+        assertThat(response.ticketIds()).containsExactly("t1", "t3");
+        assertThat(response.quantity()).isEqualTo(2);
+        assertThat(response.amount()).isEqualByComparingTo("240000");
+        verify(transactions).save(argThat(tx -> tx.getTicketIds().equals(java.util.Set.of("t1", "t3"))));
+    }
+
+    @Test
+    void nonRetailRejectsPartialSelectionBeforeReservation() {
+        TicketListingRepository listings = mock(TicketListingRepository.class);
+        MarketplaceTransactionRepository transactions = mock(MarketplaceTransactionRepository.class);
+        TicketListing listing = listing("seller-1", ListingStatus.ACTIVE);
+        listing.setMembers(List.of(member("t1"), member("t2")));
+        listing.setAllowRetail(false);
+        when(listings.findByIdForUpdate("listing-1")).thenReturn(Optional.of(listing));
+
+        assertThatThrownBy(() -> service(listings, transactions).reserveListing("buyer-1", "subset-key", "listing-1", List.of("t1")))
+                .isInstanceOf(ResponseStatusException.class).hasMessageContaining("TICKET_SELECTION_NOT_AVAILABLE");
+        verify(transactions, never()).save(any());
+        assertThat(listing.getStatus()).isEqualTo(ListingStatus.ACTIVE);
+    }
+
+    private static TicketMemberSnapshot member(String id) { return new TicketMemberSnapshot(id, "type", "show", "VIP", null, null, null, new BigDecimal("100000"), false); }
     @Test
     void reservesAnActiveListingForTheBuyerAndCreatesPendingTransaction() {
         TicketListingRepository listings = mock(TicketListingRepository.class);
@@ -100,6 +152,7 @@ class ResaleReservationTest {
                 .buyerId("buyer-1").sellerId("seller-1").amount(listing.getPrice())
                 .status(MarketplaceTransactionStatus.PENDING_PAYMENT).build();
         when(listings.findByStatusAndReservedUntilBefore(eq(ListingStatus.RESERVED), any())).thenReturn(List.of(listing));
+        when(listings.findByIdForUpdate("listing-1")).thenReturn(Optional.of(listing));
         when(transactions.findByTicketListing_IdAndStatus("listing-1", MarketplaceTransactionStatus.PENDING_PAYMENT))
                 .thenReturn(Optional.of(transaction));
 
@@ -113,7 +166,8 @@ class ResaleReservationTest {
     private static TicketListingService service(TicketListingRepository listings, MarketplaceTransactionRepository transactions) {
         return new TicketListingService(listings, mock(MarketplaceSagaRepository.class), mock(OutboxEventRepository.class),
                 mock(TicketTransferRepository.class), transactions, mock(TicketServiceClient.class),
-                mock(EventServiceClient.class), mock(UserServiceClient.class), new ObjectMapper());
+                mock(EventServiceClient.class), mock(UserServiceClient.class), new ObjectMapper(),
+                mock(EventTransferPolicyService.class));
     }
 
     private static TicketListing listing(String sellerId, ListingStatus status) {

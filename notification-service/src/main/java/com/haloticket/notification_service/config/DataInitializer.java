@@ -35,7 +35,7 @@ public class DataInitializer implements CommandLineRunner {
         upsertTemplate("ntpl-ticket-confirmation-email",
                 NotificationType.TICKET_CONFIRMATION,
                 NotificationChannel.EMAIL,
-                "Your HaloTicket order is confirmed",
+                "HaloTicket - Thanh toán thành công đơn {{bookingCode}}",
                 "Hi {{fullName}}, your booking {{bookingCode}} has been confirmed.");
 
         upsertTemplate("ntpl-event-reminder-push",

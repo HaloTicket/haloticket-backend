@@ -38,6 +38,21 @@ public class GlobalExceptionHandler {
                 "CONFLICT", exception.getMessage(), Instant.now()));
     }
 
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatus(org.springframework.web.server.ResponseStatusException exception) {
+        log.warn("Response status exception: {} - {}", exception.getStatusCode(), exception.getReason());
+        return ResponseEntity.status(exception.getStatusCode()).body(new ErrorResponse(
+                exception.getReason() != null ? exception.getReason() : exception.getStatusCode().toString(),
+                exception.getReason() != null ? exception.getReason() : exception.getMessage(),
+                Instant.now()));
+    }
+
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(org.springframework.web.servlet.resource.NoResourceFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(
+                "NOT_FOUND", exception.getMessage(), Instant.now()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpectedException(Exception exception) {
         log.error("Unhandled exception in booking-service: ", exception);

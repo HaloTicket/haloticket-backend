@@ -27,8 +27,10 @@ import org.redisson.api.RBucket;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -105,7 +107,7 @@ public class BookingServiceImpl implements BookingService {
                             } else {
                                 boolean isOwnPendingBooking = false;
                                 if (heldBy != null) {
-                                    Optional<Booking> previousBooking = bookingRepository.findById(heldBy);
+                                    Optional<Booking> previousBooking = bookingRepository.findByIdForUpdate(heldBy);
                                     if (previousBooking.isPresent()
                                             && previousBooking.get().getStatus() == BookingStatus.PENDING
                                             && currentCustomerId.equals(previousBooking.get().getCustomerId())) {
@@ -254,6 +256,9 @@ public class BookingServiceImpl implements BookingService {
                     .id(savedBooking.getId())
                     .bookingCode(savedBooking.getBookingCode())
                     .customerId(savedBooking.getCustomerId())
+                    .customerName(savedBooking.getCustomerName())
+                    .customerEmail(savedBooking.getCustomerEmail())
+                    .eventId(savedBooking.getEventId())
                     .totalAmount(savedBooking.getTotalAmount())
                     .status(savedBooking.getStatus())
                     .expiredAt(savedBooking.getExpiredAt())
@@ -267,5 +272,25 @@ public class BookingServiceImpl implements BookingService {
                 lock.unlock();
             }
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BookingResponse getBookingById(String idOrCode) {
+        Booking booking = bookingRepository.findById(idOrCode)
+                .or(() -> bookingRepository.findByBookingCode(idOrCode))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND"));
+
+        return BookingResponse.builder()
+                .id(booking.getId())
+                .bookingCode(booking.getBookingCode())
+                .customerId(booking.getCustomerId())
+                .customerName(booking.getCustomerName())
+                .customerEmail(booking.getCustomerEmail())
+                .eventId(booking.getEventId())
+                .totalAmount(booking.getTotalAmount())
+                .status(booking.getStatus())
+                .expiredAt(booking.getExpiredAt())
+                .build();
     }
 }

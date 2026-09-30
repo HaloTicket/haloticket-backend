@@ -14,13 +14,16 @@ import java.util.EnumSet;
 public class SagaTimeoutScheduler {
     private final MarketplaceSagaRepository sagaRepository;
     private final TicketListingService listingService;
+    private final ResalePurchaseService purchaseService;
 
     @Scheduled(fixedDelayString = "${marketplace.saga.poll-delay-ms:5000}")
     public void recoverExpiredSagas() {
         Instant now = Instant.now();
         for (MarketplaceSaga saga : sagaRepository.findTop50ByStateInAndNextRetryAtBeforeOrderByCreatedAtAsc(EnumSet.of(SagaState.WAITING_LOCK, SagaState.WAITING_RECIPIENT, SagaState.WAITING_TRANSFER, SagaState.COMPENSATING), now)) {
             try {
-                if (saga.getDeadlineAt() != null && saga.getDeadlineAt().isBefore(now) && saga.getState() != SagaState.COMPENSATING) {
+                if ("RESALE_PURCHASE".equals(saga.getType()) && saga.getState() == SagaState.WAITING_TRANSFER) {
+                    purchaseService.retryTimedOutTransfer(saga.getId());
+                } else if (saga.getDeadlineAt() != null && saga.getDeadlineAt().isBefore(now) && saga.getState() != SagaState.COMPENSATING) {
                     listingService.requestRelease(saga.getId(), "SAGA_EXPIRED");
                 } else if (saga.getState() == SagaState.COMPENSATING) {
                     saga.setNextRetryAt(now.plusSeconds(10)); saga.setRetryCount((saga.getRetryCount() == null ? 0 : saga.getRetryCount()) + 1); sagaRepository.save(saga);

@@ -9,6 +9,7 @@ import com.haloticket.marketplace_service.repository.MarketplaceTransactionRepos
 import com.haloticket.marketplace_service.repository.OutboxEventRepository;
 import com.haloticket.marketplace_service.repository.TicketListingRepository;
 import com.haloticket.marketplace_service.repository.TicketTransferRepository;
+import feign.FeignException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -19,6 +20,28 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class TicketListingServiceEligibilityTest {
+
+    @Test
+    void missingEventPolicyExplainsWhyAValidTicketCannotBeResold() {
+        TicketServiceClient ticketClient = mock(TicketServiceClient.class);
+        EventServiceClient eventClient = mock(EventServiceClient.class);
+        TicketListingService service = new TicketListingService(
+                mock(TicketListingRepository.class), mock(MarketplaceSagaRepository.class),
+                mock(OutboxEventRepository.class), mock(TicketTransferRepository.class),
+                mock(MarketplaceTransactionRepository.class), ticketClient, eventClient,
+                mock(UserServiceClient.class), new ObjectMapper(), mock(EventTransferPolicyService.class));
+        when(ticketClient.getResaleEligibility("Bearer token", "ticket-1"))
+                .thenReturn(new TicketServiceClient.ResaleEligibilityResponse(
+                        "ticket-1", "event-1", true, null, new BigDecimal("10000"),
+                        null, null, null, null, null, "Premium", null, null, null));
+        when(eventClient.getResalePolicy("Bearer token", "event-1"))
+                .thenThrow(mock(FeignException.NotFound.class));
+
+        var result = service.eligibility("Bearer token", "ticket-1");
+
+        assertThat(result.eligible()).isFalse();
+        assertThat(result.reasonCode()).isEqualTo("RESALE_POLICY_NOT_CONFIGURED");
+    }
 
     @Test
     void eligibilityIncludesTheCurrentResalePriceRangeAndPolicySnapshot() {
@@ -32,9 +55,10 @@ class TicketListingServiceEligibilityTest {
                 ticketClient,
                 eventClient,
                 mock(UserServiceClient.class),
-                new ObjectMapper()
+                new ObjectMapper(),
+                mock(EventTransferPolicyService.class)
         );
-        Instant closesAt = Instant.parse("2026-09-20T09:26:00Z");
+        Instant closesAt = Instant.now().plusSeconds(3600);
         when(ticketClient.getResaleEligibility("Bearer token", "ticket-1"))
                 .thenReturn(new TicketServiceClient.ResaleEligibilityResponse(
                         "ticket-1", "event-1", true, null,

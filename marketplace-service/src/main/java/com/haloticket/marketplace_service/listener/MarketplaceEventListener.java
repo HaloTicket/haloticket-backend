@@ -67,6 +67,20 @@ public class MarketplaceEventListener {
         } catch (Exception exception) { throw new IllegalStateException("Failed to process resale payment completion", exception); }
     }
 
+    @KafkaListener(topics = "haloticket.payment.failed.v1", groupId = "marketplace-service")
+    @Transactional
+    public void onPaymentFailed(String message) {
+        try {
+            JsonNode root = objectMapper.readTree(message);
+            String messageId = root.path("messageId").asText(root.path("paymentId").asText());
+            if (messageId.isBlank() || processedEvents.existsByConsumerNameAndMessageId("marketplace-payment-failed", messageId)) return;
+            String transactionId = root.path("bookingId").asText();
+            if (!transactionId.isBlank()) listingService.paymentFailed(transactionId);
+            processedEvents.save(ProcessedEvent.builder().consumerName("marketplace-payment-failed")
+                    .messageId(messageId).processedAt(Instant.now()).build());
+        } catch (Exception exception) { throw new IllegalStateException("Failed to process resale payment failure", exception); }
+    }
+
     @KafkaListener(topics = "haloticket.ticket.released.v1", groupId = "marketplace-service")
     @Transactional
     public void onTicketReleased(String message) {

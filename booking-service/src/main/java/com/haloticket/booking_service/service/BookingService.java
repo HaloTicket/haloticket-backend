@@ -5,4 +5,5 @@ import com.haloticket.booking_service.dto.response.BookingResponse;
 
 public interface BookingService {
     BookingResponse createBooking(BookingCreateRequest request);
+    BookingResponse getBookingById(String idOrCode);
 }

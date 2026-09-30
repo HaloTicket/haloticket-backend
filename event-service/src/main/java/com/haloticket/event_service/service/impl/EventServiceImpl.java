@@ -41,6 +41,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -272,6 +273,13 @@ public class EventServiceImpl implements EventService {
         }
 
         Event saved = eventRepository.save(eventToSave);
+
+        // 1. Sync master event-level ticket types (showtimeId = null)
+        if (request.getTickets() != null && !request.getTickets().isEmpty()) {
+            syncTicketsToTicketService(saved.getId(), null, request.getTickets());
+        }
+
+        // 2. Sync showtime-specific ticket types
         if (saved.getShowtimes() != null && !saved.getShowtimes().isEmpty() && request.getShowtimes() != null) {
             for (EventShowtime st : saved.getShowtimes()) {
                 deletedShowtimeIds.remove(st.getId());
@@ -488,6 +496,22 @@ public class EventServiceImpl implements EventService {
 
         // fetch tickets dynamically from ticket-service, fallback to local JSON
         Object ticketsObj = fetchTicketsFromTicketService(event.getId());
+        if (ticketsObj instanceof List<?>) {
+            Map<String, Object> dedupTickets = new LinkedHashMap<>();
+            for (Object t : (List<?>) ticketsObj) {
+                if (t instanceof Map<?, ?> tMap) {
+                    String name = (String) tMap.get("name");
+                    Object status = tMap.get("ticketTypeStatus");
+                    if ("HIDDEN".equalsIgnoreCase(String.valueOf(status))) continue;
+                    if (name != null && !name.trim().isEmpty()) {
+                        dedupTickets.putIfAbsent(name.trim().toLowerCase(), t);
+                    }
+                } else {
+                    dedupTickets.put(String.valueOf(t.hashCode()), t);
+                }
+            }
+            ticketsObj = new ArrayList<>(dedupTickets.values());
+        }
         if ((ticketsObj == null || (ticketsObj instanceof List && ((List<?>) ticketsObj).isEmpty()))
                 && event.getTicketsData() != null && !event.getTicketsData().trim().isEmpty()) {
             try {

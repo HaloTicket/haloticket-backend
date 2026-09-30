@@ -20,6 +20,8 @@ public class SecurityConfig {
     @Bean SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http.csrf(csrf -> csrf.disable()).authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/**", "/health").permitAll()
+                // This one endpoint validates its service credential before any DB access.
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/internal/tickets/*/transfer-snapshot").permitAll()
                 .requestMatchers("/api/tickets/types/**", "/api/tickets/seat-layouts/**", "/api/tickets/seat-status").permitAll()
                 .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder()))).build();

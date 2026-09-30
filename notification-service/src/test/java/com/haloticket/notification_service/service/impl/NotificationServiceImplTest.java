@@ -7,6 +7,7 @@ import com.haloticket.notification_service.dto.response.NotificationResponse;
 import com.haloticket.notification_service.dto.response.NotificationTemplateResponse;
 import com.haloticket.notification_service.entity.Notification;
 import com.haloticket.notification_service.entity.NotificationTemplate;
+import com.haloticket.notification_service.event.NotificationEvent;
 import com.haloticket.notification_service.enums.NotificationChannel;
 import com.haloticket.notification_service.enums.NotificationStatus;
 import com.haloticket.notification_service.enums.NotificationTemplateStatus;
@@ -157,5 +158,18 @@ class NotificationServiceImplTest {
 
         assertThat(responses).hasSize(1);
         assertThat(responses.getFirst().getId()).isEqualTo("notification-1");
+    }
+
+    @Test
+    void processEventAssociatesNotificationWithPurchaserId() {
+        NotificationEvent event = new NotificationEvent("order-confirmation:booking-1", "template-1",
+                "customer-1", "buyer@example.com", NotificationChannel.EMAIL, Map.of(), null);
+        when(notificationRepository.findByEventId(event.eventId())).thenReturn(Optional.empty());
+        when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        NotificationResponse response = notificationService.processEvent(event);
+
+        assertThat(response.getUserId()).isEqualTo("customer-1");
+        assertThat(response.getRecipientEmail()).isEqualTo("buyer@example.com");
     }
 }

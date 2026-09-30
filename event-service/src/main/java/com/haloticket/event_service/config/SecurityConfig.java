@@ -41,7 +41,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/events/organizer-profile").authenticated()
                         .requestMatchers("/api/events/my-events").authenticated()
                         .requestMatchers("/api/events/approvals", "/api/events/*/approve", "/api/events/*/reject").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/events/*/resale-policy").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/events/**").permitAll()
                         .requestMatchers("/api/events/test-questions").permitAll()
                         .requestMatchers("/api/events/**").authenticated()

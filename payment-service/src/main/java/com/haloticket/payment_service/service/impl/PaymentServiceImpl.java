@@ -186,6 +186,17 @@ public class PaymentServiceImpl implements PaymentService {
                         .status(PaymentStatus.PENDING)
                         .build());
 
+        if (payment.getStatus() == PaymentStatus.SUCCESS) {
+            response.put("RspCode", "00");
+            response.put("Message", "Already Confirmed");
+            return response;
+        }
+        if (payment.getStatus() == PaymentStatus.FAILED && !"00".equals(vnp_ResponseCode)) {
+            response.put("RspCode", "01");
+            response.put("Message", "Transaction Failed");
+            return response;
+        }
+
         if ("00".equals(vnp_ResponseCode)) {
             payment.setStatus(PaymentStatus.SUCCESS);
             paymentRepository.save(payment);

@@ -10,5 +10,6 @@ import org.springframework.web.bind.annotation.*;
 public class ResalePolicyController {
     private final ResalePolicyService service;
     @GetMapping public ResalePolicyResponse get(@PathVariable String eventId) { return service.get(eventId); }
-    @PutMapping public ResalePolicyResponse put(@PathVariable String eventId, @RequestBody ResalePolicyRequest request) { return service.upsert(eventId, request); }
+    @PutMapping public ResalePolicyResponse put(@PathVariable String eventId, @RequestBody ResalePolicyRequest request,
+            @RequestHeader("Authorization") String authorization) { return service.upsert(eventId, request, authorization); }
 }

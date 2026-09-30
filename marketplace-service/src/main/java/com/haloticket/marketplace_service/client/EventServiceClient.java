@@ -6,6 +6,8 @@ import java.time.Instant;
 @FeignClient(name="event-service", path="/api/events")
 public interface EventServiceClient {
     @GetMapping("/{eventId}/resale-policy")
-    ResalePolicyResponse getResalePolicy(@RequestHeader("Authorization") String authorization, @PathVariable String eventId);
+    ResalePolicyResponse getResalePolicy(@RequestHeader("Authorization") String authorization, @PathVariable("eventId") String eventId);
+    @GetMapping("/{eventId}/members/my-role")
+    String getMyRole(@RequestHeader("Authorization") String authorization, @PathVariable("eventId") String eventId);
     record ResalePolicyResponse(boolean enabled, BigDecimal minPricePercent, BigDecimal maxPricePercent, Instant closesAt, String termsVersion, Long version) {}
 }

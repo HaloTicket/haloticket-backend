@@ -13,5 +13,14 @@ public interface TicketServiceClient {
     record ResaleEligibilityResponse(String ticketId, String eventId, boolean eligible, String reasonCode,
                                      BigDecimal originalPrice, BigDecimal minPrice, BigDecimal maxPrice,
                                      Long policyVersion, Instant closesAt, String termsVersion,
-                                     String ticketTypeName, String section, String row, String seat) {}
+                                     String ticketTypeName, String section, String row, String seat,
+                                     String ticketTypeId, String showtimeId) {
+        public ResaleEligibilityResponse(String ticketId, String eventId, boolean eligible, String reasonCode,
+                                         BigDecimal originalPrice, BigDecimal minPrice, BigDecimal maxPrice,
+                                         Long policyVersion, Instant closesAt, String termsVersion,
+                                         String ticketTypeName, String section, String row, String seat) {
+            this(ticketId, eventId, eligible, reasonCode, originalPrice, minPrice, maxPrice, policyVersion,
+                    closesAt, termsVersion, ticketTypeName, section, row, seat, null, null);
+        }
+    }
 }

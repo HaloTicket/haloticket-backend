@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haloticket.notification_service.enums.NotificationChannel;
 import com.haloticket.notification_service.enums.NotificationTemplateStatus;
+import com.haloticket.notification_service.enums.NotificationStatus;
 import com.haloticket.notification_service.enums.NotificationType;
 import com.haloticket.notification_service.entity.NotificationTemplate;
 import com.haloticket.notification_service.repository.NotificationTemplateRepository;
@@ -15,6 +16,9 @@ import com.haloticket.notification_service.service.NotificationService;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.Locale;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -43,60 +47,88 @@ public class SagaNotificationListener {
     private String mailFrom;
     @Value("${notification.mail.from:no-reply@haloticket.local}")
     private String fromAddress;
-
-    @KafkaListener(topics = "haloticket.booking.confirmed.v1", groupId = "notification-service-saga")
-    public void handleBookingConfirmedNotification(String payload) {
-        try {
-            log.info("NotificationService received BOOKING_CONFIRMED event: {}", payload);
-            JsonNode node = objectMapper.readTree(payload);
-            String bookingCode = node.has("bookingCode") ? node.get("bookingCode").asText() : "";
-            String customerEmail = node.has("customerEmail") ? node.get("customerEmail").asText() : "";
-            String customerName = node.has("customerName") ? node.get("customerName").asText() : "";
-            String customerId = node.has("customerId") ? node.get("customerId").asText() : "";
-            
-            if (customerEmail == null || customerEmail.isBlank()) {
-                log.warn("Cannot send confirmation email, missing customerEmail for booking: {}", bookingCode);
-                return;
-            }
-
-            NotificationTemplate template = templateRepository.findByTypeAndChannelAndStatus(
-                    NotificationType.TICKET_CONFIRMATION,
-                    NotificationChannel.EMAIL,
-                    NotificationTemplateStatus.ACTIVE
-            ).orElse(null);
-
-            if (template != null) {
-                Map<String, String> vars = new HashMap<>();
-                vars.put("fullName", customerName != null && !customerName.isBlank() ? customerName : "Quý khách");
-                vars.put("bookingCode", bookingCode);
-                vars.put("customerId", customerId);
-                
-                String eventId = node.has("eventId") ? node.get("eventId").asText() : "";
-                vars.put("eventId", eventId); // just in case template uses it
-                
-                emailSender.send(template, customerEmail, vars);
-                log.info("Sent order confirmation email to {} for booking {}", customerEmail, bookingCode);
-            } else {
-                log.warn("TICKET_CONFIRMATION template not found in DB!");
-            }
-
-        } catch (Exception e) {
-            log.error("Failed to process BOOKING_CONFIRMED notification", e);
-        }
-    }
+    @Value("${notification.frontend-base-url:http://localhost:5173}")
+    private String frontendBaseUrl;
 
     @KafkaListener(topics = "haloticket.tickets.issued.v1", groupId = "notification-service-saga")
     public void handleTicketsIssuedNotification(String payload) {
         try {
-            log.info("NotificationService received TICKETS_ISSUED event: {}", payload);
             JsonNode node = objectMapper.readTree(payload);
-            String bookingId = node.has("bookingId") ? node.get("bookingId").asText() : "";
-            String qrToken = node.has("qrToken") ? node.get("qrToken").asText() : "";
+            String bookingId = node.path("bookingId").asText("");
+            String bookingCode = node.path("bookingCode").asText("");
+            String customerEmail = node.path("customerEmail").asText("");
+            JsonNode tickets = node.path("tickets");
+            if (bookingId.isBlank() || bookingCode.isBlank() || customerEmail.isBlank()
+                    || !tickets.isArray() || tickets.isEmpty()) {
+                log.warn("Skipping incomplete TICKETS_ISSUED batch for booking {}", bookingId);
+                return;
+            }
 
-            log.info("Ticket issued notification sent for bookingId: {}, QR Token: {}", bookingId, qrToken);
+            NotificationTemplate template = templateRepository.findByTypeAndChannelAndStatus(
+                    NotificationType.TICKET_CONFIRMATION, NotificationChannel.EMAIL, NotificationTemplateStatus.ACTIVE)
+                    .orElseThrow(() -> new IllegalStateException("Active ticket confirmation template is missing"));
+            Map<String, String> vars = orderVariables(node, tickets);
+            NotificationEvent event = new NotificationEvent("order-confirmation:" + bookingId,
+                    template.getId(), node.path("customerId").asText(""), customerEmail,
+                    NotificationChannel.EMAIL, vars, null);
+            var notification = notificationService.processEvent(event);
+            if (notification.getStatus() == NotificationStatus.SENT) return;
+
+            emailSender.send(template, customerEmail, vars);
+            notificationService.markAsSent(notification.getId());
+            log.info("Sent order confirmation email for booking {}", bookingId);
         } catch (Exception e) {
-            log.error("Failed to process TICKETS_ISSUED notification", e);
+            throw new IllegalStateException("Failed to process TICKETS_ISSUED notification", e);
         }
+    }
+
+    private Map<String, String> orderVariables(JsonNode node, JsonNode tickets) {
+        Map<String, String> vars = new HashMap<>();
+        String name = node.path("customerName").asText("");
+        String bookingCode = node.path("bookingCode").asText();
+        String eventTitle = node.path("eventTitle").asText("");
+        if (eventTitle.isBlank()) eventTitle = "Sự kiện " + node.path("eventId").asText("");
+        vars.put("fullName", escapeHtml(name.isBlank() ? "Quý khách" : name));
+        vars.put("bookingCode", escapeHtml(bookingCode));
+        vars.put("eventTitle", escapeHtml(eventTitle));
+        vars.put("ticketCount", tickets.size() + " vé");
+        vars.put("amount", formatAmount(node.path("amount")));
+        vars.put("orderUrl", escapeHtml(frontendBaseUrl.replaceAll("/+$", "")
+                + "/my-tickets/orders/" + URLEncoder.encode(bookingCode, StandardCharsets.UTF_8).replace("+", "%20")));
+
+        StringBuilder rows = new StringBuilder();
+        for (JsonNode ticket : tickets) {
+            String type = ticket.path("ticketTypeName").asText("");
+            if (type.isBlank()) type = "Vé sự kiện";
+            StringBuilder seat = new StringBuilder();
+            appendSeatPart(seat, "Khu ", ticket.path("section").asText(""));
+            appendSeatPart(seat, "Hàng ", ticket.path("row").asText(""));
+            appendSeatPart(seat, "Ghế ", ticket.path("seat").asText(""));
+            rows.append("<tr><td>").append(escapeHtml(type)).append("</td><td>")
+                    .append(seat.isEmpty() ? "Vé tự do" : seat)
+                    .append("</td></tr>");
+        }
+        vars.put("ticketRows", rows.toString());
+        return vars;
+    }
+
+    private static void appendSeatPart(StringBuilder seat, String label, String value) {
+        if (value.isBlank()) return;
+        if (!seat.isEmpty()) seat.append(" · ");
+        seat.append(label).append(escapeHtml(value));
+    }
+
+    private static String formatAmount(JsonNode amount) {
+        if (!amount.isNumber()) return "—";
+        DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(Locale.forLanguageTag("vi-VN"));
+        DecimalFormat format = new DecimalFormat("#,##0.##", symbols);
+        return format.format(amount.decimalValue()) + " ₫";
+    }
+
+    private static String escapeHtml(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&#39;")
+                .replace("{", "&#123;").replace("}", "&#125;");
     }
 
     @KafkaListener(topics = "haloticket.marketplace.gift.invited.v1", groupId = "notification-service-marketplace")

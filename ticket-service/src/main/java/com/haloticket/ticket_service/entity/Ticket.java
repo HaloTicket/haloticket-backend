@@ -25,6 +25,18 @@ public class Ticket {
     @JoinColumn(name = "seat_id", unique = true)
     private Seat seat;
 
+    @Column(name = "seat_reference")
+    private String seatReference;
+
+    @Column(name = "seat_section")
+    private String seatSection;
+
+    @Column(name = "seat_row_label")
+    private String seatRowLabel;
+
+    @Column(name = "seat_number_label")
+    private String seatNumberLabel;
+
     @Column(name = "event_id", nullable = false)
     private String eventId;
 
