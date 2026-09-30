@@ -75,10 +75,13 @@ public class TicketListingController {
     public ResponseEntity<ReservationResponse> reserve(
             @PathVariable String listingId,
             @RequestHeader(value = "Idempotency-Key", required = false) String key,
+            @RequestBody(required = false) ReserveListingRequest request,
             Authentication authentication) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(service.reserveListing(authentication.getName(), key, listingId));
+                .body(service.reserveListing(authentication.getName(), key, listingId, request == null ? null : request.ticketIds()));
     }
+
+    public record ReserveListingRequest(java.util.List<String> ticketIds) {}
 
     @PostMapping("/listings/{listingId}/cancel-reservation")
     public ResponseEntity<Void> cancelReservation(@PathVariable String listingId, Authentication authentication) {

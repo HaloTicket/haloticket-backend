@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity @Table(name = "marketplace_transactions", indexes = @Index(name = "idx_market_tx_listing_status", columnList = "ticket_listing_id,status"))
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
@@ -22,6 +24,12 @@ public class MarketplaceTransaction {
     @Column(name = "completed_at") private Instant completedAt;
     @Column(name = "cancelled_at") private Instant cancelledAt;
     @Column(name = "saga_id") private String sagaId;
+    @Column(name = "selection_explicit") private Boolean selectionExplicit;
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "marketplace_transaction_tickets", joinColumns = @JoinColumn(name = "transaction_id"),
+            uniqueConstraints = @UniqueConstraint(name = "uk_transaction_ticket", columnNames = {"transaction_id", "ticket_id"}))
+    @Column(name = "ticket_id", nullable = false)
+    @Builder.Default private Set<String> ticketIds = new LinkedHashSet<>();
     @Version private Long version;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;

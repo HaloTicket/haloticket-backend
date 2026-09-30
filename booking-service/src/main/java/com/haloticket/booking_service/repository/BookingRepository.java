@@ -1,6 +1,8 @@
 package com.haloticket.booking_service.repository;
 
 import com.haloticket.booking_service.entity.Booking;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -18,7 +20,12 @@ import java.util.Optional;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, String> {
+       @Lock(LockModeType.PESSIMISTIC_WRITE)
+       @Query("SELECT b FROM Booking b WHERE b.id = :id")
+       Optional<Booking> findByIdForUpdate(@Param("id") String id);
+
        Optional<Booking> findByBookingCode(String bookingCode);
+       @Lock(LockModeType.PESSIMISTIC_WRITE)
        List<Booking> findByStatusAndExpiredAtBefore(BookingStatus status, LocalDateTime dateTime);
 
        @Query("SELECT COUNT(DISTINCT b.customerId) FROM Booking b WHERE b.eventId = :eventId AND b.status = 'PAID'")

@@ -5,6 +5,8 @@ import com.haloticket.marketplace_service.enums.TransferType;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity @Table(name = "ticket_transfers")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
@@ -27,5 +29,8 @@ public class TicketTransfer {
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "transferred_at") private Instant transferredAt;
     @Version private Long version;
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "ticket_transfer_members", joinColumns = @JoinColumn(name = "transfer_id"))
+    @Builder.Default private List<TicketMemberSnapshot> members = new ArrayList<>();
     @PrePersist void onCreate() { createdAt = Instant.now(); if (status == null) status = TransferStatus.PENDING; }
 }

@@ -107,7 +107,7 @@ public class BookingServiceImpl implements BookingService {
                             } else {
                                 boolean isOwnPendingBooking = false;
                                 if (heldBy != null) {
-                                    Optional<Booking> previousBooking = bookingRepository.findById(heldBy);
+                                    Optional<Booking> previousBooking = bookingRepository.findByIdForUpdate(heldBy);
                                     if (previousBooking.isPresent()
                                             && previousBooking.get().getStatus() == BookingStatus.PENDING
                                             && currentCustomerId.equals(previousBooking.get().getCustomerId())) {

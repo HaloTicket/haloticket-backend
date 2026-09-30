@@ -17,7 +17,7 @@ import java.util.List;
 public class TicketListing {
     @Id @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
-    @Column(name = "ticket_id", nullable = false, unique = true) private String ticketId;
+    @Column(name = "ticket_id", nullable = false) private String ticketId;
     @Column(name = "seller_id", nullable = false) private String sellerId;
     @Column(nullable = false, precision = 19, scale = 0) private BigDecimal price;
     @Column(name = "original_price", precision = 19, scale = 0) private BigDecimal originalPrice;
@@ -45,6 +45,16 @@ public class TicketListing {
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
     @OneToMany(mappedBy = "ticketListing", fetch = FetchType.LAZY) @Builder.Default
     private List<MarketplaceTransaction> transactions = new ArrayList<>();
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "ticket_listing_members", joinColumns = @JoinColumn(name = "listing_id"),
+            uniqueConstraints = @UniqueConstraint(name = "uk_listing_member", columnNames = {"listing_id", "ticket_id"}))
+    @Builder.Default private List<TicketMemberSnapshot> members = new ArrayList<>();
+
+    public List<TicketMemberSnapshot> remainingMembers() {
+        if (members == null || members.isEmpty()) return List.of(new TicketMemberSnapshot(ticketId, null, null,
+                ticketTypeNameSnapshot, sectionSnapshot, rowSnapshot, seatSnapshot, originalPrice, false));
+        return members.stream().filter(member -> !member.isSold()).toList();
+    }
 
     @PrePersist void onCreate() { createdAt = Instant.now(); updatedAt = createdAt; if (status == null) status = ListingStatus.ACTIVE; }
     @PreUpdate void onUpdate() { updatedAt = Instant.now(); }

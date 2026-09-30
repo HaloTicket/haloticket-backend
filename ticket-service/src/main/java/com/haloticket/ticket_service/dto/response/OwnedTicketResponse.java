@@ -9,7 +9,8 @@ import java.time.LocalDateTime;
 
 public record OwnedTicketResponse(String id, String bookingCode, String eventId, String ticketTypeId, String ticketTypeName,
                                   BigDecimal price, BigDecimal originalPrice, String acquisitionType, String status,
-                                  String qrCode, Integer qrVersion, LocalDateTime issuedAt, String seatName) {
+                                  String qrCode, Integer qrVersion, LocalDateTime issuedAt, String seatName,
+                                  String bookingId, String showtimeId, String section, String row, String seatNumber) {
     public static OwnedTicketResponse from(Ticket ticket) {
         BigDecimal price = ticket.getOriginalPrice();
         String typeId = null;
@@ -32,12 +33,21 @@ public record OwnedTicketResponse(String id, String bookingCode, String eventId,
             } else {
                 seatName = "Số " + seat.getSeatNumber();
             }
+        } else if (ticket.getSeatNumberLabel() != null) {
+            seatName = ticket.getSeatRowLabel() == null ? "Ghế " + ticket.getSeatNumberLabel()
+                    : "Hàng " + ticket.getSeatRowLabel() + " - Ghế " + ticket.getSeatNumberLabel();
         }
 
         return new OwnedTicketResponse(ticket.getId(), ticket.getBookingId(), ticket.getEventId(), typeId, typeName, paidPrice,
                 price, ticket.getAcquisitionType() == null ? "PRIMARY" : ticket.getAcquisitionType(),
                 ticket.getStatus() == null ? null : ticket.getStatus().name(),
                 isValid ? ticket.getQrCodeHash() : null,
-                ticket.getQrVersion(), ticket.getIssuedAt(), seatName);
+                ticket.getQrVersion(), ticket.getIssuedAt(), seatName,
+                ticket.getBookingId(), ticket.getShowtimeId() != null ? ticket.getShowtimeId()
+                        : ticket.getTicketType() == null ? null : ticket.getTicketType().getShowtimeId(),
+                seat == null || seat.getSeatRow() == null || seat.getSeatRow().getSeatZone() == null
+                        ? ticket.getSeatSection() : seat.getSeatRow().getSeatZone().getName(),
+                seat == null || seat.getSeatRow() == null ? ticket.getSeatRowLabel() : seat.getSeatRow().getLabel(),
+                seat == null ? ticket.getSeatNumberLabel() : seat.getSeatNumber());
     }
 }

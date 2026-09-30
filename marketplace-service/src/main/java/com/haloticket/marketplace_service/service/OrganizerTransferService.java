@@ -6,6 +6,7 @@ import com.haloticket.marketplace_service.dto.OrganizerListingResponse;
 import com.haloticket.marketplace_service.dto.OrganizerTransferSummaryResponse;
 import com.haloticket.marketplace_service.entity.TicketListing;
 import com.haloticket.marketplace_service.entity.TicketTransfer;
+import com.haloticket.marketplace_service.entity.TicketMemberSnapshot;
 import com.haloticket.marketplace_service.enums.ListingStatus;
 import com.haloticket.marketplace_service.enums.TransferStatus;
 import com.haloticket.marketplace_service.repository.TicketListingRepository;
@@ -93,7 +94,9 @@ public class OrganizerTransferService {
                     l.getPrice(),
                     "VND",
                     l.getStatus().name(),
-                    l.getCreatedAt()
+                    l.getCreatedAt(),
+                    l.remainingMembers().size(),
+                    l.remainingMembers().stream().map(TicketMemberSnapshot::getTicketId).toList()
             );
         });
     }
@@ -115,7 +118,9 @@ public class OrganizerTransferService {
                     t.getTicketTypeName() != null ? t.getTicketTypeName() : "Vé sự kiện",
                     t.getCreatedAt(),
                     t.getInvitationExpiresAt() != null ? t.getInvitationExpiresAt() : t.getCreatedAt(),
-                    t.getStatus().name()
+                    t.getStatus().name(),
+                    t.getMembers().isEmpty() ? 1 : t.getMembers().size(),
+                    t.getMembers().isEmpty() ? java.util.List.of(t.getTicketId()) : t.getMembers().stream().map(TicketMemberSnapshot::getTicketId).toList()
             );
         });
     }
@@ -139,7 +144,9 @@ public class OrganizerTransferService {
                 l.getPrice(),
                 "VND",
                 l.getStatus().name(),
-                l.getCreatedAt()
+                l.getCreatedAt(),
+                l.remainingMembers().size(),
+                l.remainingMembers().stream().map(TicketMemberSnapshot::getTicketId).toList()
         );
     }
 
@@ -158,7 +165,9 @@ public class OrganizerTransferService {
                 t.getTicketTypeName() != null ? t.getTicketTypeName() : "Vé sự kiện",
                 t.getCreatedAt(),
                 t.getInvitationExpiresAt() != null ? t.getInvitationExpiresAt() : t.getCreatedAt(),
-                t.getStatus().name()
+                t.getStatus().name(),
+                t.getMembers().isEmpty() ? 1 : t.getMembers().size(),
+                t.getMembers().isEmpty() ? java.util.List.of(t.getTicketId()) : t.getMembers().stream().map(TicketMemberSnapshot::getTicketId).toList()
         );
     }
 

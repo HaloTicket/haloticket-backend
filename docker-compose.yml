@@ -408,6 +408,7 @@ services:
       SMTP_AUTH: ${SMTP_AUTH:-true}
       SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       NOTIFICATION_GIFT_ACCEPT_BASE_URL: ${GIFT_ACCEPT_BASE_URL:-http://localhost:5173/gifts/accept}
+      PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-http://localhost:5173}
     depends_on:
       <<: *dependencies
       kafka:

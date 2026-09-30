@@ -128,7 +128,8 @@ public class NotificationServiceImpl implements NotificationService {
                 .orElseGet(() -> {
                     Notification notification = Notification.builder()
                             .eventId(event.eventId())
-                            .userId(event.recipientEmail())
+                            .userId(event.userId() == null || event.userId().isBlank()
+                                    ? event.recipientEmail() : event.userId())
                             .recipientEmail(event.recipientEmail())
                             .variablesJson(toVariablesJson(event.variables()))
                             .channel(event.channel())

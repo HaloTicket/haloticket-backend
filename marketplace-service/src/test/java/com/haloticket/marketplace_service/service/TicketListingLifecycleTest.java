@@ -25,6 +25,26 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 class TicketListingLifecycleTest {
+    @Test
+    void releaseCallbackCancelsOriginalListingOnlyAfterPrimaryTicketWasRelisted() {
+        TicketListingRepository listings = mock(TicketListingRepository.class);
+        MarketplaceSagaRepository sagas = mock(MarketplaceSagaRepository.class);
+        TicketListingService service = service(listings, sagas, mock(OutboxEventRepository.class));
+        TicketListing original = listing("seller-1", ListingStatus.ACTIVE);
+        TicketListing buyersNewListing = TicketListing.builder().id("buyer-listing").ticketId("ticket-1")
+                .sellerId("buyer-1").status(ListingStatus.ACTIVE).build();
+        MarketplaceSaga saga = MarketplaceSaga.builder().id("saga-1").ticketId("ticket-1")
+                .businessId("listing-1").type("RESALE_LISTING").state(SagaState.COMPENSATING).payload("{}").build();
+        when(sagas.findById("saga-1")).thenReturn(Optional.of(saga));
+        when(listings.findById("listing-1")).thenReturn(Optional.of(original));
+        when(listings.findByTicketIdAndStatus("ticket-1", ListingStatus.ACTIVE)).thenReturn(Optional.of(buyersNewListing));
+
+        service.handleTicketReleased("saga-1");
+
+        assertThat(original.getStatus()).isEqualTo(ListingStatus.CANCELLED);
+        assertThat(buyersNewListing.getStatus()).isEqualTo(ListingStatus.ACTIVE);
+        verify(listings, never()).findByTicketIdAndStatus(anyString(), any());
+    }
 
     @Test
     void sellerCancellationHidesTheListingAndRequestsTicketRelease() throws Exception {

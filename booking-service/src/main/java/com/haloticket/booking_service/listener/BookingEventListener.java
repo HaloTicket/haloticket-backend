@@ -3,6 +3,9 @@ package com.haloticket.booking_service.listener;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haloticket.booking_service.entity.Booking;
+import com.haloticket.booking_service.client.EventServiceClient;
+import com.haloticket.booking_service.dto.response.EventResponse;
+import com.haloticket.booking_service.dto.response.EventShowtimeDto;
 import com.haloticket.booking_service.entity.SeatReservation;
 import com.haloticket.booking_service.enums.BookingStatus;
 import com.haloticket.booking_service.enums.SeatReservationStatus;
@@ -24,6 +27,7 @@ import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.Objects;
 
 @Component
 @RequiredArgsConstructor
@@ -36,6 +40,7 @@ public class BookingEventListener {
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
     private final SeatWebsocketService websocketService;
+    private final EventServiceClient eventServiceClient;
 
     @KafkaListener(topics = "haloticket.payment.completed.v1", groupId = "booking-service")
     @Transactional
@@ -50,11 +55,13 @@ public class BookingEventListener {
                 return;
             }
 
-            String provider = node.has("provider") ? node.get("provider").asText() : "UNKNOWN";
-
-            Booking booking = bookingRepository.findById(bookingId).orElse(null);
+            Booking booking = bookingRepository.findByIdForUpdate(bookingId).orElse(null);
             if (booking == null) {
                 log.warn("Booking not found for payment completed event: {}", bookingId);
+                return;
+            }
+            if (booking.getStatus() != BookingStatus.PENDING) {
+                log.info("Ignoring payment completion for booking {} in status {}", bookingId, booking.getStatus());
                 return;
             }
 
@@ -106,6 +113,21 @@ public class BookingEventListener {
             payloadMap.put("showtimeId", booking.getShowtimeId());
             payloadMap.put("amount", booking.getTotalAmount());
             payloadMap.put("seatIds", seatIds);
+            try {
+                EventResponse event = eventServiceClient.getEventById(booking.getEventId());
+                if (event != null) {
+                    payloadMap.put("eventTitle", event.getTitle());
+                    payloadMap.put("locationName", event.getLocationName());
+                    payloadMap.put("address", event.getAddress());
+                    EventShowtimeDto showtime = event.getShowtimes() == null ? null : event.getShowtimes().stream()
+                            .filter(st -> Objects.equals(st.getId(), booking.getShowtimeId()))
+                            .findFirst().orElse(null);
+                    var eventStartTime = showtime != null ? showtime.getStartTime() : event.getStartTime();
+                    if (eventStartTime != null) payloadMap.put("eventStartTime", eventStartTime.toString());
+                }
+            } catch (RuntimeException e) {
+                log.warn("Event details unavailable for booking {}", bookingId, e);
+            }
             
             List<Map<String, Object>> itemsList = new ArrayList<>();
             if (booking.getItems() != null) {
@@ -113,6 +135,7 @@ public class BookingEventListener {
                     Map<String, Object> itemMap = new HashMap<>();
                     itemMap.put("ticketTypeId", item.getTicketTypeId());
                     itemMap.put("quantity", item.getQuantity());
+                    itemMap.put("unitPrice", item.getUnitPrice());
                     itemsList.add(itemMap);
                 }
             }
@@ -133,6 +156,8 @@ public class BookingEventListener {
 
         } catch (Exception e) {
             log.error("Error processing PAYMENT_COMPLETED event", e);
+            if (e instanceof RuntimeException runtimeException) throw runtimeException;
+            throw new IllegalStateException("Error processing PAYMENT_COMPLETED event", e);
         }
     }
 
@@ -148,8 +173,12 @@ public class BookingEventListener {
                 return;
             }
 
-            Booking booking = bookingRepository.findById(bookingId).orElse(null);
+            Booking booking = bookingRepository.findByIdForUpdate(bookingId).orElse(null);
             if (booking == null) return;
+            if (booking.getStatus() != BookingStatus.PENDING) {
+                log.info("Ignoring payment failure for booking {} in status {}", bookingId, booking.getStatus());
+                return;
+            }
 
             booking.setStatus(BookingStatus.CANCELLED);
             bookingRepository.save(booking);
@@ -177,6 +206,8 @@ public class BookingEventListener {
 
         } catch (Exception e) {
             log.error("Error processing PAYMENT_FAILED event", e);
+            if (e instanceof RuntimeException runtimeException) throw runtimeException;
+            throw new IllegalStateException("Error processing PAYMENT_FAILED event", e);
         }
     }
 }

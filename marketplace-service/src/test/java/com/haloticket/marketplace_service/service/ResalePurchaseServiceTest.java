@@ -13,6 +13,70 @@ import static org.mockito.Mockito.*;
 
 class ResalePurchaseServiceTest {
     @Test
+    void timedOutPaidTransferRetriesSameMembersAndLateSuccessCompletesOnce() {
+        Fixture fixture = new Fixture();
+        fixture.listing.setMembers(new java.util.ArrayList<>(java.util.List.of(
+                new TicketMemberSnapshot("ticket-1", "type", "show", "VIP", null, null, null, new BigDecimal("100000"), false),
+                new TicketMemberSnapshot("ticket-2", "type", "show", "VIP", null, null, null, new BigDecimal("100000"), false))));
+        fixture.transaction.setTicketIds(new java.util.LinkedHashSet<>(java.util.List.of("ticket-2")));
+        fixture.transaction.setStatus(MarketplaceTransactionStatus.TRANSFERRING);
+        fixture.transaction.setSagaId("purchase-saga");
+        MarketplaceSaga saga = MarketplaceSaga.builder().id("purchase-saga").type("RESALE_PURCHASE")
+                .state(SagaState.WAITING_TRANSFER).retryCount(0).build();
+        when(fixture.sagas.findById("purchase-saga")).thenReturn(Optional.of(saga));
+        when(fixture.transactions.findBySagaId("purchase-saga")).thenReturn(Optional.of(fixture.transaction));
+        when(fixture.transfers.findBySagaId("purchase-saga")).thenReturn(Optional.of(TicketTransfer.builder().ticketId("ticket-2").status(TransferStatus.PENDING).build()));
+
+        fixture.service.retryTimedOutTransfer("purchase-saga");
+        assertThat(saga.getState()).isEqualTo(SagaState.WAITING_TRANSFER);
+        assertThat(fixture.transaction.getStatus()).isEqualTo(MarketplaceTransactionStatus.TRANSFERRING);
+        verify(fixture.outbox).save(argThat(event -> event.getPayload().contains("\"operationId\":\"purchase-saga:TRANSFER\"")
+                && event.getPayload().contains("\"ticketIds\":[\"ticket-2\"]")
+                && event.getPayload().contains("\"lockTicketIds\":[\"ticket-1\",\"ticket-2\"]")));
+        fixture.service.handleOwnershipTransferred("purchase-saga");
+        fixture.service.handleOwnershipTransferred("purchase-saga");
+        assertThat(fixture.transaction.getStatus()).isEqualTo(MarketplaceTransactionStatus.COMPLETED);
+        assertThat(fixture.listing.remainingMembers()).extracting(TicketMemberSnapshot::getTicketId).containsExactly("ticket-1");
+        verify(fixture.settlements, times(1)).save(any());
+    }
+    @Test
+    void batchPurchaseTransfersExactSelectionAtUnitPrice() {
+        Fixture fixture = new Fixture();
+        fixture.listing.setMembers(new java.util.ArrayList<>(java.util.List.of(
+                new TicketMemberSnapshot("ticket-1", "type", "show", "VIP", null, null, null, new BigDecimal("100000"), false),
+                new TicketMemberSnapshot("ticket-2", "type", "show", "VIP", null, null, null, new BigDecimal("100000"), false),
+                new TicketMemberSnapshot("ticket-3", "type", "show", "VIP", null, null, null, new BigDecimal("100000"), false))));
+        fixture.transaction.setTicketIds(new java.util.LinkedHashSet<>(java.util.List.of("ticket-1", "ticket-3")));
+        fixture.transaction.setAmount(new BigDecimal("240000"));
+        fixture.transaction.setStatus(MarketplaceTransactionStatus.PAYMENT_PROCESSING);
+        when(fixture.transactions.findById("tx-1")).thenReturn(Optional.of(fixture.transaction));
+
+        fixture.service.handlePaymentCompleted("tx-1", "payment-1", new BigDecimal("240000"));
+
+        verify(fixture.outbox).save(argThat(event -> event.getPayload().contains("\"ticketIds\":[\"ticket-1\",\"ticket-3\"]")
+                && event.getPayload().contains("\"purchasePrice\":120000")));
+        verify(fixture.transfers).save(argThat(transfer -> transfer.getMembers().size() == 2));
+    }
+    @Test
+    void subsetCompletionOnlyMarksSelectedMemberSold() {
+        Fixture fixture = new Fixture();
+        fixture.listing.setMembers(new java.util.ArrayList<>(java.util.List.of(
+                new TicketMemberSnapshot("ticket-1", "type", "show", "VIP", null, null, null, new BigDecimal("100000"), false),
+                new TicketMemberSnapshot("ticket-2", "type", "show", "VIP", null, null, null, new BigDecimal("100000"), false))));
+        fixture.transaction.setTicketIds(new java.util.LinkedHashSet<>(java.util.Set.of("ticket-1")));
+        fixture.transaction.setStatus(MarketplaceTransactionStatus.TRANSFERRING);
+        fixture.transaction.setSagaId("purchase-saga");
+        when(fixture.transactions.findBySagaId("purchase-saga")).thenReturn(Optional.of(fixture.transaction));
+        when(fixture.transfers.findBySagaId("purchase-saga")).thenReturn(Optional.of(TicketTransfer.builder().ticketId("ticket-1").status(TransferStatus.PENDING).build()));
+        when(fixture.sagas.findById("purchase-saga")).thenReturn(Optional.of(MarketplaceSaga.builder().state(SagaState.WAITING_TRANSFER).build()));
+
+        fixture.service.handleOwnershipTransferred("purchase-saga");
+
+        assertThat(fixture.listing.getStatus()).isEqualTo(ListingStatus.ACTIVE);
+        assertThat(fixture.listing.remainingMembers()).extracting(TicketMemberSnapshot::getTicketId).containsExactly("ticket-2");
+        assertThat(fixture.listing.getQuantity()).isEqualTo(1);
+    }
+    @Test
     void buyerCanReadPurchaseCompletionStatus() {
         Fixture fixture = new Fixture();
         fixture.transaction.setStatus(MarketplaceTransactionStatus.COMPLETED);
@@ -88,6 +152,6 @@ class ResalePurchaseServiceTest {
         final MarketplaceTransaction transaction = MarketplaceTransaction.builder().id("tx-1").ticketListing(listing)
                 .buyerId("buyer-1").sellerId("seller-1").amount(new BigDecimal("120000"))
                 .status(MarketplaceTransactionStatus.PENDING_PAYMENT).reservationExpiresAt(Instant.now().plusSeconds(600)).build();
-        final ResalePurchaseService service = new ResalePurchaseService(transactions, sagas, transfers, settlements, outbox, new ObjectMapper());
+        final ResalePurchaseService service = new ResalePurchaseService(transactions, sagas, transfers, settlements, outbox, new ObjectMapper(), mock(EventTransferPolicyService.class));
     }
 }

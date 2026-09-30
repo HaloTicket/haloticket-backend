@@ -15,6 +15,10 @@
     .order-box { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 25px; margin-bottom: 35px; }
     .order-box .label { font-size: 13px; font-weight: 600; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; margin-bottom: 5px; }
     .order-box .value { font-size: 24px; font-weight: 800; color: #2563eb; letter-spacing: 1px; }
+    .details { width: 100%; border-collapse: collapse; margin: 0 0 24px; font-size: 15px; }
+    .details th, .details td { text-align: left; padding: 12px; border-bottom: 1px solid #e2e8f0; }
+    .details th { color: #64748b; font-size: 13px; }
+    .summary { margin: 0 0 30px; line-height: 1.8; }
     .cta-container { text-align: center; margin-bottom: 20px; }
     .cta-btn { display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 9999px; font-weight: 700; font-size: 16px; transition: background-color 0.2s; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2); }
     .footer { background-color: #1e293b; padding: 30px; text-align: center; color: #94a3b8; font-size: 14px; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; }
@@ -37,9 +41,17 @@
         <div class="label">Mã Đơn Hàng</div>
         <div class="value">{{bookingCode}}</div>
       </div>
+
+      <div class="summary"><strong>Sự kiện:</strong> {{eventTitle}}<br>
+        <strong>Số lượng:</strong> {{ticketCount}}<br>
+        <strong>Đã thanh toán:</strong> {{amount}}</div>
+      <table class="details" role="presentation">
+        <thead><tr><th>Loại vé</th><th>Vị trí</th></tr></thead>
+        <tbody>{{ticketRows}}</tbody>
+      </table>
       
       <div class="cta-container">
-        <a href="http://localhost:5173/my-tickets" class="cta-btn">Xem Vé Của Tôi</a>
+        <a href="{{orderUrl}}" class="cta-btn">Xem Vé Của Tôi</a>
       </div>
       
       <div class="success-msg" style="text-align: center; font-size: 14px;">

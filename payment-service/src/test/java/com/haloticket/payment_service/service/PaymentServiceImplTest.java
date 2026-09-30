@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -138,6 +139,25 @@ class PaymentServiceImplTest {
 
         assertThat(first.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
         assertThat(second.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
+        verify(outboxEventRepository, times(1)).save(any());
+    }
+
+    @Test
+    void repeatedVnPayIpnDoesNotRepublishOrReverseSuccess() throws Exception {
+        Payment payment = Payment.builder().id("payment-1").bookingId("booking-1")
+                .status(PaymentStatus.PENDING).build();
+        when(vnPayService.verifyIpn(any())).thenReturn(true);
+        when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc("booking-1"))
+                .thenReturn(Optional.of(payment));
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+        PaymentServiceImpl service = createService();
+        Map<String, String> success = Map.of("vnp_TxnRef", "booking-1", "vnp_ResponseCode", "00");
+
+        service.processVnPayIpn(success);
+        service.processVnPayIpn(success);
+        service.processVnPayIpn(Map.of("vnp_TxnRef", "booking-1", "vnp_ResponseCode", "99"));
+
+        assertThat(payment.getStatus()).isEqualTo(PaymentStatus.SUCCESS);
         verify(outboxEventRepository, times(1)).save(any());
     }
 
