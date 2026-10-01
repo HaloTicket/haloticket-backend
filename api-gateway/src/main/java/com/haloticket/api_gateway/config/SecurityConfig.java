@@ -16,6 +16,9 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.Collections;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
 @Configuration
 @EnableWebFluxSecurity
@@ -71,6 +74,11 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
                         .pathMatchers("/ws/**", "/api/payments/vnpay/ipn", "/api/payments/momo/ipn", "/api/payments/zalopay/ipn", "/api/payments/sepay/webhook").permitAll()
                         .pathMatchers("/eureka/**", "/actuator/**").permitAll()
+                        .pathMatchers("/api/events/admin/reports", "/api/events/admin/reports/**",
+                                "/api/payments/admin/report-payments")
+                        .access((authentication, context) -> authentication
+                                .map(auth -> new AuthorizationDecision(isReportAdmin(auth)))
+                                .defaultIfEmpty(new AuthorizationDecision(false)))
                         .pathMatchers("/api/events/**", "/api/tickets/**", "/api/media/**",
                                 "/api/v1/**", "/ws-notifications/**")
                         .permitAll()
@@ -86,5 +94,18 @@ public class SecurityConfig {
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtDecoder(jwtDecoder())));
 
         return http.build();
+    }
+
+    static boolean isReportAdmin(Authentication authentication) {
+        if (!(authentication instanceof JwtAuthenticationToken token) || !authentication.isAuthenticated()) return false;
+        Object direct = token.getToken().getClaim("roles");
+        Object realm = token.getToken().getClaim("realm_access");
+        return hasAdminRole(direct) || (realm instanceof java.util.Map<?, ?> map && hasAdminRole(map.get("roles")));
+    }
+
+    private static boolean hasAdminRole(Object roles) {
+        return roles instanceof java.util.Collection<?> values && values.stream()
+                .anyMatch(value -> "ADMIN".equalsIgnoreCase(String.valueOf(value))
+                        || "ROLE_ADMIN".equalsIgnoreCase(String.valueOf(value)));
     }
 }
