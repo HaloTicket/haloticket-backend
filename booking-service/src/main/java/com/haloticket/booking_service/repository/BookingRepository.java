@@ -17,9 +17,21 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
+import java.util.Collection;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, String> {
+       interface ReportFact {
+              String getBookingId();
+              String getEventId();
+              Long getTickets();
+              BookingStatus getStatus();
+       }
+
+       @Query("SELECT b.id AS bookingId, b.eventId AS eventId, COALESCE(SUM(i.quantity), 0) AS tickets, b.status AS status " +
+              "FROM Booking b LEFT JOIN b.items i WHERE b.id IN :bookingIds GROUP BY b.id, b.eventId, b.status")
+       List<ReportFact> findReportFactsByBookingIds(@Param("bookingIds") Collection<String> bookingIds);
+
        @Lock(LockModeType.PESSIMISTIC_WRITE)
        @Query("SELECT b FROM Booking b WHERE b.id = :id")
        Optional<Booking> findByIdForUpdate(@Param("id") String id);
