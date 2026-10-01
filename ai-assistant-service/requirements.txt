@@ -1,8 +1,11 @@
 fastapi
 uvicorn
 langchain
+langchain-community
 langchain_google_genai
 google-generativeai
+langchain-groq
+langchain-openai
 sqlalchemy
 pgvector
 pydantic-settings

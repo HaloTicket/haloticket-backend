@@ -5,6 +5,7 @@ from app.core.config import settings
 from app.db.session import engine, Base
 from app.models.event_vector import EventVector
 from app.api.endpoints import customer
+from app.api.endpoints import organizer
 from app.services.kafka.consumer import run_consumer_in_background
 
 @asynccontextmanager
@@ -37,4 +38,10 @@ app.include_router(
     customer.router,
     prefix="/api/customer",
     tags=["Customer API"]
+)
+
+app.include_router(
+    organizer.router,
+    prefix="/api/organizer",
+    tags=["Organizer API"]
 )

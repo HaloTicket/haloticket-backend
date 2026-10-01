@@ -7,7 +7,7 @@ from app.models.event_vector import EventVector
 from app.services.ai.rag_engine import rag_engine
 
 def process_event_message(msg_value):
-    """function to process event message"""
+    """Hàm xử lý tin nhắn sự kiện từ Kafka"""
     data = json.loads(msg_value)
     event_id = data.get("eventId")
     # gather information for AI training
@@ -33,7 +33,7 @@ def process_event_message(msg_value):
         db.close()
 
 def start_kafka_consumer():
-    """function to start kafka consumer"""
+    """Hàm khởi chạy Kafka Consumer"""
     conf = {
         'bootstrap.servers': settings.kafka_bootstrap_servers,
         'group.id': 'ai-assistant-group',
@@ -50,7 +50,7 @@ def start_kafka_consumer():
         if msg is None:
             continue
         if msg.error():
-            if msg.error().code() == KafkaError._PARTITION_EOF:
+            if msg.error().code() in [KafkaError._PARTITION_EOF, KafkaError.UNKNOWN_TOPIC_OR_PART]:
                 continue
             else:
                 print(f"Kafka error: {msg.error()}")
@@ -62,6 +62,6 @@ def start_kafka_consumer():
     consumer.close()
 
 def run_consumer_in_background():
-    """Put the listening loop in a background thread so as not to block the Server API"""
+    """Đưa vòng lặp lắng nghe vào luồng chạy ngầm để không chặn Server API"""
     thread = threading.Thread(target=start_kafka_consumer, daemon=True)
     thread.start()

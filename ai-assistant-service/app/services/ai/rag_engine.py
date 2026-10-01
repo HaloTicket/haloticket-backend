@@ -9,7 +9,7 @@ class RAGEngine:
         self.embeddings = get_embeddings()
 
     def test_connection(self):
-        """Function to test if API Key and model are working"""
+        """Hàm test nhanh xem API Key và Model có hoạt động không"""
         try:
             # 1. test model Chat
             response = self.llm.invoke([HumanMessage(content="Hello, who are you?")])
@@ -26,7 +26,8 @@ class RAGEngine:
 
     def search_events(self, db, query: str, top_k: int = 3):
         # 1. convert customer questions into vectors
-        query_vector = self.embeddings.embed_query(query)
+        search_query = query if query and query.strip() != "" else "sự kiện"
+        query_vector = self.embeddings.embed_query(search_query)
 
         # 2. search the database for events with the most similar vectors (Semantic Search)
         distance_col = EventVector.embedding.cosine_distance(query_vector).label("distance")
