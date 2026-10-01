@@ -20,10 +20,15 @@ class SQLEngine:
         
         # 2. build custom prompt using standard LangChain primitives
         prompt = PromptTemplate.from_template(
-            "You are a PostgreSQL expert. Based on the following database structure:\n"
+            "Bạn là chuyên gia PostgreSQL và Chuyên viên Phân tích Dữ liệu của HaloTicket.\n"
+            "Cấu trúc Database (bao gồm các bảng từ Event Service, và bảng FDW từ Booking & Ticket Services):\n"
             "{table_info}\n\n"
-            "Write ONLY ONE SQL query (NO markdown, NO explanation, JUST the SQL query) to answer the following question:\n"
-            "Question: {question}"
+            "Mối quan hệ & logic nghiệp vụ:\n"
+            "- events.id = bookings.event_id\n"
+            "- bookings (revenue/doanh thu): use SUM(bookings.total_amount) WHERE status in ('PAID', 'CONFIRMED')\n"
+            "- tickets.event_id = events.id, ticket_types.event_id = events.id\n\n"
+            "Trả VỀ DUY NHẤT MỘT câu truy vấn SQL (KHÔNG markdown, KHÔNG giải thích, CHỈ câu SQL) để trả lời câu hỏi sau:\n"
+            "Câu hỏi: {question}"
         )
         
         try:
@@ -48,12 +53,29 @@ class SQLEngine:
                 columns = result_proxy.keys()
                 rows = result_proxy.fetchall()
                 data = [dict(zip(columns, row)) for row in rows]
+            # 5. generate insights from data
+            analysis_prompt = PromptTemplate.from_template(
+                "Bạn là một chuyên gia phân tích dữ liệu (Data Analyst) của hệ thống HaloTicket.\n"
+                "Người dùng đã hỏi: {question}\n"
+                "Câu truy vấn SQL đã chạy: {sql_query}\n"
+                "Kết quả dữ liệu trả về từ Database: {data}\n\n"
+                "Nhiệm vụ của bạn:\n"
+                "- Viết một đoạn tóm tắt phân tích dữ liệu (khoảng 2-3 câu) bằng tiếng Việt thật chuyên nghiệp, dễ hiểu.\n"
+                "- Đưa ra một nhận xét, đánh giá hoặc phán đoán kinh doanh từ số liệu này (Ví dụ: sự kiện nào đang hot, xu hướng mua vé, đề xuất marketing...).\n"
+                "CHỈ TRẢ VỀ NỘI DUNG PHÂN TÍCH, không lặp lại câu hỏi hay SQL."
+            )
+            analysis_chain = analysis_prompt | self.llm
+            analysis_response = analysis_chain.invoke({"question": question, "sql_query": sql_query, "data": str(data[:10])})
+            
+            analysis_text = analysis_response.content
+            if isinstance(analysis_text, list):
+                analysis_text = "".join([part.get("text", "") if isinstance(part, dict) else str(part) for part in analysis_text])
             
             return {
                 "question": question,
                 "generated_sql": sql_query,
                 "data": data,
-                "reply": "Đây là kết quả phân tích dữ liệu cho câu hỏi của bạn:"
+                "reply": str(analysis_text)
             }
         except Exception as e:
             return {"error": str(e)}
