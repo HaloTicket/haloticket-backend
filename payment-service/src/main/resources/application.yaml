@@ -71,3 +71,6 @@ shopeepay:
 payment:
   sandbox-return-confirmation-enabled: ${PAYMENT_SANDBOX_RETURN_CONFIRMATION_ENABLED:false}
 
+reports:
+  source-zone: ${REPORTS_SOURCE_ZONE:}
+
