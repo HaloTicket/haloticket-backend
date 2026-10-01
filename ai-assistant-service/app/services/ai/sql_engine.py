@@ -13,7 +13,7 @@ class SQLEngine:
         self.llm = get_fast_llm()
 
     def analyze_data(self, question: str):
-        """Translate customer questions into SQL queries and return results"""
+        """Dịch câu hỏi của người dùng thành lệnh SQL và trả về kết quả"""
         
         # 1. extract table schema
         table_info = self.db.get_table_info()
@@ -41,13 +41,19 @@ class SQLEngine:
             # remove SQL code tags if AI generates them
             sql_query = text_content.replace("```sql", "").replace("```sql\n", "").replace("```", "").strip()
             
-            # 4. execute SQL query to get raw result
-            db_result = self.db.run(sql_query)
+            # 4. execute SQL query to get raw result using sqlalchemy
+            with self.db._engine.begin() as conn:
+                from sqlalchemy import text
+                result_proxy = conn.execute(text(sql_query))
+                columns = result_proxy.keys()
+                rows = result_proxy.fetchall()
+                data = [dict(zip(columns, row)) for row in rows]
             
             return {
                 "question": question,
                 "generated_sql": sql_query,
-                "raw_result": db_result
+                "data": data,
+                "reply": "Đây là kết quả phân tích dữ liệu cho câu hỏi của bạn:"
             }
         except Exception as e:
             return {"error": str(e)}

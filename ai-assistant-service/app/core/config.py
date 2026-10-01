@@ -6,6 +6,8 @@ class Settings(BaseSettings):
     eureka_server: str = "http://localhost:8761/eureka"
     database_url: str = "postgresql+psycopg2://haloticket:secretpassword@localhost:5433/event_db"
     gemini_api_key: str = "your-default-key-if-missing"
+    groq_api_key: str = ""
+    openai_api_key: str = ""
     kafka_bootstrap_servers: str = "localhost:9092"
 
 
