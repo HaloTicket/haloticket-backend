@@ -4,7 +4,13 @@ from langchain_openai import ChatOpenAI
 from app.core.config import settings
 
 def _get_gemini_keys():
+    if not settings.gemini_api_key: return []
     keys = settings.gemini_api_key.split(",")
+    return [k.strip() for k in keys if k.strip()]
+
+def _get_groq_keys():
+    if not settings.groq_api_key: return []
+    keys = settings.groq_api_key.split(",")
     return [k.strip() for k in keys if k.strip()]
 
 def get_fast_llm(tools=None):
@@ -12,9 +18,10 @@ def get_fast_llm(tools=None):
     models = []
     
     # 1. Groq (Llama 3.1 70B - Fastest, Native tool calling)
-    if settings.groq_api_key:
+    groq_keys = _get_groq_keys()
+    for key in groq_keys:
         model = ChatGroq(
-            api_key=settings.groq_api_key,
+            api_key=key,
             model="openai/gpt-oss-20b",
             temperature=0.2,
             max_retries=1
@@ -58,9 +65,10 @@ def get_smart_llm(tools=None):
     models = []
     
     # 1. Groq (Llama 3.1 70B)
-    if settings.groq_api_key:
+    groq_keys = _get_groq_keys()
+    for key in groq_keys:
         model = ChatGroq(
-            api_key=settings.groq_api_key,
+            api_key=key,
             model="openai/gpt-oss-120b",
             temperature=0.0,
             max_retries=1

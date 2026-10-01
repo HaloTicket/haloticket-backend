@@ -30,7 +30,8 @@ async def semantic_search(request: SearchRequest, db = Depends(get_db)):
 
 class ChatRequest(BaseModel):
     message: str
+    history: list = []
 
 @router.post("/smart-booking-chat")
 async def smart_booking(request: ChatRequest, db = Depends(get_db)):
-    return booking_agent.chat(request.message, db)
+    return booking_agent.chat(request.message, request.history, db)

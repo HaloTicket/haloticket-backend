@@ -102,7 +102,7 @@ services:
   # Apache Kafka (KRaft Mode - Tối ưu heap 192MB)
   kafka:
     image: apache/kafka:3.7.0
-    mem_limit: ${KAFKA_MEMORY_LIMIT:-384m}
+    mem_limit: ${KAFKA_MEMORY_LIMIT:-512m}
     container_name: haloticket-kafka
     restart: unless-stopped
     logging: *logging
@@ -110,7 +110,7 @@ services:
       - "${INFRA_BIND_ADDRESS:-127.0.0.1}:${KAFKA_PORT:-9092}:9092"
     environment:
       KAFKA_LOG_DIRS: /var/lib/kafka/data
-      KAFKA_HEAP_OPTS: "-Xms96m -Xmx192m"
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx256m"
       KAFKA_LOG_RETENTION_HOURS: ${KAFKA_LOG_RETENTION_HOURS:-24}
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -452,6 +452,8 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - EUREKA_SERVER=http://discovery-server:8761/eureka
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    volumes:
+      - ./ai-assistant-service/app:/app/app
     depends_on:
       postgres:
         condition: service_healthy
