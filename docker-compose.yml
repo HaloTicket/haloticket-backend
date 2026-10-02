@@ -186,7 +186,7 @@ services:
     <<: *runtime
     mem_limit: ${DISCOVERY_MEMORY_LIMIT:-200m}
     container_name: haloticket-discovery-server
-    image: haloticket/discovery-server:${IMAGE_TAG:-local}
+    image: ${DOCKERHUB_USERNAME:-haloticket}/haloticket-discovery-server:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -202,7 +202,7 @@ services:
     <<: *runtime
     mem_limit: ${GATEWAY_MEMORY_LIMIT:-200m}
     container_name: haloticket-api-gateway
-    image: haloticket/api-gateway:${IMAGE_TAG:-local}
+    image: ${DOCKERHUB_USERNAME:-haloticket}/haloticket-api-gateway:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -225,7 +225,7 @@ services:
     <<: *runtime
     mem_limit: ${USER_MEMORY_LIMIT:-300m}
     container_name: haloticket-user-service
-    image: haloticket/user-service:${IMAGE_TAG:-local}
+    image: ${DOCKERHUB_USERNAME:-haloticket}/haloticket-user-service:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -260,7 +260,7 @@ services:
     <<: *runtime
     mem_limit: ${EVENT_MEMORY_LIMIT:-300m}
     container_name: haloticket-event-service
-    image: haloticket/event-service:${IMAGE_TAG:-local}
+    image: ${DOCKERHUB_USERNAME:-haloticket}/haloticket-event-service:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -280,7 +280,7 @@ services:
     <<: *runtime
     mem_limit: ${TICKET_MEMORY_LIMIT:-450m}
     container_name: haloticket-ticket-service
-    image: haloticket/ticket-service:${IMAGE_TAG:-local}
+    image: ${DOCKERHUB_USERNAME:-haloticket}/haloticket-ticket-service:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -301,7 +301,7 @@ services:
     <<: *runtime
     mem_limit: ${MARKETPLACE_MEMORY_LIMIT:-300m}
     container_name: haloticket-marketplace-service
-    image: haloticket/marketplace-service:${IMAGE_TAG:-local}
+    image: ${DOCKERHUB_USERNAME:-haloticket}/haloticket-marketplace-service:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -324,7 +324,7 @@ services:
     <<: *runtime
     mem_limit: ${BOOKING_MEMORY_LIMIT:-300m}
     container_name: haloticket-booking-service
-    image: haloticket/booking-service:${IMAGE_TAG:-local}
+    image: ${DOCKERHUB_USERNAME:-haloticket}/haloticket-booking-service:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -346,7 +346,7 @@ services:
     <<: *runtime
     mem_limit: ${PAYMENT_MEMORY_LIMIT:-300m}
     container_name: haloticket-payment-service
-    image: haloticket/payment-service:${IMAGE_TAG:-local}
+    image: ${DOCKERHUB_USERNAME:-haloticket}/haloticket-payment-service:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -391,7 +391,7 @@ services:
     <<: *runtime
     mem_limit: ${NOTIFICATION_MEMORY_LIMIT:-300m}
     container_name: haloticket-notification-service
-    image: haloticket/notification-service:${IMAGE_TAG:-local}
+    image: ${DOCKERHUB_USERNAME:-haloticket}/haloticket-notification-service:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -420,7 +420,7 @@ services:
     <<: *runtime
     mem_limit: ${MEDIA_MEMORY_LIMIT:-200m}
     container_name: haloticket-media-service
-    image: haloticket/media-service:${IMAGE_TAG:-local}
+    image: ${DOCKERHUB_USERNAME:-haloticket}/haloticket-media-service:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -440,7 +440,7 @@ services:
         condition: service_healthy
 
   ai-assistant-service:
-    image: haloticket/ai-assistant-service:${IMAGE_TAG:-local}
+    image: ${DOCKERHUB_USERNAME:-haloticket}/haloticket-ai-assistant-service:${IMAGE_TAG:-latest}
     build:
       context: ./ai-assistant-service
       dockerfile: Dockerfile

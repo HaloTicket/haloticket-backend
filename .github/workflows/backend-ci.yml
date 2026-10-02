@@ -85,6 +85,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull api-gateway
             docker compose up -d --no-deps api-gateway
             docker image prune -f
@@ -123,6 +125,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull event-service
             docker compose up -d --no-deps event-service
             docker image prune -f
@@ -161,6 +165,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull ticket-service
             docker compose up -d --no-deps ticket-service
             docker image prune -f
@@ -199,6 +205,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull booking-service
             docker compose up -d --no-deps booking-service
             docker image prune -f
@@ -237,6 +245,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull payment-service
             docker compose up -d --no-deps payment-service
             docker image prune -f
@@ -275,6 +285,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull user-service
             docker compose up -d --no-deps user-service
             docker image prune -f
@@ -313,6 +325,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull media-service
             docker compose up -d --no-deps media-service
             docker image prune -f
@@ -351,6 +365,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull notification-service
             docker compose up -d --no-deps notification-service
             docker image prune -f
@@ -389,6 +405,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull discovery-server
             docker compose up -d --no-deps discovery-server
             docker image prune -f
@@ -427,6 +445,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull marketplace-service
             docker compose up -d --no-deps marketplace-service
             docker image prune -f
@@ -464,6 +484,9 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull ai-assistant-service
             docker compose up -d --no-deps ai-assistant-service
             docker image prune -f
+
