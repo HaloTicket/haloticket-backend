@@ -16,6 +16,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import com.haloticket.ticket_service.service.TicketService;
 
+import org.springframework.transaction.annotation.Transactional;
+
 @RestController
 @RequestMapping("/api/tickets")
 @RequiredArgsConstructor
@@ -24,6 +26,7 @@ public class TicketMarketplaceController {
     private final TicketService ticketService;
 
     @GetMapping("/mine")
+    @Transactional(readOnly = true)
     public Page<OwnedTicketResponse> myTickets(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -33,6 +36,7 @@ public class TicketMarketplaceController {
     }
 
     @GetMapping("/{ticketId}")
+    @Transactional(readOnly = true)
     public OwnedTicketResponse myTicket(@PathVariable String ticketId, @AuthenticationPrincipal Jwt jwt) {
         if (jwt == null || jwt.getSubject() == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         Ticket ticket = ticketRepository.findById(ticketId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -41,6 +45,7 @@ public class TicketMarketplaceController {
     }
 
     @GetMapping("/{ticketId}/resale-eligibility")
+    @Transactional(readOnly = true)
     public ResaleEligibilityResponse resaleEligibility(@PathVariable String ticketId, @AuthenticationPrincipal Jwt jwt) {
         Ticket ticket = ticketRepository.findById(ticketId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         String subject = jwt == null ? null : jwt.getSubject();
