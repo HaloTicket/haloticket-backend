@@ -79,8 +79,6 @@ public class Ticket {
     @Column(name = "used_at")
     private LocalDateTime usedAt;
 
-    @Version
-    private Long version;
 
     @PrePersist
     protected void onCreate() {
