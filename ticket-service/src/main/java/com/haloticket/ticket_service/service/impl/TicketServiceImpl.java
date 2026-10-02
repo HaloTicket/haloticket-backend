@@ -439,6 +439,7 @@ public class TicketServiceImpl implements TicketService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<OwnedTicketResponse> getMyTickets(String userId, Pageable pageable) {
         if (userId == null || userId.isBlank()) return Page.empty();
         return ticketRepository.findByOwnerIdOrderByIssuedAtDesc(userId, pageable)
@@ -446,6 +447,7 @@ public class TicketServiceImpl implements TicketService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public OwnedTicketResponse getMyTicket(String ticketId, String userId) {
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new RuntimeException("Ticket not found"));

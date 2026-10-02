@@ -440,7 +440,7 @@ services:
         condition: service_healthy
 
   ai-assistant-service:
-    image: haloticket/ai-assistant-service:local
+    image: haloticket/ai-assistant-service:${IMAGE_TAG:-local}
     build:
       context: ./ai-assistant-service
       dockerfile: Dockerfile
@@ -465,6 +465,26 @@ services:
         condition: service_healthy
     networks:
       - haloticket-network
+
+  marketplace-service:
+    <<: *runtime
+    mem_limit: ${MARKETPLACE_MEMORY_LIMIT:-300m}
+    container_name: haloticket-marketplace-service
+    image: haloticket/marketplace-service:${IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: marketplace-service
+    ports: ["${SERVICE_BIND_ADDRESS:-127.0.0.1}:${MARKETPLACE_SERVICE_PORT:-8088}:8088"]
+    environment:
+      <<: *environment
+      SERVER_PORT: "8088"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/marketplace_db
+    depends_on:
+      <<: *dependencies
+      kafka:
+        condition: service_healthy
 
 volumes:
   postgres_data:
