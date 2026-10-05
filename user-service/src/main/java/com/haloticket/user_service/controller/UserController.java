@@ -29,6 +29,7 @@ public class UserController {
 
     public record GiftRecipient(String userId, String email, String fullName) {}
     public record PublicUser(String userId, String fullName) {}
+    public record ChangePasswordRequest(String currentPassword, String newPassword) {}
 
     @GetMapping("/gift-recipient")
     public GiftRecipient giftRecipient(@RequestParam String email) {
@@ -53,5 +54,12 @@ public class UserController {
     public ResponseEntity<UserResponse> updateCurrentUser(@AuthenticationPrincipal Jwt jwt,
                                                            @RequestBody UserProfileUpdateRequest request) {
         return ResponseEntity.ok(userService.updateCurrentUser(jwt, request));
+    }
+
+    @PutMapping("/me/password")
+    public ResponseEntity<Void> changePassword(@AuthenticationPrincipal Jwt jwt,
+                                               @RequestBody ChangePasswordRequest request) {
+        userService.changePassword(jwt, request.currentPassword(), request.newPassword());
+        return ResponseEntity.ok().build();
     }
 }

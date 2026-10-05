@@ -188,6 +188,26 @@ public class UserServiceImpl implements UserService {
         return toResponse(userRepository.save(user));
     }
 
+    @Override
+    public void changePassword(Jwt jwt, String currentPassword, String newPassword) {
+        String keycloakId = jwt == null ? null : jwt.getSubject();
+        if (isBlank(keycloakId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Authenticated token must contain subject");
+        }
+        User user = userRepository.findByKeycloakId(keycloakId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        
+        try {
+            // verify current password by attempting to login
+            keycloakAuthPort.login(user.getEmail(), currentPassword);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mật khẩu hiện tại không đúng");
+        }
+        
+        // update to new password
+        keycloakAuthPort.changePassword(keycloakId, newPassword);
+    }
+
     private UserResponse mapToUserResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())

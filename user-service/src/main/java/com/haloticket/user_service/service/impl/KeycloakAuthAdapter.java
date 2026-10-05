@@ -190,6 +190,27 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
     }
 
     @Override
+    public void changePassword(String keycloakUserId, String newPassword) {
+        String adminToken = obtainAdminToken();
+        String resetPasswordUrl = properties.authServerUrl() + "/admin/realms/" + properties.realm()
+                + "/users/" + keycloakUserId + "/reset-password";
+        KeycloakCredential credential = new KeycloakCredential("password", newPassword, false);
+        try {
+            restClient.put()
+                    .uri(resetPasswordUrl)
+                    .header("Authorization", "Bearer " + adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(credential)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (HttpClientErrorException ex) {
+            throw new AuthException("KEYCLOAK_ERROR", "Password change failed: " + ex.getMessage(), ex.getStatusCode().value());
+        } catch (ResourceAccessException | HttpServerErrorException ex) {
+            throw new AuthException("KEYCLOAK_UNAVAILABLE", "Identity provider is unavailable", 503);
+        }
+    }
+
+    @Override
     public AuthResponses.Login login(String email, String password) {
         String tokenUrl = properties.authServerUrl() + "/realms/" + properties.realm() + "/protocol/openid-connect/token";
 

@@ -22,6 +22,7 @@ public interface UserService {
     UserResponse updateCurrentUser(Jwt jwt, UserProfileUpdateRequest request);
     UserResponse getUserById(String id);
     UserInviteResponse inviteUser(UserInviteRequest request);
+    void changePassword(Jwt jwt, String currentPassword, String newPassword);
     
     void addRoleToUser(String id, Role role);
     
