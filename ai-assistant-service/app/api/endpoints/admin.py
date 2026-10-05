@@ -35,7 +35,8 @@ async def analyze_risk_score(request: RiskScoringRequest):
             "  \"risk_level\": \"<LOW|MEDIUM|HIGH>\",\n"
             "  \"reasons\": [\"<Lý do 1>\", \"<Lý do 2>\"]\n"
             "}}\n"
-            "CHỈ TRẢ VỀ JSON, không có định dạng markdown hay text khác."
+            "CHỈ TRẢ VỀ JSON, không có định dạng markdown hay text khác.\n"
+            "YÊU CẦU BẮT BUỘC TỐI THƯỢNG: CÁC LÝ DO TRONG MẢNG 'reasons' PHẢI ĐƯỢC VIẾT 100% BẰNG TIẾNG VIỆT."
         )
         
         chain = prompt | llm
