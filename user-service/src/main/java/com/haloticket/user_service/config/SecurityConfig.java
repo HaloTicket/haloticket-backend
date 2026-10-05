@@ -47,7 +47,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/**", "/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/v1/internal/**").permitAll() // Internal calls from other microservices
+                        .requestMatchers("/api/internal/**").permitAll() // Internal calls from other microservices
                         .requestMatchers("/api/users/me").authenticated()
                         .anyRequest().authenticated()
                 )

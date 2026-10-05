@@ -4,6 +4,7 @@ import com.haloticket.event_service.client.NotificationServiceClient;
 import com.haloticket.event_service.client.PaymentServiceClient;
 import com.haloticket.event_service.client.TicketServiceClient;
 import com.haloticket.event_service.client.UserServiceClient;
+import com.haloticket.event_service.client.UserInternalServiceClient;
 import com.haloticket.event_service.dto.request.EventCreateRequest;
 import com.haloticket.event_service.dto.request.OrganizerPayoutAccountRequest;
 import com.haloticket.event_service.dto.response.EventCategoryResponse;
@@ -11,7 +12,6 @@ import com.haloticket.event_service.dto.response.EventResponse;
 import com.haloticket.event_service.dto.response.OrganizerDto;
 import com.haloticket.event_service.dto.response.EventMemberResponse;
 import com.haloticket.event_service.dto.response.EventShowtimeDto;
-import com.haloticket.event_service.dto.response.OrganizerPayoutAccountResponse;
 import com.haloticket.event_service.dto.response.OrganizerEligibilityResponse;
 import com.haloticket.event_service.entity.Event;
 import com.haloticket.event_service.entity.EventCategory;
@@ -57,6 +57,7 @@ public class EventServiceImpl implements EventService {
     private final TicketServiceClient ticketServiceClient;
     private final PaymentServiceClient paymentServiceClient;
     private final UserServiceClient userServiceClient;
+    private final UserInternalServiceClient userInternalServiceClient;
     private final StaffAssignmentRepository staffAssignmentRepository;
 
     @Autowired(required = false)
@@ -625,6 +626,14 @@ public class EventServiceImpl implements EventService {
                 && saved.getOrganizers().get(0).getUserId() != null)
                         ? saved.getOrganizers().get(0).getUserId()
                         : "user_default_id";
+
+        if (!"user_default_id".equals(recipientUserId)) {
+            try {
+                userInternalServiceClient.addRoleToUser(recipientUserId, "ORGANIZER");
+            } catch (Exception e) {
+                System.err.println("Failed to grant ORGANIZER role to user: " + recipientUserId);
+            }
+        }
 
         if (prevStatus == EventApprovalStatus.UPDATE_PENDING) {
             publishNotification(recipientUserId, "EVENT_UPDATE_APPROVED", "Sự kiện đã được phê duyệt cập nhật!",

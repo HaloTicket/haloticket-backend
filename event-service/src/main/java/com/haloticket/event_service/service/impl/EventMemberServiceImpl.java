@@ -90,20 +90,24 @@ public class EventMemberServiceImpl implements EventMemberService {
         List<StaffAssignment> assignments = staffAssignmentRepository.findByEventId(eventId);
         List<EventMemberResponse> responses = assignments.stream().map(a -> {
             String avatarUrl = null;
+            String name = a.getName();
+            String email = a.getEmail();
             if (a.getUserId() != null) {
                 try {
                     InternalUserResponse userResp = userInternalServiceClient.getUserById(a.getUserId());
-                    if (userResp != null && userResp.getAvatarUrl() != null) {
-                        avatarUrl = userResp.getAvatarUrl();
+                    if (userResp != null) {
+                        if (userResp.getAvatarUrl() != null) avatarUrl = userResp.getAvatarUrl();
+                        if (userResp.getFullName() != null) name = userResp.getFullName();
+                        if (userResp.getEmail() != null) email = userResp.getEmail();
                     }
                 } catch (Exception ex) {
-                    // ignore, fallback to null
+                    // ignore, fallback
                 }
             }
             return EventMemberResponse.builder()
                 .id(a.getId())
-                .name(a.getName())
-                .email(a.getEmail())
+                .name(name)
+                .email(email)
                 .avatar(avatarUrl)
                 .role(a.getRole())
                 .status(a.getStatus().name())

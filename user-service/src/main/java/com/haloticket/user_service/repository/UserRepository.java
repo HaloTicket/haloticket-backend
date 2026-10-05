@@ -10,8 +10,10 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+
 @Repository
-public interface UserRepository extends JpaRepository<User, String> {
+public interface UserRepository extends JpaRepository<User, String>, JpaSpecificationExecutor<User> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.keycloakId = :keycloakId")
     Optional<User> findForEkycUpdateByKeycloakId(@Param("keycloakId") String keycloakId);

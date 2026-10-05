@@ -24,6 +24,19 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.List;
+import java.util.ArrayList;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.JoinType;
+
+import com.haloticket.user_service.dto.response.AdminUserListItem;
+import com.haloticket.user_service.dto.response.AdminUserDetailResponse;
+import com.haloticket.user_service.entity.EkycProfile;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -83,18 +96,18 @@ public class UserServiceImpl implements UserService {
 
         final String targetEmail = email;
 
-        // 1. Try to find user by Keycloak ID
+        // 1. try to find user by Keycloak ID
         Optional<User> userByKeycloak = userRepository.findByKeycloakId(keycloakId);
         User user;
 
         if (userByKeycloak.isPresent()) {
             user = userByKeycloak.get();
         } else {
-            // 2. Try to find user by email (e.g. from seed data or prior registration)
+            // 2. try to find user by email 
             Optional<User> userByEmail = userRepository.findByEmail(targetEmail);
             if (userByEmail.isPresent()) {
                 User existing = userByEmail.get();
-                // If keycloak_id is null/blank or is a seed dummy id like "kc-...", link keycloakId
+                // if keycloak_id is null/blank or is a seed dummy id like "kc-...", link keycloakId
                 if (isBlank(existing.getKeycloakId()) || existing.getKeycloakId().startsWith("kc-") || keycloakId.equals(existing.getKeycloakId())) {
                     existing.setKeycloakId(keycloakId);
                     user = existing;
@@ -111,7 +124,7 @@ public class UserServiceImpl implements UserService {
             }
         }
 
-        // Check if email collides with another user (other than current user)
+        // check if email collides with another user (other than current user)
         Optional<User> emailOwner = userRepository.findByEmail(targetEmail);
         if (emailOwner.isPresent() && user != emailOwner.get()
                 && (user.getId() == null || !user.getId().equals(emailOwner.get().getId()))) {
@@ -234,6 +247,130 @@ public class UserServiceImpl implements UserService {
                 .isNewUser(true)
                 .generatedPassword(generatedPassword)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<AdminUserListItem> getAdminUsers(String query, String status, String ekycStatus, String role, Pageable pageable) {
+        Specification<User> spec = (root, cq, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (query != null && !query.isBlank()) {
+                String like = "%" + query.toLowerCase() + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("email")), like),
+                        cb.like(cb.lower(root.get("fullName")), like),
+                        cb.like(cb.lower(root.get("phoneNumber")), like)
+                ));
+            }
+            if (status != null && !status.equalsIgnoreCase("ALL")) {
+                try {
+                    predicates.add(cb.equal(root.get("status"), UserStatus.valueOf(status.toUpperCase())));
+                } catch (IllegalArgumentException ignored) {}
+            }
+            if (ekycStatus != null && !ekycStatus.equalsIgnoreCase("ALL")) {
+                var ekycJoin = root.join("ekycProfile", JoinType.LEFT);
+                if (ekycStatus.equalsIgnoreCase("UNVERIFIED")) {
+                    predicates.add(cb.isNull(ekycJoin.get("status")));
+                } else {
+                    predicates.add(cb.equal(cb.upper(ekycJoin.get("status").as(String.class)), ekycStatus.toUpperCase()));
+                }
+            }
+            if (role != null && !role.equalsIgnoreCase("ALL")) {
+                try {
+                    Role roleEnum = Role.valueOf(role.toUpperCase());
+                    predicates.add(cb.isMember(roleEnum, root.get("roles")));
+                } catch (IllegalArgumentException ignored) {}
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        return userRepository.findAll(spec, pageable).map(user -> {
+            EkycProfile ekyc = user.getEkycProfile();
+            return AdminUserListItem.builder()
+                    .id(user.getId())
+                    .email(user.getEmail())
+                    .fullName(user.getFullName())
+                    .phoneNumber(user.getPhoneNumber())
+                    .avatarUrl(user.getAvatarUrl())
+                    .gender(user.getGender())
+                    .status(user.getStatus())
+                    .roles(user.getRoles())
+                    .createdAt(user.getCreatedAt())
+                    .ekycStatus(ekyc != null && ekyc.getStatus() != null ? ekyc.getStatus().name() : "UNVERIFIED")
+                    .build();
+        });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdminUserDetailResponse getAdminUserDetail(String id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        
+        EkycProfile ekyc = user.getEkycProfile();
+        return AdminUserDetailResponse.builder()
+                .id(user.getId())
+                .keycloakId(user.getKeycloakId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .phoneNumber(user.getPhoneNumber())
+                .avatarUrl(user.getAvatarUrl())
+                .gender(user.getGender())
+                .status(user.getStatus())
+                .roles(user.getRoles())
+                .createdAt(user.getCreatedAt())
+                .lastLoginAt(user.getLastLoginAt())
+                .ekycStatus(ekyc != null && ekyc.getStatus() != null ? ekyc.getStatus().name() : "UNVERIFIED")
+                .ekycDocumentType(ekyc != null && ekyc.getDocumentType() != null ? ekyc.getDocumentType().name() : null)
+                .ekycDocumentNumber(ekyc != null ? ekyc.getDocumentNumber() : null)
+                .ekycLegalName(ekyc != null ? ekyc.getLegalName() : null)
+                .ekycBirthDate(ekyc != null ? ekyc.getBirthDate() : null)
+                .ekycAddress(ekyc != null ? ekyc.getAddress() : null)
+                .ekycFrontImageUrl(ekyc != null ? ekyc.getFrontImageUrl() : null)
+                .ekycBackImageUrl(ekyc != null ? ekyc.getBackImageUrl() : null)
+                .ekycFaceVideoUrl(ekyc != null ? ekyc.getFaceVideoUrl() : null)
+                .bankName(ekyc != null ? ekyc.getBankName() : null)
+                .bankAccountName(ekyc != null ? ekyc.getBankAccountName() : null)
+                .bankAccountNumber(ekyc != null ? ekyc.getBankAccountNumber() : null)
+                .bankBranch(ekyc != null ? ekyc.getBankBranch() : null)
+                .businessType(ekyc != null ? ekyc.getBusinessType() : null)
+                .taxName(ekyc != null ? ekyc.getTaxName() : null)
+                .taxCode(ekyc != null ? ekyc.getTaxCode() : null)
+                .taxAddress(ekyc != null ? ekyc.getTaxAddress() : null)
+                .ekycApprovedAt(ekyc != null ? ekyc.getApprovedAt() : null)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void updateAdminUserStatus(String id, UserStatus status) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        user.setStatus(status);
+        userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void updateUserRoles(String id, Set<Role> roles) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        user.setRoles(roles);
+        userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void addRoleToUser(String id, Role role) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (user.getRoles() == null) {
+            user.setRoles(new java.util.HashSet<>());
+        }
+        if (!user.getRoles().contains(role)) {
+            user.getRoles().add(role);
+            userRepository.save(user);
+        }
     }
 
     private UserResponse toResponse(User user) {
