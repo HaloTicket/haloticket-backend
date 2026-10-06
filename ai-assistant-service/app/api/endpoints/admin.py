@@ -59,6 +59,43 @@ async def analyze_risk_score(request: RiskScoringRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class AdminChatRequest(BaseModel):
+    message: str
+    history: list[dict] = []
+
+class AdminChatResponse(BaseModel):
+    reply: str
+
+@router.post("/assistant-chat", response_model=AdminChatResponse)
+async def chat_admin_assistant(request: AdminChatRequest):
+    """
+    Trò chuyện với trợ lý AI dành cho Quản trị viên.
+    """
+    try:
+        prompt = PromptTemplate.from_template(
+            "Bạn là trợ lý AI chuyên nghiệp dành riêng cho Quản trị viên của hệ thống bán vé HaloTicket.\n"
+            "Nhiệm vụ của bạn là tư vấn, phân tích dữ liệu, kiểm tra hệ thống và gợi ý hướng xử lý cho Admin.\n"
+            "Hãy trả lời một cách ngắn gọn, thông minh, chuyên nghiệp bằng tiếng Việt và format bằng Markdown (dùng danh sách, in đậm nếu cần).\n\n"
+            "Lịch sử trò chuyện:\n{history}\n\n"
+            "Admin: {message}\n"
+            "AI Assistant:"
+        )
+        
+        history_str = ""
+        for msg in request.history:
+            role = "Admin" if msg.get("role") == "user" else "AI Assistant"
+            history_str += f"{role}: {msg.get('content')}\n"
+            
+        chain = prompt | llm
+        response = chain.invoke({
+            "history": history_str[-2000:], 
+            "message": request.message
+        })
+        
+        return AdminChatResponse(reply=str(response.content).strip())
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 class PriceCeilingRequest(BaseModel):
     event_id: str
     current_demand_level: str  # e.g., "HIGH", "MEDIUM", "LOW"
