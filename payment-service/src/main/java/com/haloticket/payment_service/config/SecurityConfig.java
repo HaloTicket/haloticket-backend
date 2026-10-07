@@ -53,6 +53,7 @@ public class SecurityConfig {
                                 "/api/payments/shopeepay/**",
                                 "/api/payments/verify/**",
                                 "/api/payments/methods/bulk",
+                                "/api/payments/organizer-payout-account/**",
                                 "/api/payments"
                         ).permitAll()
                         .requestMatchers("/api/payments/**").authenticated()

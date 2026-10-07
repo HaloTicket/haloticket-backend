@@ -68,7 +68,7 @@ spring:
         - id: payment-service
           uri: lb://PAYMENT-SERVICE
           predicates:
-            - Path=/api/payments/**
+            - Path=/api/payments/**, /api/payouts/**
 
         - id: notification-service
           uri: lb://NOTIFICATION-SERVICE

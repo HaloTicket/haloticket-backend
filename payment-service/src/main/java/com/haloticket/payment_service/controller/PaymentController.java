@@ -166,10 +166,9 @@ public class PaymentController {
 
     @GetMapping("/organizer-payout-account/{userId}")
     public ResponseEntity<OrganizerPayoutAccountResponse> getPayoutAccountByUserId(
-            @RequestHeader("Authorization") String authorization,
-            @PathVariable("userId") String ignoredUserId
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @PathVariable("userId") String userId
     ) {
-        String userId = requireEligibleOrganizer(authorization).userId();
         OrganizerPayoutAccountResponse response = paymentService.getPayoutAccountByUserId(userId);
         return ResponseEntity.ok(response);
     }

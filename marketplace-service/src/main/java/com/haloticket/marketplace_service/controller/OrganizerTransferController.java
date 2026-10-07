@@ -6,7 +6,6 @@ import com.haloticket.marketplace_service.dto.OrganizerTransferSummaryResponse;
 import com.haloticket.marketplace_service.enums.ListingStatus;
 import com.haloticket.marketplace_service.enums.TransferStatus;
 import com.haloticket.marketplace_service.service.OrganizerTransferService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -14,9 +13,12 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/marketplace/organizer/events/{eventId}")
-@RequiredArgsConstructor
 public class OrganizerTransferController {
     private final OrganizerTransferService organizerTransferService;
+
+    public OrganizerTransferController(OrganizerTransferService organizerTransferService) {
+        this.organizerTransferService = organizerTransferService;
+    }
 
     @GetMapping("/transfer-summary")
     public OrganizerTransferSummaryResponse getSummary(

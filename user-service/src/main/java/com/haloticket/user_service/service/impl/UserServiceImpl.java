@@ -325,6 +325,7 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public AdminUserDetailResponse getAdminUserDetail(String id) {
         User user = userRepository.findById(id)
+                .or(() -> userRepository.findByKeycloakId(id))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         
         EkycProfile ekyc = user.getEkycProfile();

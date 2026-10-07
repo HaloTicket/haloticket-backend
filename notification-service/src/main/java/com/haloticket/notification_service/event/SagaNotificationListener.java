@@ -310,4 +310,22 @@ public class SagaNotificationListener {
             log.error("Failed to process event member invitation: {}", e.getMessage(), e);
         }
     }
+
+    @KafkaListener(topics = {"haloticket.payout.requested.v1", "haloticket.payout.approved.v1"}, groupId = "notification-service-payout")
+    public void handlePayoutNotifications(String payload) {
+        try {
+            JsonNode node = objectMapper.readTree(payload);
+            String recipientUserId = node.path("recipientUserId").asText();
+            String type = node.path("type").asText();
+            String title = node.path("title").asText();
+            String message = node.path("message").asText();
+
+            if (!recipientUserId.isBlank() && !type.isBlank()) {
+                notificationService.publishDirectNotification(recipientUserId, type, title, message);
+                log.info("Sent payout notification to {} (type: {})", recipientUserId, type);
+            }
+        } catch (Exception e) {
+            log.error("Failed to process payout notification: {}", e.getMessage(), e);
+        }
+    }
 }
