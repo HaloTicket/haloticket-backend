@@ -29,7 +29,7 @@ class TicketMarketplaceControllerTest {
         Seat seat = Seat.builder().seatNumber("20").seatRow(row).build();
         Ticket ticket = Ticket.builder().id("ticket-1").eventId("event-1").ownerId("seller-1")
                 .ticketType(TicketType.builder().id("type-1").showtimeId("show-1").name("VIP").price(120000D).build())
-                .seat(seat).originalPrice(new BigDecimal("120000")).status(TicketStatus.VALID).build();
+                .seat(seat).originalPrice(new BigDecimal("120000")).status(TicketStatus.VALID).giftTransferCount(3).build();
         when(tickets.findById("ticket-1")).thenReturn(Optional.of(ticket));
         Jwt jwt = new Jwt("token", Instant.now(), Instant.now().plusSeconds(60),
                 Map.of("alg", "none"), Map.of("sub", "seller-1"));
@@ -42,6 +42,8 @@ class TicketMarketplaceControllerTest {
         assertThat(value(response, "seat")).isEqualTo("20");
         assertThat(value(response, "ticketTypeId")).isEqualTo("type-1");
         assertThat(value(response, "showtimeId")).isEqualTo("show-1");
+        assertThat(value(response, "giftTransferCount")).isEqualTo(3);
+        assertThat(value(response, "eligible")).isEqualTo(true);
     }
 
     private static Object value(Object target, String methodName) throws Exception {

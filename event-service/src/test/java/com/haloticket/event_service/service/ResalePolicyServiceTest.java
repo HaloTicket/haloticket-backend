@@ -90,4 +90,52 @@ class ResalePolicyServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value()).isEqualTo(403));
     }
+
+    @Test void omittedControlsUseDefaultsAndPreserveExistingValues() {
+        when(access.requireWrite("e1", "Bearer token")).thenReturn("user-1");
+        when(policyRepository.findByEventId("e1")).thenReturn(Optional.empty());
+        when(policyRepository.save(any())).thenAnswer(invocation -> {
+            ResalePolicy policy = invocation.getArgument(0);
+            policy.setVersion(0L);
+            return policy;
+        });
+        var request = new ResalePolicyRequest(true, BigDecimal.ZERO, new BigDecimal("120"),
+                null, null, "ALL", Set.of(), null, null);
+        var created = service.upsert("e1", request, "Bearer token");
+        assertThat(created.serviceFeePercent()).isEqualByComparingTo("5");
+        assertThat(created.requireApproval()).isFalse();
+        ResalePolicy existing = savedPolicy("e1");
+        existing.setServiceFeePercent(new BigDecimal("2.5"));
+        existing.setRequireApproval(true);
+        when(policyRepository.findByEventId("e1")).thenReturn(Optional.of(existing));
+        var updated = service.upsert("e1", request, "Bearer token");
+        assertThat(updated.serviceFeePercent()).isEqualByComparingTo("2.5");
+        assertThat(updated.requireApproval()).isTrue();
+    }
+
+    @Test void savesExplicitControlsAndIncludesThemInPolicyEvent() {
+        when(access.requireWrite("e1", "Bearer token")).thenReturn("user-1");
+        when(policyRepository.findByEventId("e1")).thenReturn(Optional.of(savedPolicy("e1")));
+        when(policyRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        for (int fee : new int[]{0, 100}) {
+            var request = new ResalePolicyRequest(true, BigDecimal.ZERO, new BigDecimal("120"),
+                    null, null, "ALL", Set.of(), null, 0L, BigDecimal.valueOf(fee), fee == 0);
+            var response = service.upsert("e1", request, "Bearer token");
+            assertThat(response.serviceFeePercent()).isEqualByComparingTo(BigDecimal.valueOf(fee));
+            assertThat(response.requireApproval()).isEqualTo(fee == 0);
+            verify(support).record(eq("e1"), eq("RESALE"), eq("user-1"), any(), eq(response), eq(0L));
+        }
+    }
+
+    @Test void invalidServiceFeesRejectBeforeSaving() {
+        when(access.requireWrite("e1", "Bearer token")).thenReturn("user-1");
+        for (String fee : new String[]{"-0.1", "100.1"}) {
+            var request = new ResalePolicyRequest(true, BigDecimal.ZERO, new BigDecimal("120"),
+                    null, null, "ALL", Set.of(), null, null, new BigDecimal(fee), false);
+            assertThatThrownBy(() -> service.upsert("e1", request, "Bearer token"))
+                    .isInstanceOfSatisfying(ResponseStatusException.class,
+                            failure -> assertThat(failure.getStatusCode().value()).isEqualTo(422));
+        }
+        verify(policyRepository, never()).save(any());
+    }
 }

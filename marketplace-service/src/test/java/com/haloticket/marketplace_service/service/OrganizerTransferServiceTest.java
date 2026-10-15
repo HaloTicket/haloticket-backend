@@ -3,6 +3,7 @@ package com.haloticket.marketplace_service.service;
 import com.haloticket.marketplace_service.client.EventServiceClient;
 import com.haloticket.marketplace_service.dto.OrganizerListingResponse;
 import com.haloticket.marketplace_service.entity.TicketListing;
+import com.haloticket.marketplace_service.entity.TicketTransfer;
 import com.haloticket.marketplace_service.enums.ListingStatus;
 import com.haloticket.marketplace_service.repository.TicketListingRepository;
 import com.haloticket.marketplace_service.repository.TicketTransferRepository;
@@ -17,6 +18,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -30,6 +32,7 @@ class OrganizerTransferServiceTest {
     private TicketTransferRepository transferRepository;
     private EventTransferPolicyService policyGate;
     private OrganizerTransferService service;
+    private TicketListingService ticketListingService;
 
     @BeforeEach
     void setUp() {
@@ -37,7 +40,8 @@ class OrganizerTransferServiceTest {
         listingRepository = mock(TicketListingRepository.class);
         transferRepository = mock(TicketTransferRepository.class);
         policyGate = mock(EventTransferPolicyService.class);
-        service = new OrganizerTransferService(eventServiceClient, listingRepository, transferRepository, policyGate);
+        ticketListingService = mock(TicketListingService.class);
+        service = new OrganizerTransferService(eventServiceClient, listingRepository, transferRepository, policyGate, ticketListingService);
     }
 
     @Test
@@ -109,5 +113,79 @@ class OrganizerTransferServiceTest {
         assertThat(item.seatCode()).isEqualTo("A · Hàng 1 · Ghế 05");
         assertThat(item.price()).isEqualByComparingTo(new BigDecimal("150000"));
         assertThat(item.status()).isEqualTo("ACTIVE");
+        assertThat(item.serviceFeePercent()).isEqualByComparingTo("5.00");
+    }
+
+    @Test
+    void ownerAndAdminCanDelegateOrganizerActionsWithAuthenticatedActor() {
+        when(eventServiceClient.getMyRole("Bearer tok", "evt-1")).thenReturn("\"OWNER\"", "ADMIN", "OWNER");
+        when(listingRepository.findById("listing-1")).thenReturn(Optional.of(TicketListing.builder().eventId("evt-1").build()));
+        when(transferRepository.findBySagaId("gift-1")).thenReturn(Optional.of(TicketTransfer.builder().eventId("evt-1").build()));
+
+        service.moderateListing("Bearer tok", "actor-1", "evt-1", "listing-1", false, "Wrong price");
+        service.cancelListing("Bearer tok", "actor-1", "evt-1", "listing-1", "Delisted");
+        service.cancelGift("Bearer tok", "actor-1", "evt-1", "gift-1", "Cancelled");
+
+        verify(ticketListingService).moderateListingAsOrganizer("actor-1", "evt-1", "listing-1", false, "Wrong price");
+        verify(ticketListingService).cancelListingAsOrganizer("actor-1", "evt-1", "listing-1", "Delisted");
+        verify(ticketListingService).cancelGiftAsOrganizer("actor-1", "evt-1", "gift-1", "Cancelled");
+    }
+
+    @Test
+    void managerHasReadAccessButCannotMutateAnyTransfer() {
+        when(eventServiceClient.getMyRole("Bearer tok", "evt-1")).thenReturn("MANAGER");
+        service.requireOrganizerAccess("Bearer tok", "evt-1");
+
+        assertThatThrownBy(() -> service.moderateListing("Bearer tok", "actor", "evt-1", "listing", true, null))
+                .isInstanceOf(ResponseStatusException.class).satisfies(error ->
+                        assertThat(((ResponseStatusException) error).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> service.cancelListing("Bearer tok", "actor", "evt-1", "listing", null))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> service.cancelGift("Bearer tok", "actor", "evt-1", "gift", null))
+                .isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(ticketListingService, listingRepository, transferRepository);
+    }
+
+    @Test
+    void organizerCannotMutateRecordsFromAnotherEvent() {
+        when(eventServiceClient.getMyRole("Bearer tok", "evt-1")).thenReturn("OWNER");
+        when(listingRepository.findById("listing")).thenReturn(Optional.of(TicketListing.builder().eventId("evt-2").build()));
+        when(transferRepository.findBySagaId("gift")).thenReturn(Optional.of(TicketTransfer.builder().eventId("evt-2").build()));
+
+        assertThatThrownBy(() -> service.moderateListing("Bearer tok", "actor", "evt-1", "listing", true, null))
+                .isInstanceOf(ResponseStatusException.class).satisfies(error ->
+                        assertThat(((ResponseStatusException) error).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND));
+        assertThatThrownBy(() -> service.cancelListing("Bearer tok", "actor", "evt-1", "listing", null))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> service.cancelGift("Bearer tok", "actor", "evt-1", "gift", null))
+                .isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(ticketListingService);
+    }
+
+    @Test
+    void giftMetadataUsesActualTransferTimeWithoutInventingRecipientVerification() {
+        Instant receivedAt = Instant.parse("2026-10-15T00:00:00Z");
+        when(eventServiceClient.getMyRole("Bearer tok", "evt-1")).thenReturn("OWNER");
+        when(transferRepository.findBySagaId("gift")).thenReturn(Optional.of(TicketTransfer.builder()
+                .sagaId("gift").ticketId("ticket").eventId("evt-1").status(com.haloticket.marketplace_service.enums.TransferStatus.COMPLETED)
+                .requireEkyc(true).transferredAt(receivedAt).build()));
+
+        var response = service.getGiftDetail("Bearer tok", "evt-1", "gift");
+
+        assertThat(response.receivedAt()).isEqualTo(receivedAt);
+        assertThat(response.requireEkyc()).isTrue();
+        assertThat(response.isRecipientEkycVerified()).isNull();
+    }
+
+    @Test
+    void giftReadModelsExposeVerificationRecordedDuringAcceptance() {
+        when(eventServiceClient.getMyRole("Bearer tok", "evt-1")).thenReturn("OWNER");
+        TicketTransfer transfer = TicketTransfer.builder().sagaId("gift").ticketId("ticket").eventId("evt-1")
+                .status(com.haloticket.marketplace_service.enums.TransferStatus.COMPLETED).recipientEkycVerified(true).build();
+        when(transferRepository.findBySagaId("gift")).thenReturn(Optional.of(transfer));
+        when(transferRepository.findByEventId("evt-1", PageRequest.of(0, 20))).thenReturn(new PageImpl<>(List.of(transfer)));
+
+        assertThat(service.getGiftDetail("Bearer tok", "evt-1", "gift").isRecipientEkycVerified()).isTrue();
+        assertThat(service.getGifts("Bearer tok", "evt-1", PageRequest.of(0, 20), null).getContent().get(0).isRecipientEkycVerified()).isTrue();
     }
 }

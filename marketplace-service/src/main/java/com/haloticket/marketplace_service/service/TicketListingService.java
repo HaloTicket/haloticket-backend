@@ -53,6 +53,8 @@ public class TicketListingService {
                 && policy.enabled()
                 && policy.minPricePercent() != null
                 && policy.maxPricePercent() != null
+                && (policy.opensAt() == null || !policy.opensAt().isAfter(Instant.now()))
+                && (!"SELECTED".equals(policy.ticketTypeScope()) || policy.allowedTicketTypeIds() != null && policy.allowedTicketTypeIds().contains(ticket.ticketTypeId()))
                 && (policy.closesAt() == null || !policy.closesAt().isBefore(Instant.now()));
         if (!policyOpen) {
             String reasonCode = policy != null && policy.enabled() && policy.closesAt() != null
@@ -72,7 +74,8 @@ public class TicketListingService {
         return new TicketServiceClient.ResaleEligibilityResponse(
                 ticket.ticketId(), ticket.eventId(), true, null, originalPrice,
                 minPrice, maxPrice, policy.version(), policy.closesAt(), policy.termsVersion(),
-                ticket.ticketTypeName(), ticket.section(), ticket.row(), ticket.seat(), ticket.ticketTypeId(), ticket.showtimeId());
+                ticket.ticketTypeName(), ticket.section(), ticket.row(), ticket.seat(), ticket.ticketTypeId(), ticket.showtimeId(),
+                ticket.giftTransferCount(), policy.serviceFeePercent() == null ? new BigDecimal("5") : policy.serviceFeePercent());
     }
 
     @Transactional
@@ -113,6 +116,9 @@ public class TicketListingService {
             eligibleTickets.add(item);
         }
         TicketServiceClient.ResaleEligibilityResponse eligibility = eligibleTickets.get(0);
+        var resalePolicy = eventServiceClient.getResalePolicy(authorization, eligibility.eventId());
+        if (resalePolicy == null || !Objects.equals(resalePolicy.version(), eligibility.policyVersion()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "POLICY_CHANGED");
         BigDecimal minPrice = eligibility.minPrice();
         BigDecimal maxPrice = eligibility.maxPrice();
         Instant now = Instant.now();
@@ -122,6 +128,8 @@ public class TicketListingService {
         payload.put("price", request.price()); payload.put("eventId", eligibility.eventId()); payload.put("originalPrice", eligibility.originalPrice());
         payload.put("minPrice", minPrice); payload.put("maxPrice", maxPrice); payload.put("policyVersion", eligibility.policyVersion());
         payload.put("closesAt", eligibility.closesAt());
+        payload.put("serviceFeePercent", eligibility.serviceFeePercent() == null ? new BigDecimal("5") : eligibility.serviceFeePercent());
+        payload.put("requireApproval", resalePolicy.requireApproval());
         payload.put("termsVersion", request.termsVersion() != null ? request.termsVersion() : eligibility.termsVersion());
         payload.put("ticketTypeName", eligibility.ticketTypeName()); payload.put("section", eligibility.section());
         payload.put("row", eligibility.row()); payload.put("seat", eligibility.seat());
@@ -248,6 +256,7 @@ public class TicketListingService {
         MarketplaceTransaction transaction = MarketplaceTransaction.builder()
                 .ticketListing(listing).buyerId(buyerId).sellerId(listing.getSellerId())
                 .amount(listing.getPrice().multiply(BigDecimal.valueOf(selected.size())))
+                .serviceFeePercent(listing.getServiceFeePercent() == null ? new BigDecimal("5") : listing.getServiceFeePercent())
                 .ticketIds(new LinkedHashSet<>(selected))
                 .selectionExplicit(requestedIds != null)
                 .currency("VND").status(MarketplaceTransactionStatus.PENDING_PAYMENT)
@@ -321,18 +330,73 @@ public class TicketListingService {
 
     @Transactional
     public SagaResponse cancelListing(String actorId, String listingId) {
-        TicketListing listing = listingRepository.findById(listingId)
+        TicketListing listing = listingRepository.findByIdForUpdate(listingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LISTING_NOT_FOUND"));
         if (!listing.getSellerId().equals(actorId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "LISTING_NOT_OWNED");
-        if (listing.getStatus() != ListingStatus.ACTIVE && listing.getStatus() != ListingStatus.PAUSED_BY_EVENT) throw new ResponseStatusException(HttpStatus.CONFLICT, "LISTING_NOT_CANCELLABLE");
+        return cancelListingLocked(actorId, listing, "SELLER_CANCELLED");
+    }
 
-        MarketplaceSaga saga = sagaRepository.findById(listing.getSagaId())
+    @Transactional
+    public SagaResponse cancelListingAsOrganizer(String actorId, String eventId, String listingId, String reason) {
+        TicketListing listing = organizerListing(eventId, listingId);
+        return cancelListingLocked(actorId, listing, reason == null || reason.isBlank() ? "ORGANIZER_CANCELLED" : boundedReason(reason));
+    }
+
+    @Transactional
+    public SagaResponse moderateListingAsOrganizer(String actorId, String eventId, String listingId, boolean approved, String reason) {
+        TicketListing listing = organizerListing(eventId, listingId);
+        if (approved && listing.getStatus() == ListingStatus.ACTIVE) return toResponse(listingSaga(listing));
+        if (!approved && listing.getStatus() == ListingStatus.CANCELLED) return toResponse(listingSaga(listing));
+        if (listing.getStatus() != ListingStatus.PENDING_APPROVAL)
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "LISTING_NOT_PENDING_APPROVAL");
+        if (!approved) {
+            if (reason == null || reason.isBlank()) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "REJECTION_REASON_REQUIRED");
+            return cancelListingLocked(actorId, listing, boundedReason(reason));
+        }
+        if (listing.getExpiresAt() != null && !listing.getExpiresAt().isAfter(Instant.now()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "LISTING_EXPIRED");
+        policyGate.requireResaleEnabled(eventId);
+        listing.setStatus(ListingStatus.ACTIVE); listing.setPublishedAt(Instant.now());
+        listing.setModeratedBy(actorId); listing.setModeratedAt(Instant.now()); listing.setModerationReason(null);
+        listingRepository.save(listing);
+        var saga = listingSaga(listing);
+        saga.setStep("LISTING_ACTIVE"); sagaRepository.save(saga);
+        outboxRepository.save(OutboxEvent.builder().aggregateType("TICKET_LISTING").aggregateId(listingId)
+                .eventType("RESALE_LISTING_ACTIVATED").topic("haloticket.marketplace.listing.activated.v1")
+                .payload(saga.getPayload()).status(OutboxStatus.PENDING).retryCount(0).build());
+        return toResponse(saga);
+    }
+
+    private TicketListing organizerListing(String eventId, String listingId) {
+        TicketListing listing = listingRepository.findByIdForUpdate(listingId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LISTING_NOT_FOUND"));
+        if (!Objects.equals(eventId, listing.getEventId())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "EVENT_MISMATCH");
+        return listing;
+    }
+
+    private MarketplaceSaga listingSaga(TicketListing listing) {
+        return sagaRepository.findById(listing.getSagaId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "LISTING_SAGA_NOT_FOUND"));
+    }
+
+    private static String boundedReason(String reason) {
+        if (reason.trim().length() > 1000) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "REASON_TOO_LONG");
+        return reason.trim();
+    }
+
+    private SagaResponse cancelListingLocked(String actorId, TicketListing listing, String reason) {
+        MarketplaceSaga saga = listingSaga(listing);
+        if (listing.getStatus() == ListingStatus.CANCELLED) return toResponse(saga);
+        if (listing.getStatus() != ListingStatus.ACTIVE && listing.getStatus() != ListingStatus.PAUSED_BY_EVENT && listing.getStatus() != ListingStatus.PENDING_APPROVAL)
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "LISTING_NOT_CANCELLABLE");
+        String listingId = listing.getId();
+
+        listing.setModeratedBy(actorId); listing.setModeratedAt(Instant.now()); listing.setModerationReason(reason);
         listing.setStatus(ListingStatus.CANCELLED);
         listingRepository.save(listing);
         saga.setState(SagaState.COMPENSATING);
         saga.setStep("SELLER_CANCELLATION_RELEASE_REQUESTED");
-        saga.setLastError("SELLER_CANCELLED");
+        saga.setLastError("SELLER_CANCELLED".equals(reason) ? reason : "ORGANIZER_CANCELLED");
         saga.setNextRetryAt(Instant.now().plusSeconds(10));
         sagaRepository.save(saga);
 
@@ -377,9 +441,15 @@ public class TicketListingService {
             var node = objectMapper.readTree(saga.getPayload());
             if ("GIFT_TRANSFER".equals(saga.getType())) {
                 TicketTransfer transfer = transferRepository.findBySagaId(sagaId).orElseThrow();
+                try { policyGate.requireGiftEnabled(transfer.getEventId()); }
+                catch (ResponseStatusException disabled) { requestRelease(sagaId, "GIFT_DISABLED"); return; }
                 String token = UUID.randomUUID().toString();
                 transfer.setInvitationTokenHash(hashToken(token));
-                transfer.setInvitationExpiresAt(Instant.now().plusSeconds(24 * 60 * 60));
+                Instant invitationExpiry = Instant.now().plusSeconds(node.path("invitationTtlHours").asInt(24) * 3600L);
+                Instant policyCutoff = node.hasNonNull("giftClosesAt") ? Instant.parse(node.path("giftClosesAt").asText()) : null;
+                if (policyCutoff != null && policyCutoff.isBefore(invitationExpiry)) invitationExpiry = policyCutoff;
+                if (!invitationExpiry.isAfter(Instant.now())) { requestRelease(sagaId, "GIFT_CLOSED"); return; }
+                transfer.setInvitationExpiresAt(invitationExpiry);
                 transferRepository.save(transfer);
                 saga.setDeadlineAt(transfer.getInvitationExpiresAt());
                 saga.setState(SagaState.WAITING_RECIPIENT); saga.setStep("INVITATION_CREATED"); sagaRepository.save(saga);
@@ -418,23 +488,25 @@ public class TicketListingService {
             if (eventId != null) {
                 try { policyGate.requireResaleEnabled(eventId); } catch (Exception e) { resaleAllowed = false; }
             }
-            ListingStatus initialStatus = resaleAllowed ? ListingStatus.ACTIVE : ListingStatus.PAUSED_BY_EVENT;
-            String pauseReason = resaleAllowed ? null : "ORGANIZER_DISABLED_RESALE";
+            boolean needsApproval = node.path("requireApproval").asBoolean(false);
+            ListingStatus initialStatus = needsApproval ? ListingStatus.PENDING_APPROVAL : resaleAllowed ? ListingStatus.ACTIVE : ListingStatus.PAUSED_BY_EVENT;
+            String pauseReason = needsApproval || resaleAllowed ? null : "ORGANIZER_DISABLED_RESALE";
             TicketListing listing = TicketListing.builder().ticketId(node.get("ticketId").asText()).sellerId(node.get("sellerId").asText())
                     .price(new BigDecimal(node.get("price").asText())).originalPrice(decimal(node,"originalPrice")).minPriceSnapshot(decimal(node,"minPrice"))
                     .maxPriceSnapshot(decimal(node,"maxPrice")).eventId(eventId).status(initialStatus).pauseReason(pauseReason).expiresAt(expiry)
+                    .serviceFeePercent(node.hasNonNull("serviceFeePercent") ? decimal(node, "serviceFeePercent") : new BigDecimal("5"))
                     .ticketTypeNameSnapshot(text(node,"ticketTypeName")).sectionSnapshot(text(node,"section"))
                     .rowSnapshot(text(node,"row")).seatSnapshot(text(node,"seat"))
                     .quantity(node.path("quantity").asInt(1))
                     .members(members(node))
                     .allowRetail(node.path("quantity").asInt(1) == 1 || node.path("allowRetail").asBoolean(true))
-                    .publishedAt(Instant.now()).policyVersion(node.hasNonNull("policyVersion") ? node.get("policyVersion").asLong() : null)
+                    .publishedAt(needsApproval ? null : Instant.now()).policyVersion(node.hasNonNull("policyVersion") ? node.get("policyVersion").asLong() : null)
                     .termsVersion(text(node,"termsVersion")).sagaId(sagaId).build();
             listingRepository.save(listing);
-            saga.setState(SagaState.COMPLETED); saga.setStep("LISTING_ACTIVE"); saga.setBusinessId(listing.getId());
+            saga.setState(SagaState.COMPLETED); saga.setStep(needsApproval ? "LISTING_PENDING_APPROVAL" : "LISTING_ACTIVE"); saga.setBusinessId(listing.getId());
             sagaRepository.save(saga);
             outboxRepository.save(OutboxEvent.builder().aggregateType("TICKET_LISTING").aggregateId(listing.getId()).eventType("RESALE_LISTING_ACTIVATED")
-                    .topic("haloticket.marketplace.listing.activated.v1").payload(saga.getPayload()).status(OutboxStatus.PENDING).retryCount(0).build());
+                    .topic(needsApproval ? "haloticket.marketplace.listing.pending-approval.v1" : "haloticket.marketplace.listing.activated.v1").payload(saga.getPayload()).status(OutboxStatus.PENDING).retryCount(0).build());
         } catch (Exception exception) { throw new IllegalStateException("Could not activate resale listing", exception); }
     }
 
@@ -444,6 +516,7 @@ public class TicketListingService {
         if (request == null || request.recipientEmail() == null || request.recipientEmail().isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "RECIPIENT_REQUIRED");
         }
+        if (!request.acceptedTerms()) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "GIFT_TERMS_REQUIRED");
         List<String> ticketIds = selectedIds(request.ticketId(), request.ticketIds());
         String hash = hash(request);
         Optional<MarketplaceSaga> existing = sagaRepository.findByIdempotencyKey(idempotencyKey);
@@ -472,8 +545,21 @@ public class TicketListingService {
         }
         TicketServiceClient.ResaleEligibilityResponse eligibility = eligibleTickets.get(0);
         if (eligibility.eventId() != null) policyGate.requireGiftEnabled(eligibility.eventId());
-        String sagaId = UUID.randomUUID().toString();
+        EventServiceClient.GiftPolicyResponse giftPolicy;
+        try { giftPolicy = eventServiceClient.getGiftPolicy(authorization, eligibility.eventId()); }
+        catch (FeignException.NotFound exception) { throw new ResponseStatusException(HttpStatus.CONFLICT, "GIFT_POLICY_NOT_CONFIGURED"); }
+        catch (Exception exception) { throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "POLICY_SERVICE_UNAVAILABLE", exception); }
         Instant now = Instant.now();
+        if (giftPolicy == null || !giftPolicy.enabled() || giftPolicy.opensAt() != null && giftPolicy.opensAt().isAfter(now)
+                || giftPolicy.closesAt() != null && !giftPolicy.closesAt().isAfter(now))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "GIFT_DISABLED");
+        for (var item : eligibleTickets) {
+            if ("SELECTED".equals(giftPolicy.ticketTypeScope()) && (giftPolicy.allowedTicketTypeIds() == null || !giftPolicy.allowedTicketTypeIds().contains(item.ticketTypeId())))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "TICKET_NOT_ELIGIBLE");
+            if (giftPolicy.maxGiftCount() > 0 && item.giftTransferCount() >= giftPolicy.maxGiftCount())
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "GIFT_LIMIT_REACHED");
+        }
+        String sagaId = UUID.randomUUID().toString();
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("sagaId", sagaId);
         payload.put("ticketId", ticketIds.get(0));
@@ -488,13 +574,19 @@ public class TicketListingService {
         payload.put("section", eligibility.section());
         payload.put("row", eligibility.row());
         payload.put("seat", eligibility.seat());
+        payload.put("invitationTtlHours", giftPolicy.invitationTtlHours());
+        payload.put("giftClosesAt", giftPolicy.closesAt());
+        payload.put("requireEkyc", giftPolicy.requireEkyc());
+        payload.put("maxGiftCount", giftPolicy.maxGiftCount());
         try {
             MarketplaceSaga saga = MarketplaceSaga.builder().id(sagaId).type("GIFT_TRANSFER").ticketId(ticketIds.get(0)).actorId(actorId).state(SagaState.WAITING_LOCK).step("LOCK_REQUESTED")
                     .payload(objectMapper.writeValueAsString(payload)).idempotencyKey(idempotencyKey).requestHash(hash).deadlineAt(eligibility.closesAt()).nextRetryAt(now).retryCount(0).build();
             sagaRepository.save(saga);
-            TicketTransfer transfer = TicketTransfer.builder().ticketId(ticketIds.get(0)).members(eligibleTickets.stream().map(item -> snapshot(item)).toList()).fromUserId(actorId).toUserId(recipient.userId()).recipientEmail(recipientEmail).message(request.message()).type(TransferType.GIFT).status(TransferStatus.PENDING).sagaId(sagaId).eventId(eligibility.eventId()).ticketTypeName(eligibility.ticketTypeName()).build();
+            TicketTransfer transfer = TicketTransfer.builder().ticketId(ticketIds.get(0)).members(eligibleTickets.stream().map(item -> snapshot(item)).toList()).fromUserId(actorId).toUserId(recipient.userId()).recipientEmail(recipientEmail).message(request.message()).type(TransferType.GIFT).status(TransferStatus.PENDING).sagaId(sagaId).eventId(eligibility.eventId()).ticketTypeName(eligibility.ticketTypeName())
+                    .requireEkyc(giftPolicy.requireEkyc()).maxGiftCount(giftPolicy.maxGiftCount()).build();
             transferRepository.save(transfer); saga.setBusinessId(transfer.getId()); sagaRepository.save(saga);
             Map<String, Object> command = new LinkedHashMap<>(); command.put("messageId", UUID.randomUUID().toString()); command.put("sagaId", sagaId); command.put("operationId", sagaId); command.put("ticketId", ticketIds.get(0)); command.put("ticketIds", ticketIds); command.put("sellerId", actorId); command.put("purpose", "GIFT");
+            command.put("maxGiftCount", giftPolicy.maxGiftCount());
             outboxRepository.save(OutboxEvent.builder().aggregateType("MARKETPLACE_SAGA").aggregateId(sagaId).eventType("TICKET_LOCK_REQUESTED").topic("haloticket.ticket.lock.requested.v1").payload(objectMapper.writeValueAsString(command)).status(OutboxStatus.PENDING).retryCount(0).build());
             return toResponse(saga);
         } catch (JsonProcessingException exception) { throw new IllegalStateException("Could not create gift saga", exception); }
@@ -502,20 +594,56 @@ public class TicketListingService {
 
     @Transactional
     public SagaResponse acceptGift(String actorId, String authorization, String sagaId, String token) {
-        TicketTransfer transfer = transferRepository.findBySagaId(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        MarketplaceSaga saga = sagaRepository.findById(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (saga.getState() != SagaState.WAITING_RECIPIENT || transfer.getInvitationExpiresAt() == null || transfer.getInvitationExpiresAt().isBefore(Instant.now())
+        MarketplaceSaga saga = sagaRepository.findByIdForUpdate(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        TicketTransfer transfer = transferRepository.findBySagaIdForUpdate(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (saga.getState() != SagaState.WAITING_RECIPIENT || transfer.getStatus() != TransferStatus.PENDING || transfer.getInvitationExpiresAt() == null || !transfer.getInvitationExpiresAt().isAfter(Instant.now())
                 || (token != null && !hashToken(token).equals(transfer.getInvitationTokenHash()))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "GIFT_INVITATION_INVALID");
         }
         if (!actorId.equals(transfer.getToUserId())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GIFT_RECIPIENT_MISMATCH");
+        policyGate.requireGiftEnabled(transfer.getEventId());
         UserServiceClient.CurrentUser currentUser = userServiceClient.getCurrentUser(authorization);
         if (currentUser == null || !transfer.getRecipientEmail().equalsIgnoreCase(currentUser.email())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GIFT_RECIPIENT_MISMATCH");
+        if (transfer.isRequireEkyc()) {
+            UserServiceClient.ResaleSellerEligibility verified;
+            try { verified = userServiceClient.getResaleEligibility(authorization); }
+            catch (Exception cause) { throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "EKYC_SERVICE_UNAVAILABLE", cause); }
+            if (verified == null || !verified.eligible()) throw new ResponseStatusException(HttpStatus.CONFLICT, "EKYC_REQUIRED");
+            transfer.setRecipientEkycVerified(true);
+        }
         transfer.setToUserId(actorId); transferRepository.save(transfer); saga.setState(SagaState.WAITING_TRANSFER); saga.setStep("TRANSFER_REQUESTED"); sagaRepository.save(saga);
         Map<String, Object> command = new LinkedHashMap<>(); command.put("messageId", UUID.randomUUID().toString()); command.put("sagaId", sagaId); command.put("operationId", sagaId + ":TRANSFER"); command.put("ticketId", transfer.getTicketId()); command.put("ticketIds", memberIds(transfer)); command.put("lockTicketIds", memberIds(transfer)); command.put("fromUserId", transfer.getFromUserId()); command.put("toUserId", actorId); command.put("lockOperationId", sagaId); command.put("purpose", "GIFT");
+        command.put("maxGiftCount", transfer.getMaxGiftCount());
         try {
             outboxRepository.save(OutboxEvent.builder().aggregateType("TICKET_TRANSFER").aggregateId(transfer.getId()).eventType("TICKET_OWNERSHIP_TRANSFER_REQUESTED").topic("haloticket.ticket.ownership.transfer.requested.v1").payload(objectMapper.writeValueAsString(command)).status(OutboxStatus.PENDING).retryCount(0).build());
         } catch (JsonProcessingException exception) { throw new IllegalStateException("Could not create transfer command", exception); }
+        return toResponse(saga);
+    }
+
+    @Transactional
+    public SagaResponse cancelGiftAsOrganizer(String actorId, String eventId, String sagaId, String reason) {
+        MarketplaceSaga saga = sagaRepository.findByIdForUpdate(sagaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "GIFT_NOT_FOUND"));
+        TicketTransfer transfer = transferRepository.findBySagaIdForUpdate(sagaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "GIFT_NOT_FOUND"));
+        if (!"GIFT_TRANSFER".equals(saga.getType()) || !Objects.equals(eventId, transfer.getEventId()))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "EVENT_MISMATCH");
+        if (transfer.getStatus() == TransferStatus.CANCELLED) return toResponse(saga);
+        if (transfer.getStatus() != TransferStatus.PENDING || saga.getState() != SagaState.WAITING_RECIPIENT)
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "GIFT_NOT_CANCELLABLE");
+        transfer.setStatus(TransferStatus.CANCELLED);
+        transfer.setCancellationReason(reason == null || reason.isBlank() ? "ORGANIZER_CANCELLED" : boundedReason(reason));
+        transferRepository.save(transfer);
+        saga.setState(SagaState.COMPENSATING); saga.setStep("ORGANIZER_GIFT_CANCELLATION_REQUESTED"); saga.setLastError("ORGANIZER_CANCELLED");
+        saga.setNextRetryAt(Instant.now().plusSeconds(10)); sagaRepository.save(saga);
+        Map<String, Object> command = new LinkedHashMap<>();
+        command.put("messageId", UUID.randomUUID().toString()); command.put("sagaId", sagaId); command.put("operationId", sagaId);
+        command.put("ticketId", transfer.getTicketId()); command.put("ticketIds", memberIds(transfer)); command.put("lockTicketIds", memberIds(transfer));
+        try {
+            outboxRepository.save(OutboxEvent.builder().aggregateType("TICKET_TRANSFER").aggregateId(transfer.getId())
+                    .eventType("TICKET_RELEASE_REQUESTED").topic("haloticket.ticket.release.requested.v1")
+                    .payload(objectMapper.writeValueAsString(command)).status(OutboxStatus.PENDING).retryCount(0).build());
+        } catch (JsonProcessingException exception) { throw new IllegalStateException("Could not cancel gift", exception); }
         return toResponse(saga);
     }
 
@@ -535,6 +663,8 @@ public class TicketListingService {
             result.put("recipientEmail", transfer.getRecipientEmail());
             result.put("expiresAt", transfer.getInvitationExpiresAt());
             result.put("state", saga.getState());
+            result.put("requireEkyc", transfer.isRequireEkyc());
+            result.put("maxGiftCount", transfer.getMaxGiftCount());
             result.put("ticketIds", memberIds(transfer));
             result.put("quantity", memberIds(transfer).size());
             result.put("tickets", transfer.getMembers());
@@ -605,16 +735,16 @@ public class TicketListingService {
         if (saga == null || "RESALE_PURCHASE".equals(saga.getType()) || saga.getState() != SagaState.COMPENSATING) return;
         if ("RESALE_LISTING".equals(saga.getType()) && saga.getBusinessId() != null) {
             listingRepository.findById(saga.getBusinessId()).ifPresent(listing -> {
-                if (listing.getStatus() == ListingStatus.ACTIVE || listing.getStatus() == ListingStatus.PAUSED_BY_EVENT) {
+                if (listing.getStatus() == ListingStatus.ACTIVE || listing.getStatus() == ListingStatus.PAUSED_BY_EVENT || listing.getStatus() == ListingStatus.PENDING_APPROVAL) {
                     listing.setStatus(ListingStatus.CANCELLED);
                     listingRepository.save(listing);
                 }
             });
         }
-        transferRepository.findBySagaId(sagaId).ifPresent(transfer -> { transfer.setStatus(TransferStatus.CANCELLED); transfer.setCancellationReason(saga.getLastError()); transferRepository.save(transfer); });
+        transferRepository.findBySagaId(sagaId).ifPresent(transfer -> { transfer.setStatus(TransferStatus.CANCELLED); if (transfer.getCancellationReason() == null) transfer.setCancellationReason(saga.getLastError()); transferRepository.save(transfer); });
         saga.setState(SagaState.COMPENSATED); saga.setStep("RELEASE_CONFIRMED"); saga.setNextRetryAt(null); sagaRepository.save(saga);
         boolean gift = "GIFT_TRANSFER".equals(saga.getType());
-        boolean sellerCancelled = "SELLER_CANCELLED".equals(saga.getLastError());
+        boolean sellerCancelled = "SELLER_CANCELLED".equals(saga.getLastError()) || "ORGANIZER_CANCELLED".equals(saga.getLastError());
         String eventType = gift ? "GIFT_CANCELLED" : sellerCancelled ? "RESALE_LISTING_CANCELLED" : "RESALE_LISTING_FAILED";
         String topic = gift ? "haloticket.marketplace.gift.cancelled.v1" : sellerCancelled ? "haloticket.marketplace.listing.cancelled.v1" : "haloticket.marketplace.listing.failed.v1";
         outboxRepository.save(OutboxEvent.builder().aggregateType("MARKETPLACE_SAGA").aggregateId(sagaId).eventType(eventType).topic(topic).payload(saga.getPayload()).status(OutboxStatus.PENDING).retryCount(0).build());

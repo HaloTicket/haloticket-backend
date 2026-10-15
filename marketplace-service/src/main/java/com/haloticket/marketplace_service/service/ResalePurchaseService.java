@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.*;
 
@@ -145,8 +146,10 @@ public class ResalePurchaseService {
         listing.setReservedBy(null); listing.setReservedUntil(null);
         transaction.setStatus(MarketplaceTransactionStatus.COMPLETED); transaction.setCompletedAt(now); transactions.save(transaction);
         saga.setState(SagaState.COMPLETED); saga.setStep("PURCHASE_COMPLETED"); sagas.save(saga);
+        BigDecimal feePercent = transaction.getServiceFeePercent() == null ? new BigDecimal("5.00") : transaction.getServiceFeePercent();
+        BigDecimal platformFee = transaction.getAmount().multiply(feePercent).movePointLeft(2).setScale(0, RoundingMode.HALF_UP);
         settlements.save(SellerSettlement.builder().marketplaceTransaction(transaction).sellerId(transaction.getSellerId())
-                .grossAmount(transaction.getAmount()).platformFee(BigDecimal.ZERO).netAmount(transaction.getAmount())
+                .grossAmount(transaction.getAmount()).platformFee(platformFee).netAmount(transaction.getAmount().subtract(platformFee))
                 .currency(transaction.getCurrency()).status(SettlementStatus.PENDING_SETTLEMENT).eligibleAt(now).build());
     }
 

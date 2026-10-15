@@ -26,12 +26,14 @@ class TicketTransferSnapshotControllerTest {
         when(repository.findById("ticket")).thenReturn(Optional.of(Ticket.builder().id("ticket")
                 .eventId("event").ownerId("owner").lockOperationId("lock").status(TicketStatus.VALID)
                 .ticketType(TicketType.builder().id("type").showtimeId("show").build())
-                .qrCodeHash("must-never-leak").build()));
+                .qrCodeHash("must-never-leak").giftTransferCount(2).build()));
         var snapshot = new TicketTransferSnapshotController(repository, "secret").snapshot("ticket", "secret");
         assertThat(snapshot.ownerId()).isEqualTo("owner");
         assertThat(snapshot.lockOperationId()).isEqualTo("lock");
         assertThat(snapshot.ticketTypeId()).isEqualTo("type");
         assertThat(snapshot.showtimeId()).isEqualTo("show");
+        assertThat(new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(snapshot)
+                .path("giftTransferCount").asInt(-1)).isEqualTo(2);
         assertThat(snapshot.toString()).doesNotContain("must-never-leak");
     }
 }

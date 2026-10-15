@@ -55,7 +55,7 @@ class TicketListingLifecycleTest {
         TicketListing listing = listing("seller-1", ListingStatus.ACTIVE);
         MarketplaceSaga saga = MarketplaceSaga.builder().id("saga-1").ticketId("ticket-1")
                 .actorId("seller-1").type("RESALE_LISTING").state(SagaState.COMPLETED).build();
-        when(listings.findById("listing-1")).thenReturn(Optional.of(listing));
+        when(listings.findByIdForUpdate("listing-1")).thenReturn(Optional.of(listing));
         when(sagas.findById("saga-1")).thenReturn(Optional.of(saga));
 
         invokeCancel(service, "seller-1", "listing-1");
@@ -74,7 +74,7 @@ class TicketListingLifecycleTest {
         TicketListingRepository listings = mock(TicketListingRepository.class);
         OutboxEventRepository outbox = mock(OutboxEventRepository.class);
         TicketListingService service = service(listings, mock(MarketplaceSagaRepository.class), outbox);
-        when(listings.findById("listing-1")).thenReturn(Optional.of(listing("seller-1", ListingStatus.ACTIVE)));
+        when(listings.findByIdForUpdate("listing-1")).thenReturn(Optional.of(listing("seller-1", ListingStatus.ACTIVE)));
 
         assertThatThrownBy(() -> invokeCancel(service, "seller-2", "listing-1"))
                 .isInstanceOf(ResponseStatusException.class)

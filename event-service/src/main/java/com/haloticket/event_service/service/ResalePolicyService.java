@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import java.math.BigDecimal;
 import java.util.Set;
 
 @Service @RequiredArgsConstructor
@@ -28,7 +29,9 @@ public class ResalePolicyService {
         String actor = access.requireWrite(eventId, authorization);
         if (request == null || request.minPricePercent() == null || request.maxPricePercent() == null
                 || request.minPricePercent().signum() < 0
-                || request.maxPricePercent().compareTo(request.minPricePercent()) < 0) {
+                || request.maxPricePercent().compareTo(request.minPricePercent()) < 0
+                || (request.serviceFeePercent() != null && (request.serviceFeePercent().signum() < 0
+                    || request.serviceFeePercent().compareTo(new BigDecimal("100")) > 0))) {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_RESALE_POLICY");
         }
         ResalePolicy existing = policyRepository.findByEventId(eventId).orElse(null);
@@ -46,6 +49,8 @@ public class ResalePolicyService {
         policy.setTicketTypeScope(scope);
         policy.setAllowedTicketTypeIds(ids);
         policy.setTermsVersion(request.termsVersion());
+        if (request.serviceFeePercent() != null) policy.setServiceFeePercent(request.serviceFeePercent());
+        if (request.requireApproval() != null) policy.setRequireApproval(request.requireApproval());
         ResalePolicy saved = policyRepository.save(policy);
         support.record(eventId, "RESALE", actor, before, ResalePolicyResponse.from(saved), saved.getVersion());
         return ResalePolicyResponse.from(saved);

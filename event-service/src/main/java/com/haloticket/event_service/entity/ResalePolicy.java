@@ -15,6 +15,9 @@ public class ResalePolicy {
     @Column(nullable = false) private boolean enabled;
     @Column(name = "min_price_percent", precision = 7, scale = 3, nullable = false) private BigDecimal minPricePercent;
     @Column(name = "max_price_percent", precision = 7, scale = 3, nullable = false) private BigDecimal maxPricePercent;
+    @Builder.Default
+    @Column(name = "service_fee_percent", precision = 7, scale = 3, nullable = false) private BigDecimal serviceFeePercent = new BigDecimal("5");
+    @Column(name = "require_approval", nullable = false) private boolean requireApproval;
     @Column(name = "closes_at") private Instant closesAt;
     @Column(name = "opens_at") private Instant opensAt;
     @Column(name = "ticket_type_scope", nullable = false) private String ticketTypeScope = "ALL";

@@ -42,8 +42,11 @@ public class TicketMarketplaceCommandListener {
             if (!existing.isEmpty()) { emitResult(existing.get(0), existing.size() == ids.size() && existing.stream().allMatch(op -> op.getState() == TicketOperationState.LOCKED) ? "TICKET_LOCKED" : "TICKET_LOCK_REJECTED"); return; }
             List<Ticket> tickets = lockedTickets(ids);
             String owner = text(root, "sellerId");
+            String purpose = root.path("purpose").asText("RESALE");
+            int maxGiftCount = "GIFT".equals(purpose) ? maxGiftCount(root) : 0;
             boolean valid = tickets.size() == ids.size() && owner != null && tickets.stream().allMatch(ticket -> owner.equals(ticket.getOwnerId())
-                    && ticket.getStatus() == TicketStatus.VALID && ticket.getLockOperationId() == null);
+                    && ticket.getStatus() == TicketStatus.VALID && ticket.getLockOperationId() == null
+                    && (maxGiftCount == 0 || ticket.getGiftTransferCount() < maxGiftCount));
             List<TicketOperation> created = new ArrayList<>();
             for (String id : ids) {
                 TicketOperation operation = operation(root, memberOperationId(operationId, id, ids), id, owner,
@@ -95,13 +98,16 @@ public class TicketMarketplaceCommandListener {
             if (operationId.isBlank() || fromUserId == null || toUserId == null) throw new IllegalArgumentException("Transfer command is incomplete");
             List<TicketOperation> existing = operations(operationId, ids);
             if (!existing.isEmpty()) { emitResult(existing.get(0), existing.size() == ids.size() && existing.stream().allMatch(op -> op.getState() == TicketOperationState.TRANSFERRED) ? "TICKET_OWNERSHIP_TRANSFERRED" : "TICKET_TRANSFER_REJECTED"); return; }
-            String purpose = root.path("purpose").asText("GIFT");
+            String purpose = root.path("purpose").asText(root.path("transferType").asText("GIFT"));
+            if (!"GIFT".equals(purpose) && !"RESALE".equals(purpose)) throw new IllegalArgumentException("Unknown transfer purpose");
+            int maxGiftCount = "GIFT".equals(purpose) ? maxGiftCount(root) : 0;
             List<Ticket> tickets = lockedTickets(ids);
             String lockOperationId = text(root, "lockOperationId");
             TicketStatus requiredStatus = "RESALE".equals(purpose) ? TicketStatus.LOCKED_FOR_RESALE : TicketStatus.LOCKED_FOR_TRANSFER;
             boolean valid = tickets.size() == ids.size() && lockOperationId != null && tickets.stream().allMatch(ticket ->
                     fromUserId.equals(ticket.getOwnerId()) && ticket.getStatus() == requiredStatus
-                            && memberOperationId(lockOperationId, ticket.getId(), root.path("lockTicketIds").isArray() ? lockIds(root) : ids).equals(ticket.getLockOperationId()));
+                            && memberOperationId(lockOperationId, ticket.getId(), root.path("lockTicketIds").isArray() ? lockIds(root) : ids).equals(ticket.getLockOperationId())
+                            && (maxGiftCount == 0 || ticket.getGiftTransferCount() < maxGiftCount));
             List<TicketOperation> created = new ArrayList<>();
             for (String id : ids) {
                 TicketOperation operation = operation(root, memberOperationId(operationId, id, ids), id, fromUserId, purpose,
@@ -115,7 +121,10 @@ public class TicketMarketplaceCommandListener {
                     ticket.setPurchasePrice(root.hasNonNull("purchasePrice") ? root.get("purchasePrice").decimalValue() : ticket.getOriginalPrice());
                     ticket.setAcquisitionType(root.path("acquisitionType").asText("RESALE"));
                     ticket.setBookingId(root.path("purchaseReference").asText(ticket.getBookingId()));
-                } else ticket.setAcquisitionType("GIFT");
+                } else {
+                    ticket.setAcquisitionType("GIFT");
+                    ticket.setGiftTransferCount(Math.addExact(ticket.getGiftTransferCount(), 1));
+                }
                 ticketRepository.save(ticket);
             }
             emitResult(created.get(0), valid ? "TICKET_OWNERSHIP_TRANSFERRED" : "TICKET_TRANSFER_REJECTED");
@@ -178,4 +187,12 @@ public class TicketMarketplaceCommandListener {
     }
 
     private static String text(JsonNode node, String field) { return node.hasNonNull(field) ? node.get(field).asText() : null; }
+
+    private static int maxGiftCount(JsonNode root) {
+        JsonNode limit = root.get("maxGiftCount");
+        if (limit == null || limit.isNull()) return 3;
+        if (!limit.isIntegralNumber() || !limit.canConvertToInt() || limit.intValue() < 0)
+            throw new IllegalArgumentException("maxGiftCount must be a non-negative integer");
+        return limit.intValue();
+    }
 }
