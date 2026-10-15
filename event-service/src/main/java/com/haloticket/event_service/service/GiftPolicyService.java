@@ -26,6 +26,10 @@ public class GiftPolicyService {
     @Transactional
     public GiftPolicyResponse upsert(String eventId, GiftPolicyRequest request, String authorization) {
         String actor = access.requireWrite(eventId, authorization);
+        if (request == null || (request.maxGiftCount() != null
+                && (request.maxGiftCount() < 0 || request.maxGiftCount() > 100))) {
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_POLICY");
+        }
         GiftPolicy existing = repository.findByEventId(eventId).orElse(null);
         if (existing != null) support.version(request.expectedVersion(), existing.getVersion());
         String scope = request.ticketTypeScope() != null ? request.ticketTypeScope() : "ALL";
@@ -41,6 +45,8 @@ public class GiftPolicyService {
         policy.setInvitationTtlHours(ttl);
         policy.setTicketTypeScope(scope);
         policy.setAllowedTicketTypeIds(ids);
+        if (request.requireEkyc() != null) policy.setRequireEkyc(request.requireEkyc());
+        if (request.maxGiftCount() != null) policy.setMaxGiftCount(request.maxGiftCount());
         GiftPolicy saved = repository.save(policy);
         support.record(eventId, "GIFT", actor, before, GiftPolicyResponse.from(saved), saved.getVersion());
         return GiftPolicyResponse.from(saved);

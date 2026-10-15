@@ -75,4 +75,49 @@ class GiftPolicyServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode().value()).isEqualTo(409));
     }
+
+    @Test void omittedControlsUseDefaultsAndPreserveExistingValues() {
+        when(access.requireWrite("e1", "Bearer token")).thenReturn("user-1");
+        when(repository.findByEventId("e1")).thenReturn(Optional.empty());
+        when(repository.save(any())).thenAnswer(invocation -> {
+            GiftPolicy policy = invocation.getArgument(0);
+            policy.setVersion(0L);
+            return policy;
+        });
+        var request = new GiftPolicyRequest(true, null, null, 24, "ALL", Set.of(), null);
+        var created = service.upsert("e1", request, "Bearer token");
+        assertThat(created.requireEkyc()).isTrue();
+        assertThat(created.maxGiftCount()).isEqualTo(3);
+        GiftPolicy existing = savedPolicy("e1");
+        existing.setRequireEkyc(false);
+        existing.setMaxGiftCount(12);
+        when(repository.findByEventId("e1")).thenReturn(Optional.of(existing));
+        var updated = service.upsert("e1", request, "Bearer token");
+        assertThat(updated.requireEkyc()).isFalse();
+        assertThat(updated.maxGiftCount()).isEqualTo(12);
+    }
+
+    @Test void savesExplicitControlsIncludingUnlimitedAndIncludesThemInPolicyEvent() {
+        when(access.requireWrite("e1", "Bearer token")).thenReturn("user-1");
+        when(repository.findByEventId("e1")).thenReturn(Optional.of(savedPolicy("e1")));
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        for (int count : new int[]{0, 100}) {
+            var request = new GiftPolicyRequest(true, null, null, 24, "ALL", Set.of(), 0L, count != 0, count);
+            var response = service.upsert("e1", request, "Bearer token");
+            assertThat(response.requireEkyc()).isEqualTo(count != 0);
+            assertThat(response.maxGiftCount()).isEqualTo(count);
+            verify(support).record(eq("e1"), eq("GIFT"), eq("user-1"), any(), eq(response), eq(0L));
+        }
+    }
+
+    @Test void invalidGiftLimitsRejectBeforeSaving() {
+        when(access.requireWrite("e1", "Bearer token")).thenReturn("user-1");
+        for (int count : new int[]{-1, 101}) {
+            var request = new GiftPolicyRequest(true, null, null, 24, "ALL", Set.of(), null, true, count);
+            assertThatThrownBy(() -> service.upsert("e1", request, "Bearer token"))
+                    .isInstanceOfSatisfying(ResponseStatusException.class,
+                            failure -> assertThat(failure.getStatusCode().value()).isEqualTo(422));
+        }
+        verify(repository, never()).save(any());
+    }
 }

@@ -14,6 +14,10 @@ public class GiftPolicy {
     @Column(name = "opens_at") private Instant opensAt;
     @Column(name = "closes_at") private Instant closesAt;
     @Column(name = "invitation_ttl_hours", nullable = false) private int invitationTtlHours;
+    @Builder.Default
+    @Column(name = "require_ekyc", nullable = false) private boolean requireEkyc = true;
+    @Builder.Default
+    @Column(name = "max_gift_count", nullable = false) private int maxGiftCount = 3;
     @Column(name = "ticket_type_scope", nullable = false) private String ticketTypeScope;
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "gift_policy_ticket_types", joinColumns = @JoinColumn(name = "policy_id"))
