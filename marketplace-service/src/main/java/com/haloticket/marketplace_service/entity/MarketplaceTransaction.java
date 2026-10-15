@@ -16,6 +16,7 @@ public class MarketplaceTransaction {
     @Column(name = "buyer_id", nullable = false) private String buyerId;
     @Column(name = "seller_id", nullable = false) private String sellerId;
     @Column(nullable = false, precision = 19, scale = 0) private BigDecimal amount;
+    @Column(name = "service_fee_percent", precision = 7, scale = 3) @Builder.Default private BigDecimal serviceFeePercent = new BigDecimal("5.00");
     @Column(nullable = false, length = 3) @Builder.Default private String currency = "VND";
     @Enumerated(EnumType.STRING) @Column(nullable = false) private MarketplaceTransactionStatus status;
     @Column(name = "payment_id") private String paymentId;

@@ -5,6 +5,8 @@ import com.haloticket.marketplace_service.entity.*;
 import com.haloticket.marketplace_service.enums.*;
 import com.haloticket.marketplace_service.repository.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
@@ -12,6 +14,28 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ResalePurchaseServiceTest {
+    @ParameterizedTest
+    @CsvSource({"120000, 5.00, 6000, 114000", "100010, 5.00, 5001, 95009", "120000, 2.50, 3000, 117000", "100000, 2.555, 2555, 97445", "120000, 0, 0, 120000", "120000, NULL, 6000, 114000"})
+    void settlementUsesTransactionFeeSnapshotAndRoundsVndOnce(String amount, String percent, String fee, String net) {
+        Fixture fixture = new Fixture();
+        fixture.transaction.setAmount(new BigDecimal(amount));
+        fixture.transaction.setServiceFeePercent("NULL".equals(percent) ? null : new BigDecimal(percent));
+        fixture.transaction.setStatus(MarketplaceTransactionStatus.TRANSFERRING);
+        fixture.transaction.setSagaId("purchase-saga");
+        when(fixture.transactions.findBySagaId("purchase-saga")).thenReturn(Optional.of(fixture.transaction));
+        when(fixture.sagas.findById("purchase-saga")).thenReturn(Optional.of(MarketplaceSaga.builder().state(SagaState.WAITING_TRANSFER).build()));
+        when(fixture.transfers.findBySagaId("purchase-saga")).thenReturn(Optional.of(TicketTransfer.builder().ticketId("ticket-1").build()));
+
+        fixture.service.handleOwnershipTransferred("purchase-saga");
+        fixture.service.handleOwnershipTransferred("purchase-saga");
+
+        verify(fixture.settlements, times(1)).save(argThat(settlement ->
+                settlement.getGrossAmount().compareTo(new BigDecimal(amount)) == 0
+                        && settlement.getPlatformFee().compareTo(new BigDecimal(fee)) == 0
+                        && settlement.getNetAmount().compareTo(new BigDecimal(net)) == 0
+                        && settlement.getStatus() == SettlementStatus.PENDING_SETTLEMENT));
+    }
+
     @Test
     void timedOutPaidTransferRetriesSameMembersAndLateSuccessCompletesOnce() {
         Fixture fixture = new Fixture();

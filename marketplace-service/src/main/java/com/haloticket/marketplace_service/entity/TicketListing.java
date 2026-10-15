@@ -21,6 +21,10 @@ public class TicketListing {
     @Column(name = "seller_id", nullable = false) private String sellerId;
     @Column(nullable = false, precision = 19, scale = 0) private BigDecimal price;
     @Column(name = "original_price", precision = 19, scale = 0) private BigDecimal originalPrice;
+    @Column(name = "service_fee_percent", precision = 7, scale = 3, nullable = false) @Builder.Default private BigDecimal serviceFeePercent = new BigDecimal("5");
+    @Column(name = "moderation_reason", length = 1000) private String moderationReason;
+    @Column(name = "moderated_by") private String moderatedBy;
+    @Column(name = "moderated_at") private Instant moderatedAt;
     @Column(name = "min_price_snapshot", precision = 19, scale = 0) private BigDecimal minPriceSnapshot;
     @Column(name = "max_price_snapshot", precision = 19, scale = 0) private BigDecimal maxPriceSnapshot;
     @Column(name = "event_id") private String eventId;

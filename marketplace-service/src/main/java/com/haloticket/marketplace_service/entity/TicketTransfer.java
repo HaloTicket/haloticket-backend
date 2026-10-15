@@ -28,6 +28,9 @@ public class TicketTransfer {
     @Column(name = "saga_id", nullable = false, unique = true) private String sagaId;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "transferred_at") private Instant transferredAt;
+    @Column(name = "require_ekyc", nullable = false) @Builder.Default private boolean requireEkyc = true;
+    @Column(name = "max_gift_count", nullable = false) @Builder.Default private int maxGiftCount = 3;
+    @Column(name = "recipient_ekyc_verified") private Boolean recipientEkycVerified;
     @Version private Long version;
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "ticket_transfer_members", joinColumns = @JoinColumn(name = "transfer_id"))

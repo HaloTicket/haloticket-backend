@@ -9,6 +9,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TicketTransferRepository extends JpaRepository<TicketTransfer, String> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select t from TicketTransfer t where t.sagaId = :sagaId")
+    Optional<TicketTransfer> findBySagaIdForUpdate(@org.springframework.data.repository.query.Param("sagaId") String sagaId);
     Optional<TicketTransfer> findBySagaId(String sagaId);
     List<TicketTransfer> findByToUserIdAndStatusOrderByCreatedAtDesc(String toUserId, TransferStatus status);
     Page<TicketTransfer> findByEventId(String eventId, Pageable pageable);
