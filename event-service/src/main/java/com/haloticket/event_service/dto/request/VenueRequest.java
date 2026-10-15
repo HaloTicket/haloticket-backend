@@ -17,4 +17,7 @@ public class VenueRequest {
     private Integer capacity;
     private String type; // "indoor", "outdoor", "hybrid"
     private Boolean verified;
+    private Boolean isPublic;
+    private String organizerId;
+    private String seatmapTemplate;
 }
