@@ -37,9 +37,16 @@ public class TicketTransferSnapshotController {
                 ticket.getStatus(), ticket.getLockOperationId(), type == null ? null : type.getId(),
                 ticket.getShowtimeId() != null ? ticket.getShowtimeId() : type == null ? null : type.getShowtimeId(),
                 ticket.getOriginalPrice() != null ? ticket.getOriginalPrice()
-                        : type == null || type.getPrice() == null ? null : BigDecimal.valueOf(type.getPrice()));
+                        : type == null || type.getPrice() == null ? null : BigDecimal.valueOf(type.getPrice()),
+                ticket.getGiftTransferCount());
     }
 
     public record TransferSnapshot(String ticketId, String eventId, String ownerId, TicketStatus status,
-            String lockOperationId, String ticketTypeId, String showtimeId, BigDecimal originalPrice) {}
+            String lockOperationId, String ticketTypeId, String showtimeId, BigDecimal originalPrice,
+            int giftTransferCount) {
+        public TransferSnapshot(String ticketId, String eventId, String ownerId, TicketStatus status,
+                String lockOperationId, String ticketTypeId, String showtimeId, BigDecimal originalPrice) {
+            this(ticketId, eventId, ownerId, status, lockOperationId, ticketTypeId, showtimeId, originalPrice, 0);
+        }
+    }
 }

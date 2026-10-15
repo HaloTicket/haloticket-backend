@@ -14,13 +14,20 @@ public interface TicketServiceClient {
                                      BigDecimal originalPrice, BigDecimal minPrice, BigDecimal maxPrice,
                                      Long policyVersion, Instant closesAt, String termsVersion,
                                      String ticketTypeName, String section, String row, String seat,
-                                     String ticketTypeId, String showtimeId) {
+                                     String ticketTypeId, String showtimeId, int giftTransferCount, BigDecimal serviceFeePercent) {
+        public ResaleEligibilityResponse(String ticketId, String eventId, boolean eligible, String reasonCode,
+                                         BigDecimal originalPrice, BigDecimal minPrice, BigDecimal maxPrice,
+                                         Long policyVersion, Instant closesAt, String termsVersion, String ticketTypeName,
+                                         String section, String row, String seat, String ticketTypeId, String showtimeId) {
+            this(ticketId, eventId, eligible, reasonCode, originalPrice, minPrice, maxPrice, policyVersion, closesAt,
+                    termsVersion, ticketTypeName, section, row, seat, ticketTypeId, showtimeId, 0, new BigDecimal("5"));
+        }
         public ResaleEligibilityResponse(String ticketId, String eventId, boolean eligible, String reasonCode,
                                          BigDecimal originalPrice, BigDecimal minPrice, BigDecimal maxPrice,
                                          Long policyVersion, Instant closesAt, String termsVersion,
                                          String ticketTypeName, String section, String row, String seat) {
             this(ticketId, eventId, eligible, reasonCode, originalPrice, minPrice, maxPrice, policyVersion,
-                    closesAt, termsVersion, ticketTypeName, section, row, seat, null, null);
+                    closesAt, termsVersion, ticketTypeName, section, row, seat, null, null, 0, new BigDecimal("5"));
         }
     }
 }

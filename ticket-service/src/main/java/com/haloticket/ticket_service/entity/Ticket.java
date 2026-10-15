@@ -58,6 +58,9 @@ public class Ticket {
     @Column(name = "acquisition_type", length = 30)
     private String acquisitionType;
 
+    @Column(name = "gift_transfer_count", nullable = false)
+    private int giftTransferCount;
+
     @Column(name = "lock_operation_id", unique = true)
     private String lockOperationId;
 
