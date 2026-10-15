@@ -16,4 +16,7 @@ public interface TicketServiceClient {
 
     @GetMapping("/types/event/{eventId}")
     Object getTicketTypesByEventId(@PathVariable("eventId") String eventId);
+
+    @GetMapping("/seat-layouts/event/{eventId}")
+    Object getSeatLayoutByEventId(@PathVariable("eventId") String eventId);
 }

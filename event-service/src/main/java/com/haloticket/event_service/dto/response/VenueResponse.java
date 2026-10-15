@@ -20,6 +20,9 @@ public class VenueResponse {
     private Integer capacity;
     private String type;
     private Boolean verified;
+    private Boolean isPublic;
+    private String organizerId;
+    private String seatmapTemplate;
     private Integer eventsHosted;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

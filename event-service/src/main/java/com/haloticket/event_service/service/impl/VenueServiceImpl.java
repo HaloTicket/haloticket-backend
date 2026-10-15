@@ -2,6 +2,7 @@ package com.haloticket.event_service.service.impl;
 
 import com.haloticket.event_service.dto.request.VenueRequest;
 import com.haloticket.event_service.dto.response.VenueResponse;
+import com.haloticket.event_service.dto.response.VenueSeatmapsResponse;
 import com.haloticket.event_service.entity.Event;
 import com.haloticket.event_service.entity.Venue;
 import com.haloticket.event_service.repository.EventRepository;
@@ -22,6 +23,7 @@ public class VenueServiceImpl implements VenueService {
 
     private final VenueRepository venueRepository;
     private final EventRepository eventRepository;
+    private final com.haloticket.event_service.client.TicketServiceClient ticketServiceClient;
 
     @Override
     @Transactional
@@ -63,6 +65,9 @@ public class VenueServiceImpl implements VenueService {
             if (request.getCapacity() != null) venue.setCapacity(request.getCapacity());
             if (request.getType() != null) venue.setType(request.getType());
             if (request.getVerified() != null) venue.setVerified(request.getVerified());
+            if (request.getIsPublic() != null) venue.setIsPublic(request.getIsPublic());
+            if (request.getOrganizerId() != null) venue.setOrganizerId(request.getOrganizerId());
+            if (request.getSeatmapTemplate() != null) venue.setSeatmapTemplate(request.getSeatmapTemplate());
             return mapToResponse(venueRepository.save(venue));
         }
 
@@ -73,12 +78,15 @@ public class VenueServiceImpl implements VenueService {
                 .ward(request.getWard() != null ? request.getWard().trim() : "")
                 .capacity(request.getCapacity() != null ? request.getCapacity() : 1000)
                 .type(request.getType() != null ? request.getType() : "indoor")
-                .verified(request.getVerified() != null ? request.getVerified() : true)
+                .verified(request.getVerified() != null ? request.getVerified() : (Boolean.FALSE.equals(request.getIsPublic()) ? false : true))
+                .isPublic(request.getIsPublic() != null ? request.getIsPublic() : true)
+                .organizerId(request.getOrganizerId())
+                .seatmapTemplate(request.getSeatmapTemplate())
                 .eventsHosted(0)
                 .build();
 
         Venue saved = venueRepository.save(newVenue);
-        log.info("Created new official Venue in DB: {} (ID: {})", saved.getName(), saved.getId());
+        log.info("Created new Venue in DB: {} (ID: {}) isPublic: {}", saved.getName(), saved.getId(), saved.getIsPublic());
         return mapToResponse(saved);
     }
 
@@ -97,6 +105,9 @@ public class VenueServiceImpl implements VenueService {
         if (request.getCapacity() != null) venue.setCapacity(request.getCapacity());
         if (request.getType() != null) venue.setType(request.getType());
         if (request.getVerified() != null) venue.setVerified(request.getVerified());
+        if (request.getIsPublic() != null) venue.setIsPublic(request.getIsPublic());
+        if (request.getOrganizerId() != null) venue.setOrganizerId(request.getOrganizerId());
+        if (request.getSeatmapTemplate() != null) venue.setSeatmapTemplate(request.getSeatmapTemplate());
 
         Venue updated = venueRepository.save(venue);
         log.info("Updated Venue ID {}: {}", updated.getId(), updated.getName());
@@ -178,6 +189,73 @@ public class VenueServiceImpl implements VenueService {
                 .build());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public VenueSeatmapsResponse getVenueSeatmaps(Long id) {
+        Venue venue = venueRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy địa điểm với ID: " + id));
+
+        // find events associated with this venue by name or address
+        List<Event> allEvents = eventRepository.findAll();
+        List<VenueSeatmapsResponse.OrganizerSeatmapDto> seatmaps = new ArrayList<>();
+
+        String venueNameLower = venue.getName() != null ? venue.getName().trim().toLowerCase() : "";
+        for (Event event : allEvents) {
+            String eventLoc = event.getLocationName() != null ? event.getLocationName().trim().toLowerCase() : "";
+            if (!venueNameLower.isEmpty() && (eventLoc.contains(venueNameLower) || venueNameLower.contains(eventLoc))) {
+                String organizerName = "Ban Tổ Chức";
+                if (event.getOrganizers() != null && !event.getOrganizers().isEmpty()) {
+                    organizerName = event.getOrganizers().get(0).getName();
+                }
+
+                // check if layout exists from ticket-service or local
+                String draftJson = null;
+                try {
+                    if (ticketServiceClient != null) {
+                        Object layoutObj = ticketServiceClient.getSeatLayoutByEventId(event.getId());
+                        if (layoutObj instanceof Map) {
+                            Map<?, ?> map = (Map<?, ?>) layoutObj;
+                            draftJson = (String) map.get("draftJson");
+                        }
+                    }
+                } catch (Exception e) {
+                    log.debug("Ticket service layout not found for event {}: {}", event.getId(), e.getMessage());
+                }
+
+                if (draftJson != null && !draftJson.isBlank()) {
+                    seatmaps.add(VenueSeatmapsResponse.OrganizerSeatmapDto.builder()
+                            .eventId(event.getId())
+                            .eventTitle(event.getTitle())
+                            .organizerName(organizerName)
+                            .updatedAt(event.getUpdatedAt() != null ? event.getUpdatedAt() : event.getCreatedAt())
+                            .draftJson(draftJson)
+                            .capacity(event.getShowtimes() != null && !event.getShowtimes().isEmpty() ? 2000 : 1000)
+                            .zonesCount(3)
+                            .build());
+                }
+            }
+        }
+
+        return VenueSeatmapsResponse.builder()
+                .venueId(venue.getId())
+                .venueName(venue.getName())
+                .adminTemplate(venue.getSeatmapTemplate())
+                .organizerSeatmaps(seatmaps)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public VenueResponse saveVenueSeatmapTemplate(Long id, String seatmapTemplate) {
+        Venue venue = venueRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy địa điểm với ID: " + id));
+
+        venue.setSeatmapTemplate(seatmapTemplate);
+        Venue updated = venueRepository.save(venue);
+        log.info("Saved Admin SeatMap template for Venue ID {}: {}", id, venue.getName());
+        return mapToResponse(updated);
+    }
+
     private VenueResponse mapToResponse(Venue venue) {
         return VenueResponse.builder()
                 .id(venue.getId())
@@ -188,6 +266,9 @@ public class VenueServiceImpl implements VenueService {
                 .capacity(venue.getCapacity())
                 .type(venue.getType())
                 .verified(venue.getVerified())
+                .isPublic(venue.getIsPublic() != null ? venue.getIsPublic() : true)
+                .organizerId(venue.getOrganizerId())
+                .seatmapTemplate(venue.getSeatmapTemplate())
                 .eventsHosted(venue.getEventsHosted())
                 .createdAt(venue.getCreatedAt())
                 .updatedAt(venue.getUpdatedAt())
