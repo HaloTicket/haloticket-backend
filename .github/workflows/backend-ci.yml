@@ -21,12 +21,19 @@ jobs:
       notification-service: ${{ steps.filter.outputs.notification-service }}
       marketplace-service: ${{ steps.filter.outputs.marketplace-service }}
       ai-assistant-service: ${{ steps.filter.outputs.ai-assistant-service }}
+      shared-files: ${{ steps.filter.outputs.shared-files }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
+            shared-files:
+              - 'docker-compose.yml'
+              - 'scripts/**'
+              - '.env.example'
+              - 'DEPLOYMENT.md'
+              - 'README.md'
             api-gateway:
               - 'api-gateway/**'
             discovery-server:
@@ -85,7 +92,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            git pull origin ${{ github.ref_name }}
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull api-gateway
             docker compose up -d --no-deps api-gateway
@@ -125,7 +132,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            git pull origin ${{ github.ref_name }}
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull event-service
             docker compose up -d --no-deps event-service
@@ -165,7 +172,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            git pull origin ${{ github.ref_name }}
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull ticket-service
             docker compose up -d --no-deps ticket-service
@@ -205,7 +212,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            git pull origin ${{ github.ref_name }}
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull booking-service
             docker compose up -d --no-deps booking-service
@@ -245,7 +252,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            git pull origin ${{ github.ref_name }}
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull payment-service
             docker compose up -d --no-deps payment-service
@@ -285,7 +292,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            git pull origin ${{ github.ref_name }}
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull user-service
             docker compose up -d --no-deps user-service
@@ -325,7 +332,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            git pull origin ${{ github.ref_name }}
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull media-service
             docker compose up -d --no-deps media-service
@@ -365,7 +372,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            git pull origin ${{ github.ref_name }}
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull notification-service
             docker compose up -d --no-deps notification-service
@@ -405,7 +412,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            git pull origin ${{ github.ref_name }}
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull discovery-server
             docker compose up -d --no-deps discovery-server
@@ -445,7 +452,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            git pull origin ${{ github.ref_name }}
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull marketplace-service
             docker compose up -d --no-deps marketplace-service
@@ -484,9 +491,30 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/haloticket-backend
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
+            git pull origin ${{ github.ref_name }}
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull ai-assistant-service
             docker compose up -d --no-deps ai-assistant-service
             docker image prune -f
+
+  # STEP 3: Sync Shared Files to VPS (scripts, docker-compose.yml, .env.example, etc.)
+  sync-shared-files:
+    name: Sync Shared Files to VPS
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.shared-files == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Shared Files via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/haloticket-backend
+            git pull origin ${{ github.ref_name }}
+            # Restart alert watchdog service if already running
+            if systemctl is-active --quiet haloticket-alert; then
+              sudo systemctl restart haloticket-alert
+            fi
 
