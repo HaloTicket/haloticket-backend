@@ -15,6 +15,8 @@ public interface TicketService {
     TicketTypeResponse createTicketType(TicketTypeCreateRequest request);
     List<TicketTypeResponse> syncTicketTypesForEvent(String eventId, String showtimeId, List<TicketTypeCreateRequest> requests);
     List<TicketTypeResponse> getTicketTypesByEventId(String eventId);
+    List<TicketTypeResponse> getAllTicketTypesByEventId(String eventId);
+    TicketTypeResponse getTicketTypeById(String id);
     List<TicketTypeResponse> getTicketTypesByShowtimeId(String showtimeId);
 
     SeatLayoutResponse saveSeatLayoutDraft(String eventId, SeatLayoutRequest request);

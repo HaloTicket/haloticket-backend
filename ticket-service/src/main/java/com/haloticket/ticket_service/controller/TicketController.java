@@ -40,6 +40,21 @@ public class TicketController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/types/event/{eventId}/all")
+    public ResponseEntity<List<TicketTypeResponse>> getAllTicketTypesByEventId(@PathVariable("eventId") String eventId) {
+        List<TicketTypeResponse> response = ticketService.getAllTicketTypesByEventId(eventId);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/types/{id}")
+    public ResponseEntity<TicketTypeResponse> getTicketTypeById(@PathVariable("id") String id) {
+        TicketTypeResponse response = ticketService.getTicketTypeById(id);
+        if (response == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/types/showtime/{showtimeId}")
     public ResponseEntity<List<TicketTypeResponse>> getTicketTypesByShowtimeId(@PathVariable("showtimeId") String showtimeId) {
         List<TicketTypeResponse> response = ticketService.getTicketTypesByShowtimeId(showtimeId);

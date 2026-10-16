@@ -176,6 +176,26 @@ public class TicketServiceImpl implements TicketService {
     }
 
     @Override
+    public List<TicketTypeResponse> getAllTicketTypesByEventId(String eventId) {
+        if (eventId == null || eventId.trim().isEmpty())
+            return List.of();
+        List<TicketType> list = ticketTypeRepository.findByEventId(eventId);
+        return list.stream()
+                .filter(tt -> tt.getTicketTypeStatus() != TicketTypeStatus.HIDDEN)
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    @Override
+    public TicketTypeResponse getTicketTypeById(String id) {
+        if (id == null || id.trim().isEmpty())
+            return null;
+        return ticketTypeRepository.findById(id)
+                .map(this::mapToResponse)
+                .orElse(null);
+    }
+
+    @Override
     public List<TicketTypeResponse> getTicketTypesByShowtimeId(String showtimeId) {
         if (showtimeId == null || showtimeId.trim().isEmpty())
             return List.of();
