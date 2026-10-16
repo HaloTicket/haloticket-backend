@@ -32,6 +32,7 @@ jobs:
           filters: |
             shared-files:
               - 'docker-compose.yml'
+              - 'Dockerfile'
               - 'scripts/**'
               - '.env.example'
               - 'DEPLOYMENT.md'

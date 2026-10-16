@@ -7,10 +7,10 @@ WORKDIR /build
 COPY ${SERVICE}/pom.xml ./pom.xml
 # Maven dependencies stay in BuildKit's cache, never in the runtime image.
 RUN --mount=type=cache,id=haloticket-maven,target=/root/.m2,sharing=locked \
-    mvn -B -ntp dependency:go-offline -DskipTests
+    mvn -B -ntp dependency:go-offline -DskipTests -Dmaven.wagon.http.retryHandler.count=5 || true
 COPY ${SERVICE}/src ./src
 RUN --mount=type=cache,id=haloticket-maven,target=/root/.m2,sharing=locked \
-    mvn -B -ntp package -DskipTests && \
+    mvn -B -ntp package -DskipTests -Dmaven.wagon.http.retryHandler.count=5 && \
     cp target/*.jar application.jar && \
     java -Djarmode=tools -jar application.jar extract --layers --destination extracted
 
