@@ -454,6 +454,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - EUREKA_SERVER=http://discovery-server:8761/eureka
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - ALERT_SSL_DOMAINS=${ALERT_SSL_DOMAINS:-haloticket-web.pages.dev,haloticket.duckdns.org}
     volumes:
       - ./ai-assistant-service/app:/app/app
     depends_on:

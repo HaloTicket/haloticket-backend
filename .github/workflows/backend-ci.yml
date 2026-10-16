@@ -23,6 +23,8 @@ jobs:
       ai-assistant-service: ${{ steps.filter.outputs.ai-assistant-service }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: dorny/paths-filter@v3
         id: filter
         with:
@@ -89,7 +91,7 @@ jobs:
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull api-gateway
             docker compose up -d --no-deps api-gateway
-            docker image prune -f
+            docker image prune -f || true
 
   # 2.2. Event Service
   deploy-event-service:
@@ -129,7 +131,7 @@ jobs:
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull event-service
             docker compose up -d --no-deps event-service
-            docker image prune -f
+            docker image prune -f || true
 
   # 2.3. Ticket Service
   deploy-ticket-service:
@@ -169,7 +171,7 @@ jobs:
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull ticket-service
             docker compose up -d --no-deps ticket-service
-            docker image prune -f
+            docker image prune -f || true
 
   # 2.4. Booking Service
   deploy-booking-service:
@@ -209,7 +211,7 @@ jobs:
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull booking-service
             docker compose up -d --no-deps booking-service
-            docker image prune -f
+            docker image prune -f || true
 
   # 2.5. Payment Service
   deploy-payment-service:
@@ -249,7 +251,7 @@ jobs:
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull payment-service
             docker compose up -d --no-deps payment-service
-            docker image prune -f
+            docker image prune -f || true
 
   # 2.6. User Service
   deploy-user-service:
@@ -289,7 +291,7 @@ jobs:
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull user-service
             docker compose up -d --no-deps user-service
-            docker image prune -f
+            docker image prune -f || true
 
   # 2.7. Media Service
   deploy-media-service:
@@ -329,7 +331,7 @@ jobs:
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull media-service
             docker compose up -d --no-deps media-service
-            docker image prune -f
+            docker image prune -f || true
 
   # 2.8. Notification Service
   deploy-notification-service:
@@ -369,7 +371,7 @@ jobs:
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull notification-service
             docker compose up -d --no-deps notification-service
-            docker image prune -f
+            docker image prune -f || true
 
   # 2.9. Discovery Server (Eureka)
   deploy-discovery-server:
@@ -409,7 +411,7 @@ jobs:
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull discovery-server
             docker compose up -d --no-deps discovery-server
-            docker image prune -f
+            docker image prune -f || true
 
   # 2.10. Marketplace Service
   deploy-marketplace-service:
@@ -449,7 +451,7 @@ jobs:
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull marketplace-service
             docker compose up -d --no-deps marketplace-service
-            docker image prune -f
+            docker image prune -f || true
 
   # 2.11. AI Assistant Service (Python)
   deploy-ai-assistant-service:
@@ -488,5 +490,5 @@ jobs:
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
             docker compose pull ai-assistant-service
             docker compose up -d --no-deps ai-assistant-service
-            docker image prune -f
+            docker image prune -f || true
 
