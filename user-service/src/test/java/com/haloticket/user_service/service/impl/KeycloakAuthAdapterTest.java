@@ -1,9 +1,6 @@
 package com.haloticket.user_service.service.impl;
 
 import com.haloticket.user_service.config.KeycloakProperties;
-import com.haloticket.user_service.service.impl.KeycloakAuthAdapter;
-import com.haloticket.user_service.entity.AuthOtpChallenge;
-import com.haloticket.user_service.enums.OtpPurpose;
 import com.haloticket.user_service.repository.AuthOtpChallengeRepository;
 import com.haloticket.user_service.service.AuthApplicationService.AuthException;
 import com.haloticket.user_service.service.AuthResponses;

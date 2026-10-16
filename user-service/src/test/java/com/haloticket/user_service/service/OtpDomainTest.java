@@ -4,14 +4,9 @@ import com.haloticket.user_service.entity.AuthOtpChallenge;
 import com.haloticket.user_service.enums.OtpPurpose;
 import com.haloticket.user_service.enums.OtpStatus;
 import com.haloticket.user_service.repository.AuthOtpChallengeRepository;
-import com.haloticket.user_service.service.AuthOtpChallengeService;
-import com.haloticket.user_service.service.OtpChallengeCommand;
 import com.haloticket.user_service.service.impl.OtpChallengeServiceImpl;
 import com.haloticket.user_service.config.AuthOtpConfiguration;
-import com.haloticket.user_service.service.OtpGenerator;
-import com.haloticket.user_service.service.OtpHasher;
 import org.junit.jupiter.api.Test;
-import jakarta.persistence.OptimisticLockException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 

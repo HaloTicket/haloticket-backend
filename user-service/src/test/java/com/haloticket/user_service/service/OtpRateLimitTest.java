@@ -1,7 +1,5 @@
 package com.haloticket.user_service.service;
 
-import com.haloticket.user_service.service.OtpRateLimiter;
-
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;

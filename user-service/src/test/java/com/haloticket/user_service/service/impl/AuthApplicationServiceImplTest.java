@@ -2,7 +2,6 @@ package com.haloticket.user_service.service.impl;
 
 import com.haloticket.user_service.entity.AuthOtpChallenge;
 import com.haloticket.user_service.enums.OtpPurpose;
-import com.haloticket.user_service.service.impl.AuthApplicationServiceImpl;
 import com.haloticket.user_service.service.AuthOtpChallengeService;
 import com.haloticket.user_service.service.AuthApplicationService;
 import com.haloticket.user_service.service.AuthRequests;

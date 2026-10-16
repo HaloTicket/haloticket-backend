@@ -1,7 +1,5 @@
 package com.haloticket.user_service.service;
 
-import com.haloticket.user_service.repository.AuthOtpChallengeRepository;
-import com.haloticket.user_service.service.OtpChallengePersistence;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
