@@ -1,6 +1,7 @@
 import py_eureka_client.eureka_client as eureka_client
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
+from sqlalchemy import text
 from app.core.config import settings
 from app.db.session import engine, Base
 from app.models.event_vector import EventVector
@@ -11,8 +12,19 @@ from app.services.kafka.consumer import run_consumer_in_background
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # ensure pgvector extension is enabled in PostgreSQL
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+            conn.commit()
+    except Exception as e:
+        print(f"Warning: Could not enable vector extension: {e}")
+
     # create table if not exists
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"Warning: Could not create tables: {e}")
 
     # start kafka consumer thread
     run_consumer_in_background()
