@@ -2,6 +2,15 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.services.ai.llm_factory import get_fast_llm
 from langchain_core.prompts import PromptTemplate
+from app.core.config import settings
+import httpx
+import time
+import asyncio
+import os
+import json
+import ssl
+import socket
+from datetime import datetime
 
 router = APIRouter()
 llm = get_fast_llm()
@@ -63,7 +72,6 @@ async def analyze_risk_score(request: RiskScoringRequest):
         })
         
         # parse json response
-        import json
         content = str(response.content).replace("```json", "").replace("```", "").strip()
         data = json.loads(content)
         
@@ -143,7 +151,7 @@ async def calculate_price_ceiling(request: PriceCeilingRequest):
             "event_id": request.event_id,
             "demand_level": request.current_demand_level
         })
-        import json
+        
         content = str(response.content).replace("```json", "").replace("```", "").strip()
         data = json.loads(content)
         
@@ -165,7 +173,6 @@ async def detect_anomalies():
     Theo dõi các log hệ thống (Kafka/API Gateway) để phát hiện hành vi đặt vé bất thường.
     """
     try:
-        import os
         log_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../event-error.log"))
         system_logs = "Không có log hệ thống mới."
         if os.path.exists(log_path):
@@ -193,7 +200,6 @@ async def detect_anomalies():
         )
         chain = prompt | llm
         response = chain.invoke({"system_logs": system_logs})
-        import json
         content = str(response.content).replace("```json", "").replace("```", "").strip()
         data = json.loads(content)
         
@@ -208,12 +214,8 @@ async def detect_anomalies():
 @router.get("/ssl-status")
 def get_ssl_status(domain: str = None):
     """Kiểm tra thực tế trạng thái SSL/TLS của hệ thống"""
-    import ssl
-    import socket
-    import os
-    from datetime import datetime
-
-    raw_domain = domain or os.getenv("ALERT_SSL_DOMAINS", "haloticket.vn").split(",")[0].strip()
+   
+    raw_domain = domain or os.getenv("ALERT_SSL_DOMAINS", "haloticket.duckdns.org").split(",")[0].strip()
     check_domain = raw_domain.strip() if raw_domain else ""
     if "://" in check_domain:
         check_domain = check_domain.split("://", 1)[1]
@@ -271,11 +273,6 @@ def get_ssl_status(domain: str = None):
 @router.get("/system-health")
 async def get_system_health():
     """Lấy danh sách các service và trạng thái sức khỏe từ Eureka"""
-    from app.core.config import settings
-    import httpx
-    import time
-    import asyncio
-    import os
     
     eureka_url = f"{settings.eureka_server.rstrip('/')}/apps"
     result = []
@@ -391,8 +388,7 @@ async def get_system_health():
 @router.get("/system-logs")
 def get_system_logs():
     """Đọc log thật từ hệ thống và trả về danh sách nhật ký kiểm toán thực tế"""
-    import os
-    import time
+
     logs = []
     try:
         possible_paths = [
