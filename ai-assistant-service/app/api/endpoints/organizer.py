@@ -52,3 +52,28 @@ async def voucher_strategy(request: VoucherStrategyRequest):
         return {"strategy": result.get("reply", "Hệ thống đang thu thập thêm dữ liệu để đưa ra đề xuất voucher phù hợp.")}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class OrganizerChatRequest(BaseModel):
+    message: str
+    history: list = []
+    event_id: str = None
+    event_title: str = None
+
+@router.post("/agent-chat")
+async def organizer_agent_chat(request: OrganizerChatRequest):
+    """
+    Endpoint Chatbot AI Agent dành cho Ban Tổ Chức (Organizer AI Data Assistant)
+    với đầy đủ Agent Pipeline, Tool Execution và Response Caching.
+    """
+    try:
+        result = organizer_agent.chat(
+            message=request.message,
+            history=request.history,
+            event_id=request.event_id,
+            event_title=request.event_title
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
