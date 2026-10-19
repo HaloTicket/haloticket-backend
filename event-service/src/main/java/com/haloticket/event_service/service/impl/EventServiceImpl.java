@@ -41,6 +41,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -669,16 +670,20 @@ public class EventServiceImpl implements EventService {
     }
 
     private void publishNotification(String userId, String type, String title, String message) {
-        Map<String, Object> payload = Map.of(
-                "userId", userId,
-                "type", type,
-                "title", title,
-                "message", message,
-                "timestamp", LocalDateTime.now().toString());
+        if (userId == null || userId.isBlank()) return;
+
+        Map<String, String> payload = new HashMap<>();
+        payload.put("userId", userId);
+        payload.put("recipientUserId", userId);
+        payload.put("type", type);
+        payload.put("title", title);
+        payload.put("message", message);
+        payload.put("timestamp", LocalDateTime.now().toString());
 
         if (kafkaTemplate != null) {
             try {
-                kafkaTemplate.send("haloticket.notifications.v1", userId, payload);
+                String json = objectMapper.writeValueAsString(payload);
+                kafkaTemplate.send("haloticket.direct.notification.v1", userId, json);
             } catch (Exception e) {
                 // silent catch
             }
@@ -686,7 +691,7 @@ public class EventServiceImpl implements EventService {
 
         if (notificationServiceClient != null) {
             try {
-                notificationServiceClient.publishNotification(payload);
+                notificationServiceClient.publishNotification(new HashMap<>(payload));
             } catch (Exception e) {
                 // silent catch
             }
