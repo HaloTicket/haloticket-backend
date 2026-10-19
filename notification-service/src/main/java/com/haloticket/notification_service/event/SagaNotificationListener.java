@@ -311,21 +311,29 @@ public class SagaNotificationListener {
         }
     }
 
-    @KafkaListener(topics = {"haloticket.payout.requested.v1", "haloticket.payout.approved.v1"}, groupId = "notification-service-payout")
-    public void handlePayoutNotifications(String payload) {
+    @KafkaListener(topics = {
+            "haloticket.payout.requested.v1",
+            "haloticket.payout.approved.v1",
+            "haloticket.direct.notification.v1",
+            "haloticket.event.approved.v1",
+            "haloticket.event.rejected.v1"
+    }, groupId = "notification-service-payout")
+    public void handleDirectAndPayoutNotifications(String payload) {
         try {
             JsonNode node = objectMapper.readTree(payload);
-            String recipientUserId = node.path("recipientUserId").asText();
+            String recipientUserId = node.hasNonNull("recipientUserId") && !node.path("recipientUserId").asText().isBlank()
+                    ? node.path("recipientUserId").asText()
+                    : node.path("userId").asText();
             String type = node.path("type").asText();
             String title = node.path("title").asText();
             String message = node.path("message").asText();
 
             if (!recipientUserId.isBlank() && !type.isBlank()) {
                 notificationService.publishDirectNotification(recipientUserId, type, title, message);
-                log.info("Sent payout notification to {} (type: {})", recipientUserId, type);
+                log.info("Sent direct/payout notification to {} (type: {})", recipientUserId, type);
             }
         } catch (Exception e) {
-            log.error("Failed to process payout notification: {}", e.getMessage(), e);
+            log.error("Failed to process direct/payout notification: {}", e.getMessage(), e);
         }
     }
 }

@@ -11,11 +11,11 @@ class RAGEngine:
     def test_connection(self):
         """Hàm test nhanh xem API Key và Model có hoạt động không"""
         try:
-            # 1. test model Chat
+            # test model Chat
             response = self.llm.invoke([HumanMessage(content="Hello, who are you?")])
             print("AI answer:", response.content)
 
-            # 2. test model Embedding 
+            # test model Embedding 
             vector = self.embeddings.embed_query("This is a music event")
             print("Vector size:", len(vector)) # expectation is 768
 
@@ -25,17 +25,21 @@ class RAGEngine:
             return False
 
     def search_events(self, db, query: str, top_k: int = 3):
-        # 1. convert customer questions into vectors
-        search_query = query if query and query.strip() != "" else "sự kiện"
-        query_vector = self.embeddings.embed_query(search_query)
+        try:
+            # convert customer questions into vectors
+            search_query = query if query and query.strip() != "" else "sự kiện"
+            query_vector = self.embeddings.embed_query(search_query)
 
-        # 2. search the database for events with the most similar vectors (Semantic Search)
-        distance_col = EventVector.embedding.cosine_distance(query_vector).label("distance")
-        results = db.query(EventVector, distance_col).order_by(
-            distance_col
-        ).limit(top_k).all()
+            # search the database for events with the most similar vectors (Semantic Search)
+            distance_col = EventVector.embedding.cosine_distance(query_vector).label("distance")
+            results = db.query(EventVector, distance_col).order_by(
+                distance_col
+            ).limit(top_k).all()
 
-        return results
+            return results
+        except Exception as e:
+            print(f"[RAG ENGINE WARNING] Embed query failed or timed out: {e}")
+            return []
 
 # initialize a shared instance
 rag_engine = RAGEngine()
