@@ -293,12 +293,6 @@ CREATE TABLE IF NOT EXISTS payments (
     updated_at TIMESTAMP
 );
 
-INSERT INTO organizer_payout_accounts (id, organizer_user_id, account_holder, account_number, bank_name, bank_branch, business_type, tax_name, tax_code, tax_address, is_verified, created_at, updated_at)
-VALUES
-('payout-org-001', '22222222-2222-2222-2222-222222222222', 'CÔNG TY TNHH NHÀ HÁT IDECAF', '999988887777', 'Vietcombank', 'Chi nhánh Tân Bình', 'company', 'CÔNG TY TNHH NHÀ HÁT IDECAF', '0312345678', 'Số 06 Mạc Đĩnh Chi, Phường Bến Nghé, Quận 1, TP.HCM', true, NOW(), NOW()),
-('payout-org-002', '55555555-5555-5555-5555-555555555555', 'HOÀNG DŨNG', '1012345678', 'MBBank', 'Chi nhánh Hà Nội', 'individual', 'HOÀNG DŨNG ENTERTAINMENT', '079200001234', 'Vinhomes Ocean Park 3, Hưng Yên', true, NOW(), NOW())
-ON CONFLICT (id) DO NOTHING;
-
 -- 5. MARKETPLACE DB (marketplace_db)
 \c marketplace_db;
 

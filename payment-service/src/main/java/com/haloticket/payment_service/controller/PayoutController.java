@@ -59,49 +59,7 @@ public class PayoutController {
 
     @GetMapping("/organizer/eligible-events")
     public ResponseEntity<List<java.util.Map<String, Object>>> getEligibleEvents(@RequestHeader("Authorization") String authHeader) {
-        // mock eligible events for payout
-        return ResponseEntity.ok(List.of(
-            java.util.Map.of(
-                "eventId", "EVT-123",
-                "eventName", "The Eras Tour - Hanoi",
-                "totalRevenue", 500000000,
-                "platformFeeRate", 0.05,
-                "netAmount", 475000000,
-                "image", "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14"
-            ),
-            java.util.Map.of(
-                "eventId", "EVT-456",
-                "eventName", "Rap Viet All-Star",
-                "totalRevenue", 120000000,
-                "platformFeeRate", 0.05,
-                "netAmount", 114000000,
-                "image", "https://images.unsplash.com/photo-1470229722913-7c090be103f6"
-            ),
-            java.util.Map.of(
-                "eventId", "EVT-789",
-                "eventName", "Anh Trai Say Hi - HCM",
-                "totalRevenue", 800000000,
-                "platformFeeRate", 0.05,
-                "netAmount", 760000000,
-                "image", "https://images.unsplash.com/photo-1492684223066-81342ee5ff30"
-            ),
-            java.util.Map.of(
-                "eventId", "EVT-101",
-                "eventName", "Anh Trai Vượt Ngàn Chông Gai",
-                "totalRevenue", 650000000,
-                "platformFeeRate", 0.05,
-                "netAmount", 617500000,
-                "image", "https://images.unsplash.com/photo-1514525253161-7a46d19cd819"
-            ),
-            java.util.Map.of(
-                "eventId", "EVT-202",
-                "eventName", "Blackpink World Tour",
-                "totalRevenue", 1500000000,
-                "platformFeeRate", 0.05,
-                "netAmount", 1425000000,
-                "image", "https://images.unsplash.com/photo-1459749411175-04bf5292ceea"
-            )
-        ));
+        return ResponseEntity.ok(List.of());
     }
 
     @PostMapping("/organizer/request")
@@ -113,15 +71,22 @@ public class PayoutController {
     }
 
     private String extractUserId(String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) return "mock-organizer-id";
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED, "Missing or invalid authorization token");
+        }
         try {
-            String[] parts = authHeader.split("\\.");
+            String token = authHeader.substring(7);
+            String[] parts = token.split("\\.");
             if (parts.length > 1) {
-                String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]));
+                String payload = new String(java.util.Base64.getUrlDecoder().decode(parts[1]), java.nio.charset.StandardCharsets.UTF_8);
                 com.fasterxml.jackson.databind.JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(payload);
-                return node.has("sub") ? node.get("sub").asText() : "mock-organizer-id";
+                if (node.has("sub") && !node.get("sub").asText().isBlank()) {
+                    return node.get("sub").asText();
+                }
             }
-        } catch (Exception e) {}
-        return "mock-organizer-id";
+        } catch (Exception ignored) {}
+        throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.UNAUTHORIZED, "Invalid authorization token");
     }
 }

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import java.text.NumberFormat;
@@ -50,32 +51,13 @@ public class PayoutServiceImpl implements PayoutService {
         return mapToResponse(saved);
     }
 
-    private Payout getOrCreatePayout(String payoutId) {
-        return payoutRepository.findById(payoutId).orElseGet(() -> {
-            Payout newPayout = Payout.builder()
-                    .id(payoutId)
-                    .eventId("Event-" + payoutId)
-                    .organizerUserId("org-001")
-                    .grossAmount(100000000.0)
-                    .platformFee(5000000.0)
-                    .netAmount(95000000.0)
-                    .status(PayoutStatus.PENDING)
-                    .build();
-            try {
-                return payoutRepository.save(newPayout);
-            } catch (Exception e) {
-                return newPayout;
-            }
-        });
-    }
-
     @Override
     public PayoutResponse approvePayout(String payoutId) {
-        Payout payout = getOrCreatePayout(payoutId);
-        
+        Payout payout = payoutRepository.findById(payoutId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Payout not found with id: " + payoutId));
         payout.setStatus(PayoutStatus.COMPLETED);
         payout.setTransferredAt(LocalDateTime.now());
-        
         Payout saved = payoutRepository.save(payout);
 
         // send realtime notification to Organizer safely
@@ -95,7 +77,9 @@ public class PayoutServiceImpl implements PayoutService {
 
     @Override
     public PayoutResponse disputePayout(String payoutId, String reason) {
-        Payout payout = getOrCreatePayout(payoutId);
+        Payout payout = payoutRepository.findById(payoutId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Payout not found with id: " + payoutId));
         payout.setStatus(PayoutStatus.DISPUTE);
         Payout saved = payoutRepository.save(payout);
         return mapToResponse(saved);
@@ -103,7 +87,9 @@ public class PayoutServiceImpl implements PayoutService {
 
     @Override
     public PayoutResponse reopenPayout(String payoutId) {
-        Payout payout = getOrCreatePayout(payoutId);
+        Payout payout = payoutRepository.findById(payoutId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Payout not found with id: " + payoutId));
         payout.setStatus(PayoutStatus.PENDING);
         Payout saved = payoutRepository.save(payout);
         return mapToResponse(saved);
@@ -111,7 +97,9 @@ public class PayoutServiceImpl implements PayoutService {
 
     @Override
     public PayoutResponse rejectPayout(String payoutId) {
-        Payout payout = getOrCreatePayout(payoutId);
+        Payout payout = payoutRepository.findById(payoutId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Payout not found with id: " + payoutId));
         payout.setStatus(PayoutStatus.FAILED);
         Payout saved = payoutRepository.save(payout);
         return mapToResponse(saved);
