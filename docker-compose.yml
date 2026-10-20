@@ -445,6 +445,7 @@ services:
       context: ./ai-assistant-service
       dockerfile: Dockerfile
     container_name: haloticket-ai-assistant
+    restart: unless-stopped
     ports:
       - "8089:8089"
     environment:
