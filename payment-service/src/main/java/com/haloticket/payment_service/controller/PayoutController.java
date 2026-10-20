@@ -32,6 +32,14 @@ public class PayoutController {
         return ResponseEntity.ok(payoutService.approvePayout(id));
     }
 
+    @PostMapping("/admin/{id}/dispute")
+    public ResponseEntity<PayoutResponse> disputePayout(
+            @PathVariable String id,
+            @RequestBody(required = false) java.util.Map<String, String> body) {
+        String reason = body != null ? body.get("reason") : null;
+        return ResponseEntity.ok(payoutService.disputePayout(id, reason));
+    }
+
     @PostMapping("/admin/{id}/reopen")
     public ResponseEntity<PayoutResponse> reopenPayout(@PathVariable String id) {
         return ResponseEntity.ok(payoutService.reopenPayout(id));
