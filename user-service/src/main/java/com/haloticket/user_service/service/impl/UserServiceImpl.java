@@ -107,14 +107,9 @@ public class UserServiceImpl implements UserService {
             Optional<User> userByEmail = userRepository.findByEmail(targetEmail);
             if (userByEmail.isPresent()) {
                 User existing = userByEmail.get();
-                // if keycloak_id is null/blank or is a seed dummy id like "kc-...", link keycloakId
-                if (isBlank(existing.getKeycloakId()) || existing.getKeycloakId().startsWith("kc-") || keycloakId.equals(existing.getKeycloakId())) {
-                    existing.setKeycloakId(keycloakId);
-                    user = existing;
-                } else {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT,
-                            "Email already belongs to another identity");
-                }
+                // link Keycloak ID to existing user account
+                existing.setKeycloakId(keycloakId);
+                user = existing;
             } else {
                 user = User.builder()
                         .keycloakId(keycloakId)
@@ -129,13 +124,8 @@ public class UserServiceImpl implements UserService {
         if (emailOwner.isPresent() && user != emailOwner.get()
                 && (user.getId() == null || !user.getId().equals(emailOwner.get().getId()))) {
             User existingOwner = emailOwner.get();
-            if (isBlank(existingOwner.getKeycloakId()) || existingOwner.getKeycloakId().startsWith("kc-")) {
-                existingOwner.setKeycloakId(keycloakId);
-                user = existingOwner;
-            } else {
-                throw new ResponseStatusException(HttpStatus.CONFLICT,
-                        "Email already belongs to another identity");
-            }
+            existingOwner.setKeycloakId(keycloakId);
+            user = existingOwner;
         }
 
         user.setEmail(targetEmail);
@@ -298,7 +288,9 @@ public class UserServiceImpl implements UserService {
             if (role != null && !role.equalsIgnoreCase("ALL")) {
                 try {
                     Role roleEnum = Role.valueOf(role.toUpperCase());
-                    predicates.add(cb.isMember(roleEnum, root.get("roles")));
+                    var roleJoin = root.join("roles", JoinType.INNER);
+                    predicates.add(cb.equal(roleJoin, roleEnum));
+                    cq.distinct(true);
                 } catch (IllegalArgumentException ignored) {}
             }
             return cb.and(predicates.toArray(new Predicate[0]));
