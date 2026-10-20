@@ -8,6 +8,7 @@ import java.util.List;
 public interface PayoutService {
     PayoutResponse requestPayout(String organizerId, PayoutCreateRequest request);
     PayoutResponse approvePayout(String payoutId);
+    PayoutResponse disputePayout(String payoutId, String reason);
     PayoutResponse reopenPayout(String payoutId);
     PayoutResponse rejectPayout(String payoutId);
     List<PayoutResponse> getPendingPayouts();

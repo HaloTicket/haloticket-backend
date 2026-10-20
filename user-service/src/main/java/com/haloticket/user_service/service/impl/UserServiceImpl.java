@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.HashSet;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -98,34 +99,25 @@ public class UserServiceImpl implements UserService {
 
         // 1. try to find user by Keycloak ID
         Optional<User> userByKeycloak = userRepository.findByKeycloakId(keycloakId);
+        Optional<User> userByEmail = userRepository.findByEmail(targetEmail);
         User user;
 
         if (userByKeycloak.isPresent()) {
             user = userByKeycloak.get();
-        } else {
-            // 2. try to find user by email 
-            Optional<User> userByEmail = userRepository.findByEmail(targetEmail);
-            if (userByEmail.isPresent()) {
-                User existing = userByEmail.get();
-                // link Keycloak ID to existing user account
-                existing.setKeycloakId(keycloakId);
-                user = existing;
-            } else {
-                user = User.builder()
-                        .keycloakId(keycloakId)
-                        .email(targetEmail)
-                        .status(UserStatus.ACTIVE)
-                        .build();
+            if (userByEmail.isPresent() && !userByEmail.get().getId().equals(user.getId())) {
+                User oldAccount = userByEmail.get();
+                oldAccount.setKeycloakId(null);
+                userRepository.save(oldAccount);
             }
-        }
-
-        // check if email collides with another user (other than current user)
-        Optional<User> emailOwner = userRepository.findByEmail(targetEmail);
-        if (emailOwner.isPresent() && user != emailOwner.get()
-                && (user.getId() == null || !user.getId().equals(emailOwner.get().getId()))) {
-            User existingOwner = emailOwner.get();
-            existingOwner.setKeycloakId(keycloakId);
-            user = existingOwner;
+        } else if (userByEmail.isPresent()) {
+            user = userByEmail.get();
+            user.setKeycloakId(keycloakId);
+        } else {
+            user = User.builder()
+                    .keycloakId(keycloakId)
+                    .email(targetEmail)
+                    .status(UserStatus.ACTIVE)
+                    .build();
         }
 
         user.setEmail(targetEmail);
@@ -141,16 +133,14 @@ public class UserServiceImpl implements UserService {
         }
 
         Set<Role> rolesFromJwt = jwtRoleConverter.toApplicationRoles(jwt);
-        if (user.getRoles() == null || user.getRoles().isEmpty()) {
-            user.setRoles(rolesFromJwt);
-        } else if (rolesFromJwt != null && !rolesFromJwt.isEmpty()) {
+        if (user.getRoles() == null) {
+            user.setRoles(new HashSet<>());
+        }
+        if (rolesFromJwt != null && !rolesFromJwt.isEmpty()) {
             user.getRoles().addAll(rolesFromJwt);
         }
 
         user.setLastLoginAt(LocalDateTime.now());
-        if (user.getStatus() == null) {
-            user.setStatus(UserStatus.ACTIVE);
-        }
         if (user.getStatus() == null) {
             user.setStatus(UserStatus.ACTIVE);
         }
