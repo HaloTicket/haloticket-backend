@@ -32,6 +32,16 @@ public class PayoutController {
         return ResponseEntity.ok(payoutService.approvePayout(id));
     }
 
+    @PostMapping("/admin/{id}/reopen")
+    public ResponseEntity<PayoutResponse> reopenPayout(@PathVariable String id) {
+        return ResponseEntity.ok(payoutService.reopenPayout(id));
+    }
+
+    @PostMapping("/admin/{id}/reject")
+    public ResponseEntity<PayoutResponse> rejectPayout(@PathVariable String id) {
+        return ResponseEntity.ok(payoutService.rejectPayout(id));
+    }
+
     // organizer endpoints
     @GetMapping("/organizer")
     public ResponseEntity<List<PayoutResponse>> getOrganizerPayouts(@RequestHeader("Authorization") String authHeader) {

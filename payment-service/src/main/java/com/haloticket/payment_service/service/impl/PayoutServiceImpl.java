@@ -74,6 +74,24 @@ public class PayoutServiceImpl implements PayoutService {
     }
 
     @Override
+    public PayoutResponse reopenPayout(String payoutId) {
+        Payout payout = payoutRepository.findById(payoutId)
+                .orElseThrow(() -> new RuntimeException("Payout not found"));
+        payout.setStatus(PayoutStatus.PENDING);
+        Payout saved = payoutRepository.save(payout);
+        return mapToResponse(saved);
+    }
+
+    @Override
+    public PayoutResponse rejectPayout(String payoutId) {
+        Payout payout = payoutRepository.findById(payoutId)
+                .orElseThrow(() -> new RuntimeException("Payout not found"));
+        payout.setStatus(PayoutStatus.FAILED);
+        Payout saved = payoutRepository.save(payout);
+        return mapToResponse(saved);
+    }
+
+    @Override
     public List<PayoutResponse> getPendingPayouts() {
         return payoutRepository.findByStatus(PayoutStatus.PENDING)
                 .stream().map(this::mapToResponse).collect(Collectors.toList());

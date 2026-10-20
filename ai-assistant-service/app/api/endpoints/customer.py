@@ -130,4 +130,13 @@ class ChatRequest(BaseModel):
 
 @router.post("/smart-booking-chat")
 async def smart_booking(request: ChatRequest, db = Depends(get_db)):
-    return booking_agent.chat(request.message, request.history, db)
+    try:
+        return booking_agent.chat(request.message, request.history, db)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"[SMART BOOKING ERROR]: {e}")
+        return {
+            "reply": "Xin lỗi bạn, trợ lý AI hiện đang gặp sự cố kết nối hoặc quá tải. Bạn vui lòng thử lại sau giây lát nhé!",
+            "system_actions": []
+        }

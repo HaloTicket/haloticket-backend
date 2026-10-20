@@ -8,6 +8,7 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.Set;
+import com.haloticket.user_service.config.GenderConverter;
 
 @Entity
 @Table(name = "users")
@@ -36,7 +37,8 @@ public class User {
     @Column(name = "avatar_url")
     private String avatarUrl;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = GenderConverter.class)
+    @Column(name = "gender")
     private Gender gender;
 
     @Enumerated(EnumType.STRING)
