@@ -1,5 +1,6 @@
 package com.haloticket.user_service.entity;
 
+import com.haloticket.user_service.config.EkycDocumentTypeConverter;
 import com.haloticket.user_service.enums.EkycDocumentType;
 import com.haloticket.user_service.enums.EkycVerificationStatus;
 import jakarta.persistence.*;
@@ -26,7 +27,7 @@ public class EkycProfile {
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User user;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = EkycDocumentTypeConverter.class)
     @Column(name = "document_type")
     private EkycDocumentType documentType;
 
