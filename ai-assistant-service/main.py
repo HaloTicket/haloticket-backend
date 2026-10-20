@@ -29,17 +29,32 @@ async def lifespan(app: FastAPI):
     # start kafka consumer thread
     run_consumer_in_background()
 
-    # startup: register with Eureka Server.
+    # startup: register with Eureka Server with retry mechanism
     print("Registering with Eureka Server...")
-    await eureka_client.init_async(
-        eureka_server=settings.eureka_server,
-        app_name=settings.app_name,
-        instance_port=settings.port,
-    )
-    print("Registration successful!")
+    registered = False
+    for attempt in range(1, 11):
+        try:
+            await eureka_client.init_async(
+                eureka_server=settings.eureka_server,
+                app_name=settings.app_name,
+                instance_port=settings.port,
+            )
+            print(f"Eureka registration successful on attempt {attempt}!")
+            registered = True
+            break
+        except Exception as e:
+            print(f"Eureka registration attempt {attempt}/10 failed: {e}. Retrying in 3s...")
+            import asyncio
+            await asyncio.sleep(3)
+    if not registered:
+        print("Warning: Could not register with Eureka Server after 10 attempts. Service will run in standalone mode.")
+
     yield
     # shutdown: cancel registration with Eureka Server
-    await eureka_client.stop_async()
+    try:
+        await eureka_client.stop_async()
+    except Exception as e:
+        print(f"Error stopping Eureka client: {e}")
 
 app = FastAPI(title="AI Assistant Service", lifespan=lifespan)
 
