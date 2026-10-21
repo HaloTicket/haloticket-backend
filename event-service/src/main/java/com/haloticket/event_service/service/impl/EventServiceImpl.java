@@ -221,14 +221,29 @@ public class EventServiceImpl implements EventService {
                 eventToSave.getShowtimes().clear();
                 eventToSave.getShowtimes().addAll(updatedShowtimes);
             }
+        Double minTicketPrice = null;
         try {
             if (request.getTickets() != null && !request.getTickets().isEmpty()) {
                 eventToSave.setTicketsData(objectMapper.writeValueAsString(request.getTickets()));
+                for (EventCreateRequest.TicketCreateRequest t : request.getTickets()) {
+                    if (t != null && t.getPrice() != null) {
+                        if (minTicketPrice == null || t.getPrice() < minTicketPrice) {
+                            minTicketPrice = t.getPrice();
+                        }
+                    }
+                }
             } else if (request.getShowtimes() != null) {
                 List<EventCreateRequest.TicketCreateRequest> allStTickets = new ArrayList<>();
                 for (EventCreateRequest.EventShowtimeRequest st : request.getShowtimes()) {
                     if (st.getTickets() != null && !st.getTickets().isEmpty()) {
                         allStTickets.addAll(st.getTickets());
+                        for (EventCreateRequest.TicketCreateRequest t : st.getTickets()) {
+                            if (t != null && t.getPrice() != null) {
+                                if (minTicketPrice == null || t.getPrice() < minTicketPrice) {
+                                    minTicketPrice = t.getPrice();
+                                }
+                            }
+                        }
                     }
                 }
                 if (!allStTickets.isEmpty()) {
@@ -237,6 +252,9 @@ public class EventServiceImpl implements EventService {
             }
         } catch (Exception e) {
             System.out.println("DEBUG: Exception serializing tickets: " + e.getMessage());
+        }
+        if (minTicketPrice != null) {
+            eventToSave.setMinPrice(minTicketPrice);
         }
 
         try {
@@ -596,6 +614,33 @@ public class EventServiceImpl implements EventService {
                     .collect(Collectors.toList());
         }
 
+        Double computedMinPrice = null;
+        if (ticketsObj instanceof List<?> list && !list.isEmpty()) {
+            Double min = null;
+            for (Object item : list) {
+                if (item instanceof Map<?, ?> map) {
+                    Object p = map.get("price");
+                    if (p != null) {
+                        try {
+                            double val = Double.parseDouble(p.toString());
+                            if (min == null || val < min) min = val;
+                        } catch (Exception ignored) {}
+                    }
+                }
+            }
+            if (min != null) {
+                computedMinPrice = min;
+            }
+        }
+        if (computedMinPrice == null) {
+            computedMinPrice = event.getMinPrice();
+        } else if (event.getMinPrice() == null || !computedMinPrice.equals(event.getMinPrice())) {
+            event.setMinPrice(computedMinPrice);
+            try {
+                eventRepository.save(event);
+            } catch (Exception ignored) {}
+        }
+
         return EventResponse.builder()
                 .id(event.getId())
                 .title(event.getTitle())
@@ -612,7 +657,7 @@ public class EventServiceImpl implements EventService {
                 .galleryImages(event.getGalleryImages())
                 .datesSummary(event.getDatesSummary())
                 .extraDaysCount(event.getExtraDaysCount() != null ? event.getExtraDaysCount() : 5)
-                .minPrice(event.getMinPrice())
+                .minPrice(computedMinPrice)
                 .eventStatus(event.getEventStatus())
                 .startTime(event.getStartTime())
                 .endTime(event.getEndTime())

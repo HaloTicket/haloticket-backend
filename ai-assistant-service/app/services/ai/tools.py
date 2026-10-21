@@ -245,8 +245,7 @@ def show_event_cards(event_ids: List[str]) -> str:
     with event_engine.connect() as conn:
         for eid in event_ids:
             query = text('''
-                SELECT e.id, e.title, e.banner_url, e.thumbnail_url, e.location_name, e.city, e.dates_summary,
-                       COALESCE((SELECT MIN(price) FROM ticket_types WHERE event_id = e.id AND ticket_type_status = 'ACTIVE'), e.min_price, 0) as min_price
+                SELECT e.id, e.title, e.banner_url, e.thumbnail_url, e.location_name, e.city, e.dates_summary, e.min_price
                 FROM events e 
                 WHERE e.id = :eid
                   AND (e.event_status IN ('LIVE', 'APPROVED') OR e.event_approval_status = 'APPROVED')
@@ -254,11 +253,24 @@ def show_event_cards(event_ids: List[str]) -> str:
             ''')
             result = conn.execute(query, {"eid": eid}).fetchone()
             if result:
+                # query ticket_db for real minimum ticket price among active tiers
+                min_price_val = result.min_price
+                try:
+                    with ticket_engine.connect() as t_conn:
+                        min_p_row = t_conn.execute(
+                            text("SELECT MIN(price) FROM ticket_types WHERE event_id = :eid AND ticket_type_status != 'HIDDEN'"),
+                            {"eid": eid}
+                        ).fetchone()
+                        if min_p_row and min_p_row[0] is not None:
+                            min_price_val = float(min_p_row[0])
+                except Exception as ex:
+                    print("Error getting min_price from ticket_db:", ex)
+
                 cards_data.append({
                     "event_id": result.id,
                     "title": result.title,
                     "banner_url": result.banner_url or result.thumbnail_url or "",
-                    "min_price": float(result.min_price) if result.min_price else 0,
+                    "min_price": float(min_price_val) if min_price_val is not None else 0,
                     "location": f"{result.location_name or ''}, {result.city or ''}".strip(", "),
                     "dates_summary": result.dates_summary or ""
                 })
@@ -421,6 +433,29 @@ def show_ticket_types(event_id: str) -> str:
 
     now = datetime.now(VN_TZ).replace(tzinfo=None)
     
+    # format all tickets belonging to event for direct access
+    all_event_tickets = []
+    for t in ticket_rows:
+        clean_t_name = t.name.lower().replace(" ", "").replace("-", "")
+        is_seated = tier_seated_map.get(t.id, False)
+        if not is_seated:
+            for k, val in tier_seated_map.items():
+                if k in clean_t_name or clean_t_name in k:
+                    is_seated = val
+                    break
+        all_event_tickets.append({
+            "id": t.id,
+            "name": t.name,
+            "price": float(t.price),
+            "description": t.description or "",
+            "status": t.ticket_type_status,
+            "total_quantity": t.total_quantity,
+            "min_per_order": t.min_per_order or 1,
+            "max_per_order": t.max_per_order or 10,
+            "is_seated": is_seated,
+            "area_type": "Ghế ngồi (SEATED)" if is_seated else "Khu đứng / Tự do (STANDING)"
+        })
+
     # process showtimes and associate tickets
     showtimes_list = []
     if showtimes_rows:
@@ -431,7 +466,13 @@ def show_ticket_types(event_id: str) -> str:
             st_sale_end = to_naive_vn_datetime(st.sale_end_time or ev.sale_end_time or st.end_time)
             
             # match tickets belonging to this showtime
-            matched_tickets = [t for t in ticket_rows if t.showtime_id == st.id or t.showtime_id is None]
+            st_id_str = str(st.id).strip().lower() if st.id else ""
+            matched_tickets = [
+                t for t in ticket_rows 
+                if t.showtime_id is None or not str(t.showtime_id).strip() or str(t.showtime_id).strip().lower() == st_id_str
+            ]
+            if not matched_tickets and ticket_rows:
+                matched_tickets = list(ticket_rows)
             
             # calculate showtime status
             if st_sale_start and now < st_sale_start:
@@ -541,6 +582,7 @@ def show_ticket_types(event_id: str) -> str:
         "location": f"{ev.location_name or ''}, {ev.city or ''}".strip(", "),
         "has_seatmap": has_seatmap,
         "seatmap_image_url": seatmap_image_url or "",
+        "tickets": all_event_tickets,
         "showtimes": showtimes_list
     }
     return json.dumps(payload, ensure_ascii=False)
