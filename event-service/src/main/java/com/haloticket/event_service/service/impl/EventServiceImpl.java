@@ -222,13 +222,21 @@ public class EventServiceImpl implements EventService {
                 eventToSave.getShowtimes().addAll(updatedShowtimes);
             }
         try {
-            if (request.getShowtimes() != null && !request.getShowtimes().isEmpty()) {
-                eventToSave.setTicketsData(objectMapper.writeValueAsString(request.getShowtimes()));
-            } else if (request.getTickets() != null) {
+            if (request.getTickets() != null && !request.getTickets().isEmpty()) {
                 eventToSave.setTicketsData(objectMapper.writeValueAsString(request.getTickets()));
+            } else if (request.getShowtimes() != null) {
+                List<EventCreateRequest.TicketCreateRequest> allStTickets = new ArrayList<>();
+                for (EventCreateRequest.EventShowtimeRequest st : request.getShowtimes()) {
+                    if (st.getTickets() != null && !st.getTickets().isEmpty()) {
+                        allStTickets.addAll(st.getTickets());
+                    }
+                }
+                if (!allStTickets.isEmpty()) {
+                    eventToSave.setTicketsData(objectMapper.writeValueAsString(allStTickets));
+                }
             }
         } catch (Exception e) {
-            System.out.println("DEBUG: Exception serializing tickets/showtimes: " + e.getMessage());
+            System.out.println("DEBUG: Exception serializing tickets: " + e.getMessage());
         }
 
         try {
@@ -276,32 +284,57 @@ public class EventServiceImpl implements EventService {
 
         Event saved = eventRepository.save(eventToSave);
 
-        // 1. Sync master event-level ticket types (showtimeId = null)
+        // 1. sync master event-level ticket types (showtimeId = null)
         if (request.getTickets() != null && !request.getTickets().isEmpty()) {
             syncTicketsToTicketService(saved.getId(), null, request.getTickets());
         }
 
-        // 2. Sync showtime-specific ticket types
-        if (saved.getShowtimes() != null && !saved.getShowtimes().isEmpty() && request.getShowtimes() != null) {
+        // 2. sync showtime-specific ticket types
+        if (saved.getShowtimes() != null && !saved.getShowtimes().isEmpty()) {
             for (EventShowtime st : saved.getShowtimes()) {
                 deletedShowtimeIds.remove(st.getId());
                 List<EventCreateRequest.TicketCreateRequest> stTickets = null;
-                for (EventCreateRequest.EventShowtimeRequest stReq : request.getShowtimes()) {
-                    if (stReq.getName().equals(st.getName())) {
-                        stTickets = stReq.getTickets();
-                        break;
+                if (request.getShowtimes() != null) {
+                    for (EventCreateRequest.EventShowtimeRequest stReq : request.getShowtimes()) {
+                        if (st.getName() != null && st.getName().equals(stReq.getName())) {
+                            stTickets = stReq.getTickets();
+                            break;
+                        }
                     }
                 }
                 if (stTickets != null && !stTickets.isEmpty()) {
-                    stTickets = stTickets.stream()
-                        .filter(t -> t.getShowtimeId() == null || t.getShowtimeId().equals(st.getId()))
-                        .collect(java.util.stream.Collectors.toList());
-                } else if (request.getTickets() != null) {
-                    stTickets = request.getTickets().stream()
-                        .filter(t -> t.getShowtimeId() == null || t.getShowtimeId().equals(st.getId()))
-                        .collect(java.util.stream.Collectors.toList());
+                    List<EventCreateRequest.TicketCreateRequest> clonedStTickets = new ArrayList<>();
+                    for (EventCreateRequest.TicketCreateRequest t : stTickets) {
+                        EventCreateRequest.TicketCreateRequest clone = new EventCreateRequest.TicketCreateRequest();
+                        if (st.getId().equals(t.getShowtimeId())) clone.setId(t.getId());
+                        clone.setShowtimeId(st.getId());
+                        clone.setName(t.getName());
+                        clone.setPrice(t.getPrice());
+                        clone.setIsFree(t.getIsFree());
+                        clone.setTotalQuantity(t.getTotalQuantity());
+                        clone.setMinPerOrder(t.getMinPerOrder());
+                        clone.setMaxPerOrder(t.getMaxPerOrder());
+                        clone.setDescription(t.getDescription());
+                        clonedStTickets.add(clone);
+                    }
+                    syncTicketsToTicketService(saved.getId(), st.getId(), clonedStTickets);
+                } else if (request.getTickets() != null && !request.getTickets().isEmpty()) {
+                    List<EventCreateRequest.TicketCreateRequest> clonedStTickets = new ArrayList<>();
+                    for (EventCreateRequest.TicketCreateRequest t : request.getTickets()) {
+                        EventCreateRequest.TicketCreateRequest clone = new EventCreateRequest.TicketCreateRequest();
+                        if (st.getId().equals(t.getShowtimeId())) clone.setId(t.getId());
+                        clone.setShowtimeId(st.getId());
+                        clone.setName(t.getName());
+                        clone.setPrice(t.getPrice());
+                        clone.setIsFree(t.getIsFree());
+                        clone.setTotalQuantity(t.getTotalQuantity());
+                        clone.setMinPerOrder(t.getMinPerOrder());
+                        clone.setMaxPerOrder(t.getMaxPerOrder());
+                        clone.setDescription(t.getDescription());
+                        clonedStTickets.add(clone);
+                    }
+                    syncTicketsToTicketService(saved.getId(), st.getId(), clonedStTickets);
                 }
-                syncTicketsToTicketService(saved.getId(), st.getId(), stTickets);
             }
             
             for (String deletedId : deletedShowtimeIds) {
@@ -392,6 +425,10 @@ public class EventServiceImpl implements EventService {
         if (eventId == null)
             return null;
         try {
+            Object all = ticketServiceClient.getAllTicketTypesByEventId(eventId);
+            if (all instanceof List<?> list && !list.isEmpty()) {
+                return all;
+            }
             return ticketServiceClient.getTicketTypesByEventId(eventId);
         } catch (Exception e) {
             return null;
@@ -498,26 +535,39 @@ public class EventServiceImpl implements EventService {
 
         // fetch tickets dynamically from ticket-service, fallback to local JSON
         Object ticketsObj = fetchTicketsFromTicketService(event.getId());
-        if (ticketsObj instanceof List<?>) {
-            Map<String, Object> dedupTickets = new LinkedHashMap<>();
-            for (Object t : (List<?>) ticketsObj) {
+        if (ticketsObj instanceof List<?> list) {
+            List<Object> activeTickets = new ArrayList<>();
+            for (Object t : list) {
                 if (t instanceof Map<?, ?> tMap) {
-                    String name = (String) tMap.get("name");
                     Object status = tMap.get("ticketTypeStatus");
                     if ("HIDDEN".equalsIgnoreCase(String.valueOf(status))) continue;
-                    if (name != null && !name.trim().isEmpty()) {
-                        dedupTickets.putIfAbsent(name.trim().toLowerCase(), t);
-                    }
+                    activeTickets.add(t);
                 } else {
-                    dedupTickets.put(String.valueOf(t.hashCode()), t);
+                    activeTickets.add(t);
                 }
             }
-            ticketsObj = new ArrayList<>(dedupTickets.values());
+            ticketsObj = activeTickets;
         }
         if ((ticketsObj == null || (ticketsObj instanceof List && ((List<?>) ticketsObj).isEmpty()))
                 && event.getTicketsData() != null && !event.getTicketsData().trim().isEmpty()) {
             try {
-                ticketsObj = objectMapper.readValue(event.getTicketsData(), Object.class);
+                Object parsed = objectMapper.readValue(event.getTicketsData(), Object.class);
+                if (parsed instanceof List<?> list) {
+                    List<Object> validTickets = new ArrayList<>();
+                    for (Object item : list) {
+                        if (item instanceof Map<?, ?> map) {
+                            boolean isStaleShowtime = map.containsKey("startTime") && !map.containsKey("price");
+                            if (!isStaleShowtime) {
+                                validTickets.add(item);
+                            }
+                        } else {
+                            validTickets.add(item);
+                        }
+                    }
+                    ticketsObj = validTickets.isEmpty() ? null : validTickets;
+                } else {
+                    ticketsObj = parsed;
+                }
             } catch (Exception e) {
                 ticketsObj = event.getTicketsData();
             }

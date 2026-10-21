@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -71,33 +72,121 @@ public class TicketServiceImpl implements TicketService {
 
         List<TicketTypeResponse> responses = new ArrayList<>();
         Set<String> processedIds = new HashSet<>();
+        Map<String, String> renamedFromOldToNew = new HashMap<>();
+
+        // if doing event-level sync (showtimeId == null), identify all showtimes for this event
+        Set<String> allShowtimeIds = new HashSet<>();
+        if (showtimeId == null) {
+            for (TicketType tt : existingTicketTypes) {
+                if (tt.getShowtimeId() != null && !tt.getShowtimeId().isBlank()) {
+                    allShowtimeIds.add(tt.getShowtimeId());
+                }
+            }
+        }
 
         if (requests != null && !requests.isEmpty()) {
+            // first pass: detect renames from requests matching by ID
+            for (TicketTypeCreateRequest req : requests) {
+                String requestedId = req.getId();
+                if (requestedId != null && !requestedId.startsWith("tier_") && existingMap.containsKey(requestedId)) {
+                    TicketType oldTt = existingMap.get(requestedId);
+                    if (oldTt.getName() != null && req.getName() != null && !oldTt.getName().trim().equalsIgnoreCase(req.getName().trim())) {
+                        renamedFromOldToNew.put(oldTt.getName().trim().toLowerCase(), req.getName().trim());
+                    }
+                }
+            }
+
+            // second pass: handle unmatched requests vs unmatched existing distinct tiers (rename by elimination)
+            Set<String> requestNames = requests.stream()
+                    .map(r -> r.getName() != null ? r.getName().trim().toLowerCase() : "")
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toSet());
+            Set<String> existingDistinctNames = existingTicketTypes.stream()
+                    .map(t -> t.getName() != null ? t.getName().trim().toLowerCase() : "")
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toSet());
+
+            List<String> unmatchedReqNames = requestNames.stream()
+                    .filter(rn -> !existingDistinctNames.contains(rn))
+                    .collect(Collectors.toList());
+            List<String> unmatchedOldNames = existingDistinctNames.stream()
+                    .filter(en -> !requestNames.contains(en))
+                    .collect(Collectors.toList());
+            if (unmatchedReqNames.size() == 1 && unmatchedOldNames.size() == 1) {
+                String oldNorm = unmatchedOldNames.get(0);
+                String newName = requests.stream()
+                        .filter(r -> r.getName() != null && r.getName().trim().equalsIgnoreCase(unmatchedReqNames.get(0)))
+                        .map(r -> r.getName().trim())
+                        .findFirst()
+                        .orElse(unmatchedReqNames.get(0));
+                renamedFromOldToNew.put(oldNorm, newName);
+            }
+
             for (TicketTypeCreateRequest req : requests) {
                 req.setEventId(eventId);
                 if (showtimeId != null) req.setShowtimeId(showtimeId);
                 String requestedId = req.getId();
                 List<TicketType> matchedEntities = new ArrayList<>();
+                Set<String> matchedIdsForThisReq = new HashSet<>();
+
                 if (requestedId != null && !requestedId.startsWith("tier_") && existingMap.containsKey(requestedId)) {
-                    matchedEntities.add(existingMap.get(requestedId));
-                } else if (req.getName() != null && !req.getName().trim().isEmpty()) {
+                    TicketType directMatch = existingMap.get(requestedId);
+                    matchedEntities.add(directMatch);
+                    matchedIdsForThisReq.add(directMatch.getId());
+                }
+
+                if (req.getName() != null && !req.getName().trim().isEmpty()) {
                     String normName = req.getName().trim();
-                    // fallback to match by name to apply across all showtimes if needed
                     for (TicketType existing : existingTicketTypes) {
-                        if (existing.getName() != null && existing.getName().trim().equalsIgnoreCase(normName)) {
-                            matchedEntities.add(existing);
+                        if (!matchedIdsForThisReq.contains(existing.getId())) {
+                            if (existing.getName() != null && existing.getName().trim().equalsIgnoreCase(normName)) {
+                                matchedEntities.add(existing);
+                                matchedIdsForThisReq.add(existing.getId());
+                            }
+                        }
+                    }
+
+                    // also check if any existing was renamed to this new name
+                    for (Map.Entry<String, String> entry : renamedFromOldToNew.entrySet()) {
+                        if (entry.getValue().equalsIgnoreCase(normName)) {
+                            String oldNorm = entry.getKey();
+                            for (TicketType existing : existingTicketTypes) {
+                                if (!matchedIdsForThisReq.contains(existing.getId())) {
+                                    if (existing.getName() != null && existing.getName().trim().equalsIgnoreCase(oldNorm)) {
+                                        matchedEntities.add(existing);
+                                        matchedIdsForThisReq.add(existing.getId());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // If global event-level sync, ensure every showtime has this tier
+                if (showtimeId == null && !allShowtimeIds.isEmpty()) {
+                    Set<String> coveredShowtimeIds = matchedEntities.stream()
+                            .map(TicketType::getShowtimeId)
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toSet());
+                    for (String stId : allShowtimeIds) {
+                        if (!coveredShowtimeIds.contains(stId)) {
+                            TicketType stEntity = mapToEntity(req);
+                            stEntity.setId(null);
+                            stEntity.setShowtimeId(stId);
+                            stEntity.setTicketTypeStatus(TicketTypeStatus.ACTIVE);
+                            matchedEntities.add(stEntity);
                         }
                     }
                 }
 
                 if (!matchedEntities.isEmpty()) {
                     for (TicketType entity : matchedEntities) {
-                        entity.setName(req.getName() != null ? req.getName() : "Vé tiêu chuẩn");
+                        entity.setName(req.getName() != null ? req.getName().trim() : "Vé tiêu chuẩn");
                         entity.setPrice(req.getPrice() != null ? req.getPrice() : 0.0);
                         entity.setIsFree(req.getIsFree() != null ? req.getIsFree() : (req.getPrice() != null && req.getPrice() == 0.0));
                         entity.setTotalQuantity(req.getTotalQuantity() != null ? req.getTotalQuantity() : 100);
                         entity.setMinPerOrder(req.getMinPerOrder() != null ? req.getMinPerOrder() : 1);
-                        entity.setMaxPerOrder(req.getMaxPerOrder() != null ? req.getMaxPerOrder() : 10);
+                        entity.setMaxPerOrder(req.getMaxPerOrder() != null ? req.getMaxPerOrder() : 5);
                         entity.setTicketTypeStatus(TicketTypeStatus.ACTIVE);
                         if (entity.getInitialQuantity() == null && entity.getTotalQuantity() != null) {
                             entity.setInitialQuantity(entity.getTotalQuantity());
@@ -107,7 +196,7 @@ public class TicketServiceImpl implements TicketService {
 
                         TicketType saved = ticketTypeRepository.save(entity);
                         processedIds.add(saved.getId());
-                        // only add to response if we haven't already added this name to avoid duplicating in frontend response
+
                         boolean nameAlreadyInResponse = false;
                         for (TicketTypeResponse res : responses) {
                             if (res.getName() != null && res.getName().equalsIgnoreCase(saved.getName())) {
@@ -126,16 +215,36 @@ public class TicketServiceImpl implements TicketService {
                     TicketType saved = ticketTypeRepository.save(newEntity);
                     processedIds.add(saved.getId());
                     responses.add(mapToResponse(saved));
+
+                    // if global sync and showtimes already exist, replicate this new tier to all showtimes
+                    if (showtimeId == null && !allShowtimeIds.isEmpty()) {
+                        for (String stId : allShowtimeIds) {
+                            TicketType stEntity = mapToEntity(req);
+                            stEntity.setId(null);
+                            stEntity.setShowtimeId(stId);
+                            stEntity.setTicketTypeStatus(TicketTypeStatus.ACTIVE);
+                            TicketType savedSt = ticketTypeRepository.save(stEntity);
+                            processedIds.add(savedSt.getId());
+                        }
+                    }
                 }
             }
         }
 
+        // handle existing tickets not in processedIds
         for (TicketType tt : existingTicketTypes) {
             if (!processedIds.contains(tt.getId())) {
-                if (showtimeId == null && tt.getShowtimeId() != null) {
-                    continue; // leave showtime-specific tickets alone when doing a global sync
+                // if it was renamed, update its name and mark processed
+                String oldNorm = tt.getName() != null ? tt.getName().trim().toLowerCase() : "";
+                if (renamedFromOldToNew.containsKey(oldNorm)) {
+                    tt.setName(renamedFromOldToNew.get(oldNorm));
+                    tt.setTicketTypeStatus(TicketTypeStatus.ACTIVE);
+                    ticketTypeRepository.save(tt);
+                    processedIds.add(tt.getId());
+                    continue;
                 }
 
+                // if doing event-level sync, also clean up deleted tiers from showtimes
                 try {
                     ticketTypeRepository.delete(tt);
                 } catch (Exception e) {

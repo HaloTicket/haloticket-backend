@@ -66,3 +66,4 @@ build/
 .codex-temp/**
 .local-backups/
 __pycache__/
+**/extracted/
