@@ -104,14 +104,24 @@ public class UserServiceImpl implements UserService {
 
         if (userByKeycloak.isPresent()) {
             user = userByKeycloak.get();
-            if (userByEmail.isPresent() && !userByEmail.get().getId().equals(user.getId())) {
-                User oldAccount = userByEmail.get();
-                oldAccount.setKeycloakId(null);
-                userRepository.save(oldAccount);
+            if (userByEmail.isPresent()) {
+                User emailOwner = userByEmail.get();
+                boolean isSameUser = (user.getId() != null && user.getId().equals(emailOwner.getId()))
+                        || (user.getEmail() != null && user.getEmail().equalsIgnoreCase(targetEmail));
+                if (!isSameUser) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Email already belongs to another identity");
+                }
             }
         } else if (userByEmail.isPresent()) {
-            user = userByEmail.get();
-            user.setKeycloakId(keycloakId);
+            User existing = userByEmail.get();
+            if (isBlank(existing.getKeycloakId()) || existing.getKeycloakId().startsWith("kc-") || keycloakId.equals(existing.getKeycloakId())) {
+                existing.setKeycloakId(keycloakId);
+                user = existing;
+            } else {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Email already belongs to another identity");
+            }
         } else {
             user = User.builder()
                     .keycloakId(keycloakId)

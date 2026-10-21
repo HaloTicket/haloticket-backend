@@ -20,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import feign.FeignException;
 import java.math.BigDecimal;
 
 @Service
@@ -52,9 +53,21 @@ public class OrganizerTransferService {
             }
         } catch (ResponseStatusException e) {
             throw e;
-        } catch (Exception e) {
-            log.warn("Failed to check organizer role for event {}: {}", eventId, e.getMessage(), e);
+        } catch (FeignException.Unauthorized e) {
+            log.warn("Event service rejected token for event {}: {}", eventId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED");
+        } catch (FeignException.Forbidden e) {
+            log.warn("Access denied by event service for event {}: {}", eventId, e.getMessage());
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE");
+        } catch (FeignException.NotFound e) {
+            log.warn("Event not found in event service {}: {}", eventId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND");
+        } catch (FeignException e) {
+            log.error("Feign error calling event service for event {}: {}", eventId, e.getMessage(), e);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "EVENT_SERVICE_UNAVAILABLE");
+        } catch (Exception e) {
+            log.error("Unexpected error checking organizer role for event {}: {}", eventId, e.getMessage(), e);
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR");
         }
     }
 
