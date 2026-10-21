@@ -117,6 +117,10 @@ public class BookingServiceImpl implements BookingService {
                                         oldBooking.setStatus(BookingStatus.CANCELLED);
                                         bookingRepository.save(oldBooking);
                                         isOwnPendingBooking = true;
+                                    } else if (previousBooking.isEmpty()) {
+                                        log.warn("Seat {} held by non-existent booking ID {} (likely rolled back transaction), clearing orphaned hold",
+                                                seatId, heldBy);
+                                        isOwnPendingBooking = true;
                                     }
                                 }
                                 if (!isOwnPendingBooking) {
