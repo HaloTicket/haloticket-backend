@@ -25,11 +25,23 @@ public class GlobalExceptionHandler {
         private Instant timestamp;
     }
 
+    @ExceptionHandler(CheckinException.class)
+    public ResponseEntity<ErrorResponse> handleCheckinException(CheckinException exception) {
+        log.warn("Checkin business error [{}]: {}", exception.getCode(), exception.getMessage());
+        return ResponseEntity.badRequest().body(new ErrorResponse(
+                exception.getCode(), exception.getMessage(), Instant.now()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleBadRequest(IllegalArgumentException exception) {
         log.warn("Invalid argument: {}", exception.getMessage());
+        String code = "INVALID_REQUEST";
+        String msg = exception.getMessage() != null ? exception.getMessage() : "";
+        if (msg.contains("Ticket not found")) code = "TICKET_NOT_FOUND";
+        else if (msg.contains("does not belong to this event")) code = "WRONG_EVENT";
+        else if (msg.contains("does not belong to this showtime")) code = "WRONG_SHOWTIME";
         return ResponseEntity.badRequest().body(new ErrorResponse(
-                "INVALID_REQUEST", exception.getMessage(), Instant.now()));
+                code, exception.getMessage(), Instant.now()));
     }
 
     @ExceptionHandler(OptimisticLockingFailureException.class)

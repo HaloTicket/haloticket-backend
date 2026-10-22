@@ -596,14 +596,22 @@ public class TicketListingService {
     public SagaResponse acceptGift(String actorId, String authorization, String sagaId, String token) {
         MarketplaceSaga saga = sagaRepository.findByIdForUpdate(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         TicketTransfer transfer = transferRepository.findBySagaIdForUpdate(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (saga.getState() != SagaState.WAITING_RECIPIENT || transfer.getStatus() != TransferStatus.PENDING || transfer.getInvitationExpiresAt() == null || !transfer.getInvitationExpiresAt().isAfter(Instant.now())
-                || (token != null && !hashToken(token).equals(transfer.getInvitationTokenHash()))) {
+        if (transfer.getInvitationTokenHash() != null) {
+            if (token == null || token.isBlank()
+                    || !MessageDigest.isEqual(hashToken(token).getBytes(StandardCharsets.UTF_8), transfer.getInvitationTokenHash().getBytes(StandardCharsets.UTF_8))) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "GIFT_INVITATION_INVALID");
+            }
+        }
+        if (saga.getState() != SagaState.WAITING_RECIPIENT || transfer.getStatus() != TransferStatus.PENDING
+                || transfer.getInvitationExpiresAt() == null || !transfer.getInvitationExpiresAt().isAfter(Instant.now())
+                || !actorId.equals(transfer.getToUserId())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "GIFT_INVITATION_INVALID");
         }
-        if (!actorId.equals(transfer.getToUserId())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GIFT_RECIPIENT_MISMATCH");
         policyGate.requireGiftEnabled(transfer.getEventId());
         UserServiceClient.CurrentUser currentUser = userServiceClient.getCurrentUser(authorization);
-        if (currentUser == null || !transfer.getRecipientEmail().equalsIgnoreCase(currentUser.email())) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GIFT_RECIPIENT_MISMATCH");
+        if (currentUser == null || !transfer.getRecipientEmail().equalsIgnoreCase(currentUser.email())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "GIFT_INVITATION_INVALID");
+        }
         if (transfer.isRequireEkyc()) {
             UserServiceClient.ResaleSellerEligibility verified;
             try { verified = userServiceClient.getResaleEligibility(authorization); }
@@ -618,6 +626,60 @@ public class TicketListingService {
             outboxRepository.save(OutboxEvent.builder().aggregateType("TICKET_TRANSFER").aggregateId(transfer.getId()).eventType("TICKET_OWNERSHIP_TRANSFER_REQUESTED").topic("haloticket.ticket.ownership.transfer.requested.v1").payload(objectMapper.writeValueAsString(command)).status(OutboxStatus.PENDING).retryCount(0).build());
         } catch (JsonProcessingException exception) { throw new IllegalStateException("Could not create transfer command", exception); }
         return toResponse(saga);
+    }
+
+    @Transactional
+    public SagaResponse cancelGift(String actorId, String sagaId) {
+        MarketplaceSaga saga = sagaRepository.findByIdForUpdate(sagaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "GIFT_NOT_FOUND"));
+        TicketTransfer transfer = transferRepository.findBySagaIdForUpdate(sagaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "GIFT_NOT_FOUND"));
+        if (!actorId.equals(transfer.getFromUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "FORBIDDEN");
+        }
+        if (transfer.getStatus() != TransferStatus.PENDING || saga.getState() != SagaState.WAITING_RECIPIENT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "GIFT_NOT_CANCELLABLE");
+        }
+        transfer.setStatus(TransferStatus.CANCELLED);
+        transfer.setCancellationReason("SENDER_CANCELLED");
+        transferRepository.save(transfer);
+        requestRelease(sagaId, "SENDER_CANCELLED");
+        return toResponse(saga);
+    }
+
+    @Transactional
+    public SagaResponse declineGift(String actorId, String sagaId) {
+        MarketplaceSaga saga = sagaRepository.findByIdForUpdate(sagaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "GIFT_NOT_FOUND"));
+        TicketTransfer transfer = transferRepository.findBySagaIdForUpdate(sagaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "GIFT_NOT_FOUND"));
+        if (!actorId.equals(transfer.getToUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "FORBIDDEN");
+        }
+        if (transfer.getStatus() != TransferStatus.PENDING || saga.getState() != SagaState.WAITING_RECIPIENT) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "GIFT_NOT_CANCELLABLE");
+        }
+        transfer.setStatus(TransferStatus.CANCELLED);
+        transfer.setCancellationReason("RECIPIENT_DECLINED");
+        transferRepository.save(transfer);
+        requestRelease(sagaId, "RECIPIENT_DECLINED");
+        return toResponse(saga);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getActiveGiftByTicket(String actorId, String ticketId) {
+        TicketTransfer transfer = transferRepository.findFirstByTicketIdAndStatus(ticketId, TransferStatus.PENDING)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "GIFT_NOT_FOUND"));
+        if (!actorId.equals(transfer.getFromUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "FORBIDDEN");
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("sagaId", transfer.getSagaId());
+        result.put("ticketId", transfer.getTicketId());
+        result.put("status", transfer.getStatus());
+        result.put("recipientEmail", transfer.getRecipientEmail());
+        result.put("expiresAt", transfer.getInvitationExpiresAt());
+        return result;
     }
 
     @Transactional
@@ -651,8 +713,14 @@ public class TicketListingService {
     public Map<String, Object> giftInvitation(String actorId, String sagaId, String token) {
         TicketTransfer transfer = transferRepository.findBySagaId(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         MarketplaceSaga saga = sagaRepository.findById(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!actorId.equals(transfer.getToUserId()) || (token != null && !hashToken(token).equals(transfer.getInvitationTokenHash()))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GIFT_RECIPIENT_MISMATCH");
+        if (!actorId.equals(transfer.getToUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GIFT_INVITATION_INVALID");
+        }
+        if (transfer.getInvitationTokenHash() != null) {
+            if (token == null || token.isBlank()
+                    || !MessageDigest.isEqual(hashToken(token).getBytes(StandardCharsets.UTF_8), transfer.getInvitationTokenHash().getBytes(StandardCharsets.UTF_8))) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GIFT_INVITATION_INVALID");
+            }
         }
         try {
             var payload = objectMapper.readTree(saga.getPayload());

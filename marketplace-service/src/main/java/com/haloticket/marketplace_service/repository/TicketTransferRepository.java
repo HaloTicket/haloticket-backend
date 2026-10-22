@@ -14,6 +14,7 @@ public interface TicketTransferRepository extends JpaRepository<TicketTransfer, 
     Optional<TicketTransfer> findBySagaIdForUpdate(@org.springframework.data.repository.query.Param("sagaId") String sagaId);
     Optional<TicketTransfer> findBySagaId(String sagaId);
     List<TicketTransfer> findByToUserIdAndStatusOrderByCreatedAtDesc(String toUserId, TransferStatus status);
+    Optional<TicketTransfer> findFirstByTicketIdAndStatus(String ticketId, TransferStatus status);
     Page<TicketTransfer> findByEventId(String eventId, Pageable pageable);
     Page<TicketTransfer> findByEventIdAndStatus(String eventId, TransferStatus status, Pageable pageable);
     long countByEventIdAndStatus(String eventId, TransferStatus status);

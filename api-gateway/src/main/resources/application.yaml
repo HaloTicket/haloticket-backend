@@ -48,7 +48,7 @@ spring:
         - id: marketplace-service
           uri: lb://MARKETPLACE-SERVICE
           predicates:
-            - Path=/api/marketplace/**
+            - Path=/api/marketplace/**, /api/gifts/**
 
         - id: booking-service
           uri: lb://BOOKING-SERVICE

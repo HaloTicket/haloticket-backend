@@ -1,6 +1,7 @@
 package com.haloticket.marketplace_service.controller;
 
 import com.haloticket.marketplace_service.dto.*;
+import com.haloticket.marketplace_service.service.ResalePurchaseService;
 import com.haloticket.marketplace_service.service.TicketListingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
@@ -8,12 +9,15 @@ import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
+
 @RestController
-@RequestMapping("/api/marketplace")
+@RequestMapping({"/api/marketplace", "/api"})
 @RequiredArgsConstructor
 public class TicketListingController {
     private final TicketListingService service;
-    private final com.haloticket.marketplace_service.service.ResalePurchaseService purchaseService;
+    private final ResalePurchaseService purchaseService;
 
     @GetMapping("/tickets/{ticketId}/resale-eligibility")
     public ResponseEntity<?> eligibility(@RequestHeader("Authorization") String authorization, @PathVariable String ticketId) {
@@ -40,6 +44,21 @@ public class TicketListingController {
         return service.acceptGift(authentication.getName(), authorization, sagaId, token);
     }
 
+    @PostMapping("/gifts/{sagaId}/cancel")
+    public SagaResponse cancelGift(@PathVariable String sagaId, Authentication authentication) {
+        return service.cancelGift(authentication.getName(), sagaId);
+    }
+
+    @PostMapping("/gifts/{sagaId}/decline")
+    public SagaResponse declineGift(@PathVariable String sagaId, Authentication authentication) {
+        return service.declineGift(authentication.getName(), sagaId);
+    }
+
+    @GetMapping("/gifts/by-ticket/{ticketId}")
+    public Map<String, Object> getActiveGiftByTicket(@PathVariable String ticketId, Authentication authentication) {
+        return service.getActiveGiftByTicket(authentication.getName(), ticketId);
+    }
+
     @GetMapping("/sagas/{id}")
     public SagaResponse saga(@PathVariable String id, Authentication authentication) { return service.getSaga(authentication.getName(), id); }
 
@@ -49,17 +68,17 @@ public class TicketListingController {
     }
 
     @GetMapping("/gifts/{sagaId}/invitation")
-    public java.util.Map<String, Object> giftInvitation(@PathVariable String sagaId, @RequestParam(required = false) String token, Authentication authentication) {
+    public Map<String, Object> giftInvitation(@PathVariable String sagaId, @RequestParam(required = false) String token, Authentication authentication) {
         return service.giftInvitation(authentication.getName(), sagaId, token);
     }
 
     @GetMapping("/gifts/mine")
-    public java.util.List<java.util.Map<String, Object>> myGiftInvitations(Authentication authentication) {
+    public List<Map<String, Object>> myGiftInvitations(Authentication authentication) {
         return service.myGiftInvitations(authentication.getName());
     }
 
     @GetMapping("/events")
-    public java.util.List<ResaleEventSummary> events() { return service.publicEvents(); }
+    public List<ResaleEventSummary> events() { return service.publicEvents(); }
 
     @GetMapping("/events/{eventId}/listings")
     public Page<ListingResponse> eventListings(@PathVariable String eventId, Pageable pageable, Authentication authentication) {
@@ -81,7 +100,7 @@ public class TicketListingController {
                 .body(service.reserveListing(authentication.getName(), key, listingId, request == null ? null : request.ticketIds()));
     }
 
-    public record ReserveListingRequest(java.util.List<String> ticketIds) {}
+    public record ReserveListingRequest(List<String> ticketIds) {}
 
     @PostMapping("/listings/{listingId}/cancel-reservation")
     public ResponseEntity<Void> cancelReservation(@PathVariable String listingId, Authentication authentication) {

@@ -36,3 +36,10 @@ eureka:
 logging:
   level:
     org.springframework.security: TRACE
+
+checkin:
+  window:
+    enabled: ${CHECKIN_WINDOW_ENABLED:false}
+    open-before-minutes: ${CHECKIN_WINDOW_OPEN_BEFORE_MINUTES:180}
+    close-after-end-minutes: ${CHECKIN_WINDOW_CLOSE_AFTER_END_MINUTES:120}
+    fail-open: ${CHECKIN_WINDOW_FAIL_OPEN:true}

@@ -13,6 +13,7 @@ public class TicketCheckinDTO {
     private String seatName;
     private String ticketTypeName;
     private String status; // checkin status
+    private String code;
     private LocalDateTime checkedInAt;
     private String showtimeId;
     private String ownerId;
