@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haloticket.ticket_service.entity.*;
 import com.haloticket.ticket_service.enums.*;
 import com.haloticket.ticket_service.repository.*;
+import com.haloticket.ticket_service.util.GeneralAdmissionSeatIds;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -69,12 +70,11 @@ public class TicketEventListener {
             types.put(type.getId(), type);
             if (item.hasNonNull("unitPrice")) prices.put(type.getId(), item.get("unitPrice").decimalValue());
         }
+        String bookingCode = text(booking, "bookingCode");
+
         List<Ticket> existing = ticketRepository.findByBookingId(bookingId);
-        if (!existing.isEmpty()) {
-            if (existing.size() != purchased) {
-                throw new IllegalStateException("Existing ticket count differs from purchased quantity for booking " + bookingId);
-            }
-            log.info("Tickets already issued for bookingId {}", bookingId);
+        if (!existing.isEmpty() && existing.size() == purchased) {
+            log.info("All {} tickets already issued for bookingId {}", purchased, bookingId);
             return;
         }
 
@@ -95,12 +95,15 @@ public class TicketEventListener {
                     }).orElse(null);
         }
 
+        Map<String, Integer> sequencePerType = new HashMap<>();
         List<Map<String, Object>> details = new ArrayList<>();
         for (String seatId : seatIds) {
             Seat seat = seatRepository.findById(seatId).orElse(null);
             JsonNode mapSeat = findLayoutSeat(layout, seatId);
-            boolean ga = "GENERAL_ADMISSION".equals(seatId) || seatId.contains("-GA-");
-            if (seat == null && mapSeat == null && !ga) throw new IllegalArgumentException("Seat not found in layout: " + seatId);
+            boolean ga = GeneralAdmissionSeatIds.isGeneralAdmission(seatId);
+            if (seat == null && mapSeat == null && !ga) {
+                throw new IllegalArgumentException("Seat not found in layout: " + seatId);
+            }
 
             String section = null, row = null, number = null, mappedTypeId = null;
             if (seat != null) {
@@ -131,9 +134,14 @@ public class TicketEventListener {
             } else if (remaining.size() == 1) {
                 type = types.values().iterator().next();
             } else if (ga) {
-                type = remaining.entrySet().stream().filter(e -> e.getValue() > 0)
-                        .map(e -> types.get(e.getKey())).findFirst()
-                        .orElseThrow(() -> new IllegalArgumentException("No purchased type for GA seat"));
+                String extractedTypeId = GeneralAdmissionSeatIds.extractTicketTypeId(seatId);
+                if (extractedTypeId != null && remaining.getOrDefault(extractedTypeId, 0) > 0) {
+                    type = types.get(extractedTypeId);
+                } else {
+                    type = remaining.entrySet().stream().filter(e -> e.getValue() > 0)
+                            .map(e -> types.get(e.getKey())).findFirst()
+                            .orElseThrow(() -> new IllegalArgumentException("No purchased type for GA seat"));
+                }
             } else {
                 throw new IllegalArgumentException("Seat has no ticket type: " + seatId);
             }
@@ -141,15 +149,36 @@ public class TicketEventListener {
                 throw new IllegalArgumentException("Seat count exceeds purchased quantity for type " + type.getId());
             }
             remaining.put(type.getId(), remaining.get(type.getId()) - 1);
-            details.add(issueSingleTicket(bookingId, customerId, eventId, showtimeId, type,
-                    prices.get(type.getId()), seat, seatId, section, row, number));
+
+            int seq = sequencePerType.merge(type.getId(), 1, Integer::sum);
+            String issueKey = bookingId + ":" + type.getId() + ":" + seq;
+            boolean isGa = ga;
+
+            Optional<Ticket> existingTicketOpt = ticketRepository.findByIssueKey(issueKey);
+            if (existingTicketOpt.isPresent()) {
+                Ticket existingTicket = existingTicketOpt.get();
+                log.info("Ticket with issueKey {} already exists (idempotent skip), reusing ticket {}", issueKey, existingTicket.getId());
+                details.add(buildTicketDetail(existingTicket, type, prices.get(type.getId()), seatId, section, row, number, isGa));
+            } else {
+                details.add(issueSingleTicket(bookingId, bookingCode, customerId, eventId, showtimeId, type,
+                        prices.get(type.getId()), seat, seatId, section, row, number, isGa, issueKey));
+            }
         }
         for (Map.Entry<String, Integer> entry : remaining.entrySet()) {
             TicketType type = types.get(entry.getKey());
             for (int i = 0; i < entry.getValue(); i++) {
-                details.add(issueSingleTicket(bookingId, customerId, eventId, showtimeId, type,
-                        prices.get(type.getId()), null, "GENERAL_ADMISSION_" + type.getId() + "_" + i,
-                        null, null, null));
+                int seq = sequencePerType.merge(type.getId(), 1, Integer::sum);
+                String issueKey = bookingId + ":" + type.getId() + ":" + seq;
+
+                Optional<Ticket> existingTicketOpt = ticketRepository.findByIssueKey(issueKey);
+                if (existingTicketOpt.isPresent()) {
+                    Ticket existingTicket = existingTicketOpt.get();
+                    log.info("Ticket with issueKey {} already exists (idempotent skip), reusing ticket {}", issueKey, existingTicket.getId());
+                    details.add(buildTicketDetail(existingTicket, type, prices.get(type.getId()), null, null, null, null, true));
+                } else {
+                    details.add(issueSingleTicket(bookingId, bookingCode, customerId, eventId, showtimeId, type,
+                            prices.get(type.getId()), null, null, null, null, null, true, issueKey));
+                }
             }
         }
         if (details.size() != purchased) throw new IllegalStateException("Issued count does not match purchased count");
@@ -183,32 +212,52 @@ public class TicketEventListener {
         return null;
     }
 
-    private Map<String, Object> issueSingleTicket(String bookingId, String customerId, String eventId,
+    private Map<String, Object> issueSingleTicket(String bookingId, String bookingCode, String customerId, String eventId,
             String showtimeId, TicketType type, BigDecimal price, Seat seat, String seatId,
-            String section, String row, String number) {
-        String qrToken = generateQrToken(bookingId, customerId, seatId);
-        Ticket ticket = ticketRepository.save(Ticket.builder().bookingId(bookingId).ownerId(customerId)
-                .eventId(eventId).showtimeId(showtimeId).ticketType(type).seat(seat)
-                .seatReference(seatId).seatSection(section).seatRowLabel(row).seatNumberLabel(number)
-                .originalPrice(BigDecimal.valueOf(type.getPrice())).purchasePrice(price)
-                .acquisitionType("PRIMARY").qrCodeHash(qrToken).qrVersion(1)
-                .status(TicketStatus.VALID).issuedAt(LocalDateTime.now()).build());
-        if (seat != null) {
+            String section, String row, String number, boolean isGa, String issueKey) {
+        String qrToken = generateQrToken(bookingId, customerId, isGa ? issueKey : seatId);
+        Ticket ticket = ticketRepository.save(Ticket.builder()
+                .bookingId(bookingId)
+                .issueKey(issueKey)
+                .ownerId(customerId)
+                .eventId(eventId)
+                .showtimeId(showtimeId)
+                .ticketType(type)
+                .seat(isGa ? null : seat)
+                .seatReference(isGa ? null : seatId)
+                .seatSection(isGa ? null : section)
+                .seatRowLabel(isGa ? null : row)
+                .seatNumberLabel(isGa ? null : number)
+                .originalPrice(BigDecimal.valueOf(type.getPrice()))
+                .purchasePrice(price)
+                .acquisitionType("PRIMARY")
+                .qrCodeHash(qrToken)
+                .qrVersion(1)
+                .status(TicketStatus.VALID)
+                .issuedAt(LocalDateTime.now())
+                .build());
+        if (seat != null && !isGa) {
             seat.setSeatStatus(SeatStatus.SOLD);
             seatRepository.save(seat);
         }
-        if (type.getTotalQuantity() != null) {
-            type.setTotalQuantity(Math.max(0, type.getTotalQuantity() - 1));
-            ticketTypeRepository.save(type);
+        // Atomic stock decrement
+        int updated = ticketTypeRepository.decrementTotalQuantityAtomic(type.getId());
+        if (updated == 0) {
+            log.error("[OVERSOLD_ON_ISSUE] Total quantity exhausted for ticketTypeId={} on bookingCode={}", type.getId(), bookingCode);
         }
+        return buildTicketDetail(ticket, type, price, seatId, section, row, number, isGa);
+    }
+
+    private Map<String, Object> buildTicketDetail(Ticket ticket, TicketType type, BigDecimal price,
+            String seatId, String section, String row, String number, boolean isGa) {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("ticketId", ticket.getId());
         detail.put("ticketTypeId", type.getId());
         detail.put("ticketTypeName", type.getName());
-        detail.put("seatId", seatId);
-        detail.put("section", section);
-        detail.put("row", row);
-        detail.put("seat", number);
+        detail.put("seatId", isGa ? null : (ticket.getSeat() != null ? ticket.getSeat().getId() : seatId));
+        detail.put("section", isGa ? null : section);
+        detail.put("row", isGa ? null : row);
+        detail.put("seat", isGa ? null : number);
         detail.put("price", price == null ? type.getPrice() : price);
         return detail;
     }

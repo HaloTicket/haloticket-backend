@@ -46,6 +46,9 @@ public class Ticket {
     @Column(name = "booking_id")
     private String bookingId;
 
+    @Column(name = "issue_key", unique = true)
+    private String issueKey;
+
     @Column(name = "owner_id", nullable = false)
     private String ownerId;
 

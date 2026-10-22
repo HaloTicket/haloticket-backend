@@ -14,12 +14,28 @@ import org.springframework.kafka.core.*;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.common.TopicPartition;
+import org.springframework.kafka.config.TopicBuilder;
+import org.springframework.kafka.listener.CommonErrorHandler;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.util.backoff.FixedBackOff;
+
 @Configuration
 @EnableKafka
 public class KafkaConfig {
 
     @Value("${spring.kafka.bootstrap-servers:${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}}")
     private String bootstrapServers;
+
+    @Bean
+    public NewTopic bookingConfirmedDltTopic() {
+        return TopicBuilder.name("haloticket.booking.confirmed.v1.DLT")
+                .partitions(1)
+                .replicas(1)
+                .build();
+    }
 
     @Bean
     public ProducerFactory<String, String> producerFactory() {
@@ -47,9 +63,20 @@ public class KafkaConfig {
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory() {
+    public CommonErrorHandler kafkaErrorHandler(KafkaOperations<String, String> kafkaOperations) {
+        DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaOperations,
+                (record, ex) -> new TopicPartition(record.topic() + ".DLT", record.partition()));
+        // Keep 10 retries with 1000ms fixed backoff as in current behavior before sending to DLT
+        return new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 10L));
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
+            ConsumerFactory<String, String> consumerFactory,
+            CommonErrorHandler kafkaErrorHandler) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(consumerFactory());
+        factory.setConsumerFactory(consumerFactory);
+        factory.setCommonErrorHandler(kafkaErrorHandler);
         return factory;
     }
 }

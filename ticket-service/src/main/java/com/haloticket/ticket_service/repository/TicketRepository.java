@@ -19,6 +19,10 @@ import java.time.LocalDateTime;
 public interface TicketRepository extends JpaRepository<Ticket, String> {
     List<Ticket> findByBookingId(String bookingId);
     
+    Optional<Ticket> findByIssueKey(String issueKey);
+
+    boolean existsByIssueKey(String issueKey);
+
     Optional<Ticket> findByQrCodeHash(String qrCodeHash);
 
     Page<Ticket> findByOwnerIdOrderByIssuedAtDesc(String ownerId, Pageable pageable);
