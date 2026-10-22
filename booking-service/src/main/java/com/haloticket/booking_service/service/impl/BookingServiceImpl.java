@@ -15,6 +15,9 @@ import com.haloticket.booking_service.repository.BookingRepository;
 import com.haloticket.booking_service.repository.OutboxEventRepository;
 import com.haloticket.booking_service.repository.SeatReservationRepository;
 import com.haloticket.booking_service.service.BookingService;
+import com.haloticket.booking_service.client.TicketServiceClient;
+import com.haloticket.booking_service.dto.response.BookingDetailResponse;
+import com.haloticket.booking_service.dto.response.TicketTypeDto;
 import org.redisson.client.codec.StringCodec;
 
 import com.haloticket.booking_service.client.EventServiceClient;
@@ -52,6 +55,7 @@ public class BookingServiceImpl implements BookingService {
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
     private final EventServiceClient eventServiceClient;
+    private final TicketServiceClient ticketServiceClient;
 
     @Override
     @Transactional
@@ -295,6 +299,54 @@ public class BookingServiceImpl implements BookingService {
                 .totalAmount(booking.getTotalAmount())
                 .status(booking.getStatus())
                 .expiredAt(booking.getExpiredAt())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BookingDetailResponse getBookingByCode(String bookingCode, String customerId) {
+        Booking booking = bookingRepository.findByBookingCode(bookingCode)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND"));
+
+        if (booking.getCustomerId() == null || !booking.getCustomerId().equals(customerId)) {
+            // return 404 instead of 403 to prevent enumeration
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND");
+        }
+
+        Map<String, String> typeNames = new HashMap<>();
+        List<BookingDetailResponse.BookingItemDetailResponse> itemDetails = new ArrayList<>();
+        if (booking.getItems() != null) {
+            for (BookingItem item : booking.getItems()) {
+                String typeName = typeNames.computeIfAbsent(item.getTicketTypeId(), id -> {
+                    try {
+                        TicketTypeDto dto = ticketServiceClient.getTicketTypeById(id);
+                        if (dto != null && dto.getName() != null && !dto.getName().isBlank()) {
+                            return dto.getName();
+                        }
+                    } catch (Exception e) {
+                        log.warn("Could not fetch ticket type name for id {}: {}", id, e.getMessage());
+                    }
+                    return "Vé sự kiện";
+                });
+
+                itemDetails.add(BookingDetailResponse.BookingItemDetailResponse.builder()
+                        .ticketTypeId(item.getTicketTypeId())
+                        .ticketTypeName(typeName)
+                        .quantity(item.getQuantity())
+                        .unitPrice(item.getUnitPrice())
+                        .build());
+            }
+        }
+
+        return BookingDetailResponse.builder()
+                .id(booking.getId())
+                .bookingCode(booking.getBookingCode())
+                .status(booking.getStatus())
+                .eventId(booking.getEventId())
+                .showtimeId(booking.getShowtimeId())
+                .totalAmount(booking.getTotalAmount())
+                .createdAt(booking.getCreatedAt())
+                .items(itemDetails)
                 .build();
     }
 }
