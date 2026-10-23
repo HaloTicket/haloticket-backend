@@ -51,7 +51,8 @@ class CheckinHardeningServiceTest {
                 ticketRepository,
                 checkInAttemptRepository,
                 eventScheduleService,
-                windowProperties
+                windowProperties,
+                new CheckinAttemptRecorder(checkInAttemptRepository, ticketRepository)
         );
     }
 
@@ -70,9 +71,9 @@ class CheckinHardeningServiceTest {
                 .satisfies(ex -> assertThat(((CheckinException) ex).getCode()).isEqualTo("TICKET_NOT_FOUND"));
 
         ArgumentCaptor<CheckInAttempt> captor = ArgumentCaptor.forClass(CheckInAttempt.class);
-        verify(checkInAttemptRepository).save(captor.capture());
+        verify(checkInAttemptRepository).saveAndFlush(captor.capture());
         assertThat(captor.getValue().getTicket()).isNull();
-        assertThat(captor.getValue().getResult()).isEqualTo(CheckInAttemptResult.FAILED_SIGNATURE);
+        assertThat(captor.getValue().getResult()).isEqualTo(CheckInAttemptResult.TICKET_NOT_FOUND);
         assertThat(captor.getValue().getFailureReason()).contains("Ticket not found");
     }
 
@@ -94,7 +95,7 @@ class CheckinHardeningServiceTest {
                 .isInstanceOf(CheckinException.class)
                 .satisfies(ex -> assertThat(((CheckinException) ex).getCode()).isEqualTo("WRONG_EVENT"));
 
-        verify(checkInAttemptRepository).save(argThat(a -> a.getResult() == CheckInAttemptResult.FAILED_SIGNATURE));
+        verify(checkInAttemptRepository).saveAndFlush(argThat(a -> a.getResult() == CheckInAttemptResult.WRONG_EVENT));
     }
 
     @Test
@@ -117,7 +118,7 @@ class CheckinHardeningServiceTest {
                 .isInstanceOf(CheckinException.class)
                 .satisfies(ex -> assertThat(((CheckinException) ex).getCode()).isEqualTo("WRONG_SHOWTIME"));
 
-        verify(checkInAttemptRepository).save(argThat(a -> a.getResult() == CheckInAttemptResult.FAILED_SIGNATURE));
+        verify(checkInAttemptRepository).saveAndFlush(argThat(a -> a.getResult() == CheckInAttemptResult.WRONG_SHOWTIME));
     }
 
     @Test
@@ -146,7 +147,7 @@ class CheckinHardeningServiceTest {
                 .isInstanceOf(CheckinException.class)
                 .satisfies(ex -> assertThat(((CheckinException) ex).getCode()).isEqualTo("OUTSIDE_CHECKIN_WINDOW"));
 
-        verify(checkInAttemptRepository).save(argThat(a -> a.getResult() == CheckInAttemptResult.OUTSIDE_CHECKIN_WINDOW));
+        verify(checkInAttemptRepository).saveAndFlush(argThat(a -> a.getResult() == CheckInAttemptResult.OUTSIDE_CHECKIN_WINDOW));
     }
 
     @Test
@@ -217,7 +218,7 @@ class CheckinHardeningServiceTest {
         // Verify checkins row is NEVER saved
         verify(checkinRepository, never()).save(any());
         // Verify attempt is recorded
-        verify(checkInAttemptRepository).save(argThat(a -> a.getResult() == CheckInAttemptResult.FAILED_SIGNATURE));
+        verify(checkInAttemptRepository).saveAndFlush(argThat(a -> a.getResult() == CheckInAttemptResult.TICKET_LOCKED));
     }
 
     @Test

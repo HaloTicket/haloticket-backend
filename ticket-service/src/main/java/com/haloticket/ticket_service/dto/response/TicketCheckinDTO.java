@@ -2,6 +2,7 @@ package com.haloticket.ticket_service.dto.response;
 
 import lombok.Builder;
 import lombok.Data;
+import lombok.ToString;
 import java.time.LocalDateTime;
 
 @Data
@@ -9,6 +10,7 @@ import java.time.LocalDateTime;
 public class TicketCheckinDTO {
     private String checkinId;
     private String ticketId;
+    @ToString.Exclude
     private String qrCodeHash;
     private String seatName;
     private String ticketTypeName;

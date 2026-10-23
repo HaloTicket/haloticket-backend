@@ -37,6 +37,7 @@ public class CheckinService {
     private final CheckInAttemptRepository checkInAttemptRepository;
     private final EventScheduleService eventScheduleService;
     private final CheckinWindowProperties checkinWindowProperties;
+    private final CheckinAttemptRecorder attemptRecorder;
 
     private void recordAttempt(Ticket ticket, CheckinRequest request, CheckInAttemptResult result, String failureReason) {
         String staffId = request != null ? request.getStaffAssignmentId() : null;
@@ -58,6 +59,28 @@ public class CheckinService {
                 .attemptedAt(LocalDateTime.now())
                 .build();
         checkInAttemptRepository.save(attempt);
+    }
+
+    /**
+     * Stores the attempt of a scan that is refused with a CheckinException (or answered as locked). It must outlive
+     * the exception, so it is written in its own transaction. It never throws: if the row cannot be stored (for
+     * example a CHECK constraint that does not know the value yet) it is logged and the app still gets the business
+     * answer it always got.
+     */
+    private void recordRefusedScan(String ticketId, CheckinRequest request, CheckInAttemptResult result, String failureReason) {
+        try {
+            attemptRecorder.write(ticketId, request, result, failureReason);
+        } catch (Exception e) {
+            log.error("[CHECKIN_ATTEMPT_LOST] could not store attempt result={} ticketId={}: {}",
+                    result, ticketId, e.getMessage());
+        }
+    }
+
+    /** Text taken from the request is stored in a log-like column: cut it short and drop control characters. */
+    private static String requested(String value) {
+        if (value == null) return "-";
+        String clean = value.replaceAll("[\\p{Cntrl}]", "?");
+        return clean.length() > 60 ? clean.substring(0, 60) + "..." : clean;
     }
 
     private void validateCheckinWindow(Ticket ticket, CheckinRequest request) {
@@ -88,7 +111,7 @@ public class CheckinService {
                     if (now.isBefore(windowOpen) || now.isAfter(windowClose)) {
                         log.warn("Check-in outside window for ticket {}. Window: [{} to {}], Now: {}",
                                 ticket.getId(), windowOpen, windowClose, now);
-                        recordAttempt(ticket, request, CheckInAttemptResult.OUTSIDE_CHECKIN_WINDOW, "Outside checkin window");
+                        recordRefusedScan(ticket.getId(), request, CheckInAttemptResult.OUTSIDE_CHECKIN_WINDOW, "Outside checkin window");
                         throw new CheckinException("OUTSIDE_CHECKIN_WINDOW", "Outside check-in window");
                     }
                 }
@@ -98,7 +121,7 @@ public class CheckinService {
         } catch (Exception e) {
             log.warn("Failed to retrieve event schedule for window validation: {}", e.getMessage());
             if (!checkinWindowProperties.isFailOpen()) {
-                recordAttempt(ticket, request, CheckInAttemptResult.OUTSIDE_CHECKIN_WINDOW, "Check-in window verification failed (fail-open=false)");
+                recordRefusedScan(ticket.getId(), request, CheckInAttemptResult.WINDOW_UNVERIFIED, "Check-in window verification failed (fail-open=false)");
                 throw new CheckinException("OUTSIDE_CHECKIN_WINDOW", "Check-in window verification failed");
             }
         }
@@ -110,12 +133,14 @@ public class CheckinService {
                 .orElse(null);
 
         if (ticket == null) {
-            recordAttempt(null, request, CheckInAttemptResult.FAILED_SIGNATURE, "Ticket not found");
+            recordRefusedScan(null, request, CheckInAttemptResult.TICKET_NOT_FOUND,
+                    "Ticket not found (event=" + requested(request.getEventId()) + ", showtime=" + requested(request.getShowtimeId()) + ")");
             throw new CheckinException("TICKET_NOT_FOUND", "Ticket not found");
         }
 
         if (!ticket.getEventId().equals(request.getEventId())) {
-            recordAttempt(ticket, request, CheckInAttemptResult.FAILED_SIGNATURE, "Ticket does not belong to this event");
+            recordRefusedScan(ticket.getId(), request, CheckInAttemptResult.WRONG_EVENT,
+                    "Ticket does not belong to this event (scanned at event=" + requested(request.getEventId()) + ")");
             throw new CheckinException("WRONG_EVENT", "Ticket does not belong to this event");
         }
         
@@ -123,7 +148,8 @@ public class CheckinService {
             String ticketShowtime = ticket.getShowtimeId() != null ? ticket.getShowtimeId()
                     : (ticket.getTicketType() != null ? ticket.getTicketType().getShowtimeId() : null);
             if (ticketShowtime != null && !ticketShowtime.equals(request.getShowtimeId())) {
-                recordAttempt(ticket, request, CheckInAttemptResult.FAILED_SIGNATURE, "Ticket does not belong to this showtime");
+                recordRefusedScan(ticket.getId(), request, CheckInAttemptResult.WRONG_SHOWTIME,
+                        "Ticket does not belong to this showtime (scanned at showtime=" + requested(request.getShowtimeId()) + ")");
                 throw new CheckinException("WRONG_SHOWTIME", "Ticket does not belong to this showtime");
             }
         }
@@ -142,7 +168,7 @@ public class CheckinService {
         }
 
         if (ticket.getStatus() != TicketStatus.VALID) {
-            recordAttempt(ticket, request, CheckInAttemptResult.FAILED_SIGNATURE, "Ticket status is not VALID: " + ticket.getStatus());
+            recordRefusedScan(ticket.getId(), request, CheckInAttemptResult.TICKET_LOCKED, "Ticket status is not VALID: " + ticket.getStatus());
             // CRITICAL: Do NOT insert into checkins when status is INVALID!
             return buildFallbackDTO(infoOf(ticket), CheckInStatus.INVALID, "TICKET_LOCKED");
         }
@@ -198,7 +224,7 @@ public class CheckinService {
                 }
                 return buildFallbackDTO(refreshed, CheckInStatus.DUPLICATED, "ALREADY_USED");
             } else {
-                recordAttempt(refreshedTicket, request, CheckInAttemptResult.FAILED_SIGNATURE, "Ticket status is not VALID: " + refreshedTicket.getStatus());
+                recordRefusedScan(refreshedTicket.getId(), request, CheckInAttemptResult.TICKET_LOCKED, "Ticket status is not VALID: " + refreshedTicket.getStatus());
                 return buildFallbackDTO(refreshed, CheckInStatus.INVALID, "TICKET_LOCKED");
             }
         }

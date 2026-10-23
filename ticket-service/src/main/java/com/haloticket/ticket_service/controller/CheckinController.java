@@ -18,7 +18,6 @@ public class CheckinController {
 
     @PostMapping
     public ResponseEntity<TicketCheckinDTO> processCheckin(@RequestBody CheckinRequest request) {
-        System.out.println("Received CheckinRequest: " + request);
         TicketCheckinDTO result = checkinService.processCheckin(request);
         return ResponseEntity.ok(result);
     }

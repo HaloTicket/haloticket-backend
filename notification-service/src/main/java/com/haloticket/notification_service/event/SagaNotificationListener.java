@@ -140,7 +140,8 @@ public class SagaNotificationListener {
             String sagaId = node.path("sagaId").asText();
             String recipientUserId = node.path("recipientUserId").asText();
             if (email.isBlank() || token.isBlank()) {
-                log.error("Gift invitation missing email or token, skipping: {}", payload);
+                // the payload holds the invitation token; log only which saga it belongs to
+                log.error("Gift invitation missing email or token, skipping saga {}", sagaId);
                 return;
             }
 

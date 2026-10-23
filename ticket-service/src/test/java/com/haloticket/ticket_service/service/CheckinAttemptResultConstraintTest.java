@@ -26,19 +26,21 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * The production table was created when CheckInAttemptResult had three values, and ddl-auto: update never touches a
- * CHECK constraint afterwards. This test rebuilds that old constraint in an in-memory database, shows the database
- * rejecting the newer value, and then applies the real migration file.
+ * Production's checkin_attempts.result CHECK constraint was created by Hibernate with the values the enum had then, and
+ * ddl-auto: update never changes it. This test rebuilds the older constraint in an in-memory database, shows the
+ * database rejecting newer values, and applies the real migration files in order.
  *
  * Limits: the database here is H2 in PostgreSQL mode, not PostgreSQL. It proves the constraint behaviour and that the
- * statements in the migration file are valid and repeatable, not PostgreSQL's own checks (BEGIN/COMMIT are skipped
- * and the pg_constraint verification query is not executed). Run the file against a real PostgreSQL as well.
+ * statements in the migration files are valid and repeatable, not PostgreSQL's own checks (BEGIN/COMMIT are skipped and
+ * the pg_constraint verification queries are not executed). The files were also run against a real PostgreSQL.
  */
 @DataJpaTest(properties = {
         "spring.jpa.hibernate.ddl-auto=create-drop",
@@ -59,8 +61,15 @@ class CheckinAttemptResultConstraintTest {
     @EnableJpaRepositories("com.haloticket.ticket_service.repository")
     static class TestApp {}
 
-    private static final Path MIGRATION = Path.of("..", "haloticket-infrastructure", "postgres", "migrations",
-            "20261025_checkin_attempts_result_check.sql");
+    private static final Path MIGRATIONS = Path.of("..", "haloticket-infrastructure", "postgres", "migrations");
+    private static final Path FIRST = MIGRATIONS.resolve("20261025_checkin_attempts_result_check.sql");
+    private static final Path SECOND = MIGRATIONS.resolve("20261026_checkin_attempts_result_values.sql");
+
+    private static final Set<CheckInAttemptResult> THREE_ORIGINAL = EnumSet.of(CheckInAttemptResult.SUCCESS,
+            CheckInAttemptResult.FAILED_SIGNATURE, CheckInAttemptResult.FAILED_ALREADY_IN);
+    private static final Set<CheckInAttemptResult> NEWER = EnumSet.of(CheckInAttemptResult.TICKET_NOT_FOUND,
+            CheckInAttemptResult.WRONG_EVENT, CheckInAttemptResult.WRONG_SHOWTIME, CheckInAttemptResult.TICKET_LOCKED,
+            CheckInAttemptResult.WINDOW_UNVERIFIED);
 
     @Autowired JdbcTemplate jdbc;
     @Autowired CheckInAttemptRepository attempts;
@@ -68,8 +77,8 @@ class CheckinAttemptResultConstraintTest {
     @PersistenceContext EntityManager em;
 
     @BeforeEach
-    void installTheOldProductionConstraint() {
-        // Drop whatever the current enum made Hibernate generate and put back what production has.
+    void installTheOriginalProductionConstraint() {
+        // Drop whatever the current enum made Hibernate generate and put back what production was created with.
         List<String> checks = jdbc.queryForList(
                 "SELECT constraint_name FROM information_schema.table_constraints "
                         + "WHERE table_name = 'CHECKIN_ATTEMPTS' AND constraint_type = 'CHECK'", String.class);
@@ -91,13 +100,15 @@ class CheckinAttemptResultConstraintTest {
         });
     }
 
-    /** The statements of the migration that run before the "VERIFY" section, without BEGIN/COMMIT. */
-    private List<String> migrationStatements() throws IOException {
-        String sql = Files.readString(MIGRATION);
+    /** The statements of a migration that run before its "VERIFY" section, without BEGIN/COMMIT. */
+    private List<String> statementsOf(Path migration) throws IOException {
+        String sql = Files.readString(migration);
         String executable = sql.substring(0, sql.indexOf("-- VERIFY"));
+        // comments first: a ';' inside a comment must not split a statement
+        String withoutComments = executable.lines().filter(line -> !line.strip().startsWith("--")).reduce("", (a, b) -> a + "\n" + b);
         List<String> statements = new ArrayList<>();
-        for (String raw : executable.split(";")) {
-            String statement = raw.lines().filter(line -> !line.strip().startsWith("--")).reduce("", (a, b) -> a + " " + b).strip();
+        for (String raw : withoutComments.split(";")) {
+            String statement = raw.strip().replaceAll("\\s+", " ");
             if (!statement.isEmpty() && !statement.equalsIgnoreCase("BEGIN") && !statement.equalsIgnoreCase("COMMIT")) {
                 statements.add(statement);
             }
@@ -105,35 +116,60 @@ class CheckinAttemptResultConstraintTest {
         return statements;
     }
 
-    @Test
-    void theOldConstraintAcceptsOnlyTheThreeOriginalValuesAndRejectsTheNewOne() {
-        save(CheckInAttemptResult.SUCCESS);
-        save(CheckInAttemptResult.FAILED_SIGNATURE);
-        save(CheckInAttemptResult.FAILED_ALREADY_IN);
-
-        assertThatThrownBy(() -> save(CheckInAttemptResult.OUTSIDE_CHECKIN_WINDOW))
-                .isInstanceOf(PersistenceException.class)
-                .hasStackTraceContaining("CHECKIN_ATTEMPTS_RESULT_CHECK");
+    private void apply(Path migration) throws IOException {
+        List<String> statements = statementsOf(migration);
+        assertThat(statements).hasSize(2);
+        statements.forEach(jdbc::execute);
     }
 
     @Test
-    void afterTheMigrationEveryEnumValueIsAcceptedAndTheMigrationCanRunAgain() throws IOException {
-        List<String> statements = migrationStatements();
-        assertThat(statements).hasSize(2);
+    void theOriginalConstraintAcceptsOnlyTheThreeOriginalValues() {
+        THREE_ORIGINAL.forEach(this::save);
 
-        statements.forEach(jdbc::execute);
+        for (CheckInAttemptResult value : EnumSet.complementOf(EnumSet.copyOf(THREE_ORIGINAL))) {
+            assertThatThrownBy(() -> save(value)).as(value.name())
+                    .isInstanceOf(PersistenceException.class)
+                    .hasStackTraceContaining("CHECKIN_ATTEMPTS_RESULT_CHECK");
+        }
+    }
+
+    @Test
+    void theFirstMigrationAddsOnlyTheWindowValueAndStillRejectsTheNewerOnes() throws IOException {
+        apply(FIRST);
+
+        save(CheckInAttemptResult.OUTSIDE_CHECKIN_WINDOW);
+        for (CheckInAttemptResult value : NEWER) {
+            assertThatThrownBy(() -> save(value)).as(value.name()).isInstanceOf(PersistenceException.class);
+        }
+    }
+
+    @Test
+    void afterBothMigrationsEveryEnumValueIsAcceptedAndTheSecondOneCanRunAgain() throws IOException {
+        apply(FIRST);
+        apply(SECOND);
+
         for (CheckInAttemptResult value : CheckInAttemptResult.values()) {
             save(value);
         }
         assertThat(attempts.count()).isEqualTo(CheckInAttemptResult.values().length);
 
-        statements.forEach(jdbc::execute); // second run: nothing breaks
-        save(CheckInAttemptResult.OUTSIDE_CHECKIN_WINDOW);
+        apply(SECOND);
+        for (CheckInAttemptResult value : CheckInAttemptResult.values()) {
+            save(value);
+        }
     }
 
     @Test
-    void theMigrationListsEveryValueOfTheEnum() throws IOException {
-        String sql = Files.readString(MIGRATION);
+    void theSecondMigrationAloneIsEnoughOnAnyEarlierState() throws IOException {
+        apply(SECOND);
+        for (CheckInAttemptResult value : CheckInAttemptResult.values()) {
+            save(value);
+        }
+    }
+
+    @Test
+    void theLatestMigrationListsEveryValueOfTheEnum() throws IOException {
+        String sql = Files.readString(SECOND);
         for (CheckInAttemptResult value : CheckInAttemptResult.values()) {
             assertThat(sql).as("migration must list " + value).contains("'" + value.name() + "'");
         }

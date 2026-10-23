@@ -62,7 +62,7 @@ import static org.mockito.Mockito.when;
         "spring.jpa.show-sql=false"
 })
 @Transactional(propagation = Propagation.NEVER)
-@Import({CheckinService.class, CheckinServiceJpaTest.Beans.class})
+@Import({CheckinService.class, CheckinAttemptRecorder.class, CheckinServiceJpaTest.Beans.class})
 class CheckinServiceJpaTest {
 
     @SpringBootConfiguration
@@ -261,6 +261,7 @@ class CheckinServiceJpaTest {
         assertThat(locked.getCode()).isEqualTo("TICKET_LOCKED");
         assertThat(locked.getTicketTypeName()).isEqualTo("VIP Standing");
         assertThat(checkins.findAll()).isEmpty();
+        assertThat(attempts.findAll()).extracting(CheckInAttempt::getResult).containsExactly(CheckInAttemptResult.TICKET_LOCKED);
         assertThat(statusOf(t)).isEqualTo(TicketStatus.LOCKED_FOR_RESALE);
 
         tx.executeWithoutResult(s -> em.find(Ticket.class, t.getId()).setStatus(TicketStatus.VALID));
@@ -294,7 +295,16 @@ class CheckinServiceJpaTest {
         assertThatThrownBy(() -> service.processCheckin(scan("does-not-exist")))
                 .isInstanceOfSatisfying(CheckinException.class, e -> assertThat(e.getCode()).isEqualTo("TICKET_NOT_FOUND"));
 
-        // Note: the attempt row of a refused scan is rolled back together with the exception today (not asserted here).
+        // every refused scan leaves exactly one attempt row, written in its own transaction so the exception cannot undo it
+        assertThat(attempts.findAll()).extracting(CheckInAttempt::getResult)
+                .containsExactlyInAnyOrder(CheckInAttemptResult.WRONG_EVENT, CheckInAttemptResult.WRONG_SHOWTIME,
+                        CheckInAttemptResult.TICKET_NOT_FOUND);
+        CheckInAttempt unknown = attempts.findAll().stream()
+                .filter(a -> a.getResult() == CheckInAttemptResult.TICKET_NOT_FOUND).findFirst().orElseThrow();
+        assertThat(unknown.getTicket()).as("a code that matches no ticket is stored without a ticket").isNull();
+        assertThat(unknown.getFailureReason()).doesNotContain("does-not-exist");
+        assertThat(attempts.findAll().stream().filter(a -> a.getResult() != CheckInAttemptResult.TICKET_NOT_FOUND))
+                .allSatisfy(a -> assertThat(a.getTicket().getId()).isEqualTo(t.getId()));
         assertThat(checkins.findAll()).isEmpty();
         assertThat(statusOf(t)).isEqualTo(TicketStatus.VALID);
     }
@@ -312,10 +322,55 @@ class CheckinServiceJpaTest {
                 .isInstanceOfSatisfying(CheckinException.class, e -> assertThat(e.getCode()).isEqualTo("OUTSIDE_CHECKIN_WINDOW"));
         assertThat(statusOf(t)).isEqualTo(TicketStatus.VALID);
         assertThat(checkins.findAll()).isEmpty();
+        assertThat(attemptsWith(CheckInAttemptResult.OUTSIDE_CHECKIN_WINDOW)).isEqualTo(1);
 
         when(schedule.getEventSchedule(EVENT)).thenReturn(new EventServiceClient.EventDetailsResponse(
                 EVENT, LocalDateTime.now().minusMinutes(30), LocalDateTime.now().plusHours(3), List.of()));
         assertThat(service.processCheckin(scan("qr-window")).getCode()).isEqualTo("SUCCESS");
+    }
+
+    @Test
+    void windowThatCannotBeVerifiedAndFailsClosedIsRecordedAsUnverifiedButAnsweredAsOutsideTheWindow() {
+        window.setEnabled(true);
+        window.setFailOpen(false);
+        Ticket t = gaTicket("qr-unverified", TicketStatus.VALID);
+        when(schedule.getEventSchedule(EVENT)).thenThrow(new IllegalStateException("event-service down"));
+
+        assertThatThrownBy(() -> service.processCheckin(scan("qr-unverified")))
+                .isInstanceOfSatisfying(CheckinException.class, e -> assertThat(e.getCode()).isEqualTo("OUTSIDE_CHECKIN_WINDOW"));
+
+        assertThat(attempts.findAll()).extracting(CheckInAttempt::getResult).containsExactly(CheckInAttemptResult.WINDOW_UNVERIFIED);
+        assertThat(statusOf(t)).isEqualTo(TicketStatus.VALID);
+    }
+
+    @Test
+    void windowThatCannotBeVerifiedButFailsOpenLetsTheScanThrough() {
+        window.setEnabled(true);
+        window.setFailOpen(true);
+        gaTicket("qr-open", TicketStatus.VALID);
+        when(schedule.getEventSchedule(EVENT)).thenThrow(new IllegalStateException("event-service down"));
+
+        assertThat(service.processCheckin(scan("qr-open")).getCode()).isEqualTo("SUCCESS");
+        assertThat(attempts.findAll()).extracting(CheckInAttempt::getResult).containsExactly(CheckInAttemptResult.SUCCESS);
+    }
+
+    @Test
+    void everyOutcomeLeavesExactlyOneAttemptRowWithItsStaffAndDevice() {
+        gaTicket("qr-one-1", TicketStatus.VALID);
+        service.processCheckin(scan("qr-one-1"));                       // SUCCESS
+        service.processCheckin(scan("qr-one-1"));                       // FAILED_ALREADY_IN
+        gaTicket("qr-one-2", TicketStatus.LOCKED_FOR_TRANSFER);
+        service.processCheckin(scan("qr-one-2"));                       // TICKET_LOCKED
+        assertThatThrownBy(() -> service.processCheckin(scan("missing"))).isInstanceOf(CheckinException.class); // TICKET_NOT_FOUND
+
+        assertThat(attempts.findAll()).extracting(CheckInAttempt::getResult).containsExactlyInAnyOrder(
+                CheckInAttemptResult.SUCCESS, CheckInAttemptResult.FAILED_ALREADY_IN,
+                CheckInAttemptResult.TICKET_LOCKED, CheckInAttemptResult.TICKET_NOT_FOUND);
+        assertThat(attempts.findAll()).allSatisfy(a -> {
+            assertThat(a.getStaffAssignmentId()).isEqualTo("staff-1");
+            assertThat(a.getDeviceInfo()).isEqualTo("android");
+            assertThat(a.getAttemptedAt()).isNotNull();
+        });
     }
 
     // --- concurrency ------------------------------------------------------------------------------
