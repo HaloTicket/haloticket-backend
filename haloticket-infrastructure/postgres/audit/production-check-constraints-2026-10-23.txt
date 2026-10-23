@@ -1,0 +1,55 @@
+-- Production CHECK constraints, captured 2026-10-23 (read only):
+--   for db in user_db event_db ticket_db booking_db payment_db notification_db marketplace_db; do
+--     echo "-- DATABASE: $db"
+--     docker exec -i haloticket-postgres sh -c "psql -U \"\$POSTGRES_USER\" -d $db -At -F ' | '" <<'SQL'
+--       SELECT conrelid::regclass, conname, pg_get_constraintdef(oid)
+--       FROM pg_constraint WHERE contype = 'c' AND connamespace = 'public'::regnamespace ORDER BY 1, 2;
+--   SQL
+--   done > constraints_full.txt
+-- EnumCheckConstraintGuardTest compares every enum value in the code with this file: a value that production rejects must
+-- be covered by a migration. After you apply a migration on production, capture the file again and replace this one.
+-- DATABASE: user_db
+auth_otp_challenges | auth_otp_challenges_purpose_check | CHECK (((purpose)::text = ANY ((ARRAY['REGISTRATION'::character varying, 'PASSWORD_RESET'::character varying])::text[])))
+auth_otp_challenges | auth_otp_challenges_status_check | CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'VERIFIED'::character varying, 'CONSUMED'::character varying, 'EXPIRED'::character varying, 'LOCKED'::character varying])::text[])))
+ekyc_attempts | ekyc_attempts_status_check | CHECK (((status)::text = ANY ((ARRAY['CREATED'::character varying, 'PROCESSING'::character varying, 'PASSED'::character varying, 'FAILED'::character varying, 'MANUAL_REVIEW'::character varying, 'EXPIRED'::character varying, 'ERROR'::character varying])::text[])))
+-- DATABASE: event_db
+staff_assignments | staff_assignments_role_check | CHECK (((role)::text = ANY ((ARRAY['OWNER'::character varying, 'ADMIN'::character varying, 'MANAGER'::character varying, 'CHECKIN_STAFF'::character varying])::text[])))
+vouchers | vouchers_apply_scope_check | CHECK (((apply_scope)::text = ANY ((ARRAY['ALL'::character varying, 'LIMITED_SHOWTIMES'::character varying])::text[])))
+-- DATABASE: ticket_db
+checkin_attempts | checkin_attempts_result_check | CHECK (((result)::text = ANY ((ARRAY['SUCCESS'::character varying, 'FAILED_SIGNATURE'::character varying, 'FAILED_ALREADY_IN'::character varying, 'OUTSIDE_CHECKIN_WINDOW'::character varying, 'TICKET_NOT_FOUND'::character varying, 'WRONG_EVENT'::character varying, 'WRONG_SHOWTIME'::character varying, 'TICKET_LOCKED'::character varying, 'WINDOW_UNVERIFIED'::character varying])::text[])))
+checkins | checkins_status_check | CHECK (((status)::text = ANY ((ARRAY['VALID'::character varying, 'INVALID'::character varying, 'DUPLICATED'::character varying])::text[])))
+resale_listings | resale_listings_status_check | CHECK (((status)::text = ANY ((ARRAY['LISTED'::character varying, 'SOLD'::character varying, 'CANCELLED'::character varying])::text[])))
+seat_layouts | seat_layouts_status_check | CHECK (((status)::text = ANY ((ARRAY['DRAFT'::character varying, 'PUBLISHED'::character varying, 'ARCHIVED'::character varying])::text[])))
+seats | seats_seat_status_check | CHECK (((seat_status)::text = ANY ((ARRAY['AVAILABLE'::character varying, 'LOCKED'::character varying, 'SOLD'::character varying, 'BLOCKED'::character varying])::text[])))
+seats | seats_seat_type_check | CHECK (((seat_type)::text = ANY ((ARRAY['REGULAR'::character varying, 'VIP'::character varying, 'ACCESSIBLE'::character varying, 'RESTRICTED_VIEW'::character varying])::text[])))
+ticket_types | ticket_types_ticket_type_status_check | CHECK (((ticket_type_status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'SOLD_OUT'::character varying, 'HIDDEN'::character varying])::text[])))
+tickets | tickets_gift_transfer_count_check | CHECK ((gift_transfer_count >= 0))
+tickets | tickets_status_check | CHECK (((status)::text = ANY ((ARRAY['VALID'::character varying, 'USED'::character varying, 'TRANSFERED'::character varying, 'REVOKED'::character varying])::text[])))
+outbox_events | outbox_events_status_check | CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'PROCESSED'::character varying, 'FAILED'::character varying])::text[])))
+ticket_operations | ticket_operations_state_check | CHECK (((state)::text = ANY ((ARRAY['REQUESTED'::character varying, 'LOCKED'::character varying, 'RELEASE_REQUESTED'::character varying, 'RELEASED'::character varying, 'TRANSFERRED'::character varying, 'REJECTED'::character varying, 'CANCELLED'::character varying])::text[])))
+ticket_stock_reservations | ticket_stock_reservations_status_check | CHECK (((status)::text = ANY ((ARRAY['HELD'::character varying, 'CONSUMED'::character varying, 'RELEASED'::character varying, 'EXPIRED'::character varying])::text[])))
+-- DATABASE: booking_db
+bookings | bookings_status_check | CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'PAID'::character varying, 'CANCELLED'::character varying, 'EXPIRED'::character varying, 'REFUNDED'::character varying])::text[])))
+seat_reservations | seat_reservations_status_check | CHECK (((status)::text = ANY ((ARRAY['HOLDING'::character varying, 'CONFIRMED'::character varying, 'SOLD'::character varying, 'RELEASED'::character varying, 'CANCELLED'::character varying])::text[])))
+outbox_events | outbox_events_status_check | CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'PROCESSED'::character varying, 'FAILED'::character varying])::text[])))
+-- DATABASE: payment_db
+organizer_payout_accounts | organizer_payout_accounts_verification_status_check | CHECK (((verification_status)::text = ANY ((ARRAY['UNVERIFIED'::character varying, 'PENDING'::character varying, 'VERIFIED'::character varying, 'REJECTED'::character varying, 'REVOKED'::character varying])::text[])))
+payment_transactions | payment_transactions_status_check | CHECK (((status)::text = ANY ((ARRAY['SUCCESS'::character varying, 'FAILED'::character varying, 'PENDING_VERIFICATION'::character varying])::text[])))
+payments | payments_status_check | CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'SUCCESS'::character varying, 'FAILED'::character varying, 'REFUNDED'::character varying])::text[])))
+payouts | payouts_status_check | CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'PROCESSING'::character varying, 'COMPLETED'::character varying, 'FAILED'::character varying, 'DISPUTE'::character varying])::text[])))
+refunds | refunds_status_check | CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'PROCESSING'::character varying, 'COMPLETED'::character varying, 'FAILED'::character varying])::text[])))
+outbox_events | outbox_events_status_check | CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'PROCESSED'::character varying, 'FAILED'::character varying])::text[])))
+-- DATABASE: notification_db
+notification_templates | notification_templates_channel_check | CHECK (((channel)::text = ANY ((ARRAY['EMAIL'::character varying, 'SMS'::character varying, 'PUSH'::character varying])::text[])))
+notification_templates | notification_templates_status_check | CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'INACTIVE'::character varying])::text[])))
+notification_templates | notification_templates_type_check | CHECK (((type)::text = ANY ((ARRAY['TICKET_CONFIRMATION'::character varying, 'EVENT_REMINDER'::character varying, 'SYSTEM_ALERT'::character varying, 'EKYC_RESULT'::character varying])::text[])))
+notifications | notifications_channel_check | CHECK (((channel)::text = ANY ((ARRAY['EMAIL'::character varying, 'SMS'::character varying, 'PUSH'::character varying])::text[])))
+notifications | notifications_status_check | CHECK (((status)::text = ANY ((ARRAY['SENT'::character varying, 'FAILED'::character varying, 'PENDING'::character varying])::text[])))
+-- DATABASE: marketplace_db
+marketplace_sagas | marketplace_sagas_state_check | CHECK (((state)::text = ANY ((ARRAY['WAITING_LOCK'::character varying, 'WAITING_RECIPIENT'::character varying, 'WAITING_TRANSFER'::character varying, 'COMPLETED'::character varying, 'FAILED'::character varying, 'COMPENSATING'::character varying, 'COMPENSATED'::character varying])::text[])))
+marketplace_transactions | marketplace_transactions_status_check | CHECK (((status)::text = ANY ((ARRAY['PENDING_PAYMENT'::character varying, 'PAYMENT_PROCESSING'::character varying, 'TRANSFERRING'::character varying, 'COMPLETED'::character varying, 'REFUND_PENDING'::character varying, 'REFUNDED'::character varying, 'CANCELLED'::character varying, 'EXPIRED'::character varying])::text[])))
+outbox_events | outbox_events_status_check | CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'PROCESSED'::character varying, 'FAILED'::character varying])::text[])))
+seller_settlements | seller_settlements_status_check | CHECK (((status)::text = ANY ((ARRAY['PENDING_SETTLEMENT'::character varying, 'SETTLED'::character varying, 'CANCELLED'::character varying])::text[])))
+ticket_listings | ticket_listings_status_check | CHECK (((status)::text = ANY ((ARRAY['ACTIVE'::character varying, 'RESERVED'::character varying, 'SOLD'::character varying, 'CANCELLED'::character varying, 'EXPIRED'::character varying])::text[])))
+ticket_transfers | ticket_transfers_status_check | CHECK (((status)::text = ANY ((ARRAY['PENDING'::character varying, 'COMPLETED'::character varying, 'CANCELLED'::character varying])::text[])))
+ticket_transfers | ticket_transfers_type_check | CHECK (((type)::text = ANY ((ARRAY['GIFT'::character varying, 'RESALE'::character varying])::text[])))
