@@ -401,6 +401,7 @@ services:
     environment:
       <<: *environment
       SERVER_PORT: "8086"
+      TZ: Asia/Ho_Chi_Minh
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notification_db
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}

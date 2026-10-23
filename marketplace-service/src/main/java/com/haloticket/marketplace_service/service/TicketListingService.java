@@ -596,11 +596,8 @@ public class TicketListingService {
     public SagaResponse acceptGift(String actorId, String authorization, String sagaId, String token) {
         MarketplaceSaga saga = sagaRepository.findByIdForUpdate(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         TicketTransfer transfer = transferRepository.findBySagaIdForUpdate(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (transfer.getInvitationTokenHash() != null) {
-            if (token == null || token.isBlank()
-                    || !MessageDigest.isEqual(hashToken(token).getBytes(StandardCharsets.UTF_8), transfer.getInvitationTokenHash().getBytes(StandardCharsets.UTF_8))) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "GIFT_INVITATION_INVALID");
-            }
+        if (!isInvitationTokenValid(transfer, token)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "GIFT_INVITATION_INVALID");
         }
         if (saga.getState() != SagaState.WAITING_RECIPIENT || transfer.getStatus() != TransferStatus.PENDING
                 || transfer.getInvitationExpiresAt() == null || !transfer.getInvitationExpiresAt().isAfter(Instant.now())
@@ -716,11 +713,8 @@ public class TicketListingService {
         if (!actorId.equals(transfer.getToUserId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GIFT_INVITATION_INVALID");
         }
-        if (transfer.getInvitationTokenHash() != null) {
-            if (token == null || token.isBlank()
-                    || !MessageDigest.isEqual(hashToken(token).getBytes(StandardCharsets.UTF_8), transfer.getInvitationTokenHash().getBytes(StandardCharsets.UTF_8))) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GIFT_INVITATION_INVALID");
-            }
+        if (!isInvitationTokenValid(transfer, token)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "GIFT_INVITATION_INVALID");
         }
         try {
             var payload = objectMapper.readTree(saga.getPayload());
@@ -880,5 +874,13 @@ public class TicketListingService {
     }
     private String hash(CreateListingRequest request) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(request.toString().getBytes(StandardCharsets.UTF_8))); } catch (Exception exception) { throw new IllegalStateException(exception); } }
     private String hash(CreateGiftRequest request) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(request.toString().getBytes(StandardCharsets.UTF_8))); } catch (Exception exception) { throw new IllegalStateException(exception); } }
+    
+    /** Hash missing, token missing/blank or token mismatch are all rejected the same way. */
+    private boolean isInvitationTokenValid(TicketTransfer transfer, String token) {
+        String expectedHash = transfer.getInvitationTokenHash();
+        if (expectedHash == null || token == null || token.isBlank()) return false;
+        return MessageDigest.isEqual(hashToken(token).getBytes(StandardCharsets.UTF_8), expectedHash.getBytes(StandardCharsets.UTF_8));
+    }
+
     private String hashToken(String token) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8))); } catch (Exception exception) { throw new IllegalStateException(exception); } }
 }
