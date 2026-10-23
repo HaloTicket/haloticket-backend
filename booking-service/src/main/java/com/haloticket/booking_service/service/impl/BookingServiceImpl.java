@@ -306,6 +306,7 @@ public class BookingServiceImpl implements BookingService {
     @Transactional(readOnly = true)
     public BookingDetailResponse getBookingByCode(String bookingCode, String customerId) {
         Booking booking = bookingRepository.findByBookingCode(bookingCode)
+                .or(() -> bookingRepository.findById(bookingCode))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND"));
 
         if (booking.getCustomerId() == null || !booking.getCustomerId().equals(customerId)) {

@@ -166,8 +166,28 @@ class BookingGetByIdTest {
     }
 
     @Test
+    void getBookingByCode_foundByUuid() {
+        Booking booking = Booking.builder()
+                .id("booking-uuid-3")
+                .bookingCode("BK-CODE-300")
+                .customerId("cust-owner")
+                .status(BookingStatus.PAID)
+                .build();
+
+        when(bookingRepository.findByBookingCode("booking-uuid-3")).thenReturn(Optional.empty());
+        when(bookingRepository.findById("booking-uuid-3")).thenReturn(Optional.of(booking));
+
+        BookingDetailResponse res = bookingService.getBookingByCode("booking-uuid-3", "cust-owner");
+
+        assertThat(res).isNotNull();
+        assertThat(res.getId()).isEqualTo("booking-uuid-3");
+        assertThat(res.getBookingCode()).isEqualTo("BK-CODE-300");
+    }
+
+    @Test
     void getBookingByCode_throws404WhenNotFound() {
         when(bookingRepository.findByBookingCode("NON-EXISTENT")).thenReturn(Optional.empty());
+        when(bookingRepository.findById("NON-EXISTENT")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> bookingService.getBookingByCode("NON-EXISTENT", "any-user"))
                 .isInstanceOf(ResponseStatusException.class)
