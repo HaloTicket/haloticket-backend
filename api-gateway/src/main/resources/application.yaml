@@ -17,7 +17,8 @@ spring:
     gateway:
       discovery:
         locator:
-          enabled: true
+          # Off: only the explicit routes below are reachable. On exposes every Eureka service as /<service-id>/**
+          enabled: ${GATEWAY_DISCOVERY_LOCATOR_ENABLED:false}
           lower-case-service-id: true
 
       default-filters:

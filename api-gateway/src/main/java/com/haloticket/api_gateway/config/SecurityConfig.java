@@ -71,9 +71,10 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchange -> exchange
+                        // Second layer behind InternalPathBlockFilter (which also handles any depth, case, encoding).
+                        .pathMatchers("/api/internal/**", "/*/api/internal/**", "/actuator/**", "/eureka/**").denyAll()
                         .pathMatchers(HttpMethod.OPTIONS).permitAll()
                         .pathMatchers("/ws/**", "/api/payments/vnpay/ipn", "/api/payments/momo/ipn", "/api/payments/zalopay/ipn", "/api/payments/sepay/webhook").permitAll()
-                        .pathMatchers("/eureka/**", "/actuator/**").permitAll()
                         .pathMatchers("/api/events/admin/reports", "/api/events/admin/reports/**",
                                 "/api/payments/admin/report-payments")
                         .access((authentication, context) -> authentication
