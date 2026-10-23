@@ -15,6 +15,7 @@ import com.haloticket.booking_service.repository.BookingRepository;
 import com.haloticket.booking_service.repository.OutboxEventRepository;
 import com.haloticket.booking_service.repository.SeatReservationRepository;
 import com.haloticket.booking_service.service.BookingService;
+import com.haloticket.booking_service.service.GaReservationService;
 import com.haloticket.booking_service.client.TicketServiceClient;
 import com.haloticket.booking_service.dto.response.BookingDetailResponse;
 import com.haloticket.booking_service.dto.response.TicketTypeDto;
@@ -56,12 +57,15 @@ public class BookingServiceImpl implements BookingService {
     private final ObjectMapper objectMapper;
     private final EventServiceClient eventServiceClient;
     private final TicketServiceClient ticketServiceClient;
+    private final GaReservationService gaReservationService;
 
     @Override
     @Transactional
     public BookingResponse createBooking(BookingCreateRequest request) {
         String eventId = request.getEventId();
-        List<String> seatIds = request.getSeatIds();
+        // with booking.ga.reservation.enabled off this is the request untouched.
+        GaReservationService.Plan gaPlan = gaReservationService.plan(request);
+        List<String> seatIds = gaPlan.seatIds();
 
         // 1. acquire Redisson Distributed Lock for Event
         String lockKey = "lock:event:" + eventId + ":booking";
@@ -89,9 +93,12 @@ public class BookingServiceImpl implements BookingService {
 
             // wait up to 3 seconds for lock, auto-release after 5 seconds to prevent
             // deadlocks
-            boolean isLocked = lock.tryLock(3, 5, TimeUnit.SECONDS);
-            if (!isLocked) {
-                throw new RuntimeException("Khu vực đặt vé đang bận, vui lòng thử lại sau giây lát.");
+            boolean stockOnlyOrder = gaPlan.hasGa() && !gaPlan.hasSeats();
+            if (!stockOnlyOrder) {
+                boolean isLocked = lock.tryLock(3, 5, TimeUnit.SECONDS);
+                if (!isLocked) {
+                    throw new RuntimeException("Khu vực đặt vé đang bận, vui lòng thử lại sau giây lát.");
+                }
             }
 
             // 2. check seat availability in Redis
@@ -206,6 +213,12 @@ public class BookingServiceImpl implements BookingService {
             }
 
             Booking savedBooking = bookingRepository.save(booking);
+
+            // 3b. hold general-admission stock; sold out / unavailable rolls this booking back
+            if (gaPlan.hasGa()) {
+                gaReservationService.reserve(savedBooking.getId(), request, gaPlan, expiresAt);
+                savedBooking.setGaReserved(true);
+            }
 
             // 4. reserve seats & set 15-min hold TTL in Redis
             List<SeatReservation> reservations = new ArrayList<>();

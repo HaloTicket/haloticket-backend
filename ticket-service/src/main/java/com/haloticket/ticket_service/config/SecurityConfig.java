@@ -7,6 +7,8 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
 
+import org.springframework.http.HttpMethod;
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -21,7 +23,9 @@ public class SecurityConfig {
         return http.csrf(csrf -> csrf.disable()).authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/**", "/health").permitAll()
                 // This one endpoint validates its service credential before any DB access.
-                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/internal/tickets/*/transfer-snapshot").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/internal/tickets/*/transfer-snapshot").permitAll()
+                // Service token is validated inside the controller before any DB access.
+                .requestMatchers(HttpMethod.POST, "/api/internal/tickets/stock-reservations", "/api/internal/tickets/stock-reservations/*/release").permitAll()
                 .requestMatchers("/api/tickets/types/**", "/api/tickets/seat-layouts/**", "/api/tickets/seat-status").permitAll()
                 .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder()))).build();

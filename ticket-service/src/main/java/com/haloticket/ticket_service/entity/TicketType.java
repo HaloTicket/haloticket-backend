@@ -38,6 +38,11 @@ public class TicketType {
     @Column(name = "initial_quantity")
     private Integer initialQuantity;
 
+    // stock held by unpaid general-admission bookings. Available = totalQuantity - reservedQuantity.
+    @Column(name = "reserved_quantity")
+    @Builder.Default
+    private Integer reservedQuantity = 0;
+
     @Column(name = "min_per_order")
     private Integer minPerOrder;
 

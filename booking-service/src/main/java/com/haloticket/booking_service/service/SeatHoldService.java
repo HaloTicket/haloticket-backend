@@ -1,5 +1,6 @@
 package com.haloticket.booking_service.service;
 
+import com.haloticket.booking_service.util.GeneralAdmissionSeatIds;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -17,10 +18,15 @@ public class SeatHoldService {
 
     private final RedissonClient redissonClient;
     private final SeatWebsocketService websocketService;
+    private final GaReservationService gaReservationService;
 
     private static final long HOLD_TTL_MINUTES = 15;
 
     public boolean holdSeat(String eventId, String showtimeId, String seatId, String userId) {
+        // older web clients still hold virtual GA seats first; with stock holds on, createBooking checks stock instead.
+        if (gaReservationService.isEnabled() && GeneralAdmissionSeatIds.isGeneralAdmission(seatId)) {
+            return true;
+        }
         String showtimePrefix = showtimeId != null ? "showtime:" + showtimeId : "event:" + eventId;
         String lockKey = "lock:seat:" + showtimePrefix + ":" + seatId;
         String holdKey = "seat:hold:" + showtimePrefix + ":" + seatId; // fixed prefix to match TicketService
@@ -54,6 +60,9 @@ public class SeatHoldService {
     }
 
     public void releaseSeat(String eventId, String showtimeId, String seatId, String userId) {
+        if (gaReservationService.isEnabled() && GeneralAdmissionSeatIds.isGeneralAdmission(seatId)) {
+            return;
+        }
         String showtimePrefix = showtimeId != null ? "showtime:" + showtimeId : "event:" + eventId;
         String holdKey = "seat:hold:" + showtimePrefix + ":" + seatId;
         String eventHeldSetKey = showtimePrefix + ":held_seats";

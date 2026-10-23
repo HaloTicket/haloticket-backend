@@ -46,7 +46,8 @@ class BookingGetByIdTest {
                 mock(StringRedisTemplate.class),
                 mock(ObjectMapper.class),
                 mock(EventServiceClient.class),
-                ticketServiceClient
+                ticketServiceClient,
+                mock(com.haloticket.booking_service.service.GaReservationService.class)
         );
     }
 

@@ -10,6 +10,7 @@ import com.haloticket.booking_service.entity.SeatReservation;
 import com.haloticket.booking_service.enums.BookingStatus;
 import com.haloticket.booking_service.enums.SeatReservationStatus;
 import com.haloticket.booking_service.repository.BookingRepository;
+import com.haloticket.booking_service.service.GaReservationService;
 import com.haloticket.booking_service.repository.SeatReservationRepository;
 import com.haloticket.booking_service.entity.OutboxEvent;
 import com.haloticket.booking_service.entity.BookingItem;
@@ -41,6 +42,7 @@ public class BookingEventListener {
     private final ObjectMapper objectMapper;
     private final SeatWebsocketService websocketService;
     private final EventServiceClient eventServiceClient;
+    private final GaReservationService gaReservationService;
 
     @KafkaListener(topics = "haloticket.payment.completed.v1", groupId = "booking-service")
     @Transactional
@@ -61,7 +63,14 @@ public class BookingEventListener {
                 return;
             }
             if (booking.getStatus() != BookingStatus.PENDING) {
-                log.info("Ignoring payment completion for booking {} in status {}", bookingId, booking.getStatus());
+                if (booking.getStatus() == BookingStatus.CANCELLED) {
+                    // paid after the booking expired or was cancelled: no revival, no refund here. Flag it for follow-up.
+                    log.error("[LATE_PAYMENT] bookingId={} status=CANCELLED gaReserved={} paymentId={} amount={} provider={}; payment was not applied",
+                            bookingId, Boolean.TRUE.equals(booking.getGaReserved()), node.path("paymentId").asText(""),
+                            node.path("amount").asText(""), node.path("provider").asText(""));
+                } else {
+                    log.info("Ignoring payment completion for booking {} in status {}", bookingId, booking.getStatus());
+                }
                 return;
             }
 
@@ -202,6 +211,7 @@ public class BookingEventListener {
                 websocketService.broadcastSeatStatus(booking.getEventId(), showtimeId, res.getSeatId(), "AVAILABLE");
             }
             seatReservationRepository.saveAll(reservations);
+            gaReservationService.releaseIfReserved(booking);
             log.info("Booking {} cancelled after payment failed", bookingId);
 
         } catch (Exception e) {

@@ -8,6 +8,7 @@ import com.haloticket.booking_service.enums.BookingStatus;
 import com.haloticket.booking_service.enums.OutboxStatus;
 import com.haloticket.booking_service.enums.SeatReservationStatus;
 import com.haloticket.booking_service.repository.BookingRepository;
+import com.haloticket.booking_service.service.GaReservationService;
 import com.haloticket.booking_service.repository.OutboxEventRepository;
 import com.haloticket.booking_service.repository.SeatReservationRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class BookingExpirationScheduler {
     private final OutboxEventRepository outboxEventRepository;
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
+    private final GaReservationService gaReservationService;
 
     @Scheduled(fixedDelay = 30000) // Check every 30 seconds
     @Transactional
@@ -58,6 +60,7 @@ public class BookingExpirationScheduler {
                 stringRedisTemplate.opsForSet().remove(showtimePrefix + ":held_seats", res.getSeatId());
             }
             seatReservationRepository.saveAll(reservations);
+            gaReservationService.releaseIfReserved(booking);
 
             try {
                 Map<String, Object> payloadMap = new HashMap<>();

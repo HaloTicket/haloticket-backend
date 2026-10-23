@@ -14,6 +14,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 
+import org.springframework.http.HttpMethod;
+
 @Configuration
 @EnableMethodSecurity
 public class InternalReportSecurityConfig {
@@ -55,6 +57,7 @@ public class InternalReportSecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/bookings/by-code/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/bookings/*/cancel").authenticated()
                         .anyRequest().permitAll())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt

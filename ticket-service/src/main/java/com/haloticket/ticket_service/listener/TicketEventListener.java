@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haloticket.ticket_service.entity.*;
 import com.haloticket.ticket_service.enums.*;
 import com.haloticket.ticket_service.repository.*;
+import com.haloticket.ticket_service.service.StockReservationService;
 import com.haloticket.ticket_service.util.GeneralAdmissionSeatIds;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class TicketEventListener {
     private final SeatLayoutRepository seatLayoutRepository;
     private final EntityManager entityManager;
     private final ObjectMapper objectMapper;
+    private final StockReservationService stockReservations;
 
     @KafkaListener(topics = "haloticket.booking.confirmed.v1", groupId = "ticket-service")
     @Transactional
@@ -48,9 +50,13 @@ public class TicketEventListener {
         String eventId = requiredText(booking, "eventId");
         String showtimeId = text(booking, "showtimeId");
 
-        // Concurrent Kafka deliveries must check for prior issuance under the same DB lock.
+        // concurrent Kafka deliveries must check for prior issuance under the same DB lock.
         entityManager.createNativeQuery("SELECT 1 FROM pg_advisory_xact_lock(hashtextextended(:bookingId, 0))")
                 .setParameter("bookingId", bookingId).getSingleResult();
+
+        // general-admission stock held at booking time turns into issued tickets in this same transaction.
+        // no held row (flag off, expired, older booking) leaves the decrement below exactly as before.
+        stockReservations.consumeForBooking(bookingId);
         List<TicketType> showtimeTypes = showtimeId == null ? List.of() : ticketTypeRepository.findByShowtimeId(showtimeId);
         if (showtimeId != null && showtimeTypes.isEmpty()) {
             throw new IllegalArgumentException("No ticket types for showtime: " + showtimeId);
@@ -240,7 +246,7 @@ public class TicketEventListener {
             seat.setSeatStatus(SeatStatus.SOLD);
             seatRepository.save(seat);
         }
-        // Atomic stock decrement
+        // atomic stock decrement
         int updated = ticketTypeRepository.decrementTotalQuantityAtomic(type.getId());
         if (updated == 0) {
             log.error("[OVERSOLD_ON_ISSUE] Total quantity exhausted for ticketTypeId={} on bookingCode={}", type.getId(), bookingCode);

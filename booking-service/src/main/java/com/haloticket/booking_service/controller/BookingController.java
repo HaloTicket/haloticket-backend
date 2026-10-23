@@ -3,6 +3,7 @@ package com.haloticket.booking_service.controller;
 import com.haloticket.booking_service.dto.request.BookingCreateRequest;
 import com.haloticket.booking_service.dto.response.BookingDetailResponse;
 import com.haloticket.booking_service.dto.response.BookingResponse;
+import com.haloticket.booking_service.service.BookingCancellationService;
 import com.haloticket.booking_service.service.BookingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class BookingController {
 
     private final BookingService bookingService;
+    private final BookingCancellationService bookingCancellationService;
 
     @PostMapping
     public ResponseEntity<BookingResponse> createBooking(@RequestBody BookingCreateRequest request) {
@@ -27,6 +29,14 @@ public class BookingController {
     @GetMapping("/{id}")
     public ResponseEntity<BookingResponse> getBooking(@PathVariable String id) {
         return ResponseEntity.ok(bookingService.getBookingById(id));
+    }
+
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<BookingResponse> cancelBooking(@PathVariable String id, @AuthenticationPrincipal Jwt jwt) {
+        if (jwt == null || jwt.getSubject() == null || jwt.getSubject().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+        return ResponseEntity.ok(bookingCancellationService.cancelOwnBooking(id, jwt.getSubject()));
     }
 
     @GetMapping("/by-code/{bookingCode}")

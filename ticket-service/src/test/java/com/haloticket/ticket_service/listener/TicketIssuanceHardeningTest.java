@@ -28,6 +28,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.haloticket.ticket_service.service.StockReservationService;
+
 class TicketIssuanceHardeningTest {
 
     private final TicketRepository tickets = mock(TicketRepository.class);
@@ -46,7 +48,8 @@ class TicketIssuanceHardeningTest {
 
     @BeforeEach
     void setUp() {
-        listener = new TicketEventListener(tickets, outbox, types, seats, layouts, entityManager, mapper);
+        listener = new TicketEventListener(tickets, outbox, types, seats, layouts, entityManager, mapper,
+                mock(StockReservationService.class));
 
         when(entityManager.createNativeQuery(anyString())).thenReturn(lockQuery);
         when(lockQuery.setParameter(eq("bookingId"), any())).thenReturn(lockQuery);

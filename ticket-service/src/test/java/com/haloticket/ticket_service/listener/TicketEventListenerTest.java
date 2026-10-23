@@ -15,6 +15,8 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.haloticket.ticket_service.service.StockReservationService;
+
 class TicketEventListenerTest {
     private final TicketRepository tickets = mock(TicketRepository.class);
     private final OutboxEventRepository outbox = mock(OutboxEventRepository.class);
@@ -25,7 +27,8 @@ class TicketEventListenerTest {
     private final Query lockQuery = mock(Query.class);
     private final ObjectMapper mapper = new ObjectMapper();
     private final TicketEventListener listener = new TicketEventListener(
-            tickets, outbox, types, seats, layouts, entityManager, mapper);
+            tickets, outbox, types, seats, layouts, entityManager, mapper,
+            mock(StockReservationService.class));
     private final List<Ticket> saved = new ArrayList<>();
 
     private void setup() {

@@ -43,3 +43,9 @@ checkin:
     open-before-minutes: ${CHECKIN_WINDOW_OPEN_BEFORE_MINUTES:180}
     close-after-end-minutes: ${CHECKIN_WINDOW_CLOSE_AFTER_END_MINUTES:120}
     fail-open: ${CHECKIN_WINDOW_FAIL_OPEN:true}
+
+ticket:
+  stock-reservation:
+    # shared secret for booking-service -> ticket-service stock holds; blank rejects every call
+    internal-token: ${TICKET_RESERVATION_INTERNAL_TOKEN:}
+    expiry-interval-ms: ${TICKET_RESERVATION_EXPIRY_INTERVAL_MS:30000}

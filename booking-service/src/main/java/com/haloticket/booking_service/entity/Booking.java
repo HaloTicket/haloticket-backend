@@ -50,6 +50,10 @@ public class Booking {
     @Enumerated(EnumType.STRING)
     private BookingStatus status;
 
+    // true when general-admission stock was held for this booking at creation.
+    @Column(name = "ga_reserved")
+    private Boolean gaReserved;
+
     @Column(name = "expired_at")
     private LocalDateTime expiredAt;
 

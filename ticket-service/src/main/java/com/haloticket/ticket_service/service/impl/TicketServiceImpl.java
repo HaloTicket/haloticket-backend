@@ -380,6 +380,8 @@ public class TicketServiceImpl implements TicketService {
                 .isFree(entity.getIsFree())
                 .totalQuantity(entity.getTotalQuantity())
                 .initialQuantity(entity.getInitialQuantity())
+                .availableQuantity(entity.getTotalQuantity() == null ? null
+                        : Math.max(0, entity.getTotalQuantity() - (entity.getReservedQuantity() == null ? 0 : entity.getReservedQuantity())))
                 .minPerOrder(entity.getMinPerOrder())
                 .maxPerOrder(entity.getMaxPerOrder())
                 .description(entity.getDescription())

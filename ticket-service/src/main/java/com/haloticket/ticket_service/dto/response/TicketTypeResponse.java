@@ -15,6 +15,7 @@ public class TicketTypeResponse {
     private Boolean isFree;
     private Integer totalQuantity;
     private Integer initialQuantity;
+    private Integer availableQuantity;
     private Integer minPerOrder;
     private Integer maxPerOrder;
     private String description;

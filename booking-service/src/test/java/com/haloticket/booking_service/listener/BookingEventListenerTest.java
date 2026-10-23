@@ -39,7 +39,8 @@ class BookingEventListenerTest {
     @Mock EventServiceClient events;
 
     private BookingEventListener listener() {
-        return new BookingEventListener(bookings, reservations, outbox, redis, new ObjectMapper(), websocket, events);
+        return new BookingEventListener(bookings, reservations, outbox, redis, new ObjectMapper(), websocket, events,
+                org.mockito.Mockito.mock(com.haloticket.booking_service.service.GaReservationService.class));
     }
 
     @Test

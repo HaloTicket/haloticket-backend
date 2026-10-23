@@ -34,3 +34,14 @@ eureka:
       defaultZone: http://localhost:8761/eureka/
   instance:
     prefer-ip-address: true
+
+booking:
+  ga:
+    reservation:
+      enabled: ${BOOKING_GA_RESERVATION_ENABLED:false}
+      internal-token: ${TICKET_RESERVATION_INTERNAL_TOKEN:}
+      slack-seconds: ${BOOKING_GA_RESERVATION_SLACK_SECONDS:60}
+
+spring.cloud.openfeign.client.config.ticketStockClient:
+  connect-timeout: 2000
+  read-timeout: 5000

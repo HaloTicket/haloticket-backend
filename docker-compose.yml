@@ -290,6 +290,7 @@ services:
     environment:
       <<: *environment
       SERVER_PORT: "8083"
+      TICKET_RESERVATION_INTERNAL_TOKEN: ${TICKET_RESERVATION_INTERNAL_TOKEN:-}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ticket_db
       TRANSFER_INTERNAL_TOKEN: ${TRANSFER_INTERNAL_TOKEN:-}
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
@@ -335,6 +336,8 @@ services:
       <<: *environment
       SERVER_PORT: "8084"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/booking_db
+      BOOKING_GA_RESERVATION_ENABLED: ${BOOKING_GA_RESERVATION_ENABLED:-false}
+      TICKET_RESERVATION_INTERNAL_TOKEN: ${TICKET_RESERVATION_INTERNAL_TOKEN:-}
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-haloticket-realm}/protocol/openid-connect/certs
     depends_on:
