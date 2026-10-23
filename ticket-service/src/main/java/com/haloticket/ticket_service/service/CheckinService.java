@@ -136,55 +136,70 @@ public class CheckinService {
             recordAttempt(ticket, request, CheckInAttemptResult.FAILED_ALREADY_IN, "Ticket already checked in");
             Checkin existingCheckin = checkinRepository.findByTicketId(ticket.getId()).orElse(null);
             if (existingCheckin != null) {
-                return mapToCheckinDTO(existingCheckin, ticket, CheckInStatus.DUPLICATED, "ALREADY_USED");
+                return mapToCheckinDTO(existingCheckin, infoOf(ticket), CheckInStatus.DUPLICATED, "ALREADY_USED");
             }
-            return buildFallbackDTO(ticket, CheckInStatus.DUPLICATED, "ALREADY_USED");
+            return buildFallbackDTO(infoOf(ticket), CheckInStatus.DUPLICATED, "ALREADY_USED");
         }
 
         if (ticket.getStatus() != TicketStatus.VALID) {
             recordAttempt(ticket, request, CheckInAttemptResult.FAILED_SIGNATURE, "Ticket status is not VALID: " + ticket.getStatus());
             // CRITICAL: Do NOT insert into checkins when status is INVALID!
-            return buildFallbackDTO(ticket, CheckInStatus.INVALID, "TICKET_LOCKED");
+            return buildFallbackDTO(infoOf(ticket), CheckInStatus.INVALID, "TICKET_LOCKED");
         }
+
+        // A VALID ticket that already has a check-in row must not get a second one (checkins.ticket_id is unique).
+        // Looking first keeps this a normal answer: a unique-key error raised at commit time would be a 500.
+        Checkin alreadyCheckedIn = checkinRepository.findByTicketId(ticket.getId()).orElse(null);
+        if (alreadyCheckedIn != null) {
+            recordAttempt(ticket, request, CheckInAttemptResult.FAILED_ALREADY_IN, "Ticket already has a check-in record");
+            return mapToCheckinDTO(alreadyCheckedIn, infoOf(ticket), CheckInStatus.DUPLICATED, "ALREADY_USED");
+        }
+
+        // Read everything the response needs now: the bulk UPDATE below clears the persistence context, which detaches
+        // the ticket together with its not yet loaded ticket type and seat.
+        TicketInfo info = infoOf(ticket);
 
         // Ticket status is VALID -> perform atomic conditional update
         LocalDateTime now = LocalDateTime.now();
         int rowsUpdated = ticketRepository.markTicketUsedIfValid(ticket.getId(), now);
 
         if (rowsUpdated == 1) {
+            // Re-attach the ticket (it now reads USED) so the new rows below reference a managed entity.
+            Ticket current = ticketRepository.findById(ticket.getId()).orElse(ticket);
             try {
                 Checkin checkin = Checkin.builder()
-                        .ticket(ticket)
-                        .eventId(ticket.getEventId())
+                        .ticket(current)
+                        .eventId(current.getEventId())
                         .staffAssignmentId(request.getStaffAssignmentId())
                         .status(CheckInStatus.VALID)
                         .checkedInAt(now)
                         .build();
                 checkinRepository.save(checkin);
-                recordAttempt(ticket, request, CheckInAttemptResult.SUCCESS, null);
-                return mapToCheckinDTO(checkin, ticket, null, "SUCCESS");
+                recordAttempt(current, request, CheckInAttemptResult.SUCCESS, null);
+                return mapToCheckinDTO(checkin, info, null, "SUCCESS");
             } catch (DataIntegrityViolationException dive) {
                 log.warn("Concurrent duplicate checkin caught by unique constraint for ticket {}", ticket.getId());
-                recordAttempt(ticket, request, CheckInAttemptResult.FAILED_ALREADY_IN, "Duplicate checkin caught by constraint");
+                recordAttempt(current, request, CheckInAttemptResult.FAILED_ALREADY_IN, "Duplicate checkin caught by constraint");
                 Checkin existingCheckin = checkinRepository.findByTicketId(ticket.getId()).orElse(null);
                 if (existingCheckin != null) {
-                    return mapToCheckinDTO(existingCheckin, ticket, CheckInStatus.DUPLICATED, "ALREADY_USED");
+                    return mapToCheckinDTO(existingCheckin, info, CheckInStatus.DUPLICATED, "ALREADY_USED");
                 }
-                return buildFallbackDTO(ticket, CheckInStatus.DUPLICATED, "ALREADY_USED");
+                return buildFallbackDTO(info, CheckInStatus.DUPLICATED, "ALREADY_USED");
             }
         } else {
             // rowsUpdated == 0: Ticket status changed between our read and update (concurrent scan/transfer)
             Ticket refreshedTicket = ticketRepository.findById(ticket.getId()).orElse(ticket);
+            TicketInfo refreshed = refreshedTicket == ticket ? info : infoOf(refreshedTicket);
             if (refreshedTicket.getStatus() == TicketStatus.USED) {
                 recordAttempt(refreshedTicket, request, CheckInAttemptResult.FAILED_ALREADY_IN, "Ticket already checked in (concurrent)");
                 Checkin existingCheckin = checkinRepository.findByTicketId(refreshedTicket.getId()).orElse(null);
                 if (existingCheckin != null) {
-                    return mapToCheckinDTO(existingCheckin, refreshedTicket, CheckInStatus.DUPLICATED, "ALREADY_USED");
+                    return mapToCheckinDTO(existingCheckin, refreshed, CheckInStatus.DUPLICATED, "ALREADY_USED");
                 }
-                return buildFallbackDTO(refreshedTicket, CheckInStatus.DUPLICATED, "ALREADY_USED");
+                return buildFallbackDTO(refreshed, CheckInStatus.DUPLICATED, "ALREADY_USED");
             } else {
                 recordAttempt(refreshedTicket, request, CheckInAttemptResult.FAILED_SIGNATURE, "Ticket status is not VALID: " + refreshedTicket.getStatus());
-                return buildFallbackDTO(refreshedTicket, CheckInStatus.INVALID, "TICKET_LOCKED");
+                return buildFallbackDTO(refreshed, CheckInStatus.INVALID, "TICKET_LOCKED");
             }
         }
     }
@@ -205,7 +220,7 @@ public class CheckinService {
             checkins = checkinRepository.findByEventIdOrderByCheckedInAtDesc(eventId);
         }
         return checkins.stream()
-                .map(c -> mapToCheckinDTO(c, c.getTicket(), null, c.getStatus() == CheckInStatus.VALID ? "SUCCESS" : c.getStatus().name()))
+                .map(c -> mapToCheckinDTO(c, infoOf(c.getTicket()), null, c.getStatus() == CheckInStatus.VALID ? "SUCCESS" : c.getStatus().name()))
                 .collect(Collectors.toList());
     }
 
@@ -233,37 +248,44 @@ public class CheckinService {
         }
     }
 
-    private TicketCheckinDTO buildFallbackDTO(Ticket ticket, CheckInStatus status, String code) {
+    /** What the responses show about a ticket, read while the ticket is still attached to the persistence context. */
+    private record TicketInfo(String id, String qrCodeHash, String ownerId, String ticketTypeName, String seatName,
+                              String showtimeId, LocalDateTime usedAt) {}
+
+    private TicketInfo infoOf(Ticket ticket) {
+        String ticketTypeName = ticket.getTicketType() != null ? ticket.getTicketType().getName() : null;
+        String showtimeId = ticket.getShowtimeId() != null ? ticket.getShowtimeId()
+                : (ticket.getTicketType() != null ? ticket.getTicketType().getShowtimeId() : null);
+        return new TicketInfo(ticket.getId(), ticket.getQrCodeHash(), ticket.getOwnerId(), ticketTypeName,
+                formatSeatName(ticket), showtimeId, ticket.getUsedAt());
+    }
+
+    private TicketCheckinDTO buildFallbackDTO(TicketInfo ticket, CheckInStatus status, String code) {
         return TicketCheckinDTO.builder()
-                .ticketId(ticket.getId())
-                .qrCodeHash(ticket.getQrCodeHash())
-                .seatName(formatSeatName(ticket))
-                .ticketTypeName(ticket.getTicketType() != null ? ticket.getTicketType().getName() : null)
+                .ticketId(ticket.id())
+                .qrCodeHash(ticket.qrCodeHash())
+                .seatName(ticket.seatName())
+                .ticketTypeName(ticket.ticketTypeName())
                 .status(status.name())
                 .code(code)
-                .checkedInAt(ticket.getUsedAt() != null ? ticket.getUsedAt() : LocalDateTime.now())
-                .showtimeId(ticket.getShowtimeId() != null ? ticket.getShowtimeId() : (ticket.getTicketType() != null ? ticket.getTicketType().getShowtimeId() : null))
-                .ownerId(ticket.getOwnerId())
+                .checkedInAt(ticket.usedAt() != null ? ticket.usedAt() : LocalDateTime.now())
+                .showtimeId(ticket.showtimeId())
+                .ownerId(ticket.ownerId())
                 .build();
     }
 
-    private TicketCheckinDTO mapToCheckinDTO(Checkin checkin, Ticket ticket, CheckInStatus overrideStatus, String code) {
-        String seatName = formatSeatName(ticket);
+    private TicketCheckinDTO mapToCheckinDTO(Checkin checkin, TicketInfo ticket, CheckInStatus overrideStatus, String code) {
         return TicketCheckinDTO.builder()
                 .checkinId(checkin.getId())
-                .ticketId(ticket.getId())
-                .qrCodeHash(ticket.getQrCodeHash())
-                .seatName(seatName)
-                .ticketTypeName(ticket.getTicketType() != null ? ticket.getTicketType().getName() : null)
+                .ticketId(ticket.id())
+                .qrCodeHash(ticket.qrCodeHash())
+                .seatName(ticket.seatName())
+                .ticketTypeName(ticket.ticketTypeName())
                 .status(overrideStatus != null ? overrideStatus.name() : checkin.getStatus().name())
                 .code(code != null ? code : (checkin.getStatus() == CheckInStatus.VALID ? "SUCCESS" : checkin.getStatus().name()))
                 .checkedInAt(checkin.getCheckedInAt())
-                .showtimeId(ticket.getShowtimeId() != null ? ticket.getShowtimeId() : (ticket.getTicketType() != null ? ticket.getTicketType().getShowtimeId() : null))
-                .ownerId(ticket.getOwnerId())
+                .showtimeId(ticket.showtimeId())
+                .ownerId(ticket.ownerId())
                 .build();
-    }
-
-    private TicketCheckinDTO mapToCheckinDTO(Checkin checkin, Ticket ticket, CheckInStatus overrideStatus) {
-        return mapToCheckinDTO(checkin, ticket, overrideStatus, null);
     }
 }
