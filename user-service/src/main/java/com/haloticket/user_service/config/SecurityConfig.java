@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
@@ -16,6 +17,8 @@ import org.springframework.util.StringUtils;
 
 @Configuration
 @EnableWebSecurity
+// second layer behind the route rule below: @PreAuthorize on AdminUserController
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -49,6 +52,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/internal/**").permitAll() // Internal calls from other microservices
                         .requestMatchers("/api/users/me").authenticated()
+                        // user administration: list, detail, status and role changes (JwtRoleConverter maps ROLE_ADMIN from the token)
+                        .requestMatchers("/api/users/admin", "/api/users/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt
