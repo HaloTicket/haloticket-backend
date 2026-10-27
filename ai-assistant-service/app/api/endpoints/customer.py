@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
-from typing import List, Optional
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import text
 from app.db.session import get_db
 from app.services.ai.rag_engine import rag_engine
@@ -8,12 +7,43 @@ from app.services.ai.booking_agent import booking_agent
 
 router = APIRouter()
 
+# light limits against abuse of this public endpoint (no login). Too long a question or too large a top_k answers 422.
+MAX_TEXT_CHARS = 500
+MAX_TOP_K = 10
+# the web widget sends the whole conversation every time, so a long history is cut to the latest entries, not refused.
+MAX_HISTORY_ITEMS = 10
+MAX_HISTORY_ITEM_CHARS = 2000
+
+EVENT_SELECT = '''
+    SELECT e.id, e.title, e.description, e.banner_url, e.thumbnail_url,
+           e.location_name, e.city, e.ward, e.address, e.dates_summary,
+           COALESCE((SELECT MIN(price) FROM ticket_types WHERE event_id = e.id AND ticket_type_status = 'ACTIVE'), e.min_price, 0) as min_price
+    FROM events e
+'''
+
+
+def _event_dict(row) -> dict:
+    return {
+        "id": row.id,
+        "title": row.title,
+        "description": row.description or "",
+        "bannerUrl": row.banner_url or row.thumbnail_url or "",
+        "thumbnailUrl": row.thumbnail_url or row.banner_url or "",
+        "locationName": row.location_name or "",
+        "city": row.city or "",
+        "ward": row.ward or "",
+        "address": row.address or "",
+        "datesSummary": row.dates_summary or "",
+        "minPrice": float(row.min_price) if row.min_price else 0
+    }
+
+
 class SearchRequest(BaseModel):
-    query: str
-    top_k: int = 6
+    query: str = Field(max_length=MAX_TEXT_CHARS)
+    top_k: int = Field(default=6, ge=1, le=MAX_TOP_K)
 
 @router.post("/chat-search")
-async def semantic_search(request: SearchRequest, db = Depends(get_db)):
+def semantic_search(request: SearchRequest, db = Depends(get_db)):
     """
     Tìm kiếm sự kiện bằng ngôn ngữ tự nhiên (Semantic AI Search)
     kết hợp tìm kiếm Vector theo ngữ nghĩa và thông tin chi tiết sự kiện từ cơ sở dữ liệu.
@@ -36,62 +66,29 @@ async def semantic_search(request: SearchRequest, db = Depends(get_db)):
     # retrieve rich event details from events & ticket_types tables
     events_map = {}
     if event_ids:
-        q = text('''
-            SELECT e.id, e.title, e.description, e.banner_url, e.thumbnail_url,
-                   e.location_name, e.city, e.ward, e.address, e.dates_summary,
-                   COALESCE((SELECT MIN(price) FROM ticket_types WHERE event_id = e.id AND ticket_type_status = 'ACTIVE'), e.min_price, 0) as min_price
-            FROM events e
+        q = text(EVENT_SELECT + '''
             WHERE e.id IN :eids
               AND e.event_status = 'LIVE'
               AND (e.end_time IS NULL OR e.end_time >= NOW())
         ''').bindparams(eids=tuple(event_ids))
-        
-        with db.connection() as conn:
-            for row in conn.execute(q).fetchall():
-                events_map[row.id] = {
-                    "id": row.id,
-                    "title": row.title,
-                    "description": row.description or "",
-                    "bannerUrl": row.banner_url or row.thumbnail_url or "",
-                    "thumbnailUrl": row.thumbnail_url or row.banner_url or "",
-                    "locationName": row.location_name or "",
-                    "city": row.city or "",
-                    "ward": row.ward or "",
-                    "address": row.address or "",
-                    "datesSummary": row.dates_summary or "",
-                    "minPrice": float(row.min_price) if row.min_price else 0
-                }
+
+        # session.execute, not the session connection used as a context manager: leaving that block closes the connection, and the
+        # keyword query below then failed with ResourceClosedError whenever the vector search had found events.
+        for row in db.execute(q).fetchall():
+            events_map[row.id] = _event_dict(row)
 
     # fallback keyword search if semantic search yields fewer than 3 events
     if len(events_map) < 3:
         keyword_term = f"%{clean_query}%"
-        fallback_query = text('''
-            SELECT e.id, e.title, e.description, e.banner_url, e.thumbnail_url,
-                   e.location_name, e.city, e.ward, e.address, e.dates_summary,
-                   COALESCE((SELECT MIN(price) FROM ticket_types WHERE event_id = e.id AND ticket_type_status = 'ACTIVE'), e.min_price, 0) as min_price
-            FROM events e
+        fallback_query = text(EVENT_SELECT + '''
             WHERE (e.title ILIKE :kw OR e.description ILIKE :kw OR e.location_name ILIKE :kw OR e.city ILIKE :kw)
               AND e.event_status = 'LIVE'
               AND (e.end_time IS NULL OR e.end_time >= NOW())
             LIMIT 5
         ''')
-        with db.connection() as conn:
-            for row in conn.execute(fallback_query, {"kw": keyword_term}).fetchall():
-                if row.id not in events_map:
-                    events_map[row.id] = {
-                        "id": row.id,
-                        "title": row.title,
-                        "description": row.description or "",
-                        "bannerUrl": row.banner_url or row.thumbnail_url or "",
-                        "thumbnailUrl": row.thumbnail_url or row.banner_url or "",
-                        "locationName": row.location_name or "",
-                        "city": row.city or "",
-                        "ward": row.ward or "",
-                        "address": row.address or "",
-                        "datesSummary": row.dates_summary or "",
-                        "minPrice": float(row.min_price) if row.min_price else 0,
-                        "relevanceScore": 0.85
-                    }
+        for row in db.execute(fallback_query, {"kw": keyword_term}).fetchall():
+            if row.id not in events_map:
+                events_map[row.id] = {**_event_dict(row), "relevanceScore": 0.85}
 
     # order events by similarity score
     ordered_events = []
@@ -125,11 +122,21 @@ async def semantic_search(request: SearchRequest, db = Depends(get_db)):
     }
 
 class ChatRequest(BaseModel):
-    message: str
-    history: list = []
+    message: str = Field(max_length=MAX_TEXT_CHARS)
+    history: list = Field(default_factory=list)
+
+    @field_validator("history")
+    @classmethod
+    def keep_latest_entries(cls, history: list) -> list:
+        trimmed = []
+        for item in history[-MAX_HISTORY_ITEMS:]:
+            if isinstance(item, dict) and isinstance(item.get("content"), str) and len(item["content"]) > MAX_HISTORY_ITEM_CHARS:
+                item = {**item, "content": item["content"][:MAX_HISTORY_ITEM_CHARS]}
+            trimmed.append(item)
+        return trimmed
 
 @router.post("/smart-booking-chat")
-async def smart_booking(request: ChatRequest, db = Depends(get_db)):
+def smart_booking(request: ChatRequest, db = Depends(get_db)):
     try:
         return booking_agent.chat(request.message, request.history, db)
     except Exception as e:

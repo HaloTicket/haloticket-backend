@@ -3,7 +3,8 @@ import json
 import os
 from typing import List, Dict, Any
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
+from app.db.session import make_engine
 
 VN_TZ = timezone(timedelta(hours=7))
 
@@ -22,8 +23,11 @@ def to_naive_vn_datetime(dt):
 EVENT_DB_URL = os.getenv("EVENT_DB_URL", "postgresql+psycopg2://haloticket:secretpassword@postgres:5432/event_db")
 TICKET_DB_URL = os.getenv("TICKET_DB_URL", "postgresql+psycopg2://haloticket:secretpassword@postgres:5432/ticket_db")
 
-event_engine = create_engine(EVENT_DB_URL)
-ticket_engine = create_engine(TICKET_DB_URL)
+event_engine = make_engine(EVENT_DB_URL)
+ticket_engine = make_engine(TICKET_DB_URL)
+
+# the model chooses the id list; one query per id, so it is capped
+MAX_EVENT_CARDS = 10
 
 @tool
 def find_adjacent_seats(event_id: str, zone: str, num_seats: int) -> str:
@@ -243,7 +247,7 @@ def show_event_cards(event_ids: List[str]) -> str:
     """
     cards_data = []
     with event_engine.connect() as conn:
-        for eid in event_ids:
+        for eid in event_ids[:MAX_EVENT_CARDS]:
             query = text('''
                 SELECT e.id, e.title, e.banner_url, e.thumbnail_url, e.location_name, e.city, e.dates_summary, e.min_price
                 FROM events e 

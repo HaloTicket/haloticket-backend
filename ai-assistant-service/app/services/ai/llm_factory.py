@@ -24,6 +24,7 @@ def get_fast_llm(tools=None):
             api_key=key,
             model="openai/gpt-oss-20b",
             temperature=0.2,
+            timeout=settings.llm_timeout_seconds,
             max_retries=1
         )
         if tools: model = model.bind_tools(tools)
@@ -35,6 +36,7 @@ def get_fast_llm(tools=None):
             api_key=settings.openai_api_key,
             model="gpt-4o-mini",
             temperature=0.2,
+            timeout=settings.llm_timeout_seconds,
             max_retries=1
         )
         if tools: model = model.bind_tools(tools)
@@ -47,6 +49,7 @@ def get_fast_llm(tools=None):
             api_key=key,
             model="gemini-flash-latest",
             temperature=0.2,
+            timeout=settings.llm_timeout_seconds,
             max_retries=1
         )
         if tools: model = model.bind_tools(tools)
@@ -71,6 +74,7 @@ def get_smart_llm(tools=None):
             api_key=key,
             model="openai/gpt-oss-120b",
             temperature=0.0,
+            timeout=settings.llm_timeout_seconds,
             max_retries=1
         )
         if tools: model = model.bind_tools(tools)
@@ -82,6 +86,7 @@ def get_smart_llm(tools=None):
             api_key=settings.openai_api_key,
             model="gpt-4o-mini",
             temperature=0.0,
+            timeout=settings.llm_timeout_seconds,
             max_retries=1
         )
         if tools: model = model.bind_tools(tools)
@@ -94,6 +99,7 @@ def get_smart_llm(tools=None):
             api_key=key,
             model="gemini-pro-latest",
             temperature=0.0,
+            timeout=settings.llm_timeout_seconds,
             max_retries=1
         )
         if tools: model = model.bind_tools(tools)

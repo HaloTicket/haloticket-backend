@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     openai_api_key: str = ""
     kafka_bootstrap_servers: str = "localhost:9092"
+    llm_timeout_seconds: int = 45  # per call to a chat model; LLM_TIMEOUT_SECONDS overrides
 
 
     class Config:

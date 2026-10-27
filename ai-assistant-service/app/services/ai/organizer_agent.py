@@ -11,6 +11,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.services.ai.llm_factory import get_smart_llm, get_fast_llm
 from app.services.ai.sql_engine import sql_engine
 from app.core.config import settings
+from app.db.session import make_engine
 
 # database URLs
 EVENT_DB_URL = os.getenv("EVENT_DB_URL", settings.database_url or "postgresql+psycopg2://haloticket:secretpassword@localhost:5433/event_db")
@@ -18,17 +19,17 @@ TICKET_DB_URL = os.getenv("TICKET_DB_URL", EVENT_DB_URL.replace("/event_db", "/t
 BOOKING_DB_URL = os.getenv("BOOKING_DB_URL", EVENT_DB_URL.replace("/event_db", "/booking_db"))
 
 try:
-    event_engine = create_engine(EVENT_DB_URL, pool_pre_ping=True)
+    event_engine = make_engine(EVENT_DB_URL)
 except Exception:
     event_engine = None
 
 try:
-    ticket_engine = create_engine(TICKET_DB_URL, pool_pre_ping=True)
+    ticket_engine = make_engine(TICKET_DB_URL)
 except Exception:
     ticket_engine = None
 
 try:
-    booking_engine = create_engine(BOOKING_DB_URL, pool_pre_ping=True)
+    booking_engine = make_engine(BOOKING_DB_URL)
 except Exception:
     booking_engine = None
 
