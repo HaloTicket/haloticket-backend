@@ -264,9 +264,16 @@ class GatewayAuthorizationTest {
         TestConfiguration.aiAnalysisAdminOnly = false;
         try (var context = context(true)) {
             WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
-            Route route = new Route("POST", "/api/organizer/data-analysis");
-            assertThat(status(client, route, ANON)).isEqualTo(401);
-            assertThat(status(client, route, "customer")).isEqualTo(200);
+            for (String path : List.of("/api/organizer/data-analysis", "/api/organizer/voucher-strategy")) {
+                Route route = new Route("POST", path);
+                assertThat(status(client, route, ANON)).as("anonymous " + path).isEqualTo(401);
+                assertThat(status(client, route, "customer")).as("customer " + path).isEqualTo(200);
+                assertThat(status(client, route, "event-staff")).as("event staff " + path).isEqualTo(200);
+            }
+            // the organizer agent is not scoped yet: admin only whatever the flag says
+            Route agent = new Route("POST", "/api/organizer/agent-chat");
+            assertThat(status(client, agent, "customer")).isEqualTo(403);
+            assertThat(status(client, agent, "admin")).isEqualTo(200);
             // the other admin areas are not affected by that flag
             assertThat(status(client, new Route("GET", "/api/admin/system-health"), "customer")).isEqualTo(403);
         } finally {

@@ -49,7 +49,7 @@ def client(monkeypatch, calls, tmp_path):
     verifier = TokenVerifier(ISSUER, lambda _token: SIGNING_KEY.public_key())
     monkeypatch.setattr(settings, "ai_auth_enforced", True)
 
-    def analyze(question):
+    def analyze(question, scope=None):
         calls.append(("data-analysis", question))
         return {"question": question, "reply": "ok"}
 
@@ -98,7 +98,9 @@ def test_admin_routes_refuse_anonymous_and_customers(client, calls, method, path
 
     customer_response = send(client, method, path, body, auth(token(["ROLE_USER"])))
     assert customer_response.status_code == 403
-    assert customer_response.json()["detail"]["code"] == "ADMIN_ONLY"
+    # the analysis routes answer "being upgraded" while organizer analysis is off (the default), the rest "admin only"
+    expected = "ORGANIZER_ANALYSIS_DISABLED" if path.endswith(("/data-analysis", "/voucher-strategy")) else "ADMIN_ONLY"
+    assert customer_response.json()["detail"]["code"] == expected
     assert calls == []  # the handler never ran
 
 

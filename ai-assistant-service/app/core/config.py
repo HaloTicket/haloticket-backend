@@ -29,6 +29,17 @@ class Settings(BaseSettings):
     ai_sql_timeout_ms: int = 5000
     ai_sql_max_result_chars: int = 200000
 
+    # data analysis for organizers: limited to the events they may manage. Off until you switch it on.
+    ai_analysis_organizer_enabled: bool = False  # AI_ANALYSIS_ORGANIZER_ENABLED
+    ai_scope_columns: str = (
+        "v_events:event_id,v_event_showtimes:event_id,v_ticket_types:event_id,v_ticket_sales_daily:event_id,"
+        "v_booking_summary_daily:event_id,v_event_views_daily:event_id,v_vouchers:event_id"
+    )  # relation:column that holds the event id
+    ai_scope_public_relations: str = "v_venues,v_event_categories"  # no event id, public information
+    ai_scope_max_events: int = 500
+    user_service_url: str = "http://user-service:8081"  # to turn the token into the user-service user id
+    user_service_timeout_seconds: float = 8.0  # the first call after a user-service start can be slow
+
     # admin screens
     ai_system_log_file: str = "/app/event-error.log"
     ai_system_log_max_lines: int = 25

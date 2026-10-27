@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.db.session import make_engine
 from app.services.ai.llm_factory import get_fast_llm
 from app.services.ai.sql_guard import GuardedSql, SqlGuardError, parse_allowed, validate_sql
+from app.services.ai.scope import AnalysisScope
 
 log = logging.getLogger("ai.sql_engine")
 
@@ -25,8 +26,7 @@ class SQLEngine:
     def __init__(self):
         self.llm = get_fast_llm()
         self._engine = None
-        self._schema_text = None
-        self._schema_loaded_at = 0.0
+        self._schema_texts = {}  # allowed relations -> (text, loaded at)
 
     # configuration 
     @property
@@ -53,14 +53,23 @@ class SQLEngine:
         return self._engine
 
     # what the model is told about the data 
-    def schema_description(self) -> str:
+    def relations_for(self, scope: AnalysisScope) -> frozenset:
+        """What this caller may query: the configured views, and for an organizer only those that can be limited to events."""
+        spec = scope.spec()
+        if spec is None:
+            return self.allowed_relations
+        return self.allowed_relations & (frozenset(spec.columns) | spec.public)
+
+    def schema_description(self, relations=None) -> str:
         """Only the allowed views, with the comments written on them. Cached for ten minutes."""
-        if self._schema_text and time.time() - self._schema_loaded_at < 600:
-            return self._schema_text
+        relations = frozenset(relations) if relations is not None else self.allowed_relations
+        cached = self._schema_texts.get(relations)
+        if cached and time.time() - cached[1] < 600:
+            return cached[0]
         inspector = inspect(self.engine)
         schema = self.schema or None
         lines = []
-        for relation in sorted(self.allowed_relations):
+        for relation in sorted(relations):
             try:
                 columns = inspector.get_columns(relation, schema=schema)
             except Exception:
@@ -73,13 +82,14 @@ class SQLEngine:
             for column in columns:
                 note = f" -- {column['comment']}" if column.get("comment") else ""
                 lines.append(f"    {column['name']} {column['type']}{note}")
-        self._schema_text = "\n".join(lines)
-        self._schema_loaded_at = time.time()
-        return self._schema_text
+        described = "\n".join(lines)
+        self._schema_texts[relations] = (described, time.time())
+        return described
 
     # running a checked query 
 
-    def run_readonly(self, guarded: GuardedSql) -> list:
+    def run_readonly(self, guarded: GuardedSql, event_scope: str = "*") -> list:
+        """event_scope goes into app.allowed_event_ids for the views that filter by it ("*" = all events)."""
         # a colon is escaped so SQLAlchemy does not read "'a:b'" as a bind parameter
         statement = text(guarded.sql.replace(":", "\\:"))
         max_chars = settings.ai_sql_max_result_chars
@@ -88,6 +98,7 @@ class SQLEngine:
             try:
                 conn.execute(text("SET TRANSACTION READ ONLY"))
                 conn.execute(text(f"SET LOCAL statement_timeout = {int(settings.ai_sql_timeout_ms)}"))
+                conn.execute(text("SELECT set_config('app.allowed_event_ids', :ids, true)"), {"ids": event_scope})
                 result = conn.execute(statement)
                 columns = list(result.keys())
                 for row in result.fetchmany(guarded.limit):
@@ -102,16 +113,19 @@ class SQLEngine:
         return data
 
     # the question
-    def analyze_data(self, question: str):
-        """Dịch câu hỏi của người dùng thành một câu SELECT an toàn, chạy chỉ-đọc và trả về kết quả kèm insight"""
-        if not self.allowed_relations:
+    def analyze_data(self, question: str, scope: AnalysisScope = None):
+        """Dịch câu hỏi của người dùng thành một câu SELECT an toàn, chạy chỉ-đọc và trả về kết quả kèm insight.
+        scope: which events the caller may see (None or an admin scope = all)."""
+        scope = scope or AnalysisScope.admin()
+        relations = self.relations_for(scope)
+        if not relations:
             return {
                 "question": question,
                 "error": "NO_ALLOWED_RELATIONS",
                 "reply": "Tính năng phân tích dữ liệu chưa được cấu hình."
             }
         try:
-            table_info = self.schema_description()
+            table_info = self.schema_description(relations)
         except Exception as failure:
             log.error("Could not read the analysis schema: %s", type(failure).__name__)
             return {"question": question, "error": "SCHEMA_UNAVAILABLE",
@@ -121,6 +135,7 @@ class SQLEngine:
             "Bạn là chuyên gia PostgreSQL và Chuyên viên Phân tích Dữ liệu của HaloTicket.\n"
             "Bạn chỉ được truy vấn các view sau (đã loại bỏ dữ liệu cá nhân), KHÔNG dùng bất kỳ tên bảng nào khác:\n"
             "{table_info}\n\n"
+            "{scope_note}"
             "Quy tắc:\n"
             "- Chỉ sinh MỘT câu lệnh SELECT (hoặc WITH ... SELECT), TUYỆT ĐỐI KHÔNG sinh INSERT/UPDATE/DELETE/DROP, "
             "không dùng chú thích SQL, không dùng dấu chấm phẩy ở giữa câu.\n"
@@ -133,7 +148,9 @@ class SQLEngine:
 
         try:
             chain = prompt | self.llm
-            response = chain.invoke({"table_info": table_info, "question": question, "max_rows": settings.ai_sql_max_rows})
+            scope_note = "" if scope.is_admin else "Dữ liệu đã được giới hạn trong các sự kiện của người hỏi; chỉ trả lời về các sự kiện đó.\n"
+            response = chain.invoke({"table_info": table_info, "question": question, "max_rows": settings.ai_sql_max_rows,
+                                     "scope_note": scope_note})
 
             content_data = response.content
             if isinstance(content_data, list):
@@ -143,7 +160,8 @@ class SQLEngine:
             raw_sql = text_content.replace("```sql", "").replace("```", "").strip()
 
             try:
-                guarded = validate_sql(raw_sql, self.allowed_relations, schema=self.schema or None, max_rows=settings.ai_sql_max_rows)
+                guarded = validate_sql(raw_sql, self.allowed_relations, schema=self.schema or None,
+                                       max_rows=settings.ai_sql_max_rows, scope=scope.spec())
             except SqlGuardError as refusal:
                 return {
                     "question": question,
@@ -152,7 +170,7 @@ class SQLEngine:
                     "reply": f"Cảnh báo an toàn: {refusal.message}"
                 }
 
-            data = self.run_readonly(guarded)
+            data = self.run_readonly(guarded, scope.session_value)
 
             analysis_prompt = PromptTemplate.from_template(
                 "Bạn là một chuyên gia phân tích dữ liệu (Data Analyst) của hệ thống HaloTicket.\n"

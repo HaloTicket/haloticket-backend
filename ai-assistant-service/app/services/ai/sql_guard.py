@@ -56,6 +56,16 @@ class GuardedSql:
     limit: int
 
 
+@dataclass(frozen=True)
+class ScopeSpec:
+    """Limits a query to some events. `columns` maps a relation to the column that holds the event id; every use of such a
+    relation is replaced by a subquery that keeps only the rows of `event_ids` (none at all when the tuple is empty).
+    `public` relations carry no event id and are readable as they are. Anything else is refused."""
+    columns: dict
+    public: frozenset
+    event_ids: tuple
+
+
 def fingerprint(sql: str) -> str:
     """Short hash for logs: lets a refusal be matched to a query without writing the query (it may hold personal data)."""
     return hashlib.sha256((sql or "").encode("utf-8")).hexdigest()[:12]
@@ -65,17 +75,21 @@ def parse_allowed(csv: str) -> frozenset:
     return frozenset(item.strip().lower() for item in (csv or "").split(",") if item.strip())
 
 
-def validate_sql(raw_sql: str, allowed_relations: Iterable[str], schema: Optional[str] = None, max_rows: int = 500) -> GuardedSql:
+def validate_sql(raw_sql: str, allowed_relations: Iterable[str], schema: Optional[str] = None, max_rows: int = 500,
+                 scope: Optional[ScopeSpec] = None) -> GuardedSql:
     allowed = frozenset(name.lower() for name in allowed_relations)
     schema = (schema or "").lower() or None
+    if scope is not None:
+        # a scoped caller never gets more than the configured allow-list, and only relations the scope knows how to limit
+        allowed = allowed & (frozenset(scope.columns) | scope.public)
     try:
-        return _validate(raw_sql, allowed, schema, max_rows)
+        return _validate(raw_sql, allowed, schema, max_rows, scope)
     except SqlGuardError as refusal:
         log.warning("SQL refused: code=%s sql=%s chars=%d", refusal.code, fingerprint(raw_sql), len(raw_sql or ""))
         raise
 
 
-def _validate(raw_sql: str, allowed: frozenset, schema: Optional[str], max_rows: int) -> GuardedSql:
+def _validate(raw_sql: str, allowed: frozenset, schema: Optional[str], max_rows: int, scope: Optional[ScopeSpec] = None) -> GuardedSql:
     sql = (raw_sql or "").strip()
     if not sql:
         raise SqlGuardError("EMPTY_SQL", "Không có câu truy vấn SQL để thực thi.")
@@ -116,6 +130,8 @@ def _validate(raw_sql: str, allowed: frozenset, schema: Optional[str], max_rows:
 
     _check_relations(tree, allowed, schema)
     _check_functions(tree)
+    if scope is not None:
+        _apply_scope(tree, scope)
     limit = _enforce_limit(tree, max_rows)
     return GuardedSql(sql=tree.sql(dialect=_DIALECT), limit=limit)
 
@@ -135,6 +151,30 @@ def _check_relations(tree: exp.Expression, allowed: frozenset, schema: Optional[
             continue
         if name not in allowed:
             raise SqlGuardError("RELATION_NOT_ALLOWED", f"Không được phép truy vấn bảng '{table.name}'.")
+
+
+def _apply_scope(tree: exp.Expression, scope: ScopeSpec) -> None:
+    cte_names = {cte.alias_or_name.lower() for cte in tree.find_all(exp.CTE)}
+    if cte_names & set(scope.columns):
+        # inside its own body a CTE name still means the real relation; refusing is simpler than telling the two apart
+        raise SqlGuardError("RELATION_NOT_ALLOWED", "Không được đặt tên CTE trùng với tên view dữ liệu.")
+    targets = [(table, scope.columns[table.name.lower()]) for table in tree.find_all(exp.Table)
+               if table.name.lower() in scope.columns]
+    inner = []
+    for table, column in targets:
+        alias = table.alias or table.name
+        base = exp.Table(this=exp.to_identifier(table.name), db=exp.to_identifier(table.db) if table.db else None)
+        if scope.event_ids:
+            condition = exp.In(this=exp.column(column), expressions=[exp.Literal.string(event_id) for event_id in scope.event_ids])
+        else:
+            condition = exp.Boolean(this=False)
+        inner.append(base)
+        # copy=False keeps `base` the very node that ends up in the tree, which the check below relies on
+        table.replace(exp.select("*").from_(base, copy=False).where(condition, copy=False).subquery(alias, copy=False))
+    # every use of a scoped relation must now be one of the filtered ones built above
+    for table in tree.find_all(exp.Table):
+        if table.name.lower() in scope.columns and not any(table is base for base in inner):
+            raise SqlGuardError("RELATION_NOT_ALLOWED", "Không thể giới hạn phạm vi dữ liệu cho câu truy vấn này.")
 
 
 def _check_functions(tree: exp.Expression) -> None:

@@ -71,8 +71,10 @@ public class SecurityConfig {
     private boolean authzEnabled = true;
 
     /**
-     * the AI routes that read event data through the language model (data analysis, voucher strategy, organizer agent)
-     * need ROLE_ADMIN until they are scoped to the caller's own events. Only has an effect while authzEnabled is true.
+     * The AI routes that analyse event data through the language model (data analysis, voucher strategy) need ROLE_ADMIN.
+     * Set it to false to let organizers in: ai-assistant then limits each of them to the events they manage (see
+     * AI_ANALYSIS_ORGANIZER_ENABLED there). The organizer agent is not scoped yet and needs ROLE_ADMIN whatever this says.
+     * Only has an effect while authzEnabled is true.
      */
     @Value("${gateway.authz.ai-analysis-admin-only.enabled:true}")
     private boolean aiAnalysisAdminOnly = true;
@@ -92,9 +94,10 @@ public class SecurityConfig {
                                     "/api/payments/admin/report-payments")
                             .access(SecurityConfig::adminOnly);
                     if (authzEnabled) {
+                        // before the generic /api/organizer/** rule further down, which only asks for a login
+                        exchange.pathMatchers("/api/organizer/agent-chat").access(SecurityConfig::adminOnly);
                         if (aiAnalysisAdminOnly) {
-                            // before the generic /api/organizer/** rule further down, which only asks for a login
-                            exchange.pathMatchers("/api/organizer/data-analysis", "/api/organizer/voucher-strategy", "/api/organizer/agent-chat")
+                            exchange.pathMatchers("/api/organizer/data-analysis", "/api/organizer/voucher-strategy")
                                     .access(SecurityConfig::adminOnly);
                         }
                         exchange.pathMatchers("/api/admin/**", "/api/payouts/admin/**", "/api/users/admin", "/api/users/admin/**")

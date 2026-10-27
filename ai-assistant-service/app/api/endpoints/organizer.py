@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from app.services.ai.sql_engine import sql_engine
 from app.services.ai.organizer_agent import organizer_agent
 from app.core.security import require_admin, require_login
+from app.services.ai.scope import AnalysisScope, analysis_scope
 
 router = APIRouter()
 
@@ -14,8 +15,9 @@ class GenerateContentResponse(BaseModel):
     description: str
     terms_and_conditions: str
 
-# phase 1 of the lock-down: everything that reads event data through the model (data-analysis, voucher-strategy,
-# agent-chat) is ADMIN only until it is scoped to the caller's own events. Content generation needs a login only.
+# data analysis and the voucher strategy read event data through the model. An admin sees every event; an organizer sees
+# only the events they manage, and only when AI_ANALYSIS_ORGANIZER_ENABLED is on (until then they get 403). The organizer
+# agent is not scoped yet and stays ADMIN only. Content generation needs a login only.
 @router.post("/generate-event-content", response_model=GenerateContentResponse, dependencies=[Depends(require_login)])
 async def generate_event_content(request: GenerateContentRequest):
     """
@@ -35,22 +37,25 @@ async def generate_event_content(request: GenerateContentRequest):
 class AnalyzeRequest(BaseModel):
     question: str
 
-@router.post("/data-analysis", dependencies=[Depends(require_admin)])
-async def analyze_data(request: AnalyzeRequest):
-    result = sql_engine.analyze_data(request.question)
+@router.post("/data-analysis")
+def analyze_data(request: AnalyzeRequest, scope: AnalysisScope = Depends(analysis_scope)):
+    result = sql_engine.analyze_data(request.question, scope)
     return result
 
 class VoucherStrategyRequest(BaseModel):
     event_id: str
 
-@router.post("/voucher-strategy", dependencies=[Depends(require_admin)])
-async def voucher_strategy(request: VoucherStrategyRequest):
+@router.post("/voucher-strategy")
+def voucher_strategy(request: VoucherStrategyRequest, scope: AnalysisScope = Depends(analysis_scope)):
+    if not scope.allows_event(request.event_id):
+        raise HTTPException(status_code=403, detail={"code": "EVENT_NOT_IN_SCOPE", "message": "Bạn không có quyền phân tích sự kiện này."})
     try:
         # ask SQL engine about sale velocity for the event
         result = sql_engine.analyze_data(
             f"Phân tích tốc độ bán vé (sale velocity) của event_id {request.event_id} trong 7 ngày qua "
             "và đề xuất chiến lược phát hành voucher (tên voucher, mã voucher, phần trăm giảm giá, số lượng) "
-            "để kích cầu nếu cần thiết."
+            "để kích cầu nếu cần thiết.",
+            scope,
         )
         return {"strategy": result.get("reply", "Hệ thống đang thu thập thêm dữ liệu để đưa ra đề xuất voucher phù hợp.")}
     except Exception as e:

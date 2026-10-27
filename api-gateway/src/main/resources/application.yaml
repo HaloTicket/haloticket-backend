@@ -102,5 +102,7 @@ logging:
 gateway:
   authz:
     enabled: ${GATEWAY_AUTHZ_ENABLED:true}
+    # data-analysis and voucher-strategy of the AI service need ROLE_ADMIN; false lets organizers in (the service then limits
+    # them to their own events). agent-chat needs ROLE_ADMIN whatever this says. Only while authz is enabled.
     ai-analysis-admin-only:
       enabled: ${GATEWAY_AUTHZ_AI_ANALYSIS_ADMIN_ONLY:true}

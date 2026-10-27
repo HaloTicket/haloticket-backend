@@ -472,6 +472,10 @@ services:
       - AI_DB_USER=${AI_DB_USER:-}
       - AI_DB_PASSWORD=${AI_DB_PASSWORD:-}
       - AI_ANALYSIS_SCHEMA=${AI_ANALYSIS_SCHEMA:-ai_analytics}
+      - AI_ANALYSIS_ORGANIZER_ENABLED=${AI_ANALYSIS_ORGANIZER_ENABLED:-false}
+      - USER_SERVICE_URL=http://user-service:8081
+      - AI_SCOPE_COLUMNS=${AI_SCOPE_COLUMNS:-v_events:event_id,v_event_showtimes:event_id,v_ticket_types:event_id,v_ticket_sales_daily:event_id,v_booking_summary_daily:event_id,v_event_views_daily:event_id,v_vouchers:event_id}
+      - AI_SCOPE_PUBLIC_RELATIONS=${AI_SCOPE_PUBLIC_RELATIONS:-v_venues,v_event_categories}
       - AI_SQL_ALLOWED_RELATIONS=${AI_SQL_ALLOWED_RELATIONS:-v_events,v_event_showtimes,v_ticket_types,v_ticket_sales_daily,v_booking_summary_daily,v_event_views_daily,v_vouchers,v_venues,v_event_categories,v_search_terms}
       - ALERT_SSL_DOMAINS=${ALERT_SSL_DOMAINS:-haloticket-web.pages.dev,haloticket.duckdns.org}
     volumes:
