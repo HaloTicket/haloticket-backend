@@ -12,3 +12,5 @@ pydantic-settings
 py-eureka-client
 confluent-kafka
 psycopg2-binary
+sqlglot==30.25.0
+PyJWT[crypto]==2.15.1

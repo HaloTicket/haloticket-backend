@@ -40,6 +40,10 @@ class GatewayAuthorizationTest {
             new Route("GET", "/api/admin/ssl-status"),
             new Route("POST", "/api/admin/risk-scoring"),
             new Route("POST", "/api/admin/assistant-chat"),
+            // the AI routes that read event data through the language model: admin only in phase 1 of the lock-down
+            new Route("POST", "/api/organizer/data-analysis"),
+            new Route("POST", "/api/organizer/voucher-strategy"),
+            new Route("POST", "/api/organizer/agent-chat"),
             new Route("GET", "/api/payouts/admin/all"),
             new Route("POST", "/api/payouts/admin/00000000-0000-0000-0000-000000000000/approve"),
             new Route("GET", "/api/users/admin"),
@@ -49,10 +53,7 @@ class GatewayAuthorizationTest {
 
     /** a login is enough, no role: 401 without a token, 200 for any valid token (event staff may hold only ROLE_USER) */
     private static final List<Route> LOGIN_REQUIRED = List.of(
-            new Route("POST", "/api/organizer/data-analysis"),
-            new Route("POST", "/api/organizer/agent-chat"),
             new Route("POST", "/api/organizer/generate-event-content"),
-            new Route("POST", "/api/organizer/voucher-strategy"),
             new Route("POST", "/api/seats/hold"),
             new Route("POST", "/api/seats/release"),
             new Route("GET", "/api/gifts/anything"),
@@ -242,6 +243,38 @@ class GatewayAuthorizationTest {
     }
 
     @Test
+    void contentGenerationNeedsOnlyALoginWhileTheAnalysisRoutesNeedAdmin() {
+        try (var context = context(true)) {
+            WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
+            Route generate = new Route("POST", "/api/organizer/generate-event-content");
+            assertThat(status(client, generate, ANON)).isEqualTo(401);
+            assertThat(status(client, generate, "customer")).isEqualTo(200);
+            for (String path : List.of("/api/organizer/data-analysis", "/api/organizer/voucher-strategy", "/api/organizer/agent-chat")) {
+                Route route = new Route("POST", path);
+                assertThat(status(client, route, ANON)).as("anonymous " + path).isEqualTo(401);
+                assertThat(status(client, route, "customer")).as("customer " + path).isEqualTo(403);
+                assertThat(status(client, route, "event-staff")).as("event staff " + path).isEqualTo(403);
+                assertThat(status(client, route, "admin")).as("admin " + path).isEqualTo(200);
+            }
+        }
+    }
+
+    @Test
+    void theAnalysisRoutesFallBackToAnyLoginWhenTheirOwnFlagIsOff() {
+        TestConfiguration.aiAnalysisAdminOnly = false;
+        try (var context = context(true)) {
+            WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
+            Route route = new Route("POST", "/api/organizer/data-analysis");
+            assertThat(status(client, route, ANON)).isEqualTo(401);
+            assertThat(status(client, route, "customer")).isEqualTo(200);
+            // the other admin areas are not affected by that flag
+            assertThat(status(client, new Route("GET", "/api/admin/system-health"), "customer")).isEqualTo(403);
+        } finally {
+            TestConfiguration.aiAnalysisAdminOnly = true;
+        }
+    }
+
+    @Test
     void theAdminCheckReadsBothRoleClaimsAndNothingElse() {
         try (var context = context(true)) {
             WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
@@ -269,6 +302,7 @@ class GatewayAuthorizationTest {
     @EnableWebFluxSecurity
     static class TestConfiguration {
         static boolean authzEnabled = true;
+        static boolean aiAnalysisAdminOnly = true;
 
         @Bean
         SecurityWebFilterChain security(ServerHttpSecurity http) {
@@ -279,6 +313,7 @@ class GatewayAuthorizationTest {
             };
             ReflectionTestUtils.setField(config, "allowedOrigins", "http://localhost:5173");
             ReflectionTestUtils.setField(config, "authzEnabled", authzEnabled);
+            ReflectionTestUtils.setField(config, "aiAnalysisAdminOnly", aiAnalysisAdminOnly);
             return config.springSecurityFilterChain(http);
         }
 

@@ -70,6 +70,13 @@ public class SecurityConfig {
     @Value("${gateway.authz.enabled:true}")
     private boolean authzEnabled = true;
 
+    /**
+     * the AI routes that read event data through the language model (data analysis, voucher strategy, organizer agent)
+     * need ROLE_ADMIN until they are scoped to the caller's own events. Only has an effect while authzEnabled is true.
+     */
+    @Value("${gateway.authz.ai-analysis-admin-only.enabled:true}")
+    private boolean aiAnalysisAdminOnly = true;
+
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         http
@@ -85,6 +92,11 @@ public class SecurityConfig {
                                     "/api/payments/admin/report-payments")
                             .access(SecurityConfig::adminOnly);
                     if (authzEnabled) {
+                        if (aiAnalysisAdminOnly) {
+                            // before the generic /api/organizer/** rule further down, which only asks for a login
+                            exchange.pathMatchers("/api/organizer/data-analysis", "/api/organizer/voucher-strategy", "/api/organizer/agent-chat")
+                                    .access(SecurityConfig::adminOnly);
+                        }
                         exchange.pathMatchers("/api/admin/**", "/api/payouts/admin/**", "/api/users/admin", "/api/users/admin/**")
                                 .access(SecurityConfig::adminOnly);
                         // open to anonymous visitors: event, ticket-type and seat-map reads, the view and search counters,

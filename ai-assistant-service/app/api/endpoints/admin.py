@@ -1,18 +1,21 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from app.services.ai.llm_factory import get_fast_llm
 from langchain_core.prompts import PromptTemplate
 from app.core.config import settings
+from app.core.security import require_admin
 import httpx
 import time
 import asyncio
 import os
 import json
 import ssl
+import re
 import socket
 from datetime import datetime
 
-router = APIRouter()
+# every route in this file is for administrators; the token is verified here, not only at the gateway
+router = APIRouter(dependencies=[Depends(require_admin)])
 llm = get_fast_llm()
 
 class RiskScoringRequest(BaseModel):
@@ -122,16 +125,26 @@ async def chat_admin_assistant(request: AdminChatRequest):
 
 
 
+def _allowed_ssl_domains() -> list:
+    return [d.strip().lower() for d in (settings.alert_ssl_domains or "").split(",") if d.strip()]
+
+
 @router.get("/ssl-status")
 def get_ssl_status(domain: str = None):
-    """Kiểm tra thực tế trạng thái SSL/TLS của hệ thống"""
-   
-    raw_domain = domain or os.getenv("ALERT_SSL_DOMAINS", "haloticket.duckdns.org").split(",")[0].strip()
+    """Kiểm tra thực tế trạng thái SSL/TLS của hệ thống (chỉ các tên miền của hệ thống trong ALERT_SSL_DOMAINS)"""
+
+    allowed = _allowed_ssl_domains()
+    raw_domain = domain or (allowed[0] if allowed else "")
     check_domain = raw_domain.strip() if raw_domain else ""
     if "://" in check_domain:
         check_domain = check_domain.split("://", 1)[1]
-    check_domain = check_domain.split("/")[0].split(":")[0].strip()
-    
+    check_domain = check_domain.split("/")[0].split(":")[0].strip().lower()
+
+    # the server connects to this name, so an arbitrary one (or an IP) would let a caller probe other hosts
+    if check_domain and check_domain not in allowed:
+        raise HTTPException(status_code=422, detail={"code": "DOMAIN_NOT_ALLOWED",
+                                                      "message": "Tên miền không nằm trong danh sách được phép kiểm tra."})
+
     # if checking localhost or IP address
     if not check_domain or check_domain in ["localhost", "127.0.0.1"] or check_domain.startswith("192."):
         return {
@@ -296,54 +309,64 @@ async def get_system_health():
     
     return result
 
+_TOKEN_PATTERNS = [
+    (re.compile(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*"), "[token]"),
+    (re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}"), r"\1 [token]"),
+    (re.compile(r"(?i)\b(token|access_token|refresh_token|password|passwd|secret|api[_-]?key|authorization)(\s*[=:]\s*)[^\s&,;\"']+"), r"\1\2[hidden]"),
+    (re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), "[email]"),
+    (re.compile(r"\b[A-Za-z0-9+/_-]{40,}={0,2}"), "[hidden]"),
+]
+
+
+def mask_sensitive(line: str) -> str:
+    """Hides token-like strings, credentials in key=value pairs and e-mail addresses before a log line leaves the server."""
+    for pattern, replacement in _TOKEN_PATTERNS:
+        line = pattern.sub(replacement, line)
+    return line
+
+
 @router.get("/system-logs")
 def get_system_logs():
     """Đọc log thật từ hệ thống và trả về danh sách nhật ký kiểm toán thực tế"""
 
     logs = []
     try:
-        possible_paths = [
-            os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../event-error.log")),
-            "/app/event-error.log",
-            "event-error.log"
-        ]
-        for log_path in possible_paths:
-            if os.path.exists(log_path):
-                file_size = os.path.getsize(log_path)
-                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
-                    if file_size > 50000:
-                        f.seek(file_size - 30000)
-                        f.readline()  # discard partial line
-                    lines = f.readlines()[-25:]
-                    for idx, line in enumerate(lines):
-                        line_str = line.strip()
-                        if not line_str:
-                            continue
-                        is_error = "error" in line_str.lower() or "exception" in line_str.lower() or "fail" in line_str.lower()
-                        is_warn = "warn" in line_str.lower() or "timeout" in line_str.lower() or "denied" in line_str.lower()
-                        status = "ERROR" if is_error else "WARN" if is_warn else "INFO"
-                        service_name = "event-service"
-                        if "gateway" in line_str.lower(): service_name = "api-gateway"
-                        elif "ticket" in line_str.lower(): service_name = "ticket-service"
-                        elif "booking" in line_str.lower(): service_name = "booking-service"
-                        elif "auth" in line_str.lower() or "user" in line_str.lower(): service_name = "user-service"
-                        elif "payment" in line_str.lower(): service_name = "payment-service"
+        # exactly one configured file, never a path from the request
+        log_path = settings.ai_system_log_file
+        if log_path and os.path.isfile(log_path):
+            file_size = os.path.getsize(log_path)
+            with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                if file_size > 50000:
+                    f.seek(file_size - 30000)
+                    f.readline()  # discard partial line
+                lines = f.readlines()[-max(1, settings.ai_system_log_max_lines):]
+                for idx, line in enumerate(lines):
+                    line_str = mask_sensitive(line.strip())
+                    if not line_str:
+                        continue
+                    is_error = "error" in line_str.lower() or "exception" in line_str.lower() or "fail" in line_str.lower()
+                    is_warn = "warn" in line_str.lower() or "timeout" in line_str.lower() or "denied" in line_str.lower()
+                    status = "ERROR" if is_error else "WARN" if is_warn else "INFO"
+                    service_name = "event-service"
+                    if "gateway" in line_str.lower(): service_name = "api-gateway"
+                    elif "ticket" in line_str.lower(): service_name = "ticket-service"
+                    elif "booking" in line_str.lower(): service_name = "booking-service"
+                    elif "auth" in line_str.lower() or "user" in line_str.lower(): service_name = "user-service"
+                    elif "payment" in line_str.lower(): service_name = "payment-service"
 
-                        logs.append({
-                            "id": f"LOG-{int(time.time())}-{idx}",
-                            "time": time.strftime("%H:%M:%S"),
-                            "service": service_name,
-                            "event": line_str[:180] + ("..." if len(line_str) > 180 else ""),
-                            "status": status,
-                            "operator": "system",
-                            "ipAddress": "127.0.0.1",
-                            "endpoint": "/api/internal/event",
-                            "details": line_str
-                        })
-                if logs:
-                    break
+                    logs.append({
+                        "id": f"LOG-{int(time.time())}-{idx}",
+                        "time": time.strftime("%H:%M:%S"),
+                        "service": service_name,
+                        "event": line_str[:180] + ("..." if len(line_str) > 180 else ""),
+                        "status": status,
+                        "operator": "system",
+                        "ipAddress": "127.0.0.1",
+                        "endpoint": "/api/internal/event",
+                        "details": line_str
+                    })
     except Exception as e:
-        print(f"Error reading system logs: {e}")
+        print(f"Error reading system logs: {type(e).__name__}")
 
     if not logs:
         now_time = time.strftime("%H:%M:%S")

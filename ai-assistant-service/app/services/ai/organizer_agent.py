@@ -128,7 +128,7 @@ class OrganizerAgent:
     # tool 1: query event analytics
     def _tool_event_analytics(self, event_id: Optional[str], event_title: Optional[str]) -> Dict[str, Any]:
         """Truy vấn dữ liệu doanh thu, số vé đã bán và đơn hàng thực tế"""
-        engine = event_engine or sql_engine.db._engine
+        engine = event_engine
         result = {
             "event_id": event_id,
             "event_title": event_title or "Sự kiện",
@@ -234,7 +234,7 @@ class OrganizerAgent:
     # tool 2: query showtime capacity
     def _tool_showtime_capacity(self, event_id: Optional[str], event_title: Optional[str]) -> Dict[str, Any]:
         """Truy vấn các suất diễn và tỷ lệ lấp đầy theo từng hạng vé"""
-        engine = event_engine or sql_engine.db._engine
+        engine = event_engine
         result = {
             "event_id": event_id,
             "event_title": event_title or "Sự kiện",

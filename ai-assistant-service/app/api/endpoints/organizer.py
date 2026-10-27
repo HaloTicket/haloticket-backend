@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from app.services.ai.sql_engine import sql_engine
 from app.services.ai.organizer_agent import organizer_agent
+from app.core.security import require_admin, require_login
 
 router = APIRouter()
 
@@ -13,7 +14,9 @@ class GenerateContentResponse(BaseModel):
     description: str
     terms_and_conditions: str
 
-@router.post("/generate-event-content", response_model=GenerateContentResponse)
+# phase 1 of the lock-down: everything that reads event data through the model (data-analysis, voucher-strategy,
+# agent-chat) is ADMIN only until it is scoped to the caller's own events. Content generation needs a login only.
+@router.post("/generate-event-content", response_model=GenerateContentResponse, dependencies=[Depends(require_login)])
 async def generate_event_content(request: GenerateContentRequest):
     """
     Sinh mô tả sự kiện và điều khoản từ bullet points.
@@ -32,7 +35,7 @@ async def generate_event_content(request: GenerateContentRequest):
 class AnalyzeRequest(BaseModel):
     question: str
 
-@router.post("/data-analysis")
+@router.post("/data-analysis", dependencies=[Depends(require_admin)])
 async def analyze_data(request: AnalyzeRequest):
     result = sql_engine.analyze_data(request.question)
     return result
@@ -40,7 +43,7 @@ async def analyze_data(request: AnalyzeRequest):
 class VoucherStrategyRequest(BaseModel):
     event_id: str
 
-@router.post("/voucher-strategy")
+@router.post("/voucher-strategy", dependencies=[Depends(require_admin)])
 async def voucher_strategy(request: VoucherStrategyRequest):
     try:
         # ask SQL engine about sale velocity for the event
@@ -60,7 +63,7 @@ class OrganizerChatRequest(BaseModel):
     event_id: str = None
     event_title: str = None
 
-@router.post("/agent-chat")
+@router.post("/agent-chat", dependencies=[Depends(require_admin)])
 async def organizer_agent_chat(request: OrganizerChatRequest):
     """
     Endpoint Chatbot AI Agent dành cho Ban Tổ Chức (Organizer AI Data Assistant)

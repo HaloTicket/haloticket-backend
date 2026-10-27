@@ -101,5 +101,6 @@ logging:
 
 gateway:
   authz:
-    # route-level authorization at the gateway (see SecurityConfig). false = old behaviour, those paths open again.
     enabled: ${GATEWAY_AUTHZ_ENABLED:true}
+    ai-analysis-admin-only:
+      enabled: ${GATEWAY_AUTHZ_AI_ANALYSIS_ADMIN_ONLY:true}
