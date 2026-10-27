@@ -52,7 +52,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/internal/**").permitAll() // Internal calls from other microservices
                         .requestMatchers("/api/users/me").authenticated()
-                        // user administration: list, detail, status and role changes (JwtRoleConverter maps ROLE_ADMIN from the token)
                         .requestMatchers("/api/users/admin", "/api/users/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )

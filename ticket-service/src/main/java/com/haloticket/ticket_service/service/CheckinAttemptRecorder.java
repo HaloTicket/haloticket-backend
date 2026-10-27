@@ -17,8 +17,6 @@ import java.time.LocalDateTime;
  * check-in transaction; the attempt row would go with it. Here it commits on its own, and because the write is
  * flushed inside this transaction any database error (for example an outdated CHECK constraint) surfaces here, rolls
  * back only this small transaction, and reaches the caller, which decides how to degrade.
- *
- * Kept as a separate bean on purpose: Spring applies REQUIRES_NEW only to calls that come through the proxy.
  */
 @Component
 @RequiredArgsConstructor

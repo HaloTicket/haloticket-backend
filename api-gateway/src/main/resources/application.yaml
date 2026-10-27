@@ -17,7 +17,7 @@ spring:
     gateway:
       discovery:
         locator:
-          # Off: only the explicit routes below are reachable. On exposes every Eureka service as /<service-id>/**
+          # off: only the explicit routes below are reachable. On exposes every Eureka service as /<service-id>/**
           enabled: ${GATEWAY_DISCOVERY_LOCATOR_ENABLED:false}
           lower-case-service-id: true
 
@@ -93,7 +93,13 @@ eureka:
   instance:
     prefer-ip-address: true
 
+# DEBUG for these two prints request headers (Authorization) and query strings; turn it on only while debugging
 logging:
   level:
-    org.springframework.security: DEBUG
-    org.springframework.cloud.gateway: DEBUG
+    org.springframework.security: ${GATEWAY_LOG_LEVEL_SECURITY:INFO}
+    org.springframework.cloud.gateway: ${GATEWAY_LOG_LEVEL_ROUTING:INFO}
+
+gateway:
+  authz:
+    # route-level authorization at the gateway (see SecurityConfig). false = old behaviour, those paths open again.
+    enabled: ${GATEWAY_AUTHZ_ENABLED:true}

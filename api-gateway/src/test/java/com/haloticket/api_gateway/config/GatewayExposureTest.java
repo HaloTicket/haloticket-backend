@@ -81,7 +81,7 @@ class GatewayExposureTest {
 
     private static final List<String> OPEN_PATHS = List.of(
             "/api/events/e1", "/api/events", "/api/tickets/types/event/e1", "/api/media/upload",
-            "/api/auth/login", "/api/auth/register/start", "/api/seats/hold",
+            "/api/auth/login", "/api/auth/register/start",
             "/api/payments/vnpay/ipn", "/api/payments/momo/ipn", "/api/payments/zalopay/ipn", "/api/payments/sepay/webhook",
             "/ws/websocket", "/ws-notifications/websocket", "/api/customer/chat-search",
             "/api/events/internal-announcements");
@@ -100,6 +100,7 @@ class GatewayExposureTest {
         for (String path : OPEN_PATHS) {
             assertThat(InternalPathBlockFilter.isBlocked(path)).as(path).isFalse();
         }
+        assertThat(InternalPathBlockFilter.isBlocked("/api/seats/hold")).isFalse(); // needs a login (GatewayAuthorizationTest) but is not an internal path
         assertThat(InternalPathBlockFilter.isBlocked("/")).isFalse();
         assertThat(InternalPathBlockFilter.isBlocked("")).isFalse();
         assertThat(InternalPathBlockFilter.isBlocked(null)).isFalse();

@@ -17,6 +17,8 @@ import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
 import java.util.Collections;
 import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.web.server.authorization.AuthorizationContext;
+import reactor.core.publisher.Mono;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
@@ -65,36 +67,71 @@ public class SecurityConfig {
         return source;
     }
 
+    @Value("${gateway.authz.enabled:true}")
+    private boolean authzEnabled = true;
+
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
-                .authorizeExchange(exchange -> exchange
-                        // Second layer behind InternalPathBlockFilter (which also handles any depth, case, encoding).
-                        .pathMatchers("/api/internal/**", "/*/api/internal/**", "/actuator/**", "/eureka/**").denyAll()
-                        .pathMatchers(HttpMethod.OPTIONS).permitAll()
-                        .pathMatchers("/ws/**", "/api/payments/vnpay/ipn", "/api/payments/momo/ipn", "/api/payments/zalopay/ipn", "/api/payments/sepay/webhook").permitAll()
-                        .pathMatchers("/api/events/admin/reports", "/api/events/admin/reports/**",
-                                "/api/payments/admin/report-payments")
-                        .access((authentication, context) -> authentication
-                                .map(auth -> new AuthorizationDecision(isReportAdmin(auth)))
-                                .defaultIfEmpty(new AuthorizationDecision(false)))
-                        .pathMatchers("/api/events/**", "/api/tickets/**", "/api/media/**",
-                                "/api/v1/**", "/ws-notifications/**")
-                        .permitAll()
-                        .pathMatchers("/api/marketplace/listings/me", "/api/marketplace/sagas/**").authenticated()
-                        .pathMatchers(HttpMethod.GET,
-                                "/api/marketplace/events", "/api/marketplace/events/**",
-                                "/api/marketplace/listings", "/api/marketplace/listings/*").permitAll()
-                        .pathMatchers("/api/marketplace/**").authenticated()
-                        .pathMatchers("/api/users/me").authenticated()
-                        .pathMatchers("/api/users/**", "/api/bookings/**", "/api/payments/**", "/api/notifications/**")
-                        .authenticated()
-                        .anyExchange().permitAll())
+                .authorizeExchange(exchange -> {
+                    exchange
+                            // second layer behind InternalPathBlockFilter
+                            .pathMatchers("/api/internal/**", "/*/api/internal/**", "/actuator/**", "/eureka/**").denyAll()
+                            .pathMatchers(HttpMethod.OPTIONS).permitAll()
+                            .pathMatchers("/ws/**", "/api/payments/vnpay/ipn", "/api/payments/momo/ipn", "/api/payments/zalopay/ipn", "/api/payments/sepay/webhook").permitAll()
+                            .pathMatchers("/api/events/admin/reports", "/api/events/admin/reports/**",
+                                    "/api/payments/admin/report-payments")
+                            .access(SecurityConfig::adminOnly);
+                    if (authzEnabled) {
+                        exchange.pathMatchers("/api/admin/**", "/api/payouts/admin/**", "/api/users/admin", "/api/users/admin/**")
+                                .access(SecurityConfig::adminOnly);
+                        // open to anonymous visitors: event, ticket-type and seat-map reads, the view and search counters,
+                        // the homepage configuration. Everything else that writes needs a login.
+                        exchange.pathMatchers(HttpMethod.POST, "/api/events/*/view", "/api/events/search-log").permitAll()
+                                .pathMatchers(HttpMethod.GET, "/api/events/*/analytics", "/api/events/my-events", "/api/events/organizer-profile",
+                                        "/api/events/*/members", "/api/events/*/members/**", "/api/events/*/transfer-settings").authenticated()
+                                .pathMatchers(HttpMethod.GET, "/api/events", "/api/events/**").permitAll()
+                                .pathMatchers("/api/events/**").authenticated()
+                                .pathMatchers("/api/tickets/checkin", "/api/tickets/checkin/**").authenticated()
+                                .pathMatchers(HttpMethod.GET, "/api/tickets/**").permitAll()
+                                .pathMatchers("/api/tickets/**").authenticated()
+                                .pathMatchers(HttpMethod.GET, "/api/media/**").permitAll()
+                                .pathMatchers("/api/media/**").authenticated()
+                                .pathMatchers("/api/v1/**", "/ws-notifications/**").permitAll();
+                    } else {
+                        exchange.pathMatchers("/api/events/**", "/api/tickets/**", "/api/media/**",
+                                "/api/v1/**", "/ws-notifications/**").permitAll();
+                    }
+                    exchange
+                            .pathMatchers("/api/marketplace/listings/me", "/api/marketplace/sagas/**").authenticated()
+                            .pathMatchers(HttpMethod.GET,
+                                    "/api/marketplace/events", "/api/marketplace/events/**",
+                                    "/api/marketplace/listings", "/api/marketplace/listings/*").permitAll()
+                            .pathMatchers("/api/marketplace/**").authenticated()
+                            .pathMatchers("/api/users/me").authenticated()
+                            .pathMatchers("/api/users/**", "/api/bookings/**", "/api/payments/**", "/api/notifications/**")
+                            .authenticated();
+                    if (authzEnabled) {
+                        exchange
+                                .pathMatchers("/api/seats/**", "/api/gifts/**", "/api/payouts/**", "/api/organizer/**").authenticated()
+                                // anonymous visitors use the chatbot widget and sign in, register and reset their password.
+                                .pathMatchers("/api/customer/**", "/api/auth/**").permitAll()
+                                .anyExchange().authenticated();
+                    } else {
+                        exchange.anyExchange().permitAll();
+                    }
+                })
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtDecoder(jwtDecoder())));
 
         return http.build();
+    }
+
+    static Mono<AuthorizationDecision> adminOnly(Mono<Authentication> authentication, AuthorizationContext context) {
+        return authentication
+                .map(auth -> new AuthorizationDecision(isReportAdmin(auth)))
+                .defaultIfEmpty(new AuthorizationDecision(false));
     }
 
     static boolean isReportAdmin(Authentication authentication) {

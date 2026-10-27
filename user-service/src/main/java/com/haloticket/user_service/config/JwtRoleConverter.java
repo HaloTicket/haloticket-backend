@@ -35,7 +35,6 @@ public class JwtRoleConverter implements Converter<Jwt, JwtAuthenticationToken> 
                     case "ROLE_USER" -> roles.add(Role.CUSTOMER);
                     case "ROLE_ADMIN" -> roles.add(Role.ADMIN);
                     // ROLE_ORGANIZER and ROLE_STAFF are ignored on purpose: nothing authorizes by them (organizer and staff
-                    // rights come from the event's staff_assignments), so they must not be copied into user_roles.
                     default -> {
                     }
                 }
