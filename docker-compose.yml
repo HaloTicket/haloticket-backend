@@ -41,6 +41,19 @@ x-environment: &environment
   KAFKA_BOOTSTRAP_SERVERS: kafka:29092
   SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
 
+x-event-scope: &event-scope
+  AUTHZ_EVENT_SCOPE_ENABLED: ${AUTHZ_EVENT_SCOPE_ENABLED:-false}
+  AUTHZ_EVENT_SCOPE_LEGACY_FALLBACK: ${AUTHZ_EVENT_SCOPE_LEGACY_FALLBACK:-true}
+  AUTHZ_EVENT_SCOPE_PERMISSION_FUNCTION_ENABLED: ${AUTHZ_EVENT_SCOPE_PERMISSION_FUNCTION_ENABLED:-false}
+  AUTHZ_EVENT_SCOPE_MEMBERS_ENABLED: ${AUTHZ_EVENT_SCOPE_MEMBERS_ENABLED:-false}
+  AUTHZ_EVENT_SCOPE_CATALOG_ENABLED: ${AUTHZ_EVENT_SCOPE_CATALOG_ENABLED:-false}
+  AUTHZ_EVENT_SCOPE_ORDERS_ENABLED: ${AUTHZ_EVENT_SCOPE_ORDERS_ENABLED:-false}
+  AUTHZ_EVENT_SCOPE_VOUCHERS_ENABLED: ${AUTHZ_EVENT_SCOPE_VOUCHERS_ENABLED:-false}
+  AUTHZ_EVENT_SCOPE_CHECKIN_ENABLED: ${AUTHZ_EVENT_SCOPE_CHECKIN_ENABLED:-false}
+  AUTHZ_EVENT_SCOPE_IDENTITY_ENABLED: ${AUTHZ_EVENT_SCOPE_IDENTITY_ENABLED:-false}
+  AUTHZ_EVENT_SCOPE_NOTIFICATIONS_ENABLED: ${AUTHZ_EVENT_SCOPE_NOTIFICATIONS_ENABLED:-false}
+  AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN: ${AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN:-}
+
 x-dependencies: &dependencies
   discovery-server:
     condition: service_healthy
@@ -271,7 +284,7 @@ services:
         SERVICE: event-service
     ports: ["${SERVICE_BIND_ADDRESS:-127.0.0.1}:${EVENT_SERVICE_PORT:-8082}:8082"]
     environment:
-      <<: *environment
+      <<: [*environment, *event-scope]
       SERVER_PORT: "8082"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/event_db
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
@@ -291,7 +304,7 @@ services:
         SERVICE: ticket-service
     ports: ["${SERVICE_BIND_ADDRESS:-127.0.0.1}:${TICKET_SERVICE_PORT:-8083}:8083"]
     environment:
-      <<: *environment
+      <<: [*environment, *event-scope]
       SERVER_PORT: "8083"
       TICKET_RESERVATION_INTERNAL_TOKEN: ${TICKET_RESERVATION_INTERNAL_TOKEN:-}
       # Check-in window: defaults match ticket-service/application.yaml (off).
@@ -318,7 +331,7 @@ services:
         SERVICE: marketplace-service
     ports: ["${SERVICE_BIND_ADDRESS:-127.0.0.1}:${MARKETPLACE_SERVICE_PORT:-8088}:8088"]
     environment:
-      <<: *environment
+      <<: [*environment, *event-scope]
       SERVER_PORT: "8088"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/marketplace_db
       TRANSFER_INTERNAL_TOKEN: ${TRANSFER_INTERNAL_TOKEN:-}
@@ -341,7 +354,7 @@ services:
         SERVICE: booking-service
     ports: ["${SERVICE_BIND_ADDRESS:-127.0.0.1}:${BOOKING_SERVICE_PORT:-8084}:8084"]
     environment:
-      <<: *environment
+      <<: [*environment, *event-scope]
       SERVER_PORT: "8084"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/booking_db
       BOOKING_GA_RESERVATION_ENABLED: ${BOOKING_GA_RESERVATION_ENABLED:-false}
@@ -365,7 +378,7 @@ services:
         SERVICE: payment-service
     ports: ["${SERVICE_BIND_ADDRESS:-127.0.0.1}:${PAYMENT_SERVICE_PORT:-8085}:8085"]
     environment:
-      <<: *environment
+      <<: [*environment, *event-scope]
       SERVER_PORT: "8085"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/payment_db
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
@@ -410,10 +423,12 @@ services:
         SERVICE: notification-service
     ports: ["${SERVICE_BIND_ADDRESS:-127.0.0.1}:${NOTIFICATION_SERVICE_PORT:-8086}:8086"]
     environment:
-      <<: *environment
+      <<: [*environment, *event-scope]
       SERVER_PORT: "8086"
       TZ: Asia/Ho_Chi_Minh
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notification_db
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
+      KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-haloticket-realm}/protocol/openid-connect/certs
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USERNAME: ${SMTP_USERNAME:-}

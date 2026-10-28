@@ -7,6 +7,9 @@ import com.haloticket.event_service.repository.EventViewLogRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import com.haloticket.event_service.authz.EventScopeProperties;
+import com.haloticket.event_service.authz.Permission;
+import com.haloticket.event_service.service.EventAccessService;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.time.LocalDateTime;
@@ -17,12 +20,17 @@ public class EventAnalyticsController {
 
     private final EventAnalyticsService analyticsService;
     private final EventViewLogRepository viewLogRepository;
+    private final EventAccessService access;
+    private final EventScopeProperties scope;
 
     @GetMapping("/api/events/{eventId}/analytics")
     public ResponseEntity<EventAnalyticsResponse> getEventAnalytics(
             @PathVariable String eventId,
             @RequestParam(defaultValue = "30d") String timeRange
     ) {
+        if (scope.catalogOn()) {
+            access.requireForRequest(eventId, Permission.ANALYTICS_VIEW);
+        }
         return ResponseEntity.ok(analyticsService.getEventAnalytics(eventId, timeRange));
     }
 

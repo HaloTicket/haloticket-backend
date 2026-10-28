@@ -14,6 +14,13 @@ public class GlobalExceptionHandler {
                 exception.getCode().name(), exception.getMessage(), Instant.now()));
     }
 
+    /** A deliberate status (401/403/404/503...) must reach the caller as it is; the catch-all below would turn it into a 500. */
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<NotificationExceptionResponse> handleStatus(org.springframework.web.server.ResponseStatusException exception) {
+        String code = exception.getReason() != null ? exception.getReason() : String.valueOf(exception.getStatusCode().value());
+        return ResponseEntity.status(exception.getStatusCode()).body(new NotificationExceptionResponse(code, code, Instant.now()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<NotificationExceptionResponse> handleBadRequest(IllegalArgumentException exception) {
         return ResponseEntity.badRequest().body(new NotificationExceptionResponse(

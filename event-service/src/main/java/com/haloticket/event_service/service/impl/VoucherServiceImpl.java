@@ -41,6 +41,14 @@ public class VoucherServiceImpl implements VoucherService {
 
     @Override
     @Transactional(readOnly = true)
+    public String eventIdOf(String voucherId) {
+        Voucher voucher = voucherRepository.findById(voucherId)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "VOUCHER_NOT_FOUND"));
+        return voucher.getEvent() == null ? null : voucher.getEvent().getId();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<VoucherResponse> getVouchersByEventId(String eventId) {
         List<Voucher> vouchers = voucherRepository.findByEventIdOrderByCreatedAtDesc(eventId);
         return vouchers.stream().map(this::mapToVoucherResponse).collect(Collectors.toList());

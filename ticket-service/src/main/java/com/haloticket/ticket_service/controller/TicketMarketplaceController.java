@@ -40,7 +40,8 @@ public class TicketMarketplaceController {
     public OwnedTicketResponse myTicket(@PathVariable String ticketId, @AuthenticationPrincipal Jwt jwt) {
         if (jwt == null || jwt.getSubject() == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         Ticket ticket = ticketRepository.findById(ticketId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!jwt.getSubject().equals(ticket.getOwnerId())) throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        // someone else's ticket looks the same as a missing one
+        if (!jwt.getSubject().equals(ticket.getOwnerId())) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         return OwnedTicketResponse.from(ticket);
     }
 

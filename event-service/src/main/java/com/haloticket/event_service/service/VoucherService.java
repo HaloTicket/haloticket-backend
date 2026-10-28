@@ -12,4 +12,7 @@ public interface VoucherService {
     VoucherResponse updateVoucher(String voucherId, VoucherUpdateRequest request);
     VoucherResponse toggleVoucherStatus(String voucherId);
     void deleteVoucher(String voucherId);
+
+    // event a voucher belongs to (404 when the voucher does not exist).
+    String eventIdOf(String voucherId);
 }

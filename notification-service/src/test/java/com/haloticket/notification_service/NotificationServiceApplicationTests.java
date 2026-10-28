@@ -11,7 +11,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 		"spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,"
 				+ "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration,"
 				+ "org.springframework.boot.data.jpa.autoconfigure.JpaRepositoriesAutoConfiguration",
-		"eureka.client.enabled=false"
+		"eureka.client.enabled=false",
+		"spring.security.oauth2.resourceserver.jwt.issuer-uri=https://issuer.example",
+		"spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://issuer.example/jwks"
 })
 class NotificationServiceApplicationTests {
 

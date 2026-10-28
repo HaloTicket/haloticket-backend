@@ -1,5 +1,6 @@
 package com.haloticket.event_service.service;
 
+import com.haloticket.event_service.authz.EventAccess;
 import com.haloticket.event_service.dto.request.EventMemberInviteRequest;
 import com.haloticket.event_service.dto.response.EventMemberResponse;
 import com.haloticket.event_service.enums.StaffRole;
@@ -14,4 +15,5 @@ public interface EventMemberService {
     void removeMember(String eventId, String assignmentId, String authorization);
     void transferOwner(String eventId, String memberId, String authorization);
     StaffRole getMyRole(String eventId, String authorization);
+    EventAccess getMyAccess(String eventId, String authorization);
 }

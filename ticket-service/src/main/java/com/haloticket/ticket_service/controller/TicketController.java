@@ -1,5 +1,7 @@
 package com.haloticket.ticket_service.controller;
 
+import com.haloticket.ticket_service.authz.EventAccessClient;
+import com.haloticket.ticket_service.authz.EventScopeProperties;
 import com.haloticket.ticket_service.dto.request.SeatLayoutRequest;
 import com.haloticket.ticket_service.dto.request.TicketTypeCreateRequest;
 import com.haloticket.ticket_service.dto.response.SeatLayoutResponse;
@@ -18,10 +20,23 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class TicketController {
 
+    private static final String INTERNAL_TOKEN_HEADER = "X-Internal-Token";
+
     private final TicketService ticketService;
+    private final EventAccessClient eventAccess;
+    private final EventScopeProperties scope;
+
+    /** Event-scoped write guard (catalog group). A service holding the internal secret (event-service sync) passes. */
+    private void requireEventEdit(String eventId, String authorization, String internalToken) {
+        if (!scope.catalogOn() || eventAccess.isInternal(internalToken)) return;
+        eventAccess.require(eventId, "EVENT_EDIT", authorization);
+    }
 
     @PostMapping("/types")
-    public ResponseEntity<TicketTypeResponse> createTicketType(@RequestBody TicketTypeCreateRequest request) {
+    public ResponseEntity<TicketTypeResponse> createTicketType(@RequestBody TicketTypeCreateRequest request,
+                                                               @RequestHeader(value = "Authorization", required = false) String authorization,
+                                                               @RequestHeader(value = INTERNAL_TOKEN_HEADER, required = false) String internalToken) {
+        requireEventEdit(request.getEventId(), authorization, internalToken);
         TicketTypeResponse response = ticketService.createTicketType(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
@@ -29,7 +44,10 @@ public class TicketController {
     @PostMapping("/types/sync/{eventId}")
     public ResponseEntity<List<TicketTypeResponse>> syncTicketTypesForEvent(@PathVariable("eventId") String eventId,
                                                                              @RequestParam(value = "showtimeId", required = false) String showtimeId,
-                                                                             @RequestBody List<TicketTypeCreateRequest> requests) {
+                                                                             @RequestBody List<TicketTypeCreateRequest> requests,
+                                                                             @RequestHeader(value = "Authorization", required = false) String authorization,
+                                                                             @RequestHeader(value = INTERNAL_TOKEN_HEADER, required = false) String internalToken) {
+        requireEventEdit(eventId, authorization, internalToken);
         List<TicketTypeResponse> response = ticketService.syncTicketTypesForEvent(eventId, showtimeId, requests);
         return ResponseEntity.ok(response);
     }
@@ -41,7 +59,10 @@ public class TicketController {
     }
 
     @GetMapping("/types/event/{eventId}/all")
-    public ResponseEntity<List<TicketTypeResponse>> getAllTicketTypesByEventId(@PathVariable("eventId") String eventId) {
+    public ResponseEntity<List<TicketTypeResponse>> getAllTicketTypesByEventId(@PathVariable("eventId") String eventId,
+                                                                                   @RequestHeader(value = "Authorization", required = false) String authorization,
+                                                                                   @RequestHeader(value = INTERNAL_TOKEN_HEADER, required = false) String internalToken) {
+        if (scope.catalogOn() && !eventAccess.isInternal(internalToken)) eventAccess.require(eventId, "ORDERS_VIEW", authorization);
         List<TicketTypeResponse> response = ticketService.getAllTicketTypesByEventId(eventId);
         return ResponseEntity.ok(response);
     }
@@ -76,14 +97,18 @@ public class TicketController {
 
     @PutMapping("/seat-layouts/event/{eventId}/draft")
     public ResponseEntity<SeatLayoutResponse> saveSeatLayoutDraft(@PathVariable("eventId") String eventId,
-                                                                    @RequestBody SeatLayoutRequest request) {
+                                                                    @RequestBody SeatLayoutRequest request,
+                                                                    @RequestHeader(value = "Authorization", required = false) String authorization) {
+        requireEventEdit(eventId, authorization, null);
         SeatLayoutResponse response = ticketService.saveSeatLayoutDraft(eventId, request);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/seat-layouts/event/{eventId}/publish")
     public ResponseEntity<SeatLayoutResponse> publishSeatLayout(@PathVariable("eventId") String eventId,
-                                                                  @RequestBody SeatLayoutRequest request) {
+                                                                  @RequestBody SeatLayoutRequest request,
+                                                                  @RequestHeader(value = "Authorization", required = false) String authorization) {
+        requireEventEdit(eventId, authorization, null);
         SeatLayoutResponse response = ticketService.publishSeatLayout(eventId, request);
         return ResponseEntity.ok(response);
     }

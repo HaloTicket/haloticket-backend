@@ -6,6 +6,12 @@ spring:
     import: optional:file:.env[.properties],optional:file:../.env[.properties]
   application:
     name: notification-service
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:9080/realms/haloticket-realm}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:}
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:

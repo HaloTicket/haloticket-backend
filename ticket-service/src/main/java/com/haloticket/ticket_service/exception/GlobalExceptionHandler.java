@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 
@@ -30,6 +31,14 @@ public class GlobalExceptionHandler {
         log.warn("Checkin business error [{}]: {}", exception.getCode(), exception.getMessage());
         return ResponseEntity.badRequest().body(new ErrorResponse(
                 exception.getCode(), exception.getMessage(), Instant.now()));
+    }
+
+    /** A deliberate status (401/403/404/503...) must reach the caller as it is; the catch-all below would turn it into a 500. */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleStatus(ResponseStatusException exception) {
+        HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
+        String code = exception.getReason() != null ? exception.getReason() : status != null ? status.name() : "ERROR";
+        return ResponseEntity.status(exception.getStatusCode()).body(new ErrorResponse(code, code, Instant.now()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

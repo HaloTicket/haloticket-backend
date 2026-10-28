@@ -70,6 +70,14 @@ public class EventMemberController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/my-access")
+    public ResponseEntity<com.haloticket.event_service.dto.response.EventAccessResponse> getMyAccess(
+            @PathVariable String eventId,
+            @RequestHeader("Authorization") String authorization) {
+        return ResponseEntity.ok(com.haloticket.event_service.dto.response.EventAccessResponse.from(
+                eventMemberService.getMyAccess(eventId, authorization)));
+    }
+
     @GetMapping("/my-role")
     public ResponseEntity<StaffRole> getMyRole(
             @PathVariable String eventId,

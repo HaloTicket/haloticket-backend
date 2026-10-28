@@ -1,5 +1,10 @@
 package com.haloticket.event_service.service.impl;
 
+import com.haloticket.event_service.authz.CallerIds;
+import com.haloticket.event_service.authz.EventAccess;
+import com.haloticket.event_service.authz.EventPermissions;
+import com.haloticket.event_service.authz.EventScopeProperties;
+import com.haloticket.event_service.service.EventAccessService;
 import com.haloticket.event_service.client.UserInternalServiceClient;
 import com.haloticket.event_service.client.UserInviteResponse;
 import com.haloticket.event_service.client.UserServiceClient;
@@ -36,49 +41,38 @@ public class EventMemberServiceImpl implements EventMemberService {
     private final UserServiceClient userServiceClient;
     private final UserInternalServiceClient userInternalServiceClient;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final EventPermissions permissions;
+    private final CallerIds callers;
+    private final EventScopeProperties scope;
 
+    /** The caller's user-service id; a bad token is 401, user-service being down is 503. */
     private String getUserIdFromAuth(String authorization) {
-        try {
-            OrganizerEligibilityResponse eligibility = userServiceClient.getOrganizerEligibility(authorization);
-            if (eligibility == null || eligibility.userId() == null) {
-                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED");
-            }
-            return eligibility.userId();
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED");
-        }
+        return callers.userId(authorization);
+    }
+
+    private EventAccess accessOf(String eventId, String userId) {
+        // a platform admin passes only once the permission function is switched on
+        return permissions.forUser(userId, eventId, EventAccessService.isPlatformAdmin() && scope.permissionFunctionOn());
     }
 
     private StaffRole requireRole(String eventId, String userId, StaffRole... allowedRoles) {
-        StaffAssignment assignment = staffAssignmentRepository.findByEventIdAndUserId(eventId, userId).orElse(null);
-        
-        if (assignment != null) {
-            if (assignment.getStatus() != StaffAssignmentStatus.ACTIVE) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ACCOUNT_INACTIVE");
-            }
-            for (StaffRole role : allowedRoles) {
-                if (assignment.getRole() == role) {
-                    return assignment.getRole();
-                }
-            }
-        } else {
-            // fallback for events created before StaffAssignment auto-creation was added
-            Event event = eventRepository.findById(eventId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND"));
-            
-            boolean isOrganizer = event.getOrganizers() != null && event.getOrganizers().stream()
-                    .anyMatch(o -> userId.equals(o.getUserId()));
-                    
-            if (isOrganizer) {
-                for (StaffRole role : allowedRoles) {
-                    if (StaffRole.OWNER == role) {
-                        return StaffRole.OWNER;
-                    }
-                }
+        EventAccess access = accessOf(eventId, userId);
+        if (access.inactive()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "ACCOUNT_INACTIVE");
+        }
+        for (StaffRole role : allowedRoles) {
+            if (access.role() == role) {
+                return role;
             }
         }
-        
         throw new ResponseStatusException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE");
+    }
+
+    /** An assignment id on the path must belong to the event on the path (404 otherwise, as if it did not exist). */
+    private void requireAssignmentOfEvent(StaffAssignment assignment, String eventId) {
+        if (scope.membersOn() && (assignment.getEvent() == null || !eventId.equals(assignment.getEvent().getId()))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND");
+        }
     }
 
     @Override
@@ -117,7 +111,7 @@ public class EventMemberServiceImpl implements EventMemberService {
                 
         // fallback for organizers who don't have a StaffAssignment record
         Event event = eventRepository.findById(eventId).orElse(null);
-        if (event != null && event.getOrganizers() != null) {
+        if (event != null && event.getOrganizers() != null && scope.legacyFallbackOn()) {
             for (EventOrganizer org : event.getOrganizers()) {
                 boolean alreadyAssigned = assignments.stream().anyMatch(a -> org.getUserId().equals(a.getUserId()));
                 if (!alreadyAssigned) {
@@ -233,6 +227,7 @@ public class EventMemberServiceImpl implements EventMemberService {
 
         StaffAssignment assignment = staffAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND"));
+        requireAssignmentOfEvent(assignment, eventId);
         
         if (assignment.getRole() == StaffRole.OWNER && currentRole != StaffRole.OWNER) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "CANNOT_MODIFY_OWNER");
@@ -261,12 +256,19 @@ public class EventMemberServiceImpl implements EventMemberService {
 
         StaffAssignment assignment = staffAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND"));
+        requireAssignmentOfEvent(assignment, eventId);
         
         if (assignment.getRole() == StaffRole.OWNER && currentRole != StaffRole.OWNER) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "CANNOT_MODIFY_OWNER");
         }
 
-        assignment.setStatus(StaffAssignmentStatus.valueOf(newStatus));
+        StaffAssignmentStatus parsedStatus;
+        try {
+            parsedStatus = StaffAssignmentStatus.valueOf(newStatus == null ? "" : newStatus.trim().toUpperCase());
+        } catch (IllegalArgumentException invalid) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_STATUS");
+        }
+        assignment.setStatus(parsedStatus);
         assignment = staffAssignmentRepository.save(assignment);
 
         return EventMemberResponse.builder()
@@ -286,6 +288,7 @@ public class EventMemberServiceImpl implements EventMemberService {
 
         StaffAssignment assignment = staffAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND"));
+        requireAssignmentOfEvent(assignment, eventId);
         
         if (assignment.getRole() == StaffRole.OWNER && currentRole != StaffRole.OWNER) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "CANNOT_MODIFY_OWNER");
@@ -326,8 +329,9 @@ public class EventMemberServiceImpl implements EventMemberService {
             staffAssignmentRepository.save(currentOwnerAssignment.get());
         }
 
-        // update EventOrganizer to the new owner
-        if (event.getOrganizers() != null && !event.getOrganizers().isEmpty()) {
+        // the organizer profile is shared by all events of its owner: rewriting it here changed the name and owner of the
+        // previous owner's other events too. With the members group on, only the roles change.
+        if (!scope.membersOn() && event.getOrganizers() != null && !event.getOrganizers().isEmpty()) {
             EventOrganizer org = event.getOrganizers().get(0);
             org.setUserId(targetAssignment.getUserId());
             org.setName(targetAssignment.getName());
@@ -337,24 +341,15 @@ public class EventMemberServiceImpl implements EventMemberService {
 
     @Override
     public StaffRole getMyRole(String eventId, String authorization) {
-        String uid = getUserIdFromAuth(authorization);
-        StaffAssignment assignment = staffAssignmentRepository.findByEventIdAndUserId(eventId, uid).orElse(null);
-        
-        if (assignment != null) {
-            return assignment.getRole();
+        EventAccess access = accessOf(eventId, getUserIdFromAuth(authorization));
+        if (access.role() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "NOT_IN_EVENT");
         }
-        
-        // fallback for events created before StaffAssignment auto-creation was added
-        Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND"));
-                
-        boolean isOrganizer = event.getOrganizers() != null && event.getOrganizers().stream()
-                .anyMatch(o -> uid.equals(o.getUserId()));
-                
-        if (isOrganizer) {
-            return StaffRole.OWNER;
-        }
-        
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "NOT_IN_EVENT");
+        return access.role();
+    }
+
+    @Override
+    public EventAccess getMyAccess(String eventId, String authorization) {
+        return accessOf(eventId, getUserIdFromAuth(authorization));
     }
 }

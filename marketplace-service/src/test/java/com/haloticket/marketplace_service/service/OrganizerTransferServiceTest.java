@@ -1,5 +1,8 @@
 package com.haloticket.marketplace_service.service;
 
+import com.haloticket.marketplace_service.authz.EventAccessClient;
+import com.haloticket.marketplace_service.authz.EventAccessView;
+import com.haloticket.marketplace_service.authz.EventScopeProperties;
 import com.haloticket.marketplace_service.client.EventServiceClient;
 import com.haloticket.marketplace_service.dto.OrganizerListingResponse;
 import com.haloticket.marketplace_service.entity.TicketListing;
@@ -33,6 +36,7 @@ class OrganizerTransferServiceTest {
     private EventTransferPolicyService policyGate;
     private OrganizerTransferService service;
     private TicketListingService ticketListingService;
+    private EventScopeProperties scope;
 
     @BeforeEach
     void setUp() {
@@ -41,7 +45,9 @@ class OrganizerTransferServiceTest {
         transferRepository = mock(TicketTransferRepository.class);
         policyGate = mock(EventTransferPolicyService.class);
         ticketListingService = mock(TicketListingService.class);
-        service = new OrganizerTransferService(eventServiceClient, listingRepository, transferRepository, policyGate, ticketListingService);
+        scope = new EventScopeProperties();
+        service = new OrganizerTransferService(eventServiceClient, listingRepository, transferRepository, policyGate, ticketListingService,
+                new EventAccessClient(eventServiceClient, scope), scope);
     }
 
     @Test
@@ -187,5 +193,47 @@ class OrganizerTransferServiceTest {
 
         assertThat(service.getGiftDetail("Bearer tok", "evt-1", "gift").isRecipientEkycVerified()).isTrue();
         assertThat(service.getGifts("Bearer tok", "evt-1", PageRequest.of(0, 20), null).getContent().get(0).isRecipientEkycVerified()).isTrue();
+    }
+
+    private static EventAccessView access(String role, String... permissions) {
+        return new EventAccessView("evt-1", "u-1", false, role, "as-1", List.of(permissions));
+    }
+
+    private void switchOrdersOn() {
+        scope.setEnabled(true);
+        scope.getOrders().setEnabled(true);
+    }
+
+    @Test
+    void withTheSwitchOnReadsNeedMarketplaceViewAndChangesNeedModerate() {
+        switchOrdersOn();
+        when(eventServiceClient.getMyAccess("evt-1", "Bearer manager")).thenReturn(access("MANAGER", "MARKETPLACE_VIEW"));
+        when(eventServiceClient.getMyAccess("evt-1", "Bearer admin")).thenReturn(access("ADMIN", "MARKETPLACE_VIEW", "MARKETPLACE_MODERATE"));
+        when(eventServiceClient.getMyAccess("evt-1", "Bearer checkin")).thenReturn(access("CHECKIN_STAFF", "CHECKIN_SCAN"));
+
+        assertThatCode(() -> service.requireOrganizerAccess("Bearer manager", "evt-1")).doesNotThrowAnyException();
+        assertThatCode(() -> service.requireOrganizerAccess("Bearer admin", "evt-1")).doesNotThrowAnyException();
+        assertThatThrownBy(() -> service.requireOrganizerAccess("Bearer checkin", "evt-1"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+        // a manager may look but not moderate
+        assertThatThrownBy(() -> service.cancelListing("Bearer manager", "actor", "evt-1", "listing", "why"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+        // the old role endpoint is not asked at all
+        verify(eventServiceClient, never()).getMyRole(anyString(), anyString());
+    }
+
+    @Test
+    void withTheSwitchOnAStrangerAndAnEventServiceOutageAreRefused() {
+        switchOrdersOn();
+        when(eventServiceClient.getMyAccess("evt-1", "Bearer stranger"))
+                .thenThrow(new feign.FeignException.Forbidden("no", feign.Request.create(feign.Request.HttpMethod.GET, "/x", java.util.Map.of(), null, java.nio.charset.StandardCharsets.UTF_8, null), new byte[0], java.util.Map.of()));
+        when(eventServiceClient.getMyAccess("evt-1", "Bearer down")).thenThrow(new RuntimeException("connection refused"));
+
+        assertThatThrownBy(() -> service.requireOrganizerAccess("Bearer stranger", "evt-1"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+        assertThatThrownBy(() -> service.requireOrganizerAccess("Bearer down", "evt-1"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE));
+        assertThatThrownBy(() -> service.requireOrganizerAccess(null, "evt-1"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED));
     }
 }

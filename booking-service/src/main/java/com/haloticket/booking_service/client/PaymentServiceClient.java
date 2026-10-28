@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import java.util.List;
 import java.util.Map;
 
-@FeignClient(name = "payment-service")
+@FeignClient(name = "payment-service", configuration = InternalTokenFeignConfig.class)
 public interface PaymentServiceClient {
     @PostMapping("/api/payments/methods/bulk")
     Map<String, String> getPaymentMethodsByBookingIds(@RequestBody List<String> bookingIds);

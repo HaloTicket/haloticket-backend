@@ -45,6 +45,8 @@ class BookingCancelEndpointTest {
     @Autowired MockMvc mvc;
     @MockitoBean BookingService bookingService;
     @MockitoBean BookingCancellationService cancellation;
+    @MockitoBean com.haloticket.booking_service.authz.EventAccessClient eventAccess;
+    @MockitoBean com.haloticket.booking_service.authz.EventScopeProperties eventScope;
     @MockitoBean JwtDecoder jwtDecoder;
 
     @BeforeEach

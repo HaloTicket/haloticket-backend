@@ -1,5 +1,7 @@
 package com.haloticket.marketplace_service.service;
 
+import com.haloticket.marketplace_service.authz.EventAccessClient;
+import com.haloticket.marketplace_service.authz.EventScopeProperties;
 import com.haloticket.marketplace_service.client.EventServiceClient;
 import com.haloticket.marketplace_service.dto.OrganizerGiftResponse;
 import com.haloticket.marketplace_service.dto.OrganizerListingResponse;
@@ -32,6 +34,8 @@ public class OrganizerTransferService {
     private final TicketTransferRepository transferRepository;
     private final EventTransferPolicyService policyGate;
     private final TicketListingService ticketListingService;
+    private final EventAccessClient eventAccess;
+    private final EventScopeProperties scope;
 
     public void requireOrganizerAccess(String authorization, String eventId) {
         requireOrganizerRole(authorization, eventId, false);
@@ -40,6 +44,11 @@ public class OrganizerTransferService {
     private void requireOrganizerRole(String authorization, String eventId, boolean write) {
         if (authorization == null || authorization.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED");
+        }
+        if (scope.ordersOn()) {
+            // one permission table in event-service: viewing needs MARKETPLACE_VIEW, changes need MARKETPLACE_MODERATE
+            eventAccess.require(eventId, write ? "MARKETPLACE_MODERATE" : "MARKETPLACE_VIEW", authorization);
+            return;
         }
         try {
             String role = eventServiceClient.getMyRole(authorization, eventId);

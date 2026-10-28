@@ -60,6 +60,8 @@ public class EventServiceImpl implements EventService {
     private final UserServiceClient userServiceClient;
     private final UserInternalServiceClient userInternalServiceClient;
     private final StaffAssignmentRepository staffAssignmentRepository;
+    private final com.haloticket.event_service.authz.EventPermissions eventPermissions;
+    private final com.haloticket.event_service.authz.EventScopeProperties eventScope;
 
     @Autowired(required = false)
     private NotificationServiceClient notificationServiceClient;
@@ -81,7 +83,7 @@ public class EventServiceImpl implements EventService {
         if (request.getEventId() != null && !request.getEventId().isBlank()) {
             eventToSave = eventRepository.findById(request.getEventId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND"));
-            if (!isOwnedBy(eventToSave, uid)) {
+            if (!mayEdit(eventToSave, uid)) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "EVENT_OWNERSHIP_REQUIRED");
             }
         } else {
@@ -402,6 +404,32 @@ public class EventServiceImpl implements EventService {
         }
     }
 
+    /**
+     * Who may change an event. With the permission function on: OWNER or ADMIN of the event (ACTIVE) or a platform admin.
+     * Before that: only the owner through the organizer profile, as it always was.
+     */
+    private boolean mayEdit(Event event, String userId) {
+        if (eventScope.permissionFunctionOn()) {
+            return eventPermissions.forUser(userId, event.getId(), com.haloticket.event_service.service.EventAccessService.isPlatformAdmin())
+                    .has(com.haloticket.event_service.authz.Permission.EVENT_EDIT);
+        }
+        return isOwnedBy(event, userId);
+    }
+
+    /** The person told about an approval or a rejection: the active OWNER, or (before the function is on) the first profile. */
+    private String recipientOf(Event event) {
+        if (eventScope.permissionFunctionOn()) {
+            return staffAssignmentRepository.findByEventId(event.getId()).stream()
+                    .filter(a -> a.getRole() == com.haloticket.event_service.enums.StaffRole.OWNER
+                            && a.getStatus() == StaffAssignmentStatus.ACTIVE && a.getUserId() != null)
+                    .map(StaffAssignment::getUserId).findFirst().orElse("user_default_id");
+        }
+        return (event.getOrganizers() != null && !event.getOrganizers().isEmpty()
+                && event.getOrganizers().get(0).getUserId() != null)
+                        ? event.getOrganizers().get(0).getUserId()
+                        : "user_default_id";
+    }
+
     private boolean isOwnedBy(Event event, String userId) {
         return event.getOrganizers() != null && event.getOrganizers().stream()
                 .anyMatch(organizer -> userId.equals(organizer.getUserId()));
@@ -477,12 +505,21 @@ public class EventServiceImpl implements EventService {
                 .collect(Collectors.toList());
     }
 
+    private List<Event> myEventsOf(String userId) {
+        java.util.Map<String, Event> byId = new java.util.LinkedHashMap<>();
+        eventRepository.findMyEvents(userId).forEach(e -> byId.put(e.getId(), e));
+        if (eventScope.legacyFallbackOn()) {
+            eventRepository.findLegacyOwnedEvents(userId).forEach(e -> byId.putIfAbsent(e.getId(), e));
+        }
+        return new ArrayList<>(byId.values());
+    }
+
     @Override
     public List<EventResponse> getMyEvents(String authorization) {
         try {
             OrganizerEligibilityResponse eligibility = userServiceClient.getOrganizerEligibility(authorization);
             if (eligibility != null && eligibility.userId() != null) {
-                return eventRepository.findMyEvents(eligibility.userId()).stream()
+                return myEventsOf(eligibility.userId()).stream()
                         .map(this::mapToEventResponse)
                         .collect(Collectors.toList());
             }
@@ -718,10 +755,7 @@ public class EventServiceImpl implements EventService {
         event.setEventStatus(EventStatus.APPROVED);
         Event saved = eventRepository.save(event);
 
-        String recipientUserId = (saved.getOrganizers() != null && !saved.getOrganizers().isEmpty()
-                && saved.getOrganizers().get(0).getUserId() != null)
-                        ? saved.getOrganizers().get(0).getUserId()
-                        : "user_default_id";
+        String recipientUserId = recipientOf(saved);
 
         if (!"user_default_id".equals(recipientUserId)) {
             try {
@@ -752,10 +786,7 @@ public class EventServiceImpl implements EventService {
         event.setRejectionNotes(notes);
         Event saved = eventRepository.save(event);
 
-        String recipientUserId = (saved.getOrganizers() != null && !saved.getOrganizers().isEmpty()
-                && saved.getOrganizers().get(0).getUserId() != null)
-                        ? saved.getOrganizers().get(0).getUserId()
-                        : "user_default_id";
+        String recipientUserId = recipientOf(saved);
 
         publishNotification(recipientUserId, "EVENT_REJECTED", "Sự kiện đã bị từ chối, xem lý do.",
                 "Sự kiện \"" + saved.getTitle() + "\" của bạn bị từ chối phê duyệt. Lý do: "
