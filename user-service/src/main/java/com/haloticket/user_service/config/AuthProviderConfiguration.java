@@ -43,6 +43,7 @@ public class AuthProviderConfiguration {
         return new KeycloakAuthPort() {
             public void ensureRegistrationAvailable(String email) { throw unavailable(); }
             public void register(String email, String password) { throw unavailable(); }
+            public void registerDormant(String email) { throw unavailable(); }
             public java.util.Optional<String> resolvePasswordResetEmail(String identifier) { throw unavailable(); }
             public String issueResetToken(String challengeId) { throw unavailable(); }
             public void resetPassword(String resetToken, String password) { throw unavailable(); }

@@ -1,5 +1,5 @@
 package com.haloticket.event_service.enums;
 
 public enum StaffAssignmentStatus {
-    ACTIVE, REVOKED
+    ACTIVE, REVOKED, PENDING, DECLINED
 }

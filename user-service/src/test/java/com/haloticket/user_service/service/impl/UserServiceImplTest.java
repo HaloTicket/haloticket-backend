@@ -46,6 +46,47 @@ class UserServiceImplTest {
     }
 
     @Test
+    void invitingAnUnknownAddressCreatesAnAccountWithoutAPasswordAndReturnsNone() {
+        User created = User.builder().id("new-id").email("fresh@example.com").fullName("fresh").build();
+        when(userRepository.findByEmail("fresh@example.com")).thenReturn(Optional.empty(), Optional.of(created));
+        com.haloticket.user_service.dto.request.UserInviteRequest request = new com.haloticket.user_service.dto.request.UserInviteRequest();
+        request.setEmail("  Fresh@Example.com ");
+
+        com.haloticket.user_service.dto.response.UserInviteResponse response = service.inviteUser(request);
+
+        assertThat(response.isNewUser()).isTrue();
+        assertThat(response.getUserId()).isEqualTo("new-id");
+        verify(keycloakAuthPort).registerDormant("fresh@example.com");
+        // no flow may choose a password for somebody else
+        verify(keycloakAuthPort, never()).register(any(), any());
+        assertThat(java.util.Arrays.stream(com.haloticket.user_service.dto.response.UserInviteResponse.class.getDeclaredFields())
+                .map(java.lang.reflect.Field::getName)).noneMatch(name -> name.toLowerCase().contains("password"));
+    }
+
+    @Test
+    void invitingAnExistingAccountDoesNotTouchKeycloak() {
+        User existing = User.builder().id("old-id").email("known@example.com").fullName("Known").build();
+        when(userRepository.findByEmail("known@example.com")).thenReturn(Optional.of(existing));
+        com.haloticket.user_service.dto.request.UserInviteRequest request = new com.haloticket.user_service.dto.request.UserInviteRequest();
+        request.setEmail("known@example.com");
+
+        com.haloticket.user_service.dto.response.UserInviteResponse response = service.inviteUser(request);
+
+        assertThat(response.isNewUser()).isFalse();
+        verify(keycloakAuthPort, never()).registerDormant(any());
+        verify(keycloakAuthPort, never()).register(any(), any());
+    }
+
+    @Test
+    void invitingABadAddressIsRefused() {
+        com.haloticket.user_service.dto.request.UserInviteRequest request = new com.haloticket.user_service.dto.request.UserInviteRequest();
+        request.setEmail("not-an-address");
+        assertThatThrownBy(() -> service.inviteUser(request)).isInstanceOf(ResponseStatusException.class);
+        verify(keycloakAuthPort, never()).registerDormant(any());
+    }
+
+
+    @Test
     void missingGooglePictureLeavesAvatarEmptyForInitialFallback() {
         Jwt jwt = Jwt.withTokenValue("token").header("alg", "none").subject("google-user")
                 .claim("email", "user@example.com").build();

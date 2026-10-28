@@ -22,6 +22,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 
 import java.net.URI;
+import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -63,6 +64,24 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
 
     @Override
     public void register(String email, String password) {
+        createUser(email, password, true);
+    }
+
+    @Override
+    public void registerDormant(String email) {
+        createUser(email, randomPassword(), false);
+    }
+
+    /** 24 random characters plus one of each class the realm password policy asks for; never stored, logged or returned. */
+    private static String randomPassword() {
+        String alphabet = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        SecureRandom random = new SecureRandom();
+        StringBuilder value = new StringBuilder(28);
+        for (int i = 0; i < 24; i++) value.append(alphabet.charAt(random.nextInt(alphabet.length())));
+        return value.append("aZ7!").toString();
+    }
+
+    private void createUser(String email, String password, boolean emailVerified) {
         String adminToken = obtainAdminToken();
         String createUrl = properties.authServerUrl() + "/admin/realms/" + properties.realm() + "/users";
 
@@ -78,7 +97,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
                 namePrefix,
                 "HaloTicket",
                 true,
-                true,
+                emailVerified,
                 List.of(new KeycloakCredential("password", password, false))
         );
 
@@ -182,10 +201,29 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
                     .toBodilessEntity();
 
             resetTokens.remove(resetToken);
+            markEmailVerified(adminToken, keycloakUserId);
         } catch (HttpClientErrorException ex) {
             throw new AuthException("KEYCLOAK_ERROR", "Password reset failed: " + ex.getMessage(), ex.getStatusCode().value());
         } catch (ResourceAccessException | HttpServerErrorException ex) {
             throw new AuthException("KEYCLOAK_UNAVAILABLE", "Identity provider is unavailable", 503);
+        }
+    }
+
+    /**
+     * A reset token only exists after the code mailed to this address was verified, so the address is proven: an account
+     * created for an invitation (unverified) becomes verified the first time its owner sets a password this way.
+     */
+    private void markEmailVerified(String adminToken, String keycloakUserId) {
+        try {
+            restClient.put()
+                    .uri(properties.authServerUrl() + "/admin/realms/" + properties.realm() + "/users/" + keycloakUserId)
+                    .header("Authorization", "Bearer " + adminToken)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("emailVerified", true))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (Exception ignored) {
+            // the password is already reset; the flag can be set later
         }
     }
 

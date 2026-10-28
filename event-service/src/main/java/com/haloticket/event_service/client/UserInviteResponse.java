@@ -9,5 +9,4 @@ public class UserInviteResponse {
     private String name;
     private String avatar;
     private boolean isNewUser;
-    private String generatedPassword;
 }

@@ -157,6 +157,77 @@ class KeycloakAuthAdapterTest {
     }
 
     @Test
+    void anInvitedAccountIsCreatedUnverifiedWithAPasswordNobodyKnows() {
+        mockServer.expect(requestTo("http://localhost:9080/realms/haloticket-realm/protocol/openid-connect/token"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"access_token\": \"admin-token\", \"expires_in\": 300}", MediaType.APPLICATION_JSON));
+        java.util.concurrent.atomic.AtomicReference<String> created = new java.util.concurrent.atomic.AtomicReference<>();
+        mockServer.expect(requestTo("http://localhost:9080/admin/realms/haloticket-realm/users"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(request -> created.set(((org.springframework.mock.http.client.MockClientHttpRequest) request).getBodyAsString()))
+                .andRespond(withCreatedEntity(URI.create("http://localhost:9080/admin/realms/haloticket-realm/users/keycloak-uuid-9")));
+        mockServer.expect(requestTo("http://localhost:9080/admin/realms/haloticket-realm/roles/ROLE_USER"))
+                .andRespond(withSuccess("{\"id\": \"role-uuid\", \"name\": \"ROLE_USER\"}", MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo("http://localhost:9080/admin/realms/haloticket-realm/users/keycloak-uuid-9/role-mappings/realm"))
+                .andRespond(withNoContent());
+        when(userRepository.findByKeycloakId("keycloak-uuid-9")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("invited.person@example.com")).thenReturn(Optional.empty());
+
+        adapter.registerDormant("invited.person@example.com");
+
+        mockServer.verify();
+        String body = created.get();
+        assertThat(body).contains("\"emailVerified\":false");
+        // the only credential is a long random value: nothing built from the address (not its local part, not a fixed suffix)
+        java.util.regex.Matcher password = java.util.regex.Pattern.compile("\"value\":\"([^\"]+)\"").matcher(body);
+        assertThat(password.find()).isTrue();
+        assertThat(password.group(1)).hasSizeGreaterThanOrEqualTo(24).doesNotContain("invited").doesNotContain("@123");
+    }
+
+    @Test
+    void twoInvitedAccountsDoNotGetTheSamePassword() {
+        java.util.List<String> passwords = new java.util.ArrayList<>();
+        for (int i = 0; i < 2; i++) {
+            RestClient.Builder builder = RestClient.builder();
+            MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+            KeycloakAuthAdapter fresh = new KeycloakAuthAdapter(properties, builder.build(), userRepository, challengeRepository);
+            server.expect(requestTo("http://localhost:9080/realms/haloticket-realm/protocol/openid-connect/token"))
+                    .andRespond(withSuccess("{\"access_token\": \"admin-token\", \"expires_in\": 300}", MediaType.APPLICATION_JSON));
+            server.expect(requestTo("http://localhost:9080/admin/realms/haloticket-realm/users"))
+                    .andExpect(request -> passwords.add(((org.springframework.mock.http.client.MockClientHttpRequest) request).getBodyAsString()))
+                    .andRespond(withCreatedEntity(URI.create("http://localhost:9080/admin/realms/haloticket-realm/users/k-" + passwords.size())));
+            server.expect(requestTo(org.hamcrest.Matchers.containsString("/roles/ROLE_USER"))).andRespond(withNoContent());
+            fresh.registerDormant("same@example.com");
+        }
+        assertThat(passwords.get(0)).isNotEqualTo(passwords.get(1));
+    }
+
+    @Test
+    void aVerifiedPasswordResetAlsoMarksTheEmailVerified() {
+        when(challengeRepository.findById("challenge-1")).thenReturn(Optional.of(
+                com.haloticket.user_service.entity.AuthOtpChallenge.builder().id("challenge-1").subject("invited@example.com").build()));
+        String resetToken = adapter.issueResetToken("challenge-1");
+        mockServer.expect(requestTo("http://localhost:9080/realms/haloticket-realm/protocol/openid-connect/token"))
+                .andRespond(withSuccess("{\"access_token\": \"admin-token\", \"expires_in\": 300}", MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo("http://localhost:9080/admin/realms/haloticket-realm/users?email=invited@example.com&exact=true"))
+                .andRespond(withSuccess("[{\"id\": \"kc-77\", \"username\": \"invited@example.com\", \"email\": \"invited@example.com\"}]", MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo("http://localhost:9080/admin/realms/haloticket-realm/users/kc-77/reset-password"))
+                .andExpect(method(HttpMethod.PUT)).andRespond(withNoContent());
+        mockServer.expect(requestTo("http://localhost:9080/admin/realms/haloticket-realm/users/kc-77"))
+                .andExpect(method(HttpMethod.PUT)).andExpect(content().json("{\"emailVerified\": true}")).andRespond(withNoContent());
+
+        adapter.resetPassword(resetToken, "Brand-new-Pass1!");
+
+        mockServer.verify();
+    }
+
+    @Test
+    void anUnknownResetTokenChangesNothing() {
+        assertThatThrownBy(() -> adapter.resetPassword("not-a-token", "Brand-new-Pass1!")).isInstanceOf(AuthException.class);
+        mockServer.verify();
+    }
+
+    @Test
     void registerConflictThrowsUserAlreadyExists() {
         // Admin token
         mockServer.expect(requestTo("http://localhost:9080/realms/haloticket-realm/protocol/openid-connect/token"))

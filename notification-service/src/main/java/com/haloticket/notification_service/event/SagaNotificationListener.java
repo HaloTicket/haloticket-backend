@@ -88,13 +88,13 @@ public class SagaNotificationListener {
         String bookingCode = node.path("bookingCode").asText();
         String eventTitle = node.path("eventTitle").asText("");
         if (eventTitle.isBlank()) eventTitle = "Sự kiện " + node.path("eventId").asText("");
-        vars.put("fullName", escapeHtml(name.isBlank() ? "Quý khách" : name));
-        vars.put("bookingCode", escapeHtml(bookingCode));
-        vars.put("eventTitle", escapeHtml(eventTitle));
+        vars.put("fullName", name.isBlank() ? "Quý khách" : name);
+        vars.put("bookingCode", bookingCode);
+        vars.put("eventTitle", eventTitle);
         vars.put("ticketCount", tickets.size() + " vé");
         vars.put("amount", formatAmount(node.path("amount")));
-        vars.put("orderUrl", escapeHtml(frontendBaseUrl.replaceAll("/+$", "")
-                + "/my-tickets/orders/" + URLEncoder.encode(bookingCode, StandardCharsets.UTF_8).replace("+", "%20")));
+        vars.put("orderUrl", frontendBaseUrl.replaceAll("/+$", "")
+                + "/my-tickets/orders/" + URLEncoder.encode(bookingCode, StandardCharsets.UTF_8).replace("+", "%20"));
 
         StringBuilder rows = new StringBuilder();
         for (JsonNode ticket : tickets) {
@@ -126,9 +126,7 @@ public class SagaNotificationListener {
     }
 
     private static String escapeHtml(String value) {
-        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-                .replace("\"", "&quot;").replace("'", "&#39;")
-                .replace("{", "&#123;").replace("}", "&#125;");
+        return EmailTemplateRenderer.escape(value);
     }
 
     @KafkaListener(topics = "haloticket.marketplace.gift.invited.v1", groupId = "notification-service-marketplace")
@@ -187,7 +185,7 @@ public class SagaNotificationListener {
                 String messageBlock = "";
                 if (!giftMessage.isBlank()) {
                     messageBlock = "<div class=\"message-box\"><span class=\"message-label\">Lời nhắn</span><p class=\"message-text\">\""
-                            + giftMessage.replace("<", "&lt;").replace(">", "&gt;") + "\"</p></div>";
+                            + escapeHtml(giftMessage) + "\"</p></div>";
                 }
 
                 // format expiresAt nicely (e.g. 15:30 ngày 20/09/2026)
@@ -224,7 +222,7 @@ public class SagaNotificationListener {
                 log.error("Gift invitation email failed for saga {}", sagaId, emailError);
             }
         } catch (Exception exception) {
-            log.error("Could not process gift invitation event, skipping", exception);
+            log.error("Could not process gift invitation event, skipping ({})", exception.getClass().getSimpleName());
         }
     }
 
@@ -263,35 +261,48 @@ public class SagaNotificationListener {
     public void onEventMemberInvitation(String payloadStr) {
         try {
             Map<String, Object> payload = objectMapper.readValue(payloadStr, Map.class);
-            
+
             String email = (String) payload.get("email");
             if (email == null) return;
-            
-            // build variables map for EmailTemplateRenderer
+
+            String base = frontendBaseUrl.replaceAll("/+$", "");
+            String eventId = urlSegment(String.valueOf(payload.get("eventId")));
+            String token = payload.get("invitationToken") instanceof String value && !value.isBlank() ? value : null;
+            String setPasswordUrl = base + "/forgot-password";
+
+            // everything a person typed (names, event title) goes into the mail escaped, never as markup
             Map<String, String> variables = new HashMap<>();
             variables.put("name", String.valueOf(payload.get("name")));
             variables.put("eventTitle", String.valueOf(payload.get("eventTitle")));
-            variables.put("eventId", String.valueOf(payload.get("eventId")));
-            
+
             String role = (String) payload.get("role");
             String roleDisplayName = role;
             if ("OWNER".equals(role)) roleDisplayName = "Chủ sự kiện";
             else if ("ADMIN".equals(role)) roleDisplayName = "Quản trị viên";
             else if ("MANAGER".equals(role)) roleDisplayName = "Quản lý";
             else if ("CHECKIN_STAFF".equals(role)) roleDisplayName = "Nhân viên Check-in";
-            variables.put("role", roleDisplayName);
-            
-            Boolean isNewUser = (Boolean) payload.get("isNewUser");
-            if (isNewUser != null && isNewUser) {
-                String generatedPassword = String.valueOf(payload.get("generatedPassword"));
-                String newUserContent = "<div style=\"margin-top:20px;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e3eaf4;\">\n" +
-                        "    <p style=\"margin-top:0;\">Hệ thống đã tự động tạo tài khoản cho bạn để có thể tham gia quản lý sự kiện này.</p>\n" +
-                        "    <p style=\"margin-bottom:0;\"><strong>Mật khẩu đăng nhập tạm thời:</strong> <span style=\"font-family:monospace;font-size:16px;background:#e3eaf4;padding:2px 6px;border-radius:4px;\">" + generatedPassword + "</span></p>\n" +
-                        "    <p style=\"font-size:12px;color:#667085;margin-bottom:0;\">(Vui lòng đăng nhập và đổi mật khẩu sau khi truy cập)</p>\n" +
-                        "</div>";
-                variables.put("newUserContent", newUserContent);
+            variables.put("role", String.valueOf(roleDisplayName));
+
+            // no password is ever sent: a person without a password sets one with the code mailed by "forgot password"
+            boolean isNewUser = Boolean.TRUE.equals(payload.get("isNewUser"));
+            String setPasswordBlock = "<div style=\"margin-top:20px;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e3eaf4;\">\n" +
+                    "    <p style=\"margin:0 0 8px;\">Chưa có mật khẩu? Hãy thiết lập mật khẩu cho tài khoản này: chúng tôi sẽ gửi mã xác nhận đến chính email này.</p>\n" +
+                    "    <p style=\"margin:0;\"><a href=\"" + escapeHtml(setPasswordUrl) + "\" style=\"color:#0b6bcb;font-weight:bold;\">Thiết lập mật khẩu</a></p>\n" +
+                    "</div>";
+            String newUserContent = isNewUser
+                    ? "<p style=\"margin-top:20px;\">Hệ thống đã tạo tài khoản HaloTicket cho bạn để có thể tham gia quản lý sự kiện này.</p>"
+                    : "";
+            variables.put("newUserContent", newUserContent);
+            variables.put("setPasswordBlock", token != null || isNewUser ? setPasswordBlock : "");
+
+            if (token != null) {
+                variables.put("primaryUrl", base + "/event-invitations/accept#token=" + URLEncoder.encode(token, StandardCharsets.UTF_8));
+                variables.put("primaryLabel", "Xem và trả lời lời mời");
+                variables.put("expiryNote", "Lời mời có hiệu lực trong thời gian có hạn và chỉ dùng được một lần, bằng đúng tài khoản có email này.");
             } else {
-                variables.put("newUserContent", "");
+                variables.put("primaryUrl", base + "/organizer/events/" + eventId + "/manage");
+                variables.put("primaryLabel", "Đến trang quản trị sự kiện");
+                variables.put("expiryNote", "");
             }
 
             // process template
@@ -300,16 +311,20 @@ public class SagaNotificationListener {
             // send email
             jakarta.mail.internet.MimeMessage message = mailSender.createMimeMessage();
             org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(message, true, "UTF-8");
-            
+
             helper.setFrom(fromAddress);
             helper.setTo(email);
             helper.setSubject("Lời mời tham gia Ban tổ chức sự kiện - HaloTicket");
             helper.setText(htmlContent, true);
-            
+
             mailSender.send(message);
         } catch (Exception e) {
-            log.error("Failed to process event member invitation: {}", e.getMessage(), e);
+            log.error("Failed to process event member invitation ({})", e.getClass().getSimpleName());
         }
+    }
+
+    private static String urlSegment(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
     @KafkaListener(topics = {

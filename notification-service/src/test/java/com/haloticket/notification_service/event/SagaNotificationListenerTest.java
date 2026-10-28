@@ -85,4 +85,52 @@ class SagaNotificationListenerTest {
         verifyNoInteractions(emailSender);
         verify(notificationService, never()).markAsSent(any());
     }
+
+    @Test
+    void memberInvitationNeverCarriesAPasswordAndLinksToTheRealRoutes() throws Exception {
+        jakarta.mail.internet.MimeMessage message = new jakarta.mail.internet.MimeMessage((jakarta.mail.Session) null);
+        when(mailSender.createMimeMessage()).thenReturn(message);
+        ReflectionTestUtils.setField(listener, "fromAddress", "no-reply@haloticket.local");
+        // a payload from an old event-service still carries generatedPassword: it must not reach the mail
+        listener.onEventMemberInvitation("""
+                {"eventId":"evt-1","eventTitle":"Show <a href=\\"https://evil.example\\">x</a>","email":"invitee@example.com",
+                "name":"Lan <b>","role":"MANAGER","isNewUser":true,"generatedPassword":"Hunter2-secret!"}
+                """);
+        ArgumentCaptor<jakarta.mail.internet.MimeMessage> sent = ArgumentCaptor.forClass(jakarta.mail.internet.MimeMessage.class);
+        verify(mailSender).send(sent.capture());
+        String html = readHtml(sent.getValue());
+        assertThat(html).doesNotContain("Hunter2-secret").doesNotContain("evil.example\"").doesNotContain("<b>");
+        assertThat(html).contains("https://haloticket.vn/organizer/events/evt-1/manage")
+                .contains("https://haloticket.vn/forgot-password").doesNotContain("https://haloticket.vn/event/");
+    }
+
+    @Test
+    void memberInvitationWithATokenLinksToTheAcceptPageAndEscapesTheToken() throws Exception {
+        jakarta.mail.internet.MimeMessage message = new jakarta.mail.internet.MimeMessage((jakarta.mail.Session) null);
+        when(mailSender.createMimeMessage()).thenReturn(message);
+        ReflectionTestUtils.setField(listener, "fromAddress", "no-reply@haloticket.local");
+        listener.onEventMemberInvitation("""
+                {"eventId":"evt-1","eventTitle":"Show","email":"invitee@example.com","name":"Lan","role":"CHECKIN_STAFF",
+                "isNewUser":false,"invitationToken":"abc-DEF_123","invitationExpiresAt":"2026-10-31T10:00"}
+                """);
+        ArgumentCaptor<jakarta.mail.internet.MimeMessage> sent = ArgumentCaptor.forClass(jakarta.mail.internet.MimeMessage.class);
+        verify(mailSender).send(sent.capture());
+        assertThat(readHtml(sent.getValue())).contains("https://haloticket.vn/event-invitations/accept#token=abc-DEF_123");
+    }
+
+    private static String readHtml(jakarta.mail.internet.MimeMessage message) throws Exception {
+        message.saveChanges();
+        Object content = message.getContent();
+        return flatten(content);
+    }
+
+    private static String flatten(Object content) throws Exception {
+        if (content instanceof String text) return text;
+        if (content instanceof jakarta.mail.Multipart multipart) {
+            StringBuilder all = new StringBuilder();
+            for (int i = 0; i < multipart.getCount(); i++) all.append(flatten(multipart.getBodyPart(i).getContent()));
+            return all.toString();
+        }
+        return "";
+    }
 }

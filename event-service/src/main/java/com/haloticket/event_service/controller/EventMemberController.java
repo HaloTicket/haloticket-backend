@@ -32,6 +32,14 @@ public class EventMemberController {
         return ResponseEntity.ok(eventMemberService.inviteMember(eventId, request, authorization));
     }
 
+    @PostMapping("/{assignmentId}/resend")
+    public ResponseEntity<EventMemberResponse> resendInvitation(
+            @PathVariable String eventId,
+            @PathVariable String assignmentId,
+            @RequestHeader("Authorization") String authorization) {
+        return ResponseEntity.ok(eventMemberService.resendInvitation(eventId, assignmentId, authorization));
+    }
+
     @PutMapping("/{assignmentId}/role")
     public ResponseEntity<EventMemberResponse> changeMemberRole(
             @PathVariable String eventId,

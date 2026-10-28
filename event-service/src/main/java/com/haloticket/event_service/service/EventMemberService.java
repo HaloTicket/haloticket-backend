@@ -3,6 +3,8 @@ package com.haloticket.event_service.service;
 import com.haloticket.event_service.authz.EventAccess;
 import com.haloticket.event_service.dto.request.EventMemberInviteRequest;
 import com.haloticket.event_service.dto.response.EventMemberResponse;
+import com.haloticket.event_service.dto.response.MemberInvitationAcceptResponse;
+import com.haloticket.event_service.dto.response.MemberInvitationPreviewResponse;
 import com.haloticket.event_service.enums.StaffRole;
 
 import java.util.List;
@@ -10,6 +12,10 @@ import java.util.List;
 public interface EventMemberService {
     List<EventMemberResponse> getEventMembers(String eventId, String authorization);
     EventMemberResponse inviteMember(String eventId, EventMemberInviteRequest request, String authorization);
+    EventMemberResponse resendInvitation(String eventId, String assignmentId, String authorization);
+    MemberInvitationPreviewResponse previewInvitation(String token, String authorization);
+    MemberInvitationAcceptResponse acceptInvitation(String token, String authorization);
+    void declineInvitation(String token, String authorization);
     EventMemberResponse changeMemberRole(String eventId, String assignmentId, StaffRole newRole, String authorization);
     EventMemberResponse changeMemberStatus(String eventId, String assignmentId, String newStatus, String authorization);
     void removeMember(String eventId, String assignmentId, String authorization);

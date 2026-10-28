@@ -222,7 +222,11 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserInviteResponse inviteUser(UserInviteRequest request) {
-        Optional<User> existingUser = userRepository.findByEmail(request.getEmail());
+        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
+        if (email.isEmpty() || !email.contains("@")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_EMAIL");
+        }
+        Optional<User> existingUser = userRepository.findByEmail(email);
         if (existingUser.isPresent()) {
             User user = existingUser.get();
             return UserInviteResponse.builder()
@@ -234,18 +238,16 @@ public class UserServiceImpl implements UserService {
                     .build();
         }
 
-        // generate a random password
-        String generatedPassword = request.getEmail().split("@")[0] + "@123";
-        
-        // register in Keycloak
+        // an account nobody can sign in to yet: the invited person sets a password through the password reset flow,
+        // which sends a code to this very mailbox (no password is chosen, returned, logged or e-mailed here)
         try {
-            keycloakAuthPort.register(request.getEmail(), generatedPassword);
+            keycloakAuthPort.registerDormant(email);
         } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to create user in Keycloak: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to create user in Keycloak");
         }
 
         // fetch the newly created user
-        User newUser = userRepository.findByEmail(request.getEmail())
+        User newUser = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User creation failed"));
         
         // return response
@@ -255,7 +257,6 @@ public class UserServiceImpl implements UserService {
                 .name(newUser.getFullName())
                 .avatar(newUser.getAvatarUrl())
                 .isNewUser(true)
-                .generatedPassword(generatedPassword)
                 .build();
     }
 

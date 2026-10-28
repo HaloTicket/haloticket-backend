@@ -15,4 +15,5 @@ public class EventMemberResponse {
     private StaffRole role;
     private String status;
     private LocalDateTime addedAt;
+    private LocalDateTime invitationExpiresAt;
 }

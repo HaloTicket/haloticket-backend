@@ -5,6 +5,7 @@ import java.util.Optional;
 public interface KeycloakAuthPort {
     void ensureRegistrationAvailable(String email);
     void register(String email, String password);
+    void registerDormant(String email);
     Optional<String> resolvePasswordResetEmail(String identifier);
     String issueResetToken(String challengeId);
     void resetPassword(String resetToken, String password);
