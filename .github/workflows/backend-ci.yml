@@ -26,9 +26,37 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Pick the commit to compare with (the one before this push)
+        id: base
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # dorny/paths-filter compares a push to a branch other than the default one (here: develop) with the merge-base
+          # with the default branch (main), not with the previous commit of the push, so every service that differs from
+          # main looks changed. Compare with the commit this push started from instead (the filters below do not change).
+          zeros=0000000000000000000000000000000000000000
+          base=""
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "$zeros" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            base="$BEFORE"
+            echo "comparing with the commit before the push: ${base:0:12}"
+          else
+            # new branch (before is all zeros) or a force-push that dropped the old commit: use the parent of the pushed commit
+            base="$(git rev-parse --verify --quiet "$AFTER^1" || true)"
+            if [ -n "$base" ]; then
+              echo "before=${BEFORE:0:12} is not usable; comparing with the parent of the pushed commit: ${base:0:12}"
+            else
+              echo "::warning::no previous commit to compare with; paths-filter falls back to its default"
+            fi
+          fi
+          if [ -n "$base" ]; then git diff --name-only "$base" "$AFTER" | sed 's/^/changed: /'; fi
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
       - uses: dorny/paths-filter@v3
         id: filter
         with:
+          base: ${{ steps.base.outputs.sha }}
+          ref: ${{ github.sha }}
           filters: |
             shared-files:
               - 'docker-compose.yml'
