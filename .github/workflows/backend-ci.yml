@@ -60,9 +60,9 @@ jobs:
             ai-assistant-service:
               - 'ai-assistant-service/**'
 
-  # STEP 2: Build & Deploy Changed Microservices
-  # 2.1. API Gateway
-  deploy-api-gateway:
+  # STEP 2: Build and push the images of the changed microservices
+  # 2.1. Api Gateway: build and push the image
+  build-api-gateway:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.api-gateway == 'true' }}
     runs-on: ubuntu-latest
@@ -87,22 +87,9 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/haloticket-api-gateway:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Deploy to AWS EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/haloticket-backend
-            git pull origin ${{ github.ref_name }}
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-            docker compose pull api-gateway
-            docker compose up -d --no-deps api-gateway
-            docker image prune -f || true
 
-  # 2.2. Event Service
-  deploy-event-service:
+  # 2.2. Event Service: build and push the image
+  build-event-service:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.event-service == 'true' }}
     runs-on: ubuntu-latest
@@ -127,22 +114,9 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/haloticket-event-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Deploy to AWS EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/haloticket-backend
-            git pull origin ${{ github.ref_name }}
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-            docker compose pull event-service
-            docker compose up -d --no-deps event-service
-            docker image prune -f || true
 
-  # 2.3. Ticket Service
-  deploy-ticket-service:
+  # 2.3. Ticket Service: build and push the image
+  build-ticket-service:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.ticket-service == 'true' }}
     runs-on: ubuntu-latest
@@ -167,22 +141,9 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/haloticket-ticket-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Deploy to AWS EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/haloticket-backend
-            git pull origin ${{ github.ref_name }}
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-            docker compose pull ticket-service
-            docker compose up -d --no-deps ticket-service
-            docker image prune -f || true
 
-  # 2.4. Booking Service
-  deploy-booking-service:
+  # 2.4. Booking Service: build and push the image
+  build-booking-service:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.booking-service == 'true' }}
     runs-on: ubuntu-latest
@@ -207,22 +168,9 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/haloticket-booking-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Deploy to AWS EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/haloticket-backend
-            git pull origin ${{ github.ref_name }}
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-            docker compose pull booking-service
-            docker compose up -d --no-deps booking-service
-            docker image prune -f || true
 
-  # 2.5. Payment Service
-  deploy-payment-service:
+  # 2.5. Payment Service: build and push the image
+  build-payment-service:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.payment-service == 'true' }}
     runs-on: ubuntu-latest
@@ -247,22 +195,9 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/haloticket-payment-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Deploy to AWS EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/haloticket-backend
-            git pull origin ${{ github.ref_name }}
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-            docker compose pull payment-service
-            docker compose up -d --no-deps payment-service
-            docker image prune -f || true
 
-  # 2.6. User Service
-  deploy-user-service:
+  # 2.6. User Service: build and push the image
+  build-user-service:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.user-service == 'true' }}
     runs-on: ubuntu-latest
@@ -287,22 +222,9 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/haloticket-user-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Deploy to AWS EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/haloticket-backend
-            git pull origin ${{ github.ref_name }}
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-            docker compose pull user-service
-            docker compose up -d --no-deps user-service
-            docker image prune -f || true
 
-  # 2.7. Media Service
-  deploy-media-service:
+  # 2.7. Media Service: build and push the image
+  build-media-service:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.media-service == 'true' }}
     runs-on: ubuntu-latest
@@ -327,22 +249,9 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/haloticket-media-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Deploy to AWS EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/haloticket-backend
-            git pull origin ${{ github.ref_name }}
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-            docker compose pull media-service
-            docker compose up -d --no-deps media-service
-            docker image prune -f || true
 
-  # 2.8. Notification Service
-  deploy-notification-service:
+  # 2.8. Notification Service: build and push the image
+  build-notification-service:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.notification-service == 'true' }}
     runs-on: ubuntu-latest
@@ -367,22 +276,9 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/haloticket-notification-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Deploy to AWS EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/haloticket-backend
-            git pull origin ${{ github.ref_name }}
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-            docker compose pull notification-service
-            docker compose up -d --no-deps notification-service
-            docker image prune -f || true
 
-  # 2.9. Discovery Server (Eureka)
-  deploy-discovery-server:
+  # 2.9. Discovery Server (Eureka): build and push the image
+  build-discovery-server:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.discovery-server == 'true' }}
     runs-on: ubuntu-latest
@@ -407,22 +303,9 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/haloticket-discovery-server:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Deploy to AWS EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/haloticket-backend
-            git pull origin ${{ github.ref_name }}
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-            docker compose pull discovery-server
-            docker compose up -d --no-deps discovery-server
-            docker image prune -f || true
 
-  # 2.10. Marketplace Service
-  deploy-marketplace-service:
+  # 2.10. Marketplace Service: build and push the image 
+  build-marketplace-service:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.marketplace-service == 'true' }}
     runs-on: ubuntu-latest
@@ -447,22 +330,9 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/haloticket-marketplace-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Deploy to AWS EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/haloticket-backend
-            git pull origin ${{ github.ref_name }}
-            export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-            docker compose pull marketplace-service
-            docker compose up -d --no-deps marketplace-service
-            docker image prune -f || true
 
-  # 2.11. AI Assistant Service (Python)
-  deploy-ai-assistant-service:
+  # 2.11. AI Assistant Service (Python): build and push the image
+  build-ai-assistant-service:
     needs: detect-changes
     if: ${{ needs.detect-changes.outputs.ai-assistant-service == 'true' }}
     runs-on: ubuntu-latest
@@ -486,25 +356,134 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/haloticket-ai-assistant-service:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Deploy to AWS EC2 via SSH
+
+  # STEP 3: Deploy to the VPS, ONE job, one service after the other.
+  deploy-vps:
+    name: Deploy changed services to the VPS
+    needs: [detect-changes, build-discovery-server, build-user-service, build-event-service, build-ticket-service, build-booking-service, build-payment-service, build-marketplace-service, build-notification-service, build-media-service, build-ai-assistant-service, build-api-gateway]
+    if: ${{ !cancelled() && needs.detect-changes.result == 'success' && (
+      (needs.detect-changes.outputs.discovery-server == 'true' && needs.build-discovery-server.result == 'success') ||
+      (needs.detect-changes.outputs.user-service == 'true' && needs.build-user-service.result == 'success') ||
+      (needs.detect-changes.outputs.event-service == 'true' && needs.build-event-service.result == 'success') ||
+      (needs.detect-changes.outputs.ticket-service == 'true' && needs.build-ticket-service.result == 'success') ||
+      (needs.detect-changes.outputs.booking-service == 'true' && needs.build-booking-service.result == 'success') ||
+      (needs.detect-changes.outputs.payment-service == 'true' && needs.build-payment-service.result == 'success') ||
+      (needs.detect-changes.outputs.marketplace-service == 'true' && needs.build-marketplace-service.result == 'success') ||
+      (needs.detect-changes.outputs.notification-service == 'true' && needs.build-notification-service.result == 'success') ||
+      (needs.detect-changes.outputs.media-service == 'true' && needs.build-media-service.result == 'success') ||
+      (needs.detect-changes.outputs.ai-assistant-service == 'true' && needs.build-ai-assistant-service.result == 'success') ||
+      (needs.detect-changes.outputs.api-gateway == 'true' && needs.build-api-gateway.result == 'success')) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH (one at a time, verified)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          timeout: 60s
+          command_timeout: 45m
           script: |
+            set -Eeuo pipefail
+
+            # What this run deploys: changed AND built. BUILD_FAILED: changed, but the image build did not succeed.
+            SERVICES="${{ needs.detect-changes.outputs.discovery-server == 'true' && needs.build-discovery-server.result == 'success' && 'discovery-server ' || '' }}${{ needs.detect-changes.outputs.user-service == 'true' && needs.build-user-service.result == 'success' && 'user-service ' || '' }}${{ needs.detect-changes.outputs.event-service == 'true' && needs.build-event-service.result == 'success' && 'event-service ' || '' }}${{ needs.detect-changes.outputs.ticket-service == 'true' && needs.build-ticket-service.result == 'success' && 'ticket-service ' || '' }}${{ needs.detect-changes.outputs.booking-service == 'true' && needs.build-booking-service.result == 'success' && 'booking-service ' || '' }}${{ needs.detect-changes.outputs.payment-service == 'true' && needs.build-payment-service.result == 'success' && 'payment-service ' || '' }}${{ needs.detect-changes.outputs.marketplace-service == 'true' && needs.build-marketplace-service.result == 'success' && 'marketplace-service ' || '' }}${{ needs.detect-changes.outputs.notification-service == 'true' && needs.build-notification-service.result == 'success' && 'notification-service ' || '' }}${{ needs.detect-changes.outputs.media-service == 'true' && needs.build-media-service.result == 'success' && 'media-service ' || '' }}${{ needs.detect-changes.outputs.ai-assistant-service == 'true' && needs.build-ai-assistant-service.result == 'success' && 'ai-assistant-service ' || '' }}${{ needs.detect-changes.outputs.api-gateway == 'true' && needs.build-api-gateway.result == 'success' && 'api-gateway ' || '' }}"
+            BUILD_FAILED="${{ needs.detect-changes.outputs.discovery-server == 'true' && needs.build-discovery-server.result != 'success' && 'discovery-server ' || '' }}${{ needs.detect-changes.outputs.user-service == 'true' && needs.build-user-service.result != 'success' && 'user-service ' || '' }}${{ needs.detect-changes.outputs.event-service == 'true' && needs.build-event-service.result != 'success' && 'event-service ' || '' }}${{ needs.detect-changes.outputs.ticket-service == 'true' && needs.build-ticket-service.result != 'success' && 'ticket-service ' || '' }}${{ needs.detect-changes.outputs.booking-service == 'true' && needs.build-booking-service.result != 'success' && 'booking-service ' || '' }}${{ needs.detect-changes.outputs.payment-service == 'true' && needs.build-payment-service.result != 'success' && 'payment-service ' || '' }}${{ needs.detect-changes.outputs.marketplace-service == 'true' && needs.build-marketplace-service.result != 'success' && 'marketplace-service ' || '' }}${{ needs.detect-changes.outputs.notification-service == 'true' && needs.build-notification-service.result != 'success' && 'notification-service ' || '' }}${{ needs.detect-changes.outputs.media-service == 'true' && needs.build-media-service.result != 'success' && 'media-service ' || '' }}${{ needs.detect-changes.outputs.ai-assistant-service == 'true' && needs.build-ai-assistant-service.result != 'success' && 'ai-assistant-service ' || '' }}${{ needs.detect-changes.outputs.api-gateway == 'true' && needs.build-api-gateway.result != 'success' && 'api-gateway ' || '' }}"
+            if [ -n "${BUILD_FAILED//[[:space:]]/}" ]; then
+              echo "NOT deployed, their image build did not succeed: $BUILD_FAILED"
+            fi
+            if [ -z "${SERVICES//[[:space:]]/}" ]; then
+              echo "nothing to deploy"
+              exit 0
+            fi
+
+            # One deploy at a time on this machine, also across workflow runs started by pushes close together.
+            exec 9>/tmp/haloticket-deploy.lock
+            echo "waiting for the deploy lock..."
+            flock -w 1800 9 || { echo "deploy lock not acquired within 30 minutes"; exit 1; }
+
             cd /home/ubuntu/haloticket-backend
             git pull origin ${{ github.ref_name }}
             export DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}
-            docker compose pull ai-assistant-service
-            docker compose up -d --no-deps ai-assistant-service
+
+            short_id() { local id="${1#sha256:}"; echo "${id:0:12}"; }
+
+            # docker compose pull, at most 3 attempts, 10 seconds apart
+            pull_with_retry() {
+              local svc="$1" attempt
+              for attempt in 1 2 3; do
+                if docker compose pull "$svc"; then return 0; fi
+                echo "docker compose pull $svc failed (attempt $attempt/3)"
+                if [ "$attempt" -lt 3 ]; then sleep 10; fi
+              done
+              return 1
+            }
+
+            # the image reference the compose file uses for this service
+            image_ref() {
+              local ref
+              ref="$(docker compose config --images 2>/dev/null | grep -E "/haloticket-$1:[^/]+$" | head -n 1 || true)"
+              echo "${ref:-${DOCKERHUB_USERNAME}/haloticket-$1:${IMAGE_TAG:-latest}}"
+            }
+
+            deploy_one() {
+              local svc="$1" ref want cid have waited=0 status
+              echo "=== $svc ==="
+              if ! pull_with_retry "$svc"; then
+                echo "$svc: pull failed 3 times; the container is NOT recreated"
+                return 1
+              fi
+              docker compose up -d --no-deps "$svc" || { echo "$svc: docker compose up failed"; return 1; }
+
+              # the container must run the image that was just pulled
+              ref="$(image_ref "$svc")"
+              want="$(docker image inspect -f '{{.Id}}' "$ref")" || { echo "$svc: image $ref not found locally"; return 1; }
+              cid="$(docker compose ps -q "$svc")"
+              if [ -z "$cid" ]; then echo "$svc: no container after up"; return 1; fi
+              have="$(docker inspect -f '{{.Image}}' "$cid")"
+              if [ "$have" != "$want" ]; then
+                echo "$svc: the container runs image $(short_id "$have") but $ref is $(short_id "$want")"
+                return 1
+              fi
+
+              # wait for the container to be healthy, at most 3 minutes
+              while [ "$waited" -lt 180 ]; do
+                if [ "$(docker inspect -f '{{.State.Running}}' "$cid")" != "true" ]; then
+                  echo "$svc: the container stopped (exit code $(docker inspect -f '{{.State.ExitCode}}' "$cid"))"
+                  return 1
+                fi
+                status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}nohealthcheck{{end}}' "$cid")"
+                if [ "$status" = "healthy" ]; then echo "$svc: healthy, image $(short_id "$have")"; return 0; fi
+                if [ "$status" = "nohealthcheck" ] && [ "$waited" -ge 20 ]; then
+                  echo "$svc: no healthcheck defined, running for 20 s, image $(short_id "$have")"
+                  return 0
+                fi
+                sleep 5
+                waited=$((waited + 5))
+              done
+              echo "$svc: not healthy within 3 minutes (status: $status)"
+              return 1
+            }
+
+            DONE=""
+            FAILED=""
+            for svc in $SERVICES; do
+              if deploy_one "$svc"; then DONE="$DONE $svc"; else FAILED="$FAILED $svc"; fi
+            done
+            echo "deployed:${DONE:- none}"
+            if [ -n "$FAILED" ]; then
+              echo "FAILED:$FAILED"
+              exit 1
+            fi
+            # once, after everything succeeded (a failed deploy keeps the old images for a manual rollback)
             docker image prune -f || true
 
-  # STEP 3: Sync Shared Files to VPS (scripts, docker-compose.yml, .env.example, etc.)
+  # STEP 4: Sync Shared Files to VPS
   sync-shared-files:
     name: Sync Shared Files to VPS
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.shared-files == 'true' }}
+    needs: [detect-changes, deploy-vps]
+    if: ${{ !cancelled() && needs.detect-changes.result == 'success' && needs.detect-changes.outputs.shared-files == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Deploy Shared Files via SSH
@@ -513,11 +492,16 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          script_stop: true
+          timeout: 60s
+          command_timeout: 45m
           script: |
+            set -Eeuo pipefail
+            exec 9>/tmp/haloticket-deploy.lock
+            flock -w 1800 9 || { echo "deploy lock not acquired within 30 minutes"; exit 1; }
             cd /home/ubuntu/haloticket-backend
             git pull origin ${{ github.ref_name }}
             # Restart alert watchdog service if already running
             if systemctl is-active --quiet haloticket-alert; then
               sudo systemctl restart haloticket-alert
             fi
-
