@@ -5,6 +5,7 @@ import com.haloticket.ticket_service.dto.request.TicketTypeCreateRequest;
 import com.haloticket.ticket_service.dto.response.OwnedTicketResponse;
 import com.haloticket.ticket_service.dto.response.SeatLayoutResponse;
 import com.haloticket.ticket_service.dto.response.TicketTypeResponse;
+import com.haloticket.ticket_service.util.TicketQuantities;
 import com.haloticket.ticket_service.entity.SeatLayout;
 import com.haloticket.ticket_service.entity.SeatZone;
 import com.haloticket.ticket_service.entity.Ticket;
@@ -380,8 +381,10 @@ public class TicketServiceImpl implements TicketService {
                 .isFree(entity.getIsFree())
                 .totalQuantity(entity.getTotalQuantity())
                 .initialQuantity(entity.getInitialQuantity())
-                .availableQuantity(entity.getTotalQuantity() == null ? null
-                        : Math.max(0, entity.getTotalQuantity() - (entity.getReservedQuantity() == null ? 0 : entity.getReservedQuantity())))
+                .availableQuantity(TicketQuantities.available(entity.getTotalQuantity(), entity.getReservedQuantity()))
+                .remainingQuantity(TicketQuantities.remaining(entity.getTotalQuantity()))
+                .heldQuantity(TicketQuantities.held(entity.getReservedQuantity()))
+                .soldQuantity(TicketQuantities.sold(entity.getInitialQuantity(), entity.getTotalQuantity()))
                 .minPerOrder(entity.getMinPerOrder())
                 .maxPerOrder(entity.getMaxPerOrder())
                 .description(entity.getDescription())

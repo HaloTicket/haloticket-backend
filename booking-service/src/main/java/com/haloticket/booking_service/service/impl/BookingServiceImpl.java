@@ -17,6 +17,7 @@ import com.haloticket.booking_service.repository.SeatReservationRepository;
 import com.haloticket.booking_service.service.BookingService;
 import com.haloticket.booking_service.service.GaReservationService;
 import com.haloticket.booking_service.client.TicketServiceClient;
+import com.haloticket.booking_service.service.OrderLimitValidator;
 import com.haloticket.booking_service.dto.response.BookingDetailResponse;
 import com.haloticket.booking_service.dto.response.TicketTypeDto;
 import org.redisson.client.codec.StringCodec;
@@ -58,6 +59,7 @@ public class BookingServiceImpl implements BookingService {
     private final EventServiceClient eventServiceClient;
     private final TicketServiceClient ticketServiceClient;
     private final GaReservationService gaReservationService;
+    private final OrderLimitValidator orderLimitValidator;
 
     @Override
     @Transactional
@@ -66,6 +68,8 @@ public class BookingServiceImpl implements BookingService {
         // with booking.ga.reservation.enabled off this is the request untouched.
         GaReservationService.Plan gaPlan = gaReservationService.plan(request);
         List<String> seatIds = gaPlan.seatIds();
+        // 422 QUANTITY_OUT_OF_RANGE when the quantity of a ticket type is below minPerOrder or above maxPerOrder
+        orderLimitValidator.validate(request);
 
         // 1. acquire Redisson Distributed Lock for Event
         String lockKey = "lock:event:" + eventId + ":booking";

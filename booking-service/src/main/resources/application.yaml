@@ -42,6 +42,11 @@ booking:
       internal-token: ${TICKET_RESERVATION_INTERNAL_TOKEN:}
       slack-seconds: ${BOOKING_GA_RESERVATION_SLACK_SECONDS:60}
 
+# order limits (OrderLimitValidator): a failed or slow read only skips the check, so keep the wait short
+spring.cloud.openfeign.client.config.ticketOrderLimitClient:
+  connect-timeout: 1000
+  read-timeout: 2000
+
 spring.cloud.openfeign.client.config.ticketStockClient:
   connect-timeout: 2000
   read-timeout: 5000

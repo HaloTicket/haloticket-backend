@@ -95,7 +95,7 @@ class BookingGaCreateBookingTest {
         properties.setInternalToken(TOKEN);
         GaReservationService ga = new GaReservationService(properties, stockClient, new ObjectMapper());
         service = new BookingServiceImpl(bookings, seatReservations, outbox, redisson, redis, new ObjectMapper(),
-                mock(EventServiceClient.class), mock(TicketServiceClient.class), ga);
+                mock(EventServiceClient.class), mock(TicketServiceClient.class), ga, mock(OrderLimitValidator.class));
     }
 
     private static BookingItemRequest item(String typeId, int quantity, Boolean ga) {

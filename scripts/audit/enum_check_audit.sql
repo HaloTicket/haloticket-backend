@@ -76,6 +76,8 @@ WITH expected(tbl, col, val) AS (VALUES
   ('staff_assignments', 'role', 'CHECKIN_STAFF'),
   ('staff_assignments', 'status', 'ACTIVE'),
   ('staff_assignments', 'status', 'REVOKED'),
+  ('staff_assignments', 'status', 'PENDING'),
+  ('staff_assignments', 'status', 'DECLINED'),
   ('vouchers', 'apply_scope', 'ALL'),
   ('vouchers', 'apply_scope', 'LIMITED_SHOWTIMES'),
   ('vouchers', 'discount_type', 'PERCENTAGE'),
