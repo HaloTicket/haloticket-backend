@@ -6,6 +6,8 @@ import os
 import pytest
 from sqlalchemy import text
 
+from sqlalchemy.engine import make_url
+
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.services.ai import scope as scope_module
@@ -22,6 +24,13 @@ pytestmark = [
 def rows(sql, **params):
     with SessionLocal() as db:
         return db.execute(text(sql), params).fetchall()
+
+
+def _use_the_dev_account(monkeypatch):
+    """The analysis account is required now; the dev database has no read-only role, so these tests use the account in DATABASE_URL."""
+    url = make_url(settings.database_url)
+    monkeypatch.setattr(settings, "ai_db_user", url.username or "")
+    monkeypatch.setattr(settings, "ai_db_password", url.password or "")
 
 
 @pytest.fixture(scope="module")
@@ -41,7 +50,7 @@ def fresh_cache():
 
 @pytest.fixture
 def engine(monkeypatch):
-    monkeypatch.setattr(settings, "ai_db_user", "")
+    _use_the_dev_account(monkeypatch)
     monkeypatch.setattr(settings, "ai_analysis_schema", "public")
     monkeypatch.setattr(settings, "ai_sql_allowed_relations", "events,event_showtimes,venues")
     monkeypatch.setattr(settings, "ai_scope_columns", "events:id,event_showtimes:event_id")

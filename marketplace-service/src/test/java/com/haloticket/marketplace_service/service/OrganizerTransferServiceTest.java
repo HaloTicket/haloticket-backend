@@ -36,7 +36,6 @@ class OrganizerTransferServiceTest {
     private EventTransferPolicyService policyGate;
     private OrganizerTransferService service;
     private TicketListingService ticketListingService;
-    private EventScopeProperties scope;
 
     @BeforeEach
     void setUp() {
@@ -45,43 +44,29 @@ class OrganizerTransferServiceTest {
         transferRepository = mock(TicketTransferRepository.class);
         policyGate = mock(EventTransferPolicyService.class);
         ticketListingService = mock(TicketListingService.class);
-        scope = new EventScopeProperties();
-        service = new OrganizerTransferService(eventServiceClient, listingRepository, transferRepository, policyGate, ticketListingService,
-                new EventAccessClient(eventServiceClient, scope), scope);
+        service = new OrganizerTransferService(listingRepository, transferRepository, policyGate, ticketListingService,
+                new EventAccessClient(eventServiceClient, new EventScopeProperties()));
     }
 
     @Test
-    void requireOrganizerAccess_allowsRawAndQuotedRoles() {
-        // Quoted JSON from OpenFeign: "\"OWNER\""
-        when(eventServiceClient.getMyRole("Bearer tok1", "evt-1")).thenReturn("\"OWNER\"");
-        assertThatCode(() -> service.requireOrganizerAccess("Bearer tok1", "evt-1")).doesNotThrowAnyException();
+    void requireOrganizerAccess_allowsMarketplaceViewers() {
+        grant("Bearer owner", "MARKETPLACE_VIEW", "MARKETPLACE_MODERATE");
+        grant("Bearer manager", "MARKETPLACE_VIEW");
 
-        // Quoted MANAGER
-        when(eventServiceClient.getMyRole("Bearer tok2", "evt-1")).thenReturn("\"MANAGER\"");
-        assertThatCode(() -> service.requireOrganizerAccess("Bearer tok2", "evt-1")).doesNotThrowAnyException();
-
-        // Raw OWNER
-        when(eventServiceClient.getMyRole("Bearer tok3", "evt-1")).thenReturn("OWNER");
-        assertThatCode(() -> service.requireOrganizerAccess("Bearer tok3", "evt-1")).doesNotThrowAnyException();
-
-        // Raw ADMIN
-        when(eventServiceClient.getMyRole("Bearer tok4", "evt-1")).thenReturn("ADMIN");
-        assertThatCode(() -> service.requireOrganizerAccess("Bearer tok4", "evt-1")).doesNotThrowAnyException();
+        assertThatCode(() -> service.requireOrganizerAccess("Bearer owner", "evt-1")).doesNotThrowAnyException();
+        assertThatCode(() -> service.requireOrganizerAccess("Bearer manager", "evt-1")).doesNotThrowAnyException();
     }
 
     @Test
-    void requireOrganizerAccess_deniesStaffOrInvalidRoles() {
-        // STAFF should be forbidden
-        when(eventServiceClient.getMyRole("Bearer tok", "evt-1")).thenReturn("\"STAFF\"");
-        assertThatThrownBy(() -> service.requireOrganizerAccess("Bearer tok", "evt-1"))
-                .isInstanceOf(ResponseStatusException.class)
-                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+    void requireOrganizerAccess_deniesCheckinStaffAndOtherEvents() {
+        grant("Bearer staff", "CHECKIN_SCAN");
+        assertThatThrownBy(() -> service.requireOrganizerAccess("Bearer staff", "evt-1"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
 
-        // null role should be forbidden
-        when(eventServiceClient.getMyRole("Bearer tok", "evt-2")).thenReturn(null);
-        assertThatThrownBy(() -> service.requireOrganizerAccess("Bearer tok", "evt-2"))
-                .isInstanceOf(ResponseStatusException.class)
-                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
+        // an owner of evt-1 is refused by event-service for evt-2
+        when(eventServiceClient.getMyAccess("evt-2", "Bearer owner")).thenThrow(forbidden());
+        assertThatThrownBy(() -> service.requireOrganizerAccess("Bearer owner", "evt-2"))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
     }
 
     @Test
@@ -93,7 +78,7 @@ class OrganizerTransferServiceTest {
 
     @Test
     void getListings_returnsMappedOrganizerPage() {
-        when(eventServiceClient.getMyRole("Bearer tok", "evt-1")).thenReturn("\"OWNER\"");
+        grant("Bearer tok", "MARKETPLACE_VIEW", "MARKETPLACE_MODERATE");
 
         TicketListing listing = TicketListing.builder()
                 .id("list-12345678")
@@ -124,7 +109,7 @@ class OrganizerTransferServiceTest {
 
     @Test
     void ownerAndAdminCanDelegateOrganizerActionsWithAuthenticatedActor() {
-        when(eventServiceClient.getMyRole("Bearer tok", "evt-1")).thenReturn("\"OWNER\"", "ADMIN", "OWNER");
+        grant("Bearer tok", "MARKETPLACE_VIEW", "MARKETPLACE_MODERATE");
         when(listingRepository.findById("listing-1")).thenReturn(Optional.of(TicketListing.builder().eventId("evt-1").build()));
         when(transferRepository.findBySagaId("gift-1")).thenReturn(Optional.of(TicketTransfer.builder().eventId("evt-1").build()));
 
@@ -139,7 +124,7 @@ class OrganizerTransferServiceTest {
 
     @Test
     void managerHasReadAccessButCannotMutateAnyTransfer() {
-        when(eventServiceClient.getMyRole("Bearer tok", "evt-1")).thenReturn("MANAGER");
+        grant("Bearer tok", "MARKETPLACE_VIEW");
         service.requireOrganizerAccess("Bearer tok", "evt-1");
 
         assertThatThrownBy(() -> service.moderateListing("Bearer tok", "actor", "evt-1", "listing", true, null))
@@ -154,7 +139,7 @@ class OrganizerTransferServiceTest {
 
     @Test
     void organizerCannotMutateRecordsFromAnotherEvent() {
-        when(eventServiceClient.getMyRole("Bearer tok", "evt-1")).thenReturn("OWNER");
+        grant("Bearer tok", "MARKETPLACE_VIEW", "MARKETPLACE_MODERATE");
         when(listingRepository.findById("listing")).thenReturn(Optional.of(TicketListing.builder().eventId("evt-2").build()));
         when(transferRepository.findBySagaId("gift")).thenReturn(Optional.of(TicketTransfer.builder().eventId("evt-2").build()));
 
@@ -171,7 +156,7 @@ class OrganizerTransferServiceTest {
     @Test
     void giftMetadataUsesActualTransferTimeWithoutInventingRecipientVerification() {
         Instant receivedAt = Instant.parse("2026-10-15T00:00:00Z");
-        when(eventServiceClient.getMyRole("Bearer tok", "evt-1")).thenReturn("OWNER");
+        grant("Bearer tok", "MARKETPLACE_VIEW", "MARKETPLACE_MODERATE");
         when(transferRepository.findBySagaId("gift")).thenReturn(Optional.of(TicketTransfer.builder()
                 .sagaId("gift").ticketId("ticket").eventId("evt-1").status(com.haloticket.marketplace_service.enums.TransferStatus.COMPLETED)
                 .requireEkyc(true).transferredAt(receivedAt).build()));
@@ -185,7 +170,7 @@ class OrganizerTransferServiceTest {
 
     @Test
     void giftReadModelsExposeVerificationRecordedDuringAcceptance() {
-        when(eventServiceClient.getMyRole("Bearer tok", "evt-1")).thenReturn("OWNER");
+        grant("Bearer tok", "MARKETPLACE_VIEW", "MARKETPLACE_MODERATE");
         TicketTransfer transfer = TicketTransfer.builder().sagaId("gift").ticketId("ticket").eventId("evt-1")
                 .status(com.haloticket.marketplace_service.enums.TransferStatus.COMPLETED).recipientEkycVerified(true).build();
         when(transferRepository.findBySagaId("gift")).thenReturn(Optional.of(transfer));
@@ -195,18 +180,20 @@ class OrganizerTransferServiceTest {
         assertThat(service.getGifts("Bearer tok", "evt-1", PageRequest.of(0, 20), null).getContent().get(0).isRecipientEkycVerified()).isTrue();
     }
 
+    private void grant(String token, String... permissions) {
+        when(eventServiceClient.getMyAccess("evt-1", token)).thenReturn(access("MEMBER", permissions));
+    }
+
+    private static feign.FeignException.Forbidden forbidden() {
+        return new feign.FeignException.Forbidden("no", feign.Request.create(feign.Request.HttpMethod.GET, "/x", java.util.Map.of(), null, java.nio.charset.StandardCharsets.UTF_8, null), new byte[0], java.util.Map.of());
+    }
+
     private static EventAccessView access(String role, String... permissions) {
         return new EventAccessView("evt-1", "u-1", false, role, "as-1", List.of(permissions));
     }
 
-    private void switchOrdersOn() {
-        scope.setEnabled(true);
-        scope.getOrders().setEnabled(true);
-    }
-
     @Test
-    void withTheSwitchOnReadsNeedMarketplaceViewAndChangesNeedModerate() {
-        switchOrdersOn();
+    void readsNeedMarketplaceViewAndChangesNeedModerate() {
         when(eventServiceClient.getMyAccess("evt-1", "Bearer manager")).thenReturn(access("MANAGER", "MARKETPLACE_VIEW"));
         when(eventServiceClient.getMyAccess("evt-1", "Bearer admin")).thenReturn(access("ADMIN", "MARKETPLACE_VIEW", "MARKETPLACE_MODERATE"));
         when(eventServiceClient.getMyAccess("evt-1", "Bearer checkin")).thenReturn(access("CHECKIN_STAFF", "CHECKIN_SCAN"));
@@ -218,13 +205,10 @@ class OrganizerTransferServiceTest {
         // a manager may look but not moderate
         assertThatThrownBy(() -> service.cancelListing("Bearer manager", "actor", "evt-1", "listing", "why"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
-        // the old role endpoint is not asked at all
-        verify(eventServiceClient, never()).getMyRole(anyString(), anyString());
     }
 
     @Test
-    void withTheSwitchOnAStrangerAndAnEventServiceOutageAreRefused() {
-        switchOrdersOn();
+    void aStrangerAndAnEventServiceOutageAreRefused() {
         when(eventServiceClient.getMyAccess("evt-1", "Bearer stranger"))
                 .thenThrow(new feign.FeignException.Forbidden("no", feign.Request.create(feign.Request.HttpMethod.GET, "/x", java.util.Map.of(), null, java.nio.charset.StandardCharsets.UTF_8, null), new byte[0], java.util.Map.of()));
         when(eventServiceClient.getMyAccess("evt-1", "Bearer down")).thenThrow(new RuntimeException("connection refused"));

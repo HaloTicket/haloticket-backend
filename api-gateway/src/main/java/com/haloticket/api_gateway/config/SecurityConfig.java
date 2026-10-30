@@ -69,18 +69,6 @@ public class SecurityConfig {
         return source;
     }
 
-    @Value("${gateway.authz.enabled:true}")
-    private boolean authzEnabled = true;
-
-    /**
-     * The AI routes that analyse event data through the language model (data analysis, voucher strategy) need ROLE_ADMIN.
-     * Set it to false to let organizers in: ai-assistant then limits each of them to the events they manage (see
-     * AI_ANALYSIS_ORGANIZER_ENABLED there). The organizer agent is not scoped yet and needs ROLE_ADMIN whatever this says.
-     * Only has an effect while authzEnabled is true.
-     */
-    @Value("${gateway.authz.ai-analysis-admin-only.enabled:true}")
-    private boolean aiAnalysisAdminOnly = true;
-
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         http
@@ -95,32 +83,25 @@ public class SecurityConfig {
                             .pathMatchers("/api/events/admin/reports", "/api/events/admin/reports/**",
                                     "/api/payments/admin/report-payments")
                             .access(SecurityConfig::adminOnly);
-                    if (authzEnabled) {
-                        // before the generic /api/organizer/** rule further down, which only asks for a login
-                        exchange.pathMatchers("/api/organizer/agent-chat").access(SecurityConfig::adminOnly);
-                        if (aiAnalysisAdminOnly) {
-                            exchange.pathMatchers("/api/organizer/data-analysis", "/api/organizer/voucher-strategy")
-                                    .access(SecurityConfig::adminOnly);
-                        }
-                        exchange.pathMatchers("/api/admin/**", "/api/payouts/admin/**", "/api/users/admin", "/api/users/admin/**")
-                                .access(SecurityConfig::adminOnly);
-                        // open to anonymous visitors: event, ticket-type and seat-map reads, the view and search counters,
-                        // the homepage configuration. Everything else that writes needs a login.
-                        exchange.pathMatchers(HttpMethod.POST, "/api/events/*/view", "/api/events/search-log").permitAll()
-                                .pathMatchers(HttpMethod.GET, "/api/events/*/analytics", "/api/events/my-events", "/api/events/organizer-profile",
-                                        "/api/events/*/members", "/api/events/*/members/**", "/api/events/*/transfer-settings").authenticated()
-                                .pathMatchers(HttpMethod.GET, "/api/events", "/api/events/**").permitAll()
-                                .pathMatchers("/api/events/**").authenticated()
-                                .pathMatchers("/api/tickets/checkin", "/api/tickets/checkin/**").authenticated()
-                                .pathMatchers(HttpMethod.GET, "/api/tickets/**").permitAll()
-                                .pathMatchers("/api/tickets/**").authenticated()
-                                .pathMatchers(HttpMethod.GET, "/api/media/**").permitAll()
-                                .pathMatchers("/api/media/**").authenticated()
-                                .pathMatchers("/api/v1/**", "/ws-notifications/**").permitAll();
-                    } else {
-                        exchange.pathMatchers("/api/events/**", "/api/tickets/**", "/api/media/**",
-                                "/api/v1/**", "/ws-notifications/**").permitAll();
-                    }
+                    // before the generic /api/organizer/** rule further down, which only asks for a login. The AI analysis
+                    // routes (data-analysis, voucher-strategy) only need a login: ai-assistant limits an organizer to the
+                    // events they manage. The organizer agent is not scoped and needs ROLE_ADMIN.
+                    exchange.pathMatchers("/api/organizer/agent-chat").access(SecurityConfig::adminOnly);
+                    exchange.pathMatchers("/api/admin/**", "/api/payouts/admin/**", "/api/users/admin", "/api/users/admin/**")
+                            .access(SecurityConfig::adminOnly);
+                    // open to anonymous visitors: event, ticket-type and seat-map reads, the view and search counters,
+                    // the homepage configuration. Everything else that writes needs a login.
+                    exchange.pathMatchers(HttpMethod.POST, "/api/events/*/view", "/api/events/search-log").permitAll()
+                            .pathMatchers(HttpMethod.GET, "/api/events/*/analytics", "/api/events/my-events", "/api/events/organizer-profile",
+                                    "/api/events/*/members", "/api/events/*/members/**", "/api/events/*/transfer-settings").authenticated()
+                            .pathMatchers(HttpMethod.GET, "/api/events", "/api/events/**").permitAll()
+                            .pathMatchers("/api/events/**").authenticated()
+                            .pathMatchers("/api/tickets/checkin", "/api/tickets/checkin/**").authenticated()
+                            .pathMatchers(HttpMethod.GET, "/api/tickets/**").permitAll()
+                            .pathMatchers("/api/tickets/**").authenticated()
+                            .pathMatchers(HttpMethod.GET, "/api/media/**").permitAll()
+                            .pathMatchers("/api/media/**").authenticated()
+                            .pathMatchers("/api/v1/**", "/ws-notifications/**").permitAll();
                     exchange
                             .pathMatchers("/api/marketplace/listings/me", "/api/marketplace/sagas/**").authenticated()
                             .pathMatchers(HttpMethod.GET,
@@ -130,15 +111,11 @@ public class SecurityConfig {
                             .pathMatchers("/api/users/me").authenticated()
                             .pathMatchers("/api/users/**", "/api/bookings/**", "/api/payments/**", "/api/notifications/**")
                             .authenticated();
-                    if (authzEnabled) {
-                        exchange
-                                .pathMatchers("/api/seats/**", "/api/gifts/**", "/api/payouts/**", "/api/organizer/**").authenticated()
-                                // anonymous visitors use the chatbot widget and sign in, register and reset their password.
-                                .pathMatchers("/api/customer/**", "/api/auth/**").permitAll()
-                                .anyExchange().authenticated();
-                    } else {
-                        exchange.anyExchange().permitAll();
-                    }
+                    exchange
+                            .pathMatchers("/api/seats/**", "/api/gifts/**", "/api/payouts/**", "/api/organizer/**").authenticated()
+                            // anonymous visitors use the chatbot widget and sign in, register and reset their password.
+                            .pathMatchers("/api/customer/**", "/api/auth/**").permitAll()
+                            .anyExchange().authenticated();
                 })
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtDecoder(jwtDecoder())));
 

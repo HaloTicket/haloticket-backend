@@ -1,7 +1,6 @@
 package com.haloticket.ticket_service.controller;
 
 import com.haloticket.ticket_service.authz.EventAccessClient;
-import com.haloticket.ticket_service.authz.EventScopeProperties;
 import com.haloticket.ticket_service.dto.request.SeatLayoutRequest;
 import com.haloticket.ticket_service.dto.request.TicketTypeCreateRequest;
 import com.haloticket.ticket_service.dto.response.SeatLayoutResponse;
@@ -24,11 +23,10 @@ public class TicketController {
 
     private final TicketService ticketService;
     private final EventAccessClient eventAccess;
-    private final EventScopeProperties scope;
 
-    /** Event-scoped write guard (catalog group). A service holding the internal secret (event-service sync) passes. */
+    /** Event-scoped write guard. A service holding the internal secret (event-service sync) passes. */
     private void requireEventEdit(String eventId, String authorization, String internalToken) {
-        if (!scope.catalogOn() || eventAccess.isInternal(internalToken)) return;
+        if (eventAccess.isInternal(internalToken)) return;
         eventAccess.require(eventId, "EVENT_EDIT", authorization);
     }
 
@@ -62,7 +60,7 @@ public class TicketController {
     public ResponseEntity<List<TicketTypeResponse>> getAllTicketTypesByEventId(@PathVariable("eventId") String eventId,
                                                                                    @RequestHeader(value = "Authorization", required = false) String authorization,
                                                                                    @RequestHeader(value = INTERNAL_TOKEN_HEADER, required = false) String internalToken) {
-        if (scope.catalogOn() && !eventAccess.isInternal(internalToken)) eventAccess.require(eventId, "ORDERS_VIEW", authorization);
+        if (!eventAccess.isInternal(internalToken)) eventAccess.require(eventId, "ORDERS_VIEW", authorization);
         List<TicketTypeResponse> response = ticketService.getAllTicketTypesByEventId(eventId);
         return ResponseEntity.ok(response);
     }

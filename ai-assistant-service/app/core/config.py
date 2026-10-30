@@ -12,12 +12,12 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = 45  # per call to a chat model; LLM_TIMEOUT_SECONDS overrides
 
     # verification of the Keycloak access token on the admin / analysis routes
-    ai_auth_enforced: bool = True  # AI_AUTH_ENFORCED=false switches the check off (quick rollback only)
     keycloak_issuer_uri: str = ""
     keycloak_jwk_set_uri: str = ""
     auth_audience: str = ""  # optional; empty = audience not checked, as at the gateway
 
-    # data analysis (text-to-SQL). the account is a read-only role that sees only the analysis views
+    # data analysis (text-to-SQL). the account is a read-only role that sees only the analysis views.
+    # Both are required: without them the analysis routes answer 503 AI_DB_NOT_CONFIGURED (the service itself still starts).
     ai_db_user: str = ""
     ai_db_password: str = ""
     ai_analysis_schema: str = "ai_analytics"
@@ -29,8 +29,7 @@ class Settings(BaseSettings):
     ai_sql_timeout_ms: int = 5000
     ai_sql_max_result_chars: int = 200000
 
-    # data analysis for organizers: limited to the events they may manage. Off until you switch it on.
-    ai_analysis_organizer_enabled: bool = False  # AI_ANALYSIS_ORGANIZER_ENABLED
+    # data analysis for organizers: limited to the events they may manage
     ai_scope_columns: str = (
         "v_events:event_id,v_event_showtimes:event_id,v_ticket_types:event_id,v_ticket_sales_daily:event_id,"
         "v_booking_summary_daily:event_id,v_event_views_daily:event_id,v_vouchers:event_id"

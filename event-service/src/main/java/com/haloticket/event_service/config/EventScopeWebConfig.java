@@ -1,6 +1,5 @@
 package com.haloticket.event_service.config;
 
-import com.haloticket.event_service.authz.EventScopeProperties;
 import com.haloticket.event_service.service.EventAccessService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -18,7 +17,6 @@ public class EventScopeWebConfig implements WebMvcConfigurer {
     // looked up on first use: the access service needs the Feign client for user-service, and Feign needs the MVC configuration
     // this class belongs to, so a direct dependency would be a cycle
     private final ObjectProvider<EventAccessService> access;
-    private final EventScopeProperties scope;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
@@ -27,7 +25,7 @@ public class EventScopeWebConfig implements WebMvcConfigurer {
             public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
                 String method = request.getMethod();
                 boolean read = "GET".equals(method) || "HEAD".equals(method) || "OPTIONS".equals(method);
-                if (!read && scope.vouchersOn()) {
+                if (!read) {
                     access.getObject().requirePlatformAdmin();
                 }
                 return true;

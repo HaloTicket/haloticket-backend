@@ -4,6 +4,9 @@ import com.haloticket.notification_service.client.UserServiceClient;
 import com.haloticket.notification_service.repository.NotificationRepository;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -14,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class NotificationScopeGuard {
@@ -22,8 +26,16 @@ public class NotificationScopeGuard {
     private final UserServiceClient users;
     private final NotificationRepository notifications;
 
+    @EventListener(ApplicationReadyEvent.class)
+    void warnWhenInternalTokenIsBlank() {
+        if (scope.getInternalToken().isBlank()) {
+            log.error("[INTERNAL_TOKEN_MISSING] AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN is blank: service-to-service calls to this service "
+                    + "(creating and publishing notifications) are refused until it is set to the shared secret");
+        }
+    }
+
     public void requireOwnerOfUserInbox(String userId, String authorization) {
-        if (!scope.notificationsOn() || isAdmin()) return;
+        if (isAdmin()) return;
         String subject = subject();
         if (subject == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED");
         if (subject.equals(userId)) return;
@@ -41,14 +53,14 @@ public class NotificationScopeGuard {
     }
 
     public void requireOwnerOfNotification(String notificationId, String authorization) {
-        if (!scope.notificationsOn() || isAdmin()) return;
+        if (isAdmin()) return;
         var found = notifications.findById(notificationId);
         if (found.isEmpty()) return; // the controller answers "not found" as before
         requireOwnerOfUserInbox(found.get().getUserId(), authorization);
     }
 
     public void requireInternalOrAdmin(String internalToken) {
-        if (!scope.notificationsOn() || isAdmin()) return;
+        if (isAdmin()) return;
         String configured = scope.getInternalToken();
         if (configured.isBlank() || internalToken == null || !MessageDigest.isEqual(
                 configured.getBytes(StandardCharsets.UTF_8), internalToken.getBytes(StandardCharsets.UTF_8))) {

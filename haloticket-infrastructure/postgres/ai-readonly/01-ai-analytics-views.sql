@@ -38,6 +38,7 @@ SELECT e.id                      AS event_id,
        e.event_approval_status   AS approval_status,
        e.min_price               AS min_price,
        e.is_private              AS is_private,
+       -- display name only: event_organizers decides no access, the scope comes from app.allowed_event_ids
        (SELECT string_agg(DISTINCT o.name, ', ')
           FROM event_organizer_mapping m
           JOIN event_organizers o ON o.id = m.organizer_id

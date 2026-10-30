@@ -1,4 +1,4 @@
--- Apply to ticket_db before enabling booking.ga.reservation.enabled.
+-- Apply to ticket_db before deploying the booking-service that holds general-admission stock in ticket-service.
 -- Hibernate (ddl-auto: update) also creates these objects, but adds reserved_quantity as a nullable column
 -- without a default; this script makes it NOT NULL DEFAULT 0 and is safe to rerun.
 

@@ -6,6 +6,8 @@ import os
 import pytest
 from sqlalchemy.exc import DBAPIError
 
+from sqlalchemy.engine import make_url
+
 from app.core.config import settings
 from app.services.ai.sql_engine import SQLEngine
 from app.services.ai.sql_guard import GuardedSql, validate_sql
@@ -16,9 +18,16 @@ pytestmark = [
 ]
 
 
+def _use_the_dev_account(monkeypatch):
+    """The analysis account is required now; the dev database has no read-only role, so these tests use the account in DATABASE_URL."""
+    url = make_url(settings.database_url)
+    monkeypatch.setattr(settings, "ai_db_user", url.username or "")
+    monkeypatch.setattr(settings, "ai_db_password", url.password or "")
+
+
 @pytest.fixture
 def engine(monkeypatch):
-    monkeypatch.setattr(settings, "ai_db_user", "")
+    _use_the_dev_account(monkeypatch)
     monkeypatch.setattr(settings, "ai_analysis_schema", "public")
     monkeypatch.setattr(settings, "ai_sql_allowed_relations", "events,event_showtimes,venues")
     monkeypatch.setattr(settings, "ai_sql_timeout_ms", 1500)

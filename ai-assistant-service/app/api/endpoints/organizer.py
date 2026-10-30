@@ -16,8 +16,7 @@ class GenerateContentResponse(BaseModel):
     terms_and_conditions: str
 
 # data analysis and the voucher strategy read event data through the model. An admin sees every event; an organizer sees
-# only the events they manage, and only when AI_ANALYSIS_ORGANIZER_ENABLED is on (until then they get 403). The organizer
-# agent is not scoped yet and stays ADMIN only. Content generation needs a login only.
+# only the events they manage. The organizer agent is not scoped yet and stays ADMIN only. Content generation needs a login only.
 @router.post("/generate-event-content", response_model=GenerateContentResponse, dependencies=[Depends(require_login)])
 async def generate_event_content(request: GenerateContentRequest):
     """
@@ -58,6 +57,8 @@ def voucher_strategy(request: VoucherStrategyRequest, scope: AnalysisScope = Dep
             scope,
         )
         return {"strategy": result.get("reply", "Hệ thống đang thu thập thêm dữ liệu để đưa ra đề xuất voucher phù hợp.")}
+    except HTTPException:
+        raise  # for example 503 AI_DB_NOT_CONFIGURED
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -82,6 +83,8 @@ async def organizer_agent_chat(request: OrganizerChatRequest):
             event_title=request.event_title
         )
         return result
+    except HTTPException:
+        raise  # for example 503 AI_DB_NOT_CONFIGURED
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

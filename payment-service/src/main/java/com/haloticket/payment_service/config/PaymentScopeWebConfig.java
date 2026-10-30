@@ -13,7 +13,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * Applies {@link PaymentScopeGuard} to the three endpoints that expose another person's data, without touching the
- * controller. Each check returns at once while the identity switch is off.
+ * controller.
  */
 @Configuration
 @RequiredArgsConstructor

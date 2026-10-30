@@ -38,7 +38,6 @@ class GaReservationServiceTest {
     @BeforeEach
     void setUp() {
         properties = new GaReservationProperties();
-        properties.setEnabled(true);
         properties.setInternalToken(TOKEN);
         client = mock(TicketStockClient.class);
         service = new GaReservationService(properties, client, new ObjectMapper());
@@ -64,22 +63,7 @@ class GaReservationServiceTest {
 
     // --- plan -----------------------------------------------------------------
 
-    @Test
-    void flagOffReturnsTheRequestUntouched() {
-        properties.setEnabled(false);
-        List<String> seats = List.of(GA + "-STT-1", GA + "-STT-2");
 
-        var plan = service.plan(request(seats, item(GA, 2, true)));
-
-        assertThat(plan.hasGa()).isFalse();
-        assertThat(plan.seatIds()).isSameAs(seats);
-    }
-
-    @Test
-    void flagOffKeepsNullSeatIdsNull() {
-        properties.setEnabled(false);
-        assertThat(service.plan(request(null, item(GA, 2, null))).seatIds()).isNull();
-    }
 
     @Test
     void orderWithoutSeatIdsIsAllGeneralAdmission() {
@@ -95,16 +79,9 @@ class GaReservationServiceTest {
         assertThat(plan.gaItems()).containsExactly(new GaReservationService.GaItem(GA, 1));
     }
 
-    @Test
-    void olderClientVirtualSeatsBecomeStockAndAreNotHeldAsSeats() {
-        var plan = service.plan(request(List.of(GA + "-STT-4", GA + "-STT-5"), item(GA, 2, null)));
-
-        assertThat(plan.gaItems()).containsExactly(new GaReservationService.GaItem(GA, 2));
-        assertThat(plan.seatIds()).isEmpty();
-    }
 
     @Test
-    void realSeatsAreLeftAloneWhenNothingIsFlaggedOrVirtual() {
+    void realSeatsAreLeftAloneWhenNothingIsFlagged() {
         var plan = service.plan(request(List.of("seat_1_2", "seat_1_3"), item(VIP, 2, null)));
 
         assertThat(plan.hasGa()).isFalse();
@@ -119,21 +96,7 @@ class GaReservationServiceTest {
         assertThat(plan.seatIds()).containsExactly("seat_1_2", "seat_1_3");
     }
 
-    @Test
-    void mixedLegacyOrderUsesTheVirtualSeatCount() {
-        var plan = service.plan(request(List.of("seat_1_2", GA + "-STT-1", GA + "-STT-2"), item(VIP, 1, null), item(GA, 2, null)));
 
-        assertThat(plan.gaItems()).containsExactly(new GaReservationService.GaItem(GA, 2));
-        assertThat(plan.seatIds()).containsExactly("seat_1_2");
-    }
-
-    @Test
-    void virtualSeatOfAnUnknownTypeStaysOnTheLegacyPath() {
-        var plan = service.plan(request(List.of("zone-x-STT-1"), item(VIP, 1, null)));
-
-        assertThat(plan.hasGa()).isFalse();
-        assertThat(plan.seatIds()).containsExactly("zone-x-STT-1");
-    }
 
     @Test
     void invalidGaQuantityIsRejected() {
@@ -231,13 +194,4 @@ class GaReservationServiceTest {
         verifyNoMoreInteractions(client);
     }
 
-    @Test
-    void releaseStillWorksWhenTheFlagWasSwitchedOffAfterTheBookingWasMade() {
-        properties.setEnabled(false);
-        var held = com.haloticket.booking_service.entity.Booking.builder().id("held").gaReserved(true).build();
-
-        service.releaseIfReserved(held);
-
-        verify(client).release(TOKEN, "held");
-    }
 }

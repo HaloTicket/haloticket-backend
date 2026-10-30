@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.config.EnableWebFlux;
 import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -40,9 +39,7 @@ class GatewayAuthorizationTest {
             new Route("GET", "/api/admin/ssl-status"),
             new Route("POST", "/api/admin/risk-scoring"),
             new Route("POST", "/api/admin/assistant-chat"),
-            // the AI routes that read event data through the language model: admin only in phase 1 of the lock-down
-            new Route("POST", "/api/organizer/data-analysis"),
-            new Route("POST", "/api/organizer/voucher-strategy"),
+            // the organizer agent is not scoped to the caller's events
             new Route("POST", "/api/organizer/agent-chat"),
             new Route("GET", "/api/payouts/admin/all"),
             new Route("POST", "/api/payouts/admin/00000000-0000-0000-0000-000000000000/approve"),
@@ -54,6 +51,9 @@ class GatewayAuthorizationTest {
     /** a login is enough, no role: 401 without a token, 200 for any valid token (event staff may hold only ROLE_USER) */
     private static final List<Route> LOGIN_REQUIRED = List.of(
             new Route("POST", "/api/organizer/generate-event-content"),
+            // ai-assistant limits an organizer to the events they manage, so a login is enough here
+            new Route("POST", "/api/organizer/data-analysis"),
+            new Route("POST", "/api/organizer/voucher-strategy"),
             new Route("POST", "/api/seats/hold"),
             new Route("POST", "/api/seats/release"),
             new Route("GET", "/api/gifts/anything"),
@@ -137,7 +137,7 @@ class GatewayAuthorizationTest {
 
     @Test
     void adminAreasNeedTheAdminRole() {
-        try (var context = context(true)) {
+        try (var context = context()) {
             WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
             for (Route route : ADMIN_ONLY) {
                 assertThat(status(client, route, ANON)).as("anonymous " + route).isEqualTo(401);
@@ -150,7 +150,7 @@ class GatewayAuthorizationTest {
 
     @Test
     void loginRequiredPathsRejectAnonymousAndAcceptAnyLoggedInUserWhateverTheRole() {
-        try (var context = context(true)) {
+        try (var context = context()) {
             WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
             for (Route route : LOGIN_REQUIRED) {
                 assertThat(status(client, route, ANON)).as("anonymous " + route).isEqualTo(401);
@@ -163,7 +163,7 @@ class GatewayAuthorizationTest {
 
     @Test
     void publicPathsStayOpenWithoutAToken() {
-        try (var context = context(true)) {
+        try (var context = context()) {
             WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
             for (Route route : PUBLIC) {
                 assertThat(status(client, route, ANON)).as("anonymous " + route).isEqualTo(200);
@@ -174,7 +174,7 @@ class GatewayAuthorizationTest {
 
     @Test
     void anonymousChatbotStaysPublicForEveryChatbotRoute() {
-        try (var context = context(true)) {
+        try (var context = context()) {
             WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
             for (String path : List.of("/api/customer/chat-search", "/api/customer/smart-booking-chat", "/api/customer/anything-else")) {
                 assertThat(status(client, new Route("POST", path), ANON)).as("anonymous " + path).isEqualTo(200);
@@ -184,7 +184,7 @@ class GatewayAuthorizationTest {
 
     @Test
     void preflightRequestsPassWithoutAToken() {
-        try (var context = context(true)) {
+        try (var context = context()) {
             // CORS needs an absolute request URL, so this client carries a base URL
             WebTestClient client = WebTestClient.bindToApplicationContext(context).configureClient().baseUrl("http://localhost").build();
             for (String path : List.of("/api/admin/system-health", "/api/organizer/data-analysis", "/api/seats/hold",
@@ -197,22 +197,20 @@ class GatewayAuthorizationTest {
     }
 
     @Test
-    void serviceToServicePathsStayClosedInBothModes() {
-        for (boolean enabled : List.of(true, false)) {
-            try (var context = context(enabled)) {
-                WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
-                for (String user : List.of(ANON, "customer", "admin")) {
-                    for (String path : List.of("/api/internal/users/x", "/actuator/health", "/eureka/apps")) {
-                        assertThat(status(client, new Route("GET", path), user)).as("enabled=" + enabled + " " + user + " " + path).isIn(401, 403);
-                    }
+    void serviceToServicePathsStayClosed() {
+        try (var context = context()) {
+            WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
+            for (String user : List.of(ANON, "customer", "admin")) {
+                for (String path : List.of("/api/internal/users/x", "/actuator/health", "/eureka/apps")) {
+                    assertThat(status(client, new Route("GET", path), user)).as(user + " " + path).isIn(401, 403);
                 }
             }
         }
     }
 
     @Test
-    void reportAdminRuleDoesNotDependOnTheFlag() {
-        try (var context = context(false)) {
+    void reportsNeedTheAdminRole() {
+        try (var context = context()) {
             WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
             Route report = new Route("GET", "/api/events/admin/reports");
             assertThat(status(client, report, ANON)).isEqualTo(401);
@@ -222,68 +220,26 @@ class GatewayAuthorizationTest {
     }
 
     @Test
-    void withTheFlagOffTheOldBehaviourReturns() {
-        try (var context = context(false)) {
+    void analysisAndContentRoutesNeedOnlyALoginWhileTheOrganizerAgentNeedsAdmin() {
+        try (var context = context()) {
             WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
-            List<Route> openBefore = new ArrayList<>(ADMIN_ONLY);
-            openBefore.addAll(List.of(new Route("POST", "/api/organizer/data-analysis"), new Route("POST", "/api/seats/hold"),
-                    new Route("GET", "/api/gifts/anything"), new Route("POST", "/api/customer/chat-search"),
-                    new Route("POST", "/api/tickets/types"), new Route("POST", "/api/media/upload"),
-                    new Route("GET", "/api/some-path-no-rule-names")));
-            for (Route route : openBefore) {
-                // /api/users/admin was already behind the login rule for /api/users/**
-                int expected = route.path().startsWith("/api/users/") ? 401 : 200;
-                assertThat(status(client, route, ANON)).as("anonymous " + route).isEqualTo(expected);
-            }
-            for (Route route : List.of(new Route("GET", "/api/bookings/my"), new Route("GET", "/api/users/me"),
-                    new Route("GET", "/api/notifications/users/x"), new Route("POST", "/api/payments"))) {
-                assertThat(status(client, route, ANON)).as("anonymous " + route).isEqualTo(401);
-            }
-        }
-    }
-
-    @Test
-    void contentGenerationNeedsOnlyALoginWhileTheAnalysisRoutesNeedAdmin() {
-        try (var context = context(true)) {
-            WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
-            Route generate = new Route("POST", "/api/organizer/generate-event-content");
-            assertThat(status(client, generate, ANON)).isEqualTo(401);
-            assertThat(status(client, generate, "customer")).isEqualTo(200);
-            for (String path : List.of("/api/organizer/data-analysis", "/api/organizer/voucher-strategy", "/api/organizer/agent-chat")) {
-                Route route = new Route("POST", path);
-                assertThat(status(client, route, ANON)).as("anonymous " + path).isEqualTo(401);
-                assertThat(status(client, route, "customer")).as("customer " + path).isEqualTo(403);
-                assertThat(status(client, route, "event-staff")).as("event staff " + path).isEqualTo(403);
-                assertThat(status(client, route, "admin")).as("admin " + path).isEqualTo(200);
-            }
-        }
-    }
-
-    @Test
-    void theAnalysisRoutesFallBackToAnyLoginWhenTheirOwnFlagIsOff() {
-        TestConfiguration.aiAnalysisAdminOnly = false;
-        try (var context = context(true)) {
-            WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
-            for (String path : List.of("/api/organizer/data-analysis", "/api/organizer/voucher-strategy")) {
+            for (String path : List.of("/api/organizer/generate-event-content", "/api/organizer/data-analysis", "/api/organizer/voucher-strategy")) {
                 Route route = new Route("POST", path);
                 assertThat(status(client, route, ANON)).as("anonymous " + path).isEqualTo(401);
                 assertThat(status(client, route, "customer")).as("customer " + path).isEqualTo(200);
                 assertThat(status(client, route, "event-staff")).as("event staff " + path).isEqualTo(200);
             }
-            // the organizer agent is not scoped yet: admin only whatever the flag says
             Route agent = new Route("POST", "/api/organizer/agent-chat");
+            assertThat(status(client, agent, ANON)).isEqualTo(401);
             assertThat(status(client, agent, "customer")).isEqualTo(403);
+            assertThat(status(client, agent, "event-staff")).isEqualTo(403);
             assertThat(status(client, agent, "admin")).isEqualTo(200);
-            // the other admin areas are not affected by that flag
-            assertThat(status(client, new Route("GET", "/api/admin/system-health"), "customer")).isEqualTo(403);
-        } finally {
-            TestConfiguration.aiAnalysisAdminOnly = true;
         }
     }
 
     @Test
     void theAdminCheckReadsBothRoleClaimsAndNothingElse() {
-        try (var context = context(true)) {
+        try (var context = context()) {
             WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
             Route route = new Route("GET", "/api/admin/system-health");
             assertThat(status(client, route, "admin-realm-only")).isEqualTo(200);
@@ -299,8 +255,7 @@ class GatewayAuthorizationTest {
         return request.exchange().returnResult(String.class).getStatus().value();
     }
 
-    private static AnnotationConfigApplicationContext context(boolean authzEnabled) {
-        TestConfiguration.authzEnabled = authzEnabled;
+    private static AnnotationConfigApplicationContext context() {
         return new AnnotationConfigApplicationContext(TestConfiguration.class, Downstream.class);
     }
 
@@ -308,9 +263,6 @@ class GatewayAuthorizationTest {
     @EnableWebFlux
     @EnableWebFluxSecurity
     static class TestConfiguration {
-        static boolean authzEnabled = true;
-        static boolean aiAnalysisAdminOnly = true;
-
         @Bean
         SecurityWebFilterChain security(ServerHttpSecurity http) {
             var config = new SecurityConfig() {
@@ -319,8 +271,6 @@ class GatewayAuthorizationTest {
                 }
             };
             ReflectionTestUtils.setField(config, "allowedOrigins", "http://localhost:5173");
-            ReflectionTestUtils.setField(config, "authzEnabled", authzEnabled);
-            ReflectionTestUtils.setField(config, "aiAnalysisAdminOnly", aiAnalysisAdminOnly);
             return config.springSecurityFilterChain(http);
         }
 

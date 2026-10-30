@@ -21,8 +21,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 class PaymentScopeGuardTest {
@@ -34,8 +32,6 @@ class PaymentScopeGuardTest {
 
     @BeforeEach
     void setUp() {
-        scope.setEnabled(true);
-        scope.getIdentity().setEnabled(true);
         scope.setInternalToken("service-secret");
         when(users.getOrganizerEligibility("Bearer owner")).thenReturn(new OrganizerEligibilityResponse(true, "u-owner", null, null));
         when(users.getOrganizerEligibility("Bearer other")).thenReturn(new OrganizerEligibilityResponse(false, "u-other", null, null));
@@ -105,14 +101,10 @@ class PaymentScopeGuardTest {
     }
 
     @Test
-    void withTheSwitchOffNothingIsChecked() {
-        scope.setEnabled(false);
-        SecurityContextHolder.clearContext();
-        assertThatCode(() -> {
-            guard.requirePayoutAccountOwner("anyone", null);
-            guard.requireBookingBuyer("bk-1", null);
-            guard.requireInternalOrAdmin(null);
-        }).doesNotThrowAnyException();
-        verifyNoInteractions(users, bookings);
+    void aBlankInternalTokenRefusesTheBulkLookupEvenForABlankOrMissingHeader() {
+        scope.setInternalToken("");
+        assertThat(status(() -> guard.requireInternalOrAdmin(""))).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(status(() -> guard.requireInternalOrAdmin(null))).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(status(() -> guard.requireInternalOrAdmin("service-secret"))).isEqualTo(HttpStatus.FORBIDDEN);
     }
 }

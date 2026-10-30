@@ -42,16 +42,6 @@ x-environment: &environment
   SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
 
 x-event-scope: &event-scope
-  AUTHZ_EVENT_SCOPE_ENABLED: ${AUTHZ_EVENT_SCOPE_ENABLED:-false}
-  AUTHZ_EVENT_SCOPE_LEGACY_FALLBACK: ${AUTHZ_EVENT_SCOPE_LEGACY_FALLBACK:-true}
-  AUTHZ_EVENT_SCOPE_PERMISSION_FUNCTION_ENABLED: ${AUTHZ_EVENT_SCOPE_PERMISSION_FUNCTION_ENABLED:-false}
-  AUTHZ_EVENT_SCOPE_MEMBERS_ENABLED: ${AUTHZ_EVENT_SCOPE_MEMBERS_ENABLED:-false}
-  AUTHZ_EVENT_SCOPE_CATALOG_ENABLED: ${AUTHZ_EVENT_SCOPE_CATALOG_ENABLED:-false}
-  AUTHZ_EVENT_SCOPE_ORDERS_ENABLED: ${AUTHZ_EVENT_SCOPE_ORDERS_ENABLED:-false}
-  AUTHZ_EVENT_SCOPE_VOUCHERS_ENABLED: ${AUTHZ_EVENT_SCOPE_VOUCHERS_ENABLED:-false}
-  AUTHZ_EVENT_SCOPE_CHECKIN_ENABLED: ${AUTHZ_EVENT_SCOPE_CHECKIN_ENABLED:-false}
-  AUTHZ_EVENT_SCOPE_IDENTITY_ENABLED: ${AUTHZ_EVENT_SCOPE_IDENTITY_ENABLED:-false}
-  AUTHZ_EVENT_SCOPE_NOTIFICATIONS_ENABLED: ${AUTHZ_EVENT_SCOPE_NOTIFICATIONS_ENABLED:-false}
   AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN: ${AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN:-}
 
 x-dependencies: &dependencies
@@ -225,9 +215,6 @@ services:
     environment:
       <<: *environment
       SERVER_PORT: "8888"
-      GATEWAY_DISCOVERY_LOCATOR_ENABLED: ${GATEWAY_DISCOVERY_LOCATOR_ENABLED:-false}
-      GATEWAY_AUTHZ_ENABLED: ${GATEWAY_AUTHZ_ENABLED:-true}
-      GATEWAY_AUTHZ_AI_ANALYSIS_ADMIN_ONLY: ${GATEWAY_AUTHZ_AI_ANALYSIS_ADMIN_ONLY:-true}
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-haloticket-realm}/protocol/openid-connect/certs
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:5174,https://haloticket-web.pages.dev}
@@ -287,7 +274,6 @@ services:
       <<: [*environment, *event-scope]
       SERVER_PORT: "8082"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/event_db
-      MEMBER_INVITATION_V2_ENABLED: ${MEMBER_INVITATION_V2_ENABLED:-false}
       MEMBER_INVITATION_TTL_HOURS: ${MEMBER_INVITATION_TTL_HOURS:-48}
       MEMBER_INVITATION_MAX_PER_EVENT_PER_DAY: ${MEMBER_INVITATION_MAX_PER_EVENT_PER_DAY:-20}
       MEMBER_INVITATION_RESEND_MIN_SECONDS: ${MEMBER_INVITATION_RESEND_MIN_SECONDS:-60}
@@ -336,7 +322,7 @@ services:
         SERVICE: marketplace-service
     ports: ["${SERVICE_BIND_ADDRESS:-127.0.0.1}:${MARKETPLACE_SERVICE_PORT:-8088}:8088"]
     environment:
-      <<: [*environment, *event-scope]
+      <<: *environment
       SERVER_PORT: "8088"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/marketplace_db
       TRANSFER_INTERNAL_TOKEN: ${TRANSFER_INTERNAL_TOKEN:-}
@@ -362,7 +348,6 @@ services:
       <<: [*environment, *event-scope]
       SERVER_PORT: "8084"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/booking_db
-      BOOKING_GA_RESERVATION_ENABLED: ${BOOKING_GA_RESERVATION_ENABLED:-false}
       TICKET_RESERVATION_INTERNAL_TOKEN: ${TICKET_RESERVATION_INTERNAL_TOKEN:-}
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-haloticket-realm}/protocol/openid-connect/certs
@@ -488,11 +473,9 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - KEYCLOAK_ISSUER_URI=${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
       - KEYCLOAK_JWK_SET_URI=http://keycloak:8080/realms/${KEYCLOAK_REALM:-haloticket-realm}/protocol/openid-connect/certs
-      - AI_AUTH_ENFORCED=${AI_AUTH_ENFORCED:-true}
       - AI_DB_USER=${AI_DB_USER:-}
       - AI_DB_PASSWORD=${AI_DB_PASSWORD:-}
       - AI_ANALYSIS_SCHEMA=${AI_ANALYSIS_SCHEMA:-ai_analytics}
-      - AI_ANALYSIS_ORGANIZER_ENABLED=${AI_ANALYSIS_ORGANIZER_ENABLED:-false}
       - USER_SERVICE_URL=http://user-service:8081
       - AI_SCOPE_COLUMNS=${AI_SCOPE_COLUMNS:-v_events:event_id,v_event_showtimes:event_id,v_ticket_types:event_id,v_ticket_sales_daily:event_id,v_booking_summary_daily:event_id,v_event_views_daily:event_id,v_vouchers:event_id}
       - AI_SCOPE_PUBLIC_RELATIONS=${AI_SCOPE_PUBLIC_RELATIONS:-v_venues,v_event_categories}

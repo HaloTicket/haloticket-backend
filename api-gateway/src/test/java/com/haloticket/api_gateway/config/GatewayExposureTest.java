@@ -189,10 +189,10 @@ class GatewayExposureTest {
     }
 
     @Test
-    void discoveryLocatorIsOffByDefaultAndOnlyOnWhenExplicitlyEnabled() throws Exception {
+    void discoveryLocatorIsAlwaysOffAndNoEnvironmentVariableTurnsItOn() throws Exception {
         String key = "spring.cloud.gateway.discovery.locator.enabled";
         assertThat(environment(Map.of()).getProperty(key)).isEqualTo("false");
-        assertThat(environment(Map.of("GATEWAY_DISCOVERY_LOCATOR_ENABLED", "true")).getProperty(key)).isEqualTo("true");
+        assertThat(environment(Map.of("GATEWAY_DISCOVERY_LOCATOR_ENABLED", "true")).getProperty(key)).isEqualTo("false");
     }
 
     @Test

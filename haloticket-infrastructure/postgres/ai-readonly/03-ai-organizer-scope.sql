@@ -3,12 +3,14 @@
 --
 --   psql -U <owner> -d event_db -v ON_ERROR_STOP=1 -f 03-ai-organizer-scope.sql
 --
--- NOT run automatically. Safe to run again. Run it BEFORE setting AI_ANALYSIS_ORGANIZER_ENABLED=true.
+-- NOT run automatically. Safe to run again. Organizer analysis is always on in ai-assistant, so run this file to get the
+-- database-side lock for it.
 --
 -- What it does: the views that hold an event id now show a row only when the event is in the session setting
 -- app.allowed_event_ids, which ai-assistant sets for every analysis query inside its own transaction:
 --   '*'                    an administrator: all events
---   'id1,id2,...'          an organizer: the events they manage
+--   'id1,id2,...'          an organizer: the events where they are an ACTIVE OWNER/ADMIN/MANAGER in staff_assignments
+--                          (worked out by ai-assistant; the database only trusts the list it is given)
 --   empty or not set       nothing (fail closed)
 -- ai-assistant already limits the query itself (it rewrites every use of these views to the caller's events). This is the
 -- second lock: even if a generated query got past that, the database would still return only the caller's events.
@@ -45,6 +47,7 @@ SELECT e.id                      AS event_id,
        e.event_approval_status   AS approval_status,
        e.min_price               AS min_price,
        e.is_private              AS is_private,
+       -- display name only: event_organizers decides no access, the scope comes from app.allowed_event_ids
        (SELECT string_agg(DISTINCT o.name, ', ')
           FROM event_organizer_mapping m
           JOIN event_organizers o ON o.id = m.organizer_id

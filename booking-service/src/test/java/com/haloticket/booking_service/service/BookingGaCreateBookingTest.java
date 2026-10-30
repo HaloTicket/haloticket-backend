@@ -91,7 +91,6 @@ class BookingGaCreateBookingTest {
         });
 
         properties = new GaReservationProperties();
-        properties.setEnabled(true);
         properties.setInternalToken(TOKEN);
         GaReservationService ga = new GaReservationService(properties, stockClient, new ObjectMapper());
         service = new BookingServiceImpl(bookings, seatReservations, outbox, redisson, redis, new ObjectMapper(),
@@ -126,23 +125,8 @@ class BookingGaCreateBookingTest {
         return out;
     }
 
-    // --- flag off: today's behaviour -----------------------------------------------
 
-    @Test
-    void flagOffKeepsVirtualSeatHoldsAndNeverTouchesTicketStock() throws Exception {
-        properties.setEnabled(false);
-
-        BookingResponse response = service.createBooking(request("u1", List.of(GA + "-STT-1", GA + "-STT-2"), item(GA, 2, null)));
-
-        assertThat(response.getId()).isEqualTo("booking-1");
-        assertThat(savedSeatReservations()).extracting(SeatReservation::getSeatId)
-                .containsExactly(GA + "-STT-1", GA + "-STT-2");
-        verify(valueOps, times(2)).set(startsWith("seat:hold:showtime:show-1:" + GA + "-STT-"), eq("booking-1"), eq(15L), eq(TimeUnit.MINUTES));
-        verify(lock).tryLock(3, 5, TimeUnit.SECONDS);
-        verifyNoInteractions(stockClient);
-    }
-
-    // --- flag on: general admission -------------------------------------------------
+    // --- general admission -------------------------------------------------
 
     @Test
     void itemsOnlyOrderHoldsStockAndCreatesNoSeatsNoRedisKeysAndNoEventLock() throws Exception {
@@ -160,14 +144,6 @@ class BookingGaCreateBookingTest {
                 .satisfies(i -> assertThat(i.getQuantity()).isEqualTo(2));
     }
 
-    @Test
-    void olderClientVirtualSeatsNeitherHoldSeatsNorRedisKeysWhenStockIsHeld() throws Exception {
-        service.createBooking(request("u1", List.of(GA + "-STT-7", GA + "-STT-8"), item(GA, 2, null)));
-
-        verify(stockClient).reserve(eq(TOKEN), any(Map.class));
-        verify(seatReservations, never()).saveAll(any());
-        verifyNoInteractions(valueOps, setOps);
-    }
 
     @Test
     void soldOutReturns409AndLeavesNoSeatOrRedisSideEffects() {
@@ -184,10 +160,10 @@ class BookingGaCreateBookingTest {
         verifyNoInteractions(valueOps, setOps);
     }
 
-    // --- flag on: seat flows are unchanged -------------------------------------------
+    // --- seat flows -------------------------------------------
 
     @Test
-    void seatmapOrderWithFlagOnIsHandledExactlyLikeBefore() throws Exception {
+    void seatmapOrderHoldsSeatsAndNeverTouchesTicketStock() throws Exception {
         service.createBooking(request("u1", List.of("seat_1_2", "seat_1_3"), item(VIP, 2, null)));
 
         assertThat(savedSeatReservations()).extracting(SeatReservation::getSeatId).containsExactly("seat_1_2", "seat_1_3");

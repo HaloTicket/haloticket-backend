@@ -11,8 +11,6 @@ public interface EventServiceClient {
     GiftPolicyResponse getGiftPolicy(@RequestHeader("Authorization") String authorization, @PathVariable("eventId") String eventId);
     @GetMapping("/{eventId}/members/my-access")
     com.haloticket.marketplace_service.authz.EventAccessView getMyAccess(@PathVariable("eventId") String eventId, @RequestHeader("Authorization") String authorization);
-    @GetMapping("/{eventId}/members/my-role")
-    String getMyRole(@RequestHeader("Authorization") String authorization, @PathVariable("eventId") String eventId);
     record ResalePolicyResponse(boolean enabled, BigDecimal minPricePercent, BigDecimal maxPricePercent, Instant closesAt, String termsVersion, Long version,
                                 BigDecimal serviceFeePercent, boolean requireApproval, Instant opensAt, String ticketTypeScope, java.util.Set<String> allowedTicketTypeIds) {
         public ResalePolicyResponse(boolean enabled, BigDecimal minPricePercent, BigDecimal maxPricePercent, Instant closesAt, String termsVersion, Long version) {

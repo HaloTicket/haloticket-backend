@@ -1,6 +1,5 @@
 package com.haloticket.booking_service.controller;
 
-import com.haloticket.booking_service.authz.EventScopeProperties;
 import com.haloticket.booking_service.dto.request.SeatHoldRequest;
 import com.haloticket.booking_service.service.SeatHoldService;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +20,6 @@ public class SeatController {
     private static final String ANONYMOUS_HOLD_PREFIX = "session_";
 
     private final SeatHoldService seatHoldService;
-    private final EventScopeProperties scope;
 
     @PostMapping("/hold")
     public ResponseEntity<String> holdSeat(@RequestBody SeatHoldRequest request, @AuthenticationPrincipal Jwt jwt) {
@@ -42,12 +40,11 @@ public class SeatController {
     }
 
     /**
-     * Identity group: a signed-in person holds and releases under the token subject, whatever the body says (otherwise
+     * A signed-in person holds and releases under the token subject, whatever the body says (otherwise
      * anyone could release another person's seats by sending that person's id). Someone who is not signed in keeps the
      * anonymous browser id "session_..." the web creates; any other id without a token is refused.
      */
     private String holderOf(String requested, Jwt jwt) {
-        if (!scope.identityOn()) return requested;
         if (jwt != null && jwt.getSubject() != null && !jwt.getSubject().isBlank()) {
             if (requested != null && !requested.equals(jwt.getSubject()) && !requested.startsWith(ANONYMOUS_HOLD_PREFIX)) {
                 log.warn("[IDENTITY_MISMATCH] seat hold userId in the body differs from the token subject; the token wins");

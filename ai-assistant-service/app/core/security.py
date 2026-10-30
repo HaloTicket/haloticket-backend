@@ -71,10 +71,8 @@ def roles_of(claims: dict) -> set:
 
 def require_login(request: Request, verifier: Optional[TokenVerifier] = Depends(get_verifier)) -> dict:
     """A valid access token, any role. Returns the claims."""
-    if not settings.ai_auth_enforced:
-        return {}
     if verifier is None:
-        log.error("Token verification is on but KEYCLOAK_ISSUER_URI / KEYCLOAK_JWK_SET_URI are not set; refusing the request")
+        log.error("Token verification needs KEYCLOAK_ISSUER_URI / KEYCLOAK_JWK_SET_URI are not set; refusing the request")
         raise _reject(503, "AUTH_NOT_CONFIGURED", "Dịch vụ chưa được cấu hình xác thực.")
     header = request.headers.get("Authorization", "")
     scheme, _, token = header.partition(" ")
@@ -89,8 +87,6 @@ def require_login(request: Request, verifier: Optional[TokenVerifier] = Depends(
 
 def require_admin(claims: dict = Depends(require_login)) -> dict:
     """A valid access token that carries ROLE_ADMIN."""
-    if not settings.ai_auth_enforced:
-        return claims
     if not (roles_of(claims) & ADMIN_ROLES):
         log.warning("Admin-only route refused for a non-admin (subject %s)", str(claims.get("sub", "?"))[:8])
         raise _reject(403, "ADMIN_ONLY", "Chỉ quản trị viên được phép sử dụng chức năng này.")

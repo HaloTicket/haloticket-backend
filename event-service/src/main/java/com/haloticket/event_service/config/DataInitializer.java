@@ -168,7 +168,7 @@ public class DataInitializer implements CommandLineRunner {
                 .category(musicCat)
                 .organizers(List.of(organizer))
                 .build();
-        entityManager.merge(musicEvent);
+        entityManager.merge(withOwner(musicEvent, organizer, "sa-seed-001"));
 
         Event sportsEvent = Event.builder()
                 .id("event-002")
@@ -187,7 +187,7 @@ public class DataInitializer implements CommandLineRunner {
                 .category(sportsCat)
                 .organizers(List.of(organizer))
                 .build();
-        entityManager.merge(sportsEvent);
+        entityManager.merge(withOwner(sportsEvent, organizer, "sa-seed-002"));
 
         Event techEvent = Event.builder()
                 .id("event-003")
@@ -206,8 +206,22 @@ public class DataInitializer implements CommandLineRunner {
                 .category(techCat)
                 .organizers(List.of(organizer))
                 .build();
-        entityManager.merge(techEvent);
+        entityManager.merge(withOwner(techEvent, organizer, "sa-seed-003"));
 
         log.info("Event Service sample data initialized successfully!");
+    }
+
+    /** The seeded event's owner: an OWNER ACTIVE staff assignment for the seed organizer's user (what authorization reads). */
+    private static Event withOwner(Event event, EventOrganizer organizer, String assignmentId) {
+        event.setStaffAssignments(new java.util.ArrayList<>(List.of(StaffAssignment.builder()
+                .id(assignmentId)
+                .event(event)
+                .userId(organizer.getUserId())
+                .name(organizer.getName())
+                .role(StaffRole.OWNER)
+                .status(StaffAssignmentStatus.ACTIVE)
+                .assignedAt(LocalDateTime.now())
+                .build())));
+        return event;
     }
 }

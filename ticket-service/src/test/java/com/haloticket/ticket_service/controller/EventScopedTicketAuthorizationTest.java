@@ -46,13 +46,10 @@ class EventScopedTicketAuthorizationTest {
 
     @BeforeEach
     void setUp() {
-        scope.setEnabled(true);
-        scope.getCatalog().setEnabled(true);
-        scope.getCheckin().setEnabled(true);
         scope.setInternalToken("service-secret");
         scope.setCacheSeconds(0); // every request asks again, so a role change is seen at once
         access = new EventAccessClient(events, scope);
-        mvc = MockMvcBuilders.standaloneSetup(new TicketController(tickets, access, scope), new CheckinController(checkins, access, scope))
+        mvc = MockMvcBuilders.standaloneSetup(new TicketController(tickets, access), new CheckinController(checkins, access))
                 .setControllerAdvice(new GlobalExceptionHandler()).build();
         // people: owner-a (OWNER of A), mgr-a (MANAGER of A), chk-a (CHECKIN_STAFF of A), owner-b (OWNER of B), root (platform admin)
         when(events.getMyAccess(anyString(), anyString())).thenAnswer(call -> {
@@ -188,20 +185,15 @@ class EventScopedTicketAuthorizationTest {
     }
 
     @Test
-    void withTheSwitchesOffNothingChanges() throws Exception {
-        scope.setEnabled(false);
-        assertThat(create(null)).isEqualTo(201);
-        assertThat(scan(null)).isEqualTo(200);
-        ArgumentCaptor<CheckinRequest> sent = ArgumentCaptor.forClass(CheckinRequest.class);
-        verify(checkins).processCheckin(sent.capture());
-        assertThat(sent.getValue().getStaffAssignmentId()).isEqualTo("spoofed");
-        verifyNoInteractions(events);
-    }
-
-    @Test
-    void oneGroupOnlyAffectsItsOwnEndpoints() throws Exception {
-        scope.getCheckin().setEnabled(false);
-        assertThat(scan("stranger")).isEqualTo(200);
-        assertThat(create("stranger")).isEqualTo(403);
+    void aBlankInternalTokenRefusesEveryInternalCallEvenWithABlankOrMissingHeader() throws Exception {
+        scope.setInternalToken("");
+        assertThat(mvc.perform(post("/api/tickets/types/sync/A").header("X-Internal-Token", "")
+                .contentType(MediaType.APPLICATION_JSON).content("[]")).andReturn().getResponse().getStatus()).isEqualTo(401);
+        assertThat(mvc.perform(post("/api/tickets/types/sync/A")
+                .contentType(MediaType.APPLICATION_JSON).content("[]")).andReturn().getResponse().getStatus()).isEqualTo(401);
+        assertThat(mvc.perform(get("/api/tickets/types/event/A/all").header("X-Internal-Token", "")).andReturn().getResponse().getStatus()).isEqualTo(401);
+        assertThat(access.isInternal("")).isFalse();
+        assertThat(access.isInternal(null)).isFalse();
+        verifyNoInteractions(tickets);
     }
 }

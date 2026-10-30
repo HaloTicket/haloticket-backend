@@ -2,9 +2,8 @@
 
 An ADMIN sees everything. Anybody else (organizers, whatever their system role) sees only the events where, in
 event-service's own rules, they are OWNER, ADMIN or MANAGER and ACTIVE:
-  - a staff_assignments row of the user with status ACTIVE and one of those roles, or
-  - the event's organizer profile belongs to the user and the user has no assignment row at all (older events, the same
-    fallback EventAccessService applies).
+a staff_assignments row of the user with status ACTIVE and one of those roles. The organizer profile
+(event_organizers) is only a display name and decides nothing here.
 CHECKIN_STAFF and REVOKED members get nothing.
 
 The token carries the Keycloak id; staff_assignments holds the user-service id. user-service turns one into the other
@@ -89,11 +88,6 @@ def events_for_user(user_id: str) -> list:
             rows = db.execute(text("""
                 SELECT sa.event_id::text FROM staff_assignments sa
                  WHERE sa.user_id = :uid AND sa.status = 'ACTIVE' AND sa.role IN ('OWNER', 'ADMIN', 'MANAGER')
-                UNION
-                SELECT m.event_id::text FROM event_organizer_mapping m
-                  JOIN event_organizers o ON o.id = m.organizer_id
-                 WHERE o.user_id = :uid
-                   AND NOT EXISTS (SELECT 1 FROM staff_assignments s WHERE s.event_id = m.event_id AND s.user_id = :uid)
             """), {"uid": user_id}).fetchall()
             db.rollback()
     except Exception as failure:
@@ -125,10 +119,8 @@ def clear_cache() -> None:
 
 def analysis_scope(request: Request, claims: dict = Depends(require_login)) -> AnalysisScope:
     """Dependency of the analysis routes: who the caller is and which events that covers."""
-    if not settings.ai_auth_enforced or roles_of(claims) & ADMIN_ROLES:
+    if roles_of(claims) & ADMIN_ROLES:
         return AnalysisScope.admin()
-    if not settings.ai_analysis_organizer_enabled:
-        raise HTTPException(status_code=403, detail={"code": "ORGANIZER_ANALYSIS_DISABLED", "message": "Tính năng đang được nâng cấp."})
     token = request.headers.get("Authorization", "").partition(" ")[2].strip()
     try:
         return resolve_scope(claims, token)

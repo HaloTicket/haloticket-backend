@@ -3,6 +3,8 @@ package com.haloticket.booking_service.authz;
 import com.haloticket.booking_service.client.EventServiceClient;
 import feign.FeignException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
@@ -30,6 +32,14 @@ public class EventAccessClient {
     public EventAccessClient(EventServiceClient events, EventScopeProperties scope) {
         this.events = events;
         this.scope = scope;
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    void warnWhenInternalTokenIsBlank() {
+        if (scope.getInternalToken().isBlank()) {
+            log.error("[INTERNAL_TOKEN_MISSING] AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN is blank: calls from booking-service to payment-service "
+                    + "carry no X-Internal-Token and are refused until it is set to the shared secret");
+        }
     }
 
     /** Returns the caller's access, or throws 401 / 403 / 404 / 503. {@code permission} is a name of event-service's Permission. */
@@ -80,13 +90,6 @@ public class EventAccessClient {
 
     public void clear() {
         cache.clear();
-    }
-
-    /** True when the header carries the configured service secret; a blank secret never matches. */
-    public boolean isInternal(String token) {
-        String configured = scope.getInternalToken();
-        return !configured.isBlank() && token != null && MessageDigest.isEqual(
-                configured.getBytes(StandardCharsets.UTF_8), token.getBytes(StandardCharsets.UTF_8));
     }
 
     private static String hash(String value) {

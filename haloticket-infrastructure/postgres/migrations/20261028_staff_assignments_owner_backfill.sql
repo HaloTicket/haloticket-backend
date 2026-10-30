@@ -1,10 +1,9 @@
--- Apply to event_db. NOT RUN by anyone yet: read it, take a pg_dump of event_db, then run the PRE-CHECK first.
+-- DO NOT RUN. This migration is no longer needed for authorization and is kept only as a record.
 --
--- Event-scoped authorization (see .env.example, AUTHZ_EVENT_SCOPE_*) takes "who owns an event" from staff_assignments
--- (role OWNER, status ACTIVE). Older events were created before that table was filled, so their owner exists only as the
--- shared display profile in event_organizers (linked through event_organizer_mapping). Until this file has been run, the
--- switch authz.event-scope.legacy-fallback (default true) keeps those owners working. After it has been run and the
--- PRE-CHECK returns no rows, set AUTHZ_EVENT_SCOPE_LEGACY_FALLBACK=false.
+-- Event-scoped authorization takes "who owns an event" only from staff_assignments (role OWNER, status ACTIVE); the
+-- organizer profile in event_organizers (linked through event_organizer_mapping) is a display profile and decides nothing.
+-- The legacy fallback that treated a profile owner as OWNER has been removed, so events without an OWNER ACTIVE row have
+-- no owner by design (test data is cleaned up instead of back-filled).
 --
 -- What it does: for each event that has a profile owner and no ACTIVE OWNER row, insert one OWNER row for the profile's
 -- user_id. It never changes an existing row: if the (event, user) pair already has a row (for example REVOKED), nothing

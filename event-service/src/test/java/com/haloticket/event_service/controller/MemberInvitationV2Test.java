@@ -52,7 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Member invitations with v2 on, on the real security filter chain, the real permission function and real repositories (H2).
+ * Member invitations on the real security filter chain, the real permission function and real repositories (H2).
  * People: owner-a, admin-a, mgr-a, chk-a (active in event A), invitee (an account that has not been in event A), stranger.
  * The token handed out by the service is read from the notification it publishes, like the notification service does.
  */
@@ -67,11 +67,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "spring.cloud.discovery.enabled=false",
         "spring.security.oauth2.resourceserver.jwt.issuer-uri=https://issuer.example",
         "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://issuer.example/jwks",
-        "authz.event-scope.enabled=true",
-        "authz.event-scope.legacy-fallback=false",
-        "authz.event-scope.permission-function.enabled=true",
-        "authz.event-scope.members.enabled=true",
-        "member.invitation.v2.enabled=true",
         "member.invitation.max-per-event-per-day=4",
         "member.invitation.resend-min-seconds=0",
         "member.invitation.max-resends=2"

@@ -1,6 +1,5 @@
 package com.haloticket.event_service.authz;
 
-import com.haloticket.event_service.entity.Event;
 import com.haloticket.event_service.entity.StaffAssignment;
 import com.haloticket.event_service.enums.StaffAssignmentStatus;
 import com.haloticket.event_service.enums.StaffRole;
@@ -24,10 +23,9 @@ public class EventPermissions {
 
     private final StaffAssignmentRepository assignments;
     private final EventRepository events;
-    private final EventScopeProperties scope;
 
     public EventAccess forUser(String userId, String eventId, boolean platformAdmin) {
-        Event event = events.findById(eventId)
+        events.findById(eventId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND"));
         if (platformAdmin) {
             return new EventAccess(eventId, userId, true, StaffRole.OWNER, null, false, RolePermissions.all());
@@ -40,12 +38,6 @@ public class EventPermissions {
             }
             return new EventAccess(eventId, userId, false, assignment.getRole(), assignment.getId(), false,
                     RolePermissions.of(assignment.getRole()));
-        }
-        // events created before the owner assignment was written automatically: the organizer profile is the only
-        // owner record. Kept until the backfill has run (authz.event-scope.legacy-fallback=false after that).
-        if (scope.legacyFallbackOn() && userId != null && event.getOrganizers() != null
-                && event.getOrganizers().stream().anyMatch(o -> userId.equals(o.getUserId()))) {
-            return new EventAccess(eventId, userId, false, StaffRole.OWNER, null, false, RolePermissions.of(StaffRole.OWNER));
         }
         return new EventAccess(eventId, userId, false, null, null, false, Set.of());
     }

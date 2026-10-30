@@ -3,7 +3,6 @@ package com.haloticket.event_service.service.impl;
 import com.haloticket.event_service.authz.CallerIds;
 import com.haloticket.event_service.authz.EventAccess;
 import com.haloticket.event_service.authz.EventPermissions;
-import com.haloticket.event_service.authz.EventScopeProperties;
 import com.haloticket.event_service.service.EventAccessService;
 import com.haloticket.event_service.client.UserInternalServiceClient;
 import com.haloticket.event_service.client.UserInviteResponse;
@@ -16,7 +15,6 @@ import com.haloticket.event_service.dto.response.EventMemberResponse;
 import com.haloticket.event_service.dto.response.OrganizerEligibilityResponse;
 import com.haloticket.event_service.dto.response.InternalUserResponse;
 import com.haloticket.event_service.entity.Event;
-import com.haloticket.event_service.entity.EventOrganizer;
 import com.haloticket.event_service.entity.StaffAssignment;
 import com.haloticket.event_service.enums.StaffAssignmentStatus;
 import com.haloticket.event_service.enums.StaffRole;
@@ -51,7 +49,6 @@ public class EventMemberServiceImpl implements EventMemberService {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final EventPermissions permissions;
     private final CallerIds callers;
-    private final EventScopeProperties scope;
     private final MemberInvitationProperties invitations;
 
     /** The caller's user-service id; a bad token is 401, user-service being down is 503. */
@@ -60,8 +57,7 @@ public class EventMemberServiceImpl implements EventMemberService {
     }
 
     private EventAccess accessOf(String eventId, String userId) {
-        // a platform admin passes only once the permission function is switched on
-        return permissions.forUser(userId, eventId, EventAccessService.isPlatformAdmin() && scope.permissionFunctionOn());
+        return permissions.forUser(userId, eventId, EventAccessService.isPlatformAdmin());
     }
 
     private StaffRole requireRole(String eventId, String userId, StaffRole... allowedRoles) {
@@ -79,7 +75,7 @@ public class EventMemberServiceImpl implements EventMemberService {
 
     /** An assignment id on the path must belong to the event on the path (404 otherwise, as if it did not exist). */
     private void requireAssignmentOfEvent(StaffAssignment assignment, String eventId) {
-        if (scope.membersOn() && (assignment.getEvent() == null || !eventId.equals(assignment.getEvent().getId()))) {
+        if (assignment.getEvent() == null || !eventId.equals(assignment.getEvent().getId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND");
         }
     }
@@ -118,40 +114,6 @@ public class EventMemberServiceImpl implements EventMemberService {
                 .invitationExpiresAt(a.getStatus() == StaffAssignmentStatus.PENDING ? a.getInvitationExpiresAt() : null)
                 .build();
         }).collect(Collectors.toCollection(java.util.ArrayList::new));
-                
-        // fallback for organizers who don't have a StaffAssignment record
-        Event event = eventRepository.findById(eventId).orElse(null);
-        if (event != null && event.getOrganizers() != null && scope.legacyFallbackOn()) {
-            for (EventOrganizer org : event.getOrganizers()) {
-                boolean alreadyAssigned = assignments.stream().anyMatch(a -> org.getUserId().equals(a.getUserId()));
-                if (!alreadyAssigned) {
-                    String name = org.getName();
-                    String email = name + " (Organizer)";
-                    String avatar = org.getAvatarUrl();
-                    
-                    try {
-                        InternalUserResponse userResp = userInternalServiceClient.getUserById(org.getUserId());
-                        if (userResp != null) {
-                            if (userResp.getFullName() != null) name = userResp.getFullName();
-                            if (userResp.getEmail() != null) email = userResp.getEmail();
-                            if (userResp.getAvatarUrl() != null) avatar = userResp.getAvatarUrl();
-                        }
-                    } catch (Exception ex) {
-                        // ignore, fallback to defaults
-                    }
-
-                    responses.add(0, EventMemberResponse.builder()
-                            .id(org.getId())
-                            .name(name)
-                            .email(email) 
-                            .avatar(avatar)
-                            .role(StaffRole.OWNER)
-                            .status(com.haloticket.event_service.enums.StaffAssignmentStatus.ACTIVE.name())
-                            .addedAt(event.getCreatedAt())
-                            .build());
-                }
-            }
-        }
 
         return responses;
     }
@@ -179,19 +141,23 @@ public class EventMemberServiceImpl implements EventMemberService {
         Event event = eventRepository.findById(eventId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND"));
 
-        // verify not self-inviting
-        if (event.getOrganizers() != null && !event.getOrganizers().isEmpty()) {
-            String ownerUserId = event.getOrganizers().get(0).getUserId();
-            try {
-                InternalUserResponse ownerUser = userInternalServiceClient.getUserById(ownerUserId);
-                if (ownerUser != null && ownerUser.getEmail() != null && ownerUser.getEmail().equalsIgnoreCase(email)) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CANNOT_INVITE_YOURSELF");
-                }
-            } catch (Exception ex) {
-                if (ex instanceof ResponseStatusException) throw ex;
-                // ignore other exceptions
-            }
-        }
+        // the caller (an ACTIVE member of the event) cannot invite their own address
+        staffAssignmentRepository.findByEventIdAndUserId(eventId, uid)
+                .filter(self -> self.getStatus() == StaffAssignmentStatus.ACTIVE)
+                .ifPresent(self -> {
+                    String callerEmail = self.getEmail();
+                    if (callerEmail == null || callerEmail.isBlank()) {
+                        try {
+                            InternalUserResponse callerUser = userInternalServiceClient.getUserById(uid);
+                            callerEmail = callerUser == null ? null : callerUser.getEmail();
+                        } catch (Exception ignored) {
+                            // the address is unknown: nothing to compare with
+                        }
+                    }
+                    if (callerEmail != null && callerEmail.equalsIgnoreCase(email)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "CANNOT_INVITE_YOURSELF");
+                    }
+                });
 
         StaffAssignment existing = pick(staffAssignmentRepository.findAllByEventIdAndEmail(eventId, email));
         requireInvitable(existing);
@@ -218,19 +184,13 @@ public class EventMemberServiceImpl implements EventMemberService {
         assignment.setInvitedAt(now);
         assignment.setAssignedAt(now);
         assignment.setRevokedAt(null);
-        String token = null;
-        if (invitations.v2On()) {
-            token = issueToken(assignment, now);
-            assignment.setInvitationResendCount(0);
-        } else {
-            assignment.setStatus(StaffAssignmentStatus.ACTIVE);
-            clearToken(assignment);
-        }
+        String token = issueToken(assignment, now);
+        assignment.setInvitationResendCount(0);
         try {
             assignment = staffAssignmentRepository.save(assignment);
         } catch (org.springframework.dao.DataIntegrityViolationException raced) {
             // with the unique (event, person) index in place, a parallel invitation of the same person loses here
-            throw new ResponseStatusException(HttpStatus.CONFLICT, invitations.v2On() ? "INVITATION_PENDING" : "ALREADY_MEMBER");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "INVITATION_PENDING");
         }
 
         publishInvitation(event, assignment, inviteRes.isNewUser(), token);
@@ -262,10 +222,10 @@ public class EventMemberServiceImpl implements EventMemberService {
         if (status == StaffAssignmentStatus.PENDING && "PENDING".equals(existing.statusLabel())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "INVITATION_PENDING");
         }
-        if (status == StaffAssignmentStatus.ACTIVE || !invitations.v2On()) {
+        if (status == StaffAssignmentStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "ALREADY_MEMBER");
         }
-        // v2 on: an expired or declined invitation, or a removed member, is invited again on the same row
+        // an expired or declined invitation, or a removed member, is invited again on the same row
     }
 
     private String issueToken(StaffAssignment assignment, LocalDateTime now) {
@@ -289,10 +249,8 @@ public class EventMemberServiceImpl implements EventMemberService {
         payload.put("name", assignment.getName());
         payload.put("role", assignment.getRole().name());
         payload.put("isNewUser", isNewUser);
-        if (token != null) {
-            payload.put("invitationToken", token);
-            payload.put("invitationExpiresAt", String.valueOf(assignment.getInvitationExpiresAt()));
-        }
+        payload.put("invitationToken", token);
+        payload.put("invitationExpiresAt", String.valueOf(assignment.getInvitationExpiresAt()));
         try {
             kafkaTemplate.send("notification.event.member.invitation", payload);
         } catch (Exception e) {
@@ -317,9 +275,6 @@ public class EventMemberServiceImpl implements EventMemberService {
     public EventMemberResponse resendInvitation(String eventId, String assignmentId, String authorization) {
         String uid = getUserIdFromAuth(authorization);
         requireRole(eventId, uid, StaffRole.OWNER, StaffRole.ADMIN);
-        if (!invitations.v2On()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "INVITATION_NOT_FOUND");
-        }
         StaffAssignment assignment = staffAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND"));
         if (assignment.getEvent() == null || !eventId.equals(assignment.getEvent().getId())) {
@@ -354,7 +309,6 @@ public class EventMemberServiceImpl implements EventMemberService {
     /** The invitation the signed-in person may answer: anything else is the same 404, so nothing about it leaks. */
     private StaffAssignment openInvitation(String token, String authorization) {
         ResponseStatusException notFound = new ResponseStatusException(HttpStatus.NOT_FOUND, "INVITATION_NOT_FOUND");
-        if (!invitations.v2On()) throw notFound;
         String uid = getUserIdFromAuth(authorization);
         if (token == null || token.isBlank() || token.length() > 200) throw notFound;
         StaffAssignment assignment = staffAssignmentRepository.findByInvitationTokenHash(InvitationTokens.hash(token.trim()))
@@ -486,9 +440,6 @@ public class EventMemberServiceImpl implements EventMemberService {
         String uid = getUserIdFromAuth(authorization);
         requireRole(eventId, uid, StaffRole.OWNER);
 
-        Event event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND"));
-
         StaffAssignment targetAssignment = staffAssignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "ASSIGNMENT_NOT_FOUND"));
 
@@ -514,15 +465,6 @@ public class EventMemberServiceImpl implements EventMemberService {
         if (currentOwnerAssignment.isPresent()) {
             currentOwnerAssignment.get().setRole(StaffRole.ADMIN);
             staffAssignmentRepository.save(currentOwnerAssignment.get());
-        }
-
-        // the organizer profile is shared by all events of its owner: rewriting it here changed the name and owner of the
-        // previous owner's other events too. With the members group on, only the roles change.
-        if (!scope.membersOn() && event.getOrganizers() != null && !event.getOrganizers().isEmpty()) {
-            EventOrganizer org = event.getOrganizers().get(0);
-            org.setUserId(targetAssignment.getUserId());
-            org.setName(targetAssignment.getName());
-            eventRepository.save(event);
         }
     }
 

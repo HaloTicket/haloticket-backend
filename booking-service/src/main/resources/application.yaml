@@ -38,7 +38,6 @@ eureka:
 booking:
   ga:
     reservation:
-      enabled: ${BOOKING_GA_RESERVATION_ENABLED:false}
       internal-token: ${TICKET_RESERVATION_INTERNAL_TOKEN:}
       slack-seconds: ${BOOKING_GA_RESERVATION_SLACK_SECONDS:60}
 

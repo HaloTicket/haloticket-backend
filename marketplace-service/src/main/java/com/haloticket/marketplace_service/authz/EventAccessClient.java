@@ -82,13 +82,6 @@ public class EventAccessClient {
         cache.clear();
     }
 
-    /** True when the header carries the configured service secret; a blank secret never matches. */
-    public boolean isInternal(String token) {
-        String configured = scope.getInternalToken();
-        return !configured.isBlank() && token != null && MessageDigest.isEqual(
-                configured.getBytes(StandardCharsets.UTF_8), token.getBytes(StandardCharsets.UTF_8));
-    }
-
     private static String hash(String value) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));

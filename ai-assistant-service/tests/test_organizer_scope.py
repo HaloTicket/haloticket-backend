@@ -184,8 +184,6 @@ def token(roles, sub):
 
 @pytest.fixture
 def api(monkeypatch):
-    monkeypatch.setattr(settings, "ai_auth_enforced", True)
-    monkeypatch.setattr(settings, "ai_analysis_organizer_enabled", True)
     seen = []
 
     def analyze(question, scope=None):
@@ -206,18 +204,10 @@ def auth(roles, sub="kc-user"):
     return {"Authorization": "Bearer " + token(roles, sub)}
 
 
-def test_while_the_organizer_flag_is_off_an_organizer_is_told_the_feature_is_being_upgraded(api, monkeypatch):
-    monkeypatch.setattr(settings, "ai_analysis_organizer_enabled", False)
-    response = api.post("/api/organizer/data-analysis", json={"question": "q"}, headers=auth(["ROLE_USER"]))
-    assert response.status_code == 403
-    assert response.json()["detail"]["code"] == "ORGANIZER_ANALYSIS_DISABLED"
-    assert api.seen == []
-
-
-def test_an_admin_is_not_affected_by_the_organizer_flag(api, monkeypatch):
-    monkeypatch.setattr(settings, "ai_analysis_organizer_enabled", False)
+def test_an_admin_sees_all_events(api):
     assert api.post("/api/organizer/data-analysis", json={"question": "q"}, headers=auth(["ROLE_ADMIN"])).status_code == 200
     assert api.seen[0].is_admin
+    assert api.seen[0].session_value == "*" and api.seen[0].spec() is None
 
 
 def test_an_organizer_reaches_data_analysis_with_their_own_scope(api, monkeypatch):
@@ -225,6 +215,20 @@ def test_an_organizer_reaches_data_analysis_with_their_own_scope(api, monkeypatc
     monkeypatch.setattr(scope_module, "events_for_user", lambda uid: ["evt-a"])
     assert api.post("/api/organizer/data-analysis", json={"question": "q"}, headers=auth(["ROLE_USER"])).status_code == 200
     assert api.seen[0].event_ids == ("evt-a",) and not api.seen[0].is_admin
+    assert api.seen[0].session_value == "evt-a"
+
+
+def test_an_organizer_only_sees_their_own_events(api, monkeypatch):
+    owned = {"user-1": ["evt-a"], "user-2": ["evt-b", "evt-c"]}
+    scope_module.clear_cache()
+    # the subject of the token stands in for the user-service id
+    monkeypatch.setattr(scope_module, "fetch_user_id", lambda t: jwt.decode(t, options={"verify_signature": False})["sub"])
+    monkeypatch.setattr(scope_module, "events_for_user", lambda uid: owned[uid])
+    api.post("/api/organizer/data-analysis", json={"question": "q"}, headers=auth(["ROLE_USER"], sub="user-1"))
+    api.post("/api/organizer/data-analysis", json={"question": "q"}, headers=auth(["ROLE_USER"], sub="user-2"))
+    scope_module.clear_cache()
+    assert [s.event_ids for s in api.seen] == [("evt-a",), ("evt-b", "evt-c")]
+    assert api.seen[0].allows_event("evt-a") and not api.seen[0].allows_event("evt-b")
 
 
 def test_anonymous_still_gets_401(api):
@@ -258,9 +262,3 @@ def test_when_the_scope_cannot_be_worked_out_nothing_runs(api, monkeypatch):
     response = api.post("/api/organizer/data-analysis", json={"question": "q"}, headers=auth(["ROLE_USER"]))
     assert response.status_code == 503 and response.json()["detail"]["code"] == "SCOPE_UNAVAILABLE"
     assert api.seen == []
-
-
-def test_with_the_check_switched_off_the_old_admin_behaviour_remains(api, monkeypatch):
-    monkeypatch.setattr(settings, "ai_auth_enforced", False)
-    assert api.post("/api/organizer/data-analysis", json={"question": "q"}).status_code == 200
-    assert api.seen[0].is_admin

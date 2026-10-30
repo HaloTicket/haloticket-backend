@@ -148,6 +148,9 @@ CREATE TABLE IF NOT EXISTS staff_assignments (
     id VARCHAR(255) PRIMARY KEY,
     event_id VARCHAR(255) REFERENCES events(id) ON DELETE CASCADE,
     user_id VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    name VARCHAR(255),
+    role VARCHAR(50),
     status VARCHAR(50),
     assigned_at TIMESTAMP,
     revoked_at TIMESTAMP
@@ -232,6 +235,15 @@ VALUES
 ('xoay-tron-concert-hoang-dung', 'org-002'),
 ('idecaf-tam-cam-dai-chien', 'org-001')
 ON CONFLICT DO NOTHING;
+
+-- Who owns each seeded event: authorization reads staff_assignments (OWNER, ACTIVE), never the organizer profile above.
+-- user_id is the user-service id of the organizer account (users.id in user_db), the same as event_organizers.user_id.
+INSERT INTO staff_assignments (id, event_id, user_id, name, role, status, assigned_at)
+VALUES
+('sa-seed-001', 'nxnx37-hoc-vien-phep-thuat', '22222222-2222-2222-2222-222222222222', 'Nhà Hát Kịch IDECAF', 'OWNER', 'ACTIVE', NOW()),
+('sa-seed-002', 'xoay-tron-concert-hoang-dung', '55555555-5555-5555-5555-555555555555', 'Hoàng Dũng Entertainment', 'OWNER', 'ACTIVE', NOW()),
+('sa-seed-003', 'idecaf-tam-cam-dai-chien', '22222222-2222-2222-2222-222222222222', 'Nhà Hát Kịch IDECAF', 'OWNER', 'ACTIVE', NOW())
+ON CONFLICT (id) DO NOTHING;
 
 -- 3. TICKET DB (ticket_db)
 \c ticket_db;

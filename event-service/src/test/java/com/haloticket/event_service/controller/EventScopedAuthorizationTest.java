@@ -5,6 +5,7 @@ import com.haloticket.event_service.client.UserServiceClient;
 import com.haloticket.event_service.config.DataInitializer;
 import com.haloticket.event_service.config.DatabaseSchemaInitializer;
 import com.haloticket.event_service.config.JwtRoleConverter;
+import com.haloticket.event_service.dto.request.EventCreateRequest;
 import com.haloticket.event_service.dto.response.EventAnalyticsResponse;
 import com.haloticket.event_service.dto.response.OrganizerEligibilityResponse;
 import com.haloticket.event_service.dto.response.VoucherResponse;
@@ -12,9 +13,11 @@ import com.haloticket.event_service.entity.Event;
 import com.haloticket.event_service.entity.StaffAssignment;
 import com.haloticket.event_service.enums.StaffAssignmentStatus;
 import com.haloticket.event_service.enums.StaffRole;
+import com.haloticket.event_service.repository.EventOrganizerRepository;
 import com.haloticket.event_service.repository.EventRepository;
 import com.haloticket.event_service.repository.StaffAssignmentRepository;
 import com.haloticket.event_service.service.EventAnalyticsService;
+import com.haloticket.event_service.service.EventService;
 import com.haloticket.event_service.service.VoucherService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,17 +63,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "eureka.client.enabled=false",
         "spring.cloud.discovery.enabled=false",
         "spring.security.oauth2.resourceserver.jwt.issuer-uri=https://issuer.example",
-        "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://issuer.example/jwks",
-        "authz.event-scope.enabled=true",
-        "authz.event-scope.legacy-fallback=false",
-        "authz.event-scope.permission-function.enabled=true",
-        "authz.event-scope.members.enabled=true",
-        "authz.event-scope.catalog.enabled=true",
-        "authz.event-scope.orders.enabled=true",
-        "authz.event-scope.vouchers.enabled=true",
-        "authz.event-scope.checkin.enabled=true",
-        "authz.event-scope.identity.enabled=true",
-        "authz.event-scope.notifications.enabled=true"
+        "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://issuer.example/jwks"
 })
 @AutoConfigureMockMvc
 class EventScopedAuthorizationTest {
@@ -80,6 +73,8 @@ class EventScopedAuthorizationTest {
     @Autowired StaffAssignmentRepository assignments;
     @Autowired JwtRoleConverter converter;
     @Autowired CallerIds callerIds;
+    @Autowired EventService eventService;
+    @Autowired EventOrganizerRepository organizers;
 
     // the startup seeders target PostgreSQL and the dev data; the test builds its own rows
     @MockitoBean DataInitializer dataInitializer;
@@ -97,6 +92,7 @@ class EventScopedAuthorizationTest {
     void data() {
         assignments.deleteAll();
         events.deleteAll();
+        organizers.deleteAll();
         callerIds.clear();
         // user-service maps the token's subject ("kc-x") to a different id ("u-x"); the token string carries the subject
         when(users.getOrganizerEligibility(anyString())).thenAnswer(call -> {
@@ -339,5 +335,52 @@ class EventScopedAuthorizationTest {
         callerIds.clear();
         assertThat(codeOf(get("/api/events/" + a + "/members/my-access"), "owner-a")).isEqualTo(503);
         assertThat(codeOf(get("/api/events/" + a + "/analytics"), "owner-a")).isEqualTo(503);
+    }
+
+    // --- who owns an event comes from staff_assignments only ---------------------------------------------------------------
+
+    @Test
+    void creatingAnEventGivesTheCreatorExactlyOneActiveOwnerAssignment() throws Exception {
+        EventCreateRequest request = new EventCreateRequest();
+        request.setTitle("Brand new");
+        request.setOrganizerName("New Org");
+        request.setStatus("DRAFT");
+        String id = eventService.createEvent(request, "kc-newbie").getId();
+
+        List<StaffAssignment> rows = assignments.findByEventId(id);
+        assertThat(rows).hasSize(1);
+        assertThat(rows.get(0).getUserId()).isEqualTo("u-newbie"); // the user-service id that the permission function compares
+        assertThat(rows.get(0).getRole()).isEqualTo(StaffRole.OWNER);
+        assertThat(rows.get(0).getStatus()).isEqualTo(StaffAssignmentStatus.ACTIVE);
+        mvc.perform(as(get("/api/events/" + id + "/members/my-access"), "newbie")).andExpect(jsonPath("$.role").value("OWNER"));
+        assertThat(myEvents("newbie")).containsExactly(id);
+    }
+
+    @Test
+    void aPersonWhoIsOnlyInTheOrganizerProfileHasNoPermissionAndNoEvents() throws Exception {
+        com.haloticket.event_service.entity.EventOrganizer profile = organizers.save(
+                com.haloticket.event_service.entity.EventOrganizer.builder().userId("u-profile").name("Profile only").build());
+        Event event = events.findById(a).orElseThrow();
+        event.setOrganizers(new java.util.ArrayList<>(List.of(profile)));
+        events.save(event);
+
+        mvc.perform(as(get("/api/events/" + a + "/members/my-access"), "profile")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.permissions.length()").value(0)).andExpect(jsonPath("$.role").doesNotExist());
+        assertThat(codeOf(get("/api/events/" + a + "/members"), "profile")).isEqualTo(403);
+        assertThat(codeOf(get("/api/events/" + a + "/analytics"), "profile")).isEqualTo(403);
+        assertThat(myEvents("profile")).isEmpty();
+        // and the members list shows no invented owner row for the profile
+        mvc.perform(as(get("/api/events/" + a + "/members"), "owner-a")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(assignments.findByEventId(a).size()));
+    }
+
+    @Test
+    void aPlatformAdminPassesOnAnEventThatHasNoAssignmentAtAll() throws Exception {
+        String lonely = events.save(Event.builder().title("No owner row").build()).getId();
+        mvc.perform(as(get("/api/events/" + lonely + "/members/my-access"), "root")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.platformAdmin").value(true)).andExpect(jsonPath("$.permissions[?(@ == 'EVENT_EDIT')]").exists());
+        assertThat(codeOf(get("/api/events/" + lonely + "/members"), "root")).isEqualTo(200);
+        assertThat(codeOf(get("/api/events/" + lonely + "/analytics"), "root")).isEqualTo(200);
+        assertThat(codeOf(get("/api/events/" + lonely + "/members"), "stranger")).isEqualTo(403);
     }
 }

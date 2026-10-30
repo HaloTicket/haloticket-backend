@@ -65,7 +65,7 @@ public class BookingServiceImpl implements BookingService {
     @Transactional
     public BookingResponse createBooking(BookingCreateRequest request) {
         String eventId = request.getEventId();
-        // with booking.ga.reservation.enabled off this is the request untouched.
+        // general-admission lines are held as stock in ticket-service; the rest goes through the per-seat flow
         GaReservationService.Plan gaPlan = gaReservationService.plan(request);
         List<String> seatIds = gaPlan.seatIds();
         // 422 QUANTITY_OUT_OF_RANGE when the quantity of a ticket type is below minPerOrder or above maxPerOrder

@@ -47,7 +47,6 @@ def calls():
 @pytest.fixture
 def client(monkeypatch, calls, tmp_path):
     verifier = TokenVerifier(ISSUER, lambda _token: SIGNING_KEY.public_key())
-    monkeypatch.setattr(settings, "ai_auth_enforced", True)
 
     def analyze(question, scope=None):
         calls.append(("data-analysis", question))
@@ -72,10 +71,8 @@ def client(monkeypatch, calls, tmp_path):
     return TestClient(app)
 
 
-# the routes that read event data through the model, or the server: ADMIN only
+# the routes that run the unscoped organizer agent, or read the server: ADMIN only
 ADMIN_ROUTES = [
-    ("POST", "/api/organizer/data-analysis", {"question": "Đếm số sự kiện"}),
-    ("POST", "/api/organizer/voucher-strategy", {"event_id": "e1"}),
     ("POST", "/api/organizer/agent-chat", {"message": "hi"}),
     ("GET", "/api/admin/system-logs", None),
     ("GET", "/api/admin/ssl-status", None),
@@ -98,15 +95,13 @@ def test_admin_routes_refuse_anonymous_and_customers(client, calls, method, path
 
     customer_response = send(client, method, path, body, auth(token(["ROLE_USER"])))
     assert customer_response.status_code == 403
-    # the analysis routes answer "being upgraded" while organizer analysis is off (the default), the rest "admin only"
-    expected = "ORGANIZER_ANALYSIS_DISABLED" if path.endswith(("/data-analysis", "/voucher-strategy")) else "ADMIN_ONLY"
-    assert customer_response.json()["detail"]["code"] == expected
+    assert customer_response.json()["detail"]["code"] == "ADMIN_ONLY"
     assert calls == []  # the handler never ran
 
 
 @pytest.mark.parametrize("roles", [["ROLE_ORGANIZER"], ["ROLE_STAFF"], ["ROLE_USER", "ROLE_ORGANIZER", "ROLE_STAFF"], ["ADMINISTRATOR"]])
 def test_other_roles_are_not_admin(client, roles):
-    assert send(client, "POST", "/api/organizer/data-analysis", {"question": "q"}, auth(token(roles))).status_code == 403
+    assert send(client, "POST", "/api/organizer/agent-chat", {"message": "q"}, auth(token(roles))).status_code == 403
 
 
 @pytest.mark.parametrize("claims", [{"roles": ["ROLE_ADMIN"]}, {"realm_access": {"roles": ["ROLE_ADMIN"]}}, {"roles": ["admin"]}])
@@ -124,6 +119,12 @@ def test_an_admin_reaches_every_admin_route(client, calls):
     assert send(client, "POST", "/api/organizer/agent-chat", {"message": "hi"}, admin_token).status_code == 200
     assert send(client, "GET", "/api/admin/system-logs", None, admin_token).status_code == 200
     assert [call[0] for call in calls][:3] == ["data-analysis", "data-analysis", "agent-chat"]  # voucher-strategy asks the engine
+
+
+@pytest.mark.parametrize("path,body", [("/api/organizer/data-analysis", {"question": "q"}), ("/api/organizer/voucher-strategy", {"event_id": "e1"})])
+def test_the_analysis_routes_need_a_login(client, calls, path, body):
+    assert send(client, "POST", path, body).status_code == 401
+    assert calls == []
 
 
 def test_content_generation_needs_a_login_but_not_a_role(client, calls):
@@ -182,7 +183,6 @@ def test_when_keycloak_cannot_be_reached_for_the_keys_the_request_is_refused_not
 
 
 def test_without_keycloak_settings_the_protected_routes_refuse_everyone(monkeypatch):
-    monkeypatch.setattr(settings, "ai_auth_enforced", True)
     monkeypatch.setattr(settings, "keycloak_issuer_uri", "")
     monkeypatch.setattr(settings, "keycloak_jwk_set_uri", "")
     security.get_verifier.cache_clear()
@@ -194,12 +194,6 @@ def test_without_keycloak_settings_the_protected_routes_refuse_everyone(monkeypa
         assert response.json()["detail"]["code"] == "AUTH_NOT_CONFIGURED"
     finally:
         security.get_verifier.cache_clear()
-
-
-def test_the_check_can_be_switched_off_for_a_quick_rollback(client, monkeypatch, calls):
-    monkeypatch.setattr(settings, "ai_auth_enforced", False)
-    assert send(client, "POST", "/api/organizer/data-analysis", {"question": "q"}).status_code == 200
-    assert calls == [("data-analysis", "q")]
 
 
 # --- ssl-status and system-logs ------------------------------------------------------------------------------------------

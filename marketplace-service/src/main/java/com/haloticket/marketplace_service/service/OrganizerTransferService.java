@@ -1,8 +1,6 @@
 package com.haloticket.marketplace_service.service;
 
 import com.haloticket.marketplace_service.authz.EventAccessClient;
-import com.haloticket.marketplace_service.authz.EventScopeProperties;
-import com.haloticket.marketplace_service.client.EventServiceClient;
 import com.haloticket.marketplace_service.dto.OrganizerGiftResponse;
 import com.haloticket.marketplace_service.dto.OrganizerListingResponse;
 import com.haloticket.marketplace_service.dto.OrganizerTransferSummaryResponse;
@@ -15,27 +13,22 @@ import com.haloticket.marketplace_service.enums.TransferStatus;
 import com.haloticket.marketplace_service.repository.TicketListingRepository;
 import com.haloticket.marketplace_service.repository.TicketTransferRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
-import feign.FeignException;
 import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class OrganizerTransferService {
-    private final EventServiceClient eventServiceClient;
     private final TicketListingRepository listingRepository;
     private final TicketTransferRepository transferRepository;
     private final EventTransferPolicyService policyGate;
     private final TicketListingService ticketListingService;
     private final EventAccessClient eventAccess;
-    private final EventScopeProperties scope;
 
     public void requireOrganizerAccess(String authorization, String eventId) {
         requireOrganizerRole(authorization, eventId, false);
@@ -45,39 +38,8 @@ public class OrganizerTransferService {
         if (authorization == null || authorization.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED");
         }
-        if (scope.ordersOn()) {
-            // one permission table in event-service: viewing needs MARKETPLACE_VIEW, changes need MARKETPLACE_MODERATE
-            eventAccess.require(eventId, write ? "MARKETPLACE_MODERATE" : "MARKETPLACE_VIEW", authorization);
-            return;
-        }
-        try {
-            String role = eventServiceClient.getMyRole(authorization, eventId);
-            if (role != null) {
-                role = role.replace("\"", "").trim().toUpperCase();
-            }
-            log.info("requireOrganizerAccess for event {}: normalized role='{}'", eventId, role);
-            if (role == null || (!"OWNER".equals(role) && !"ADMIN".equals(role) && (write || !"MANAGER".equals(role)))) {
-                log.warn("Access denied for event {}: role '{}' cannot perform organizer {}", eventId, role, write ? "changes" : "reads");
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE");
-            }
-        } catch (ResponseStatusException e) {
-            throw e;
-        } catch (FeignException.Unauthorized e) {
-            log.warn("Event service rejected token for event {}: {}", eventId, e.getMessage());
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED");
-        } catch (FeignException.Forbidden e) {
-            log.warn("Access denied by event service for event {}: {}", eventId, e.getMessage());
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE");
-        } catch (FeignException.NotFound e) {
-            log.warn("Event not found in event service {}: {}", eventId, e.getMessage());
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND");
-        } catch (FeignException e) {
-            log.error("Feign error calling event service for event {}: {}", eventId, e.getMessage(), e);
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "EVENT_SERVICE_UNAVAILABLE");
-        } catch (Exception e) {
-            log.error("Unexpected error checking organizer role for event {}: {}", eventId, e.getMessage(), e);
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR");
-        }
+        // one permission table in event-service: viewing needs MARKETPLACE_VIEW, changes need MARKETPLACE_MODERATE
+        eventAccess.require(eventId, write ? "MARKETPLACE_MODERATE" : "MARKETPLACE_VIEW", authorization);
     }
 
     public SagaResponse moderateListing(String authorization, String actorId, String eventId, String listingId, boolean approved, String reason) {

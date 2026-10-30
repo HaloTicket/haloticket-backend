@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -60,14 +59,11 @@ class EventScopedBookingAuthorizationTest {
 
     @BeforeEach
     void setUp() {
-        scope.setEnabled(true);
-        scope.getOrders().setEnabled(true);
-        scope.getIdentity().setEnabled(true);
         scope.setCacheSeconds(0);
         access = new EventAccessClient(events, scope);
-        bookingController = new BookingController(bookings, mock(BookingCancellationService.class), access, scope);
-        organizerController = new OrganizerBookingController(repository, payments, access, scope);
-        seatController = new SeatController(seatHolds, scope);
+        bookingController = new BookingController(bookings, mock(BookingCancellationService.class), access);
+        organizerController = new OrganizerBookingController(repository, payments, access);
+        seatController = new SeatController(seatHolds);
         when(events.getMyAccess(anyString(), anyString())).thenAnswer(call -> {
             String event = call.getArgument(0);
             String token = call.getArgument(1);
@@ -176,20 +172,5 @@ class EventScopedBookingAuthorizationTest {
         assertThatThrownBy(() -> seatController.releaseSeat(request, null))
                 .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED));
     }
-
-    @Test
-    void withTheSwitchesOffNothingChanges() {
-        scope.setEnabled(false);
-        assertThat(organizerList("A", null)).isEqualTo(HttpStatus.OK);
-        assertThat(read(null, null)).isEqualTo(HttpStatus.OK);
-        BookingCreateRequest request = new BookingCreateRequest();
-        request.setCustomerId("whoever");
-        assertThatCode(() -> bookingController.createBooking(request, null)).doesNotThrowAnyException();
-        assertThat(request.getCustomerId()).isEqualTo("whoever");
-        SeatHoldRequest hold = new SeatHoldRequest();
-        hold.setUserId("any");
-        seatController.holdSeat(hold, null);
-        verify(seatHolds).holdSeat(null, null, null, "any");
-        verifyNoInteractions(events);
-    }
 }
+

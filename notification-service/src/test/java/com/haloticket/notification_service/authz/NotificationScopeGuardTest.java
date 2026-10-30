@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.*;
 
 class NotificationScopeGuardTest {
@@ -31,8 +30,6 @@ class NotificationScopeGuardTest {
 
     @BeforeEach
     void setUp() {
-        scope.setEnabled(true);
-        scope.getNotifications().setEnabled(true);
         scope.setInternalToken("service-secret");
         when(users.getOrganizerEligibility("Bearer alice")).thenReturn(new UserServiceClient.Eligibility(true, "u-alice"));
         signedInAs("kc-alice", "ROLE_CUSTOMER");
@@ -109,14 +106,10 @@ class NotificationScopeGuardTest {
     }
 
     @Test
-    void withTheSwitchOffNothingIsChecked() {
-        scope.setEnabled(false);
-        SecurityContextHolder.clearContext();
-        assertThatCode(() -> {
-            guard.requireOwnerOfUserInbox("anyone", null);
-            guard.requireOwnerOfNotification("n", null);
-            guard.requireInternalOrAdmin(null);
-        }).doesNotThrowAnyException();
-        verifyNoInteractions(users, repository);
+    void aBlankInternalTokenRefusesCreatingAndPublishingEvenForABlankOrMissingHeader() {
+        scope.setInternalToken("");
+        assertThat(status(() -> guard.requireInternalOrAdmin(""))).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(status(() -> guard.requireInternalOrAdmin(null))).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(status(() -> guard.requireInternalOrAdmin("service-secret"))).isEqualTo(HttpStatus.FORBIDDEN);
     }
 }

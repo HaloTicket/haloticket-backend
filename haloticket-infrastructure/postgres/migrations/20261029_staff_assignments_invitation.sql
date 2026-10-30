@@ -22,4 +22,4 @@ HAVING count(*) > 1;
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS ux_staff_assignments_event_user ON staff_assignments (event_id, user_id);
 
 -- To undo: DROP INDEX CONCURRENTLY IF EXISTS ux_staff_assignments_event_user;  (the columns can stay; they are unused when the
--- member.invitation.v2.enabled flag is off.)
+-- invitation flow is not deployed yet.)

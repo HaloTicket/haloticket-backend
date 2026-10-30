@@ -1,7 +1,6 @@
 package com.haloticket.booking_service.controller;
 
 import com.haloticket.booking_service.authz.EventAccessClient;
-import com.haloticket.booking_service.authz.EventScopeProperties;
 import com.haloticket.booking_service.client.PaymentServiceClient;
 import com.haloticket.booking_service.dto.response.BookingDetailDto;
 import com.haloticket.booking_service.entity.Booking;
@@ -25,7 +24,6 @@ public class OrganizerBookingController {
     private final BookingRepository bookingRepository;
     private final PaymentServiceClient paymentServiceClient;
     private final EventAccessClient eventAccess;
-    private final EventScopeProperties scope;
 
     @GetMapping
     public ResponseEntity<Page<BookingDetailDto>> getEventBookings(
@@ -36,8 +34,8 @@ public class OrganizerBookingController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        // orders group: the caller must hold ORDERS_VIEW of this event (event-service answers, with the caller token)
-        if (scope.ordersOn()) eventAccess.require(eventId, "ORDERS_VIEW", authorization);
+        // the caller must hold ORDERS_VIEW of this event (event-service answers, with the caller token)
+        eventAccess.require(eventId, "ORDERS_VIEW", authorization);
         if (search == null) {
             search = "";
         }

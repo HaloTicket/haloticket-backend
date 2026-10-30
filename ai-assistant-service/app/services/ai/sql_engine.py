@@ -3,6 +3,7 @@ import logging
 import time
 
 from langchain_core.prompts import PromptTemplate
+from fastapi import HTTPException
 from sqlalchemy import inspect, text
 from sqlalchemy.engine import make_url
 
@@ -13,6 +14,16 @@ from app.services.ai.sql_guard import GuardedSql, SqlGuardError, parse_allowed, 
 from app.services.ai.scope import AnalysisScope
 
 log = logging.getLogger("ai.sql_engine")
+
+
+class AnalysisDbNotConfigured(HTTPException):
+    """AI_DB_USER / AI_DB_PASSWORD are not set: the analysis never falls back to the general database account."""
+
+    def __init__(self):
+        super().__init__(status_code=503, detail={
+            "code": "AI_DB_NOT_CONFIGURED",
+            "message": "Chức năng phân tích dữ liệu chưa được cấu hình tài khoản cơ sở dữ liệu chỉ đọc (AI_DB_USER / AI_DB_PASSWORD).",
+        })
 
 
 class SQLEngine:
@@ -38,12 +49,15 @@ class SQLEngine:
         return (settings.ai_analysis_schema or "").strip()
 
     def _analysis_url(self):
-        url = make_url(settings.database_url)
-        if settings.ai_db_user:
-            return url.set(username=settings.ai_db_user, password=settings.ai_db_password or None)
-        log.warning("AI_DB_USER is not set: data analysis connects with the general database account. "
-                    "Create the read-only role (see postgres/ai-readonly) and set AI_DB_USER / AI_DB_PASSWORD.")
-        return url
+        self.require_account()
+        return make_url(settings.database_url).set(username=settings.ai_db_user, password=settings.ai_db_password)
+
+    @staticmethod
+    def require_account() -> None:
+        if not settings.ai_db_user or not settings.ai_db_password:
+            log.error("AI_DB_USER / AI_DB_PASSWORD are not set: data analysis is refused. "
+                      "Create the read-only role (see postgres/ai-readonly) and set both.")
+            raise AnalysisDbNotConfigured()
 
     @property
     def engine(self):
@@ -116,6 +130,7 @@ class SQLEngine:
     def analyze_data(self, question: str, scope: AnalysisScope = None):
         """Dịch câu hỏi của người dùng thành một câu SELECT an toàn, chạy chỉ-đọc và trả về kết quả kèm insight.
         scope: which events the caller may see (None or an admin scope = all)."""
+        self.require_account()  # raises 503 AI_DB_NOT_CONFIGURED before anything else happens
         scope = scope or AnalysisScope.admin()
         relations = self.relations_for(scope)
         if not relations:

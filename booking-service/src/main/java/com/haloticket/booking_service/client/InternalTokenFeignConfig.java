@@ -1,14 +1,15 @@
 package com.haloticket.booking_service.client;
 
+import com.haloticket.booking_service.authz.EventScopeProperties;
 import feign.RequestInterceptor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 
 public class InternalTokenFeignConfig {
 
     @Bean
-    RequestInterceptor internalTokenInterceptor(@Value("${authz.event-scope.internal-token:}") String token) {
+    RequestInterceptor internalTokenInterceptor(EventScopeProperties scope) {
         return template -> {
+            String token = scope.getInternalToken();
             if (!token.isBlank()) template.header("X-Internal-Token", token);
         };
     }

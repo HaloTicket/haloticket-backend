@@ -3,7 +3,6 @@ package com.haloticket.event_service.service;
 import com.haloticket.event_service.authz.CallerIds;
 import com.haloticket.event_service.authz.EventAccess;
 import com.haloticket.event_service.authz.EventPermissions;
-import com.haloticket.event_service.authz.EventScopeProperties;
 import com.haloticket.event_service.authz.Permission;
 import com.haloticket.event_service.enums.StaffRole;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +23,6 @@ import org.springframework.web.server.ResponseStatusException;
 public class EventAccessService {
     private final EventPermissions permissions;
     private final CallerIds callers;
-    private final EventScopeProperties scope;
 
     public String actor(String authorization) {
         return callers.userId(authorization);
@@ -33,10 +31,10 @@ public class EventAccessService {
     /** Whatever the caller may do with the event (never throws for "no permission"; 404 for an unknown event). */
     public EventAccess forCaller(String eventId, String authorization) {
         String userId = callers.userId(authorization);
-        return permissions.forUser(userId, eventId, isPlatformAdmin() && scope.permissionFunctionOn());
+        return permissions.forUser(userId, eventId, isPlatformAdmin());
     }
 
-    /** Owner, admin or manager of the event; with the permission function on, a platform admin passes too. */
+    /** Owner, admin or manager of the event; a platform admin passes too. */
     public StaffRole requireRead(String eventId, String authorization) {
         EventAccess access = forCaller(eventId, authorization);
         if (access.has(Permission.POLICY_READ)) return access.role();

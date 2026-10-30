@@ -1,6 +1,5 @@
 package com.haloticket.event_service.controller;
 
-import com.haloticket.event_service.authz.EventScopeProperties;
 import com.haloticket.event_service.authz.Permission;
 import com.haloticket.event_service.service.EventAccessService;
 import com.haloticket.event_service.dto.request.VoucherCreateRequest;
@@ -21,12 +20,11 @@ public class VoucherController {
 
     private final VoucherService voucherService;
     private final EventAccessService access;
-    private final EventScopeProperties scope;
 
     @GetMapping("/{eventId}/vouchers")
     public ResponseEntity<List<VoucherResponse>> getVouchersByEventId(@PathVariable("eventId") String eventId) {
         List<VoucherResponse> vouchers = voucherService.getVouchersByEventId(eventId);
-        if (scope.vouchersOn() && !mayManageVouchers(eventId)) {
+        if (!mayManageVouchers(eventId)) {
             // the list stays public (checkout shows the offers) but the codes are for the people who run them
             vouchers.forEach(voucher -> voucher.setCode(null));
         }
@@ -46,9 +44,7 @@ public class VoucherController {
     public ResponseEntity<List<VoucherResponse>> createVoucher(
             @PathVariable("eventId") String eventId,
             @RequestBody VoucherCreateRequest request) {
-        if (scope.vouchersOn()) {
-            access.requireForRequest(eventId, Permission.VOUCHER_MANAGE);
-        }
+        access.requireForRequest(eventId, Permission.VOUCHER_MANAGE);
         return new ResponseEntity<>(voucherService.createVoucher(eventId, request), HttpStatus.CREATED);
     }
 
@@ -75,8 +71,6 @@ public class VoucherController {
 
     /** The voucher's own event decides (a voucher id of another event is not enough): 404 for an unknown voucher, 403 otherwise. */
     private void requireVoucherManager(String voucherId) {
-        if (scope.vouchersOn()) {
-            access.requireForRequest(voucherService.eventIdOf(voucherId), Permission.VOUCHER_MANAGE);
-        }
+        access.requireForRequest(voucherService.eventIdOf(voucherId), Permission.VOUCHER_MANAGE);
     }
 }

@@ -58,7 +58,6 @@ class BookingGaLifecycleTest {
         when(redis.opsForSet()).thenReturn(mock(SetOperations.class));
         stockClient = mock(TicketStockClient.class);
         GaReservationProperties properties = new GaReservationProperties();
-        properties.setEnabled(true);
         properties.setInternalToken(TOKEN);
         ga = new GaReservationService(properties, stockClient, new ObjectMapper());
 
@@ -199,24 +198,14 @@ class BookingGaLifecycleTest {
         verifyNoInteractions(stockClient);
     }
 
-    // --- seat hold endpoint for older clients ---------------------------------------
+    // --- seat hold endpoint ---------------------------------------
+
 
     @Test
-    void virtualSeatHoldIsAcceptedWithoutRedisWhenStockHoldsAreOn() {
-        var redisson = mock(org.redisson.api.RedissonClient.class);
-        SeatHoldService holds = new SeatHoldService(redisson, mock(SeatWebsocketService.class), ga);
-
-        assertThat(holds.holdSeat("event-1", "show-1", "11111111-1111-1111-1111-111111111111-STT-3", "session_x")).isTrue();
-        holds.releaseSeat("event-1", "show-1", "11111111-1111-1111-1111-111111111111-STT-3", "session_x");
-
-        verifyNoInteractions(redisson);
-    }
-
-    @Test
-    void realSeatHoldStillGoesThroughRedisWhenStockHoldsAreOn() {
+    void realSeatHoldGoesThroughRedis() {
         var redisson = mock(org.redisson.api.RedissonClient.class);
         when(redisson.getLock(anyString())).thenThrow(new IllegalStateException("redis reached"));
-        SeatHoldService holds = new SeatHoldService(redisson, mock(SeatWebsocketService.class), ga);
+        SeatHoldService holds = new SeatHoldService(redisson, mock(SeatWebsocketService.class));
 
         assertThatThrownBy(() -> holds.holdSeat("event-1", "show-1", "seat_1_2", "u1"))
                 .hasMessage("redis reached");
