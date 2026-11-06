@@ -26,6 +26,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/internal/tickets/*/transfer-snapshot").permitAll()
                 // Service token is validated inside the controller before any DB access.
                 .requestMatchers(HttpMethod.POST, "/api/internal/tickets/stock-reservations", "/api/internal/tickets/stock-reservations/*/release").permitAll()
+                // Same for the reopen of a hold (late payment) and the reconciliation reads (admin page through booking-service).
+                .requestMatchers(HttpMethod.POST, "/api/internal/tickets/stock-reservations/*/reopen", "/api/internal/tickets/issued-counts").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/internal/tickets/stock-reconciliation").permitAll()
                 .requestMatchers("/api/tickets/types/**", "/api/tickets/seat-layouts/**", "/api/tickets/seat-status").permitAll()
                 .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.decoder(jwtDecoder()))).build();
