@@ -175,7 +175,7 @@ class OrderLimitValidatorTest {
         when(ga.plan(any())).thenReturn(new GaReservationService.Plan(List.of(), null));
         BookingServiceImpl service = new BookingServiceImpl(bookings, mock(SeatReservationRepository.class),
                 mock(OutboxEventRepository.class), mock(RedissonClient.class), mock(StringRedisTemplate.class), new ObjectMapper(),
-                mock(EventServiceClient.class), mock(TicketServiceClient.class), ga, validator);
+                mock(EventServiceClient.class), mock(TicketServiceClient.class), ga, validator, new OrderShapeValidator());
         BookingCreateRequest request = order("t1", 9);
         request.setEventId("e1");
         assertThatThrownBy(() -> service.createBooking(request))

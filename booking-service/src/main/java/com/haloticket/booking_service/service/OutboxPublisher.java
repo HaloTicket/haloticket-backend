@@ -12,11 +12,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class OutboxPublisher {
+
+    static final long SEND_TIMEOUT_SECONDS = 10;
 
     private final OutboxEventRepository outboxEventRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
@@ -31,11 +34,13 @@ public class OutboxPublisher {
 
         for (OutboxEvent event : pendingEvents) {
             try {
-                kafkaTemplate.send(event.getTopic(), event.getAggregateId(), event.getPayload());
+                // wait for the broker's ack: marking PROCESSED before it would lose the event if the send fails
+                kafkaTemplate.send(event.getTopic(), event.getAggregateId(), event.getPayload()).get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 event.setStatus(OutboxStatus.PROCESSED);
                 event.setProcessedAt(LocalDateTime.now());
                 log.info("Published outbox event {} type {} to topic {}", event.getId(), event.getEventType(), event.getTopic());
             } catch (Exception e) {
+                if (e instanceof InterruptedException) Thread.currentThread().interrupt();
                 log.error("Failed to publish outbox event {}", event.getId(), e);
                 int retryCount = event.getRetryCount() != null ? event.getRetryCount() + 1 : 1;
                 event.setRetryCount(retryCount);

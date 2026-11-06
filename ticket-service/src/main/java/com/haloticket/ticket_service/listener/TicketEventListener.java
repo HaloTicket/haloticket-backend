@@ -221,6 +221,13 @@ public class TicketEventListener {
     private Map<String, Object> issueSingleTicket(String bookingId, String bookingCode, String customerId, String eventId,
             String showtimeId, TicketType type, BigDecimal price, Seat seat, String seatId,
             String section, String row, String number, boolean isGa, String issueKey) {
+        // atomic stock decrement, once per newly created ticket. When stock is exhausted the whole transaction rolls back
+        // (no ticket, no seat change, no outbox row); the Kafka error handler retries and then sends it to the DLT.
+        int updated = ticketTypeRepository.decrementTotalQuantityAtomic(type.getId());
+        if (updated == 0) {
+            log.error("[OVERSOLD_ON_ISSUE] Total quantity exhausted for ticketTypeId={} on bookingCode={}", type.getId(), bookingCode);
+            throw new IllegalStateException("OVERSOLD_ON_ISSUE ticketTypeId=" + type.getId() + " bookingCode=" + bookingCode);
+        }
         String qrToken = generateQrToken(bookingId, customerId, isGa ? issueKey : seatId);
         Ticket ticket = ticketRepository.save(Ticket.builder()
                 .bookingId(bookingId)
@@ -245,11 +252,6 @@ public class TicketEventListener {
         if (seat != null && !isGa) {
             seat.setSeatStatus(SeatStatus.SOLD);
             seatRepository.save(seat);
-        }
-        // atomic stock decrement
-        int updated = ticketTypeRepository.decrementTotalQuantityAtomic(type.getId());
-        if (updated == 0) {
-            log.error("[OVERSOLD_ON_ISSUE] Total quantity exhausted for ticketTypeId={} on bookingCode={}", type.getId(), bookingCode);
         }
         return buildTicketDetail(ticket, type, price, seatId, section, row, number, isGa);
     }

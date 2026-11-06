@@ -88,6 +88,46 @@ class InternalStockReservationControllerTest {
                 .andExpect(jsonPath("$.released").value(1));
     }
 
+    private static final String REOPEN = "/api/internal/tickets/stock-reservations/b1/reopen";
+    private static final String REOPEN_BODY = "{\"expiresAt\":\"" + Instant.now().plusSeconds(600) + "\"}";
+
+    @Test
+    void reopenNeedsTheToken() throws Exception {
+        mvc.perform(post(REOPEN).contentType(MediaType.APPLICATION_JSON).content(REOPEN_BODY)).andExpect(status().isForbidden());
+        mvc.perform(post(REOPEN).header("X-Internal-Token", "nope").contentType(MediaType.APPLICATION_JSON).content(REOPEN_BODY))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void reopenSucceeds() throws Exception {
+        mvc.perform(post(REOPEN).header("X-Internal-Token", TOKEN).contentType(MediaType.APPLICATION_JSON).content(REOPEN_BODY))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reopened").value(true));
+        verify(service).reopen(eq("b1"), any(Instant.class));
+    }
+
+    @Test
+    void reopenSoldOutIs409WithTheReserveBody() throws Exception {
+        doThrow(new StockReservationService.SoldOutException("t1", 0)).when(service).reopen(any(), any());
+
+        mvc.perform(post(REOPEN).header("X-Internal-Token", TOKEN).contentType(MediaType.APPLICATION_JSON).content(REOPEN_BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("TICKET_SOLD_OUT"))
+                .andExpect(jsonPath("$.ticketTypeId").value("t1"))
+                .andExpect(jsonPath("$.available").value(0));
+    }
+
+    @Test
+    void reopenOfAConsumedOrUnknownBookingIs409NotReopenable() throws Exception {
+        doThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "RESERVATION_NOT_REOPENABLE"))
+                .when(service).reopen(any(), any());
+
+        mvc.perform(post(REOPEN).header("X-Internal-Token", TOKEN).contentType(MediaType.APPLICATION_JSON).content(REOPEN_BODY))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("RESERVATION_NOT_REOPENABLE"));
+    }
+
     private static <T> T eq(T value) {
         return org.mockito.ArgumentMatchers.eq(value);
     }

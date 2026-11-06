@@ -48,7 +48,8 @@ class BookingGetByIdTest {
                 mock(EventServiceClient.class),
                 ticketServiceClient,
                 mock(com.haloticket.booking_service.service.GaReservationService.class),
-                mock(com.haloticket.booking_service.service.OrderLimitValidator.class)
+                mock(com.haloticket.booking_service.service.OrderLimitValidator.class),
+                new com.haloticket.booking_service.service.OrderShapeValidator()
         );
     }
 

@@ -18,6 +18,7 @@ import com.haloticket.booking_service.service.BookingService;
 import com.haloticket.booking_service.service.GaReservationService;
 import com.haloticket.booking_service.client.TicketServiceClient;
 import com.haloticket.booking_service.service.OrderLimitValidator;
+import com.haloticket.booking_service.service.OrderShapeValidator;
 import com.haloticket.booking_service.dto.response.BookingDetailResponse;
 import com.haloticket.booking_service.dto.response.TicketTypeDto;
 import org.redisson.client.codec.StringCodec;
@@ -60,11 +61,15 @@ public class BookingServiceImpl implements BookingService {
     private final TicketServiceClient ticketServiceClient;
     private final GaReservationService gaReservationService;
     private final OrderLimitValidator orderLimitValidator;
+    private final OrderShapeValidator orderShapeValidator;
 
     @Override
     @Transactional
     public BookingResponse createBooking(BookingCreateRequest request) {
         String eventId = request.getEventId();
+        // 422 INVALID_ORDER_ITEMS / DUPLICATE_SEAT_IDS / SEAT_COUNT_EXCEEDS_QUANTITY / SEAT_COUNT_MISMATCH: an order that
+        // could not be issued after payment is refused before anything is held
+        orderShapeValidator.validate(request);
         // general-admission lines are held as stock in ticket-service; the rest goes through the per-seat flow
         GaReservationService.Plan gaPlan = gaReservationService.plan(request);
         List<String> seatIds = gaPlan.seatIds();

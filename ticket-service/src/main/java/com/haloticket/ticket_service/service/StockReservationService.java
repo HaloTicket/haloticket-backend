@@ -93,6 +93,40 @@ public class StockReservationService {
         log.info("[GA_RESERVATION] reserved bookingId={} types={}", shortId(bookingId), wanted.size());
     }
 
+    /**
+     * Puts a closed (RELEASED/EXPIRED) hold back, for a payment that arrived after the hold was closed. One transaction:
+     * the booking's rows are locked, then every closed row is re-reserved with reserveAtomic; if any type cannot cover its
+     * quantity the whole thing rolls back (SoldOutException) and nothing changes. Idempotent when everything is HELD.
+     * A booking with no rows, or with a CONSUMED row (tickets already issued), is not reopenable.
+     */
+    @Transactional
+    public void reopen(String bookingId, Instant expiresAt) {
+        if (bookingId == null || bookingId.isBlank() || expiresAt == null || !expiresAt.isAfter(Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_RESERVATION_REQUEST");
+        }
+        List<TicketStockReservation> rows = reservations.findByBookingIdForUpdate(bookingId);
+        if (rows.isEmpty() || rows.stream().anyMatch(r -> r.getStatus() == StockReservationStatus.CONSUMED)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "RESERVATION_NOT_REOPENABLE");
+        }
+        for (TicketStockReservation row : rows) {
+            if (row.getStatus() == StockReservationStatus.HELD) {
+                if (row.getExpiresAt().isBefore(expiresAt)) {
+                    row.setExpiresAt(expiresAt);
+                    reservations.save(row);
+                }
+                continue;
+            }
+            int updated = ticketTypes.reserveAtomic(row.getTicketTypeId(), row.getQuantity());
+            if (updated == 0) {
+                throw new SoldOutException(row.getTicketTypeId(), availableOf(row.getTicketTypeId()));
+            }
+            row.setStatus(StockReservationStatus.HELD);
+            row.setExpiresAt(expiresAt);
+            reservations.save(row);
+        }
+        log.info("[GA_RESERVATION] reopened bookingId={} rows={}", shortId(bookingId), rows.size());
+    }
+
     /** idempotent. returns how many held rows were released. */
     @Transactional
     public int release(String bookingId) {

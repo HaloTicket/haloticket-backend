@@ -40,6 +40,16 @@ booking:
     reservation:
       internal-token: ${TICKET_RESERVATION_INTERNAL_TOKEN:}
       slack-seconds: ${BOOKING_GA_RESERVATION_SLACK_SECONDS:60}
+  # a payment that arrives after its booking was cancelled or expired (general-admission-only orders can take the stock back)
+  late-payment:
+    reopen-minutes: ${BOOKING_LATE_PAYMENT_REOPEN_MINUTES:10}
+  # admin reconciliation of paid orders that have too few tickets
+  reconcile:
+    paid-grace-minutes: ${BOOKING_RECONCILE_PAID_GRACE_MINUTES:10}
+    batch-size: ${BOOKING_RECONCILE_BATCH_SIZE:200}
+    max-batches: ${BOOKING_RECONCILE_MAX_BATCHES:5}
+    lookback-days: ${BOOKING_RECONCILE_LOOKBACK_DAYS:14}
+    stock-limit: ${BOOKING_RECONCILE_STOCK_LIMIT:200}
 
 # order limits (OrderLimitValidator): a failed or slow read only skips the check, so keep the wait short
 spring.cloud.openfeign.client.config.ticketOrderLimitClient:

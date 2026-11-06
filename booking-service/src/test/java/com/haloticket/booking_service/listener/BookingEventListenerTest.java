@@ -40,7 +40,9 @@ class BookingEventListenerTest {
 
     private BookingEventListener listener() {
         return new BookingEventListener(bookings, reservations, outbox, redis, new ObjectMapper(), websocket, events,
-                org.mockito.Mockito.mock(com.haloticket.booking_service.service.GaReservationService.class));
+                org.mockito.Mockito.mock(com.haloticket.booking_service.service.GaReservationService.class),
+                org.mockito.Mockito.mock(com.haloticket.booking_service.service.PaymentExceptionService.class),
+                new com.haloticket.booking_service.config.LatePaymentProperties());
     }
 
     @Test

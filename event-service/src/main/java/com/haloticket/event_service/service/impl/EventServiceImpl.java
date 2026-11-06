@@ -22,7 +22,13 @@ import com.haloticket.event_service.entity.StaffAssignment;
 import com.haloticket.event_service.enums.EventApprovalStatus;
 import com.haloticket.event_service.enums.EventStatus;
 import com.haloticket.event_service.enums.StaffRole;
-import org.springframework.transaction.annotation.Transactional;
+import com.haloticket.event_service.dto.response.TicketsSyncDto;
+import com.haloticket.event_service.enums.TicketSyncStatus;
+import com.haloticket.event_service.exception.TicketSyncFailedException;
+import com.haloticket.event_service.exception.TicketSyncRejectedException;
+import com.haloticket.event_service.service.EventCatalogWriter;
+import com.haloticket.event_service.service.TicketPayloads;
+import com.haloticket.event_service.service.TicketSyncService.Batch;
 import com.haloticket.event_service.enums.StaffAssignmentStatus;
 import com.haloticket.event_service.repository.EventCategoryRepository;
 import com.haloticket.event_service.repository.EventOrganizerRepository;
@@ -61,7 +67,9 @@ public class EventServiceImpl implements EventService {
     private final UserServiceClient userServiceClient;
     private final UserInternalServiceClient userInternalServiceClient;
     private final StaffAssignmentRepository staffAssignmentRepository;
-    private final com.haloticket.event_service.authz.EventPermissions eventPermissions;
+    private final com.haloticket.event_service.service.EventCatalogWriter catalogWriter;
+    private final com.haloticket.event_service.service.TicketSyncService ticketSyncService;
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EventServiceImpl.class);
 
     @Autowired(required = false)
     private NotificationServiceClient notificationServiceClient;
@@ -71,8 +79,11 @@ public class EventServiceImpl implements EventService {
 
     private final ObjectMapper objectMapper;
 
+    /**
+     * Not transactional on purpose: the event is saved in a short transaction by {@link EventCatalogWriter} (a separate bean),
+     * and ticket-service is called afterwards, outside any database transaction.
+     */
     @Override
-    @Transactional
     public EventResponse createEvent(EventCreateRequest request, String authorization) {
         if (request == null)
             return null;
@@ -80,289 +91,18 @@ public class EventServiceImpl implements EventService {
         OrganizerEligibilityResponse eligibility = requireEligibleOrganizer(authorization);
         String uid = eligibility.userId();
 
-        Event eventToSave;
-        if (request.getEventId() != null && !request.getEventId().isBlank()) {
-            eventToSave = eventRepository.findById(request.getEventId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND"));
-            if (!mayEdit(eventToSave, uid)) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "EVENT_OWNERSHIP_REQUIRED");
-            }
-        } else {
-            eventToSave = new Event();
-        }
+        EventCatalogWriter.Saved result = catalogWriter.save(request, uid);
+        Event saved = result.event();
+        EventApprovalStatus oldApprovalStatus = result.oldApprovalStatus();
 
-        // create or update Organizer profile
-        List<EventOrganizer> organizers = new ArrayList<>();
-        EventOrganizer organizer = eventOrganizerRepository
-                .findFirstByUserIdOrderByCreatedAtDesc(uid)
-                .orElseGet(() -> EventOrganizer.builder()
-                        .userId(uid)
-                        .name(request.getOrganizerName())
-                        .description(request.getOrganizerInfo())
-                        .avatarUrl(request.getOrganizerLogo())
-                        .build());
-
-        organizer.setUserId(uid);
-        if (request.getOrganizerName() != null && !request.getOrganizerName().trim().isEmpty()) {
-            organizer.setName(request.getOrganizerName());
-        }
-        if (request.getOrganizerInfo() != null)
-            organizer.setDescription(request.getOrganizerInfo());
-        if (request.getOrganizerLogo() != null)
-            organizer.setAvatarUrl(request.getOrganizerLogo());
-
-        organizer = eventOrganizerRepository.save(organizer);
-        organizers.add(organizer);
-
-        // auto create OWNER StaffAssignment
-        if (eventToSave.getId() == null) {
-            StaffAssignment staff = StaffAssignment.builder()
-                    .event(eventToSave)
-                    .userId(uid)
-                    .name(request.getOrganizerName())
-                    .role(StaffRole.OWNER)
-                    .status(StaffAssignmentStatus.ACTIVE)
-                    .build();
-            if (eventToSave.getStaffAssignments() == null) {
-                eventToSave.setStaffAssignments(new java.util.ArrayList<>());
-            }
-            eventToSave.getStaffAssignments().add(staff);
-        }
-
-        // find category
-        EventCategory category = null;
-        if (request.getCategoryId() != null) {
-            category = eventCategoryRepository.findById(request.getCategoryId()).orElse(null);
-        }
-        if (category == null && request.getCategoryName() != null) {
-            category = eventCategoryRepository.findByNameContainingIgnoreCase(request.getCategoryName()).orElse(null);
-        }
-
-        String eventTitle = (request.getTitle() != null && !request.getTitle().trim().isEmpty())
-                ? request.getTitle()
-                : "";
-
-        eventToSave.setTitle(eventTitle);
-        eventToSave.setDescription(request.getDescription());
-        eventToSave.setLocationType(request.getLocationType());
-        eventToSave.setLocationName(request.getLocationName());
-        eventToSave.setCity(request.getCity());
-        eventToSave.setWard(request.getWard());
-        eventToSave.setAddress(request.getAddress());
-        if (request.getThumbnailUrl() != null)
-            eventToSave.setThumbnailUrl(request.getThumbnailUrl());
-        if (request.getBannerUrl() != null)
-            eventToSave.setBannerUrl(request.getBannerUrl());
-        if (request.getGalleryImages() != null) {
-            if (eventToSave.getGalleryImages() == null) {
-                eventToSave.setGalleryImages(new ArrayList<>(request.getGalleryImages()));
-            } else {
-                eventToSave.getGalleryImages().clear();
-                eventToSave.getGalleryImages().addAll(request.getGalleryImages());
-            }
-        }
-        LocalDateTime startEvt = request.getStartTime() != null ? request.getStartTime()
-                : LocalDateTime.now().plusDays(30);
-        LocalDateTime endEvt = request.getEndTime() != null ? request.getEndTime()
-                : LocalDateTime.now().plusDays(30).plusHours(4);
-        if (endEvt.isBefore(startEvt) || endEvt.isEqual(startEvt)) {
-            throw new IllegalArgumentException(
-                    "Thời gian kết thúc sự kiện phải diễn ra sau thời gian bắt đầu sự kiện!");
-        }
-        eventToSave.setStartTime(startEvt);
-        eventToSave.setEndTime(endEvt);
-        eventToSave.setIsPrivate(request.getIsPrivate());
-        eventToSave.setConfirmationMessage(request.getConfirmationMessage());
-        eventToSave.setEnableCustomQuestions(request.getEnableCustomQuestions());
-        eventToSave.setQuestionScope(request.getQuestionScope());
-
-
-            if (request.getShowtimes() != null && !request.getShowtimes().isEmpty()) {
-                if (eventToSave.getShowtimes() == null) {
-                    eventToSave.setShowtimes(new ArrayList<>());
-                }
-                
-                Map<String, EventShowtime> existingShowtimes = new java.util.HashMap<>();
-                for (EventShowtime st : eventToSave.getShowtimes()) {
-                    existingShowtimes.put(st.getId(), st);
-                }
-                
-                List<EventShowtime> updatedShowtimes = new ArrayList<>();
-                
-                for (EventCreateRequest.EventShowtimeRequest stReq : request.getShowtimes()) {
-                    EventShowtime st = null;
-                    if (stReq.getId() != null && existingShowtimes.containsKey(stReq.getId())) {
-                        st = existingShowtimes.get(stReq.getId());
-                    } else {
-                        // fallback to name matching
-                        for (EventShowtime existing : existingShowtimes.values()) {
-                            if (existing.getName() != null && existing.getName().equals(stReq.getName())) {
-                                st = existing;
-                                break;
-                            }
-                        }
-                    }
-                    
-                    if (st != null) {
-                        st.setName(stReq.getName());
-                        st.setStartTime(stReq.getStartTime() != null ? stReq.getStartTime() : startEvt);
-                        st.setEndTime(stReq.getEndTime() != null ? stReq.getEndTime() : endEvt);
-                        st.setSaleStartTime(stReq.getSaleStartTime());
-                        st.setSaleEndTime(stReq.getSaleEndTime());
-                    } else {
-                        st = EventShowtime.builder()
-                                .event(eventToSave)
-                                .name(stReq.getName())
-                                .startTime(stReq.getStartTime() != null ? stReq.getStartTime() : startEvt)
-                                .endTime(stReq.getEndTime() != null ? stReq.getEndTime() : endEvt)
-                                .saleStartTime(stReq.getSaleStartTime())
-                                .saleEndTime(stReq.getSaleEndTime())
-                                .build();
-                    }
-                    updatedShowtimes.add(st);
-                }
-                eventToSave.getShowtimes().clear();
-                eventToSave.getShowtimes().addAll(updatedShowtimes);
-            }
-        Double minTicketPrice = null;
+        // an event with showtimes is synced per showtime only; one without showtimes once, with showtimeId = null
+        List<Batch> batches = TicketPayloads.batches(saved.getShowtimes(), request.getTickets(),
+                st -> ownTicketsOf(st, request));
+        RuntimeException syncFailure = null;
         try {
-            if (request.getTickets() != null && !request.getTickets().isEmpty()) {
-                eventToSave.setTicketsData(objectMapper.writeValueAsString(request.getTickets()));
-                for (EventCreateRequest.TicketCreateRequest t : request.getTickets()) {
-                    if (t != null && t.getPrice() != null) {
-                        if (minTicketPrice == null || t.getPrice() < minTicketPrice) {
-                            minTicketPrice = t.getPrice();
-                        }
-                    }
-                }
-            } else if (request.getShowtimes() != null) {
-                List<EventCreateRequest.TicketCreateRequest> allStTickets = new ArrayList<>();
-                for (EventCreateRequest.EventShowtimeRequest st : request.getShowtimes()) {
-                    if (st.getTickets() != null && !st.getTickets().isEmpty()) {
-                        allStTickets.addAll(st.getTickets());
-                        for (EventCreateRequest.TicketCreateRequest t : st.getTickets()) {
-                            if (t != null && t.getPrice() != null) {
-                                if (minTicketPrice == null || t.getPrice() < minTicketPrice) {
-                                    minTicketPrice = t.getPrice();
-                                }
-                            }
-                        }
-                    }
-                }
-                if (!allStTickets.isEmpty()) {
-                    eventToSave.setTicketsData(objectMapper.writeValueAsString(allStTickets));
-                }
-            }
-        } catch (Exception e) {
-            System.out.println("DEBUG: Exception serializing tickets: " + e.getMessage());
-        }
-        if (minTicketPrice != null) {
-            eventToSave.setMinPrice(minTicketPrice);
-        }
-
-        try {
-            if (request.getCustomQuestions() != null) {
-                System.out.println("DEBUG: Custom questions received: " + request.getCustomQuestions());
-                eventToSave.setCustomQuestionsData(objectMapper.writeValueAsString(request.getCustomQuestions()));
-            } else {
-                System.out.println("DEBUG: Custom questions is NULL!");
-            }
-        } catch (Exception e) {
-            System.out.println("DEBUG: Exception serializing questions: " + e.getMessage());
-        }
-
-        EventApprovalStatus oldApprovalStatus = eventToSave.getEventApprovalStatus();
-
-        if (oldApprovalStatus == EventApprovalStatus.APPROVED || oldApprovalStatus == EventApprovalStatus.UPDATE_PENDING) {
-            boolean isDraft = "DRAFT".equalsIgnoreCase(request.getStatus());
-            if (isDraft) {
-                eventToSave.setEventStatus(EventStatus.DRAFT);
-                eventToSave.setEventApprovalStatus(EventApprovalStatus.DRAFT);
-            } else {
-                eventToSave.setEventStatus(EventStatus.APPROVED);
-                eventToSave.setEventApprovalStatus(EventApprovalStatus.UPDATE_PENDING);
-            }
-        } else if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
-            boolean isDraft = "DRAFT".equalsIgnoreCase(request.getStatus());
-            eventToSave.setEventStatus(isDraft ? EventStatus.DRAFT : EventStatus.PENDING);
-            eventToSave.setEventApprovalStatus(isDraft ? EventApprovalStatus.DRAFT : EventApprovalStatus.PENDING);
-        } else if (eventToSave.getEventStatus() == null) {
-            eventToSave.setEventStatus(EventStatus.DRAFT);
-            eventToSave.setEventApprovalStatus(EventApprovalStatus.DRAFT);
-        }
-
-        eventToSave.setCategory(category);
-        eventToSave.setOrganizers(organizers);
-
-        List<String> deletedShowtimeIds = new ArrayList<>();
-        if (eventToSave.getShowtimes() != null) {
-            for (EventShowtime st : eventToSave.getShowtimes()) {
-                if (st.getId() != null) {
-                    deletedShowtimeIds.add(st.getId());
-                }
-            }
-        }
-
-        Event saved = eventRepository.save(eventToSave);
-
-        // 1. sync master event-level ticket types (showtimeId = null)
-        if (request.getTickets() != null && !request.getTickets().isEmpty()) {
-            syncTicketsToTicketService(saved.getId(), null, request.getTickets());
-        }
-
-        // 2. sync showtime-specific ticket types
-        if (saved.getShowtimes() != null && !saved.getShowtimes().isEmpty()) {
-            for (EventShowtime st : saved.getShowtimes()) {
-                deletedShowtimeIds.remove(st.getId());
-                List<EventCreateRequest.TicketCreateRequest> stTickets = null;
-                if (request.getShowtimes() != null) {
-                    for (EventCreateRequest.EventShowtimeRequest stReq : request.getShowtimes()) {
-                        if (st.getName() != null && st.getName().equals(stReq.getName())) {
-                            stTickets = stReq.getTickets();
-                            break;
-                        }
-                    }
-                }
-                if (stTickets != null && !stTickets.isEmpty()) {
-                    List<EventCreateRequest.TicketCreateRequest> clonedStTickets = new ArrayList<>();
-                    for (EventCreateRequest.TicketCreateRequest t : stTickets) {
-                        EventCreateRequest.TicketCreateRequest clone = new EventCreateRequest.TicketCreateRequest();
-                        if (st.getId().equals(t.getShowtimeId())) clone.setId(t.getId());
-                        clone.setShowtimeId(st.getId());
-                        clone.setName(t.getName());
-                        clone.setPrice(t.getPrice());
-                        clone.setIsFree(t.getIsFree());
-                        clone.setTotalQuantity(t.getTotalQuantity());
-                        clone.setMinPerOrder(t.getMinPerOrder());
-                        clone.setMaxPerOrder(t.getMaxPerOrder());
-                        clone.setDescription(t.getDescription());
-                        clonedStTickets.add(clone);
-                    }
-                    syncTicketsToTicketService(saved.getId(), st.getId(), clonedStTickets);
-                } else if (request.getTickets() != null && !request.getTickets().isEmpty()) {
-                    List<EventCreateRequest.TicketCreateRequest> clonedStTickets = new ArrayList<>();
-                    for (EventCreateRequest.TicketCreateRequest t : request.getTickets()) {
-                        EventCreateRequest.TicketCreateRequest clone = new EventCreateRequest.TicketCreateRequest();
-                        if (st.getId().equals(t.getShowtimeId())) clone.setId(t.getId());
-                        clone.setShowtimeId(st.getId());
-                        clone.setName(t.getName());
-                        clone.setPrice(t.getPrice());
-                        clone.setIsFree(t.getIsFree());
-                        clone.setTotalQuantity(t.getTotalQuantity());
-                        clone.setMinPerOrder(t.getMinPerOrder());
-                        clone.setMaxPerOrder(t.getMaxPerOrder());
-                        clone.setDescription(t.getDescription());
-                        clonedStTickets.add(clone);
-                    }
-                    syncTicketsToTicketService(saved.getId(), st.getId(), clonedStTickets);
-                }
-            }
-            
-            for (String deletedId : deletedShowtimeIds) {
-                syncTicketsToTicketService(saved.getId(), deletedId, new ArrayList<>());
-            }
-        } else {
-            syncTicketsToTicketService(saved.getId(), null, request.getTickets());
+            syncAndMark(saved, batches);
+        } catch (TicketSyncFailedException | TicketSyncRejectedException e) {
+            syncFailure = e; // the event stays saved; the rest of the save still happens, the caller gets the error at the end
         }
         syncPayoutAccountToPaymentService(uid, request, authorization);
 
@@ -379,6 +119,7 @@ public class EventServiceImpl implements EventService {
                     "Sự kiện \"" + saved.getTitle() + "\" đã được Ban tổ chức cập nhật thông tin và cần xem xét.");
         }
 
+        if (syncFailure != null) throw syncFailure;
         return mapToEventResponse(saved);
     }
 
@@ -389,6 +130,76 @@ public class EventServiceImpl implements EventService {
         }
         request.setEventId(id);
         return createEvent(request, authorization);
+    }
+
+    /** Sends the stored ticketsData snapshot to ticket-service again (an upsert there). Permission is checked by the caller. */
+    @Override
+    public EventResponse resyncTickets(String eventId) {
+        Event event = eventRepository.findById(eventId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND"));
+        List<EventCreateRequest.TicketCreateRequest> snapshot = parseSnapshot(event.getTicketsData());
+        List<EventShowtime> showtimes = event.getShowtimes();
+        List<EventCreateRequest.TicketCreateRequest> eventLevel = snapshot;
+        if (showtimes != null && !showtimes.isEmpty()) {
+            java.util.Set<String> ids = showtimes.stream().map(EventShowtime::getId).collect(Collectors.toSet());
+            eventLevel = snapshot.stream()
+                    .filter(t -> t.getShowtimeId() == null || t.getShowtimeId().isBlank() || !ids.contains(t.getShowtimeId()))
+                    .collect(Collectors.toList());
+        }
+        List<Batch> batches = TicketPayloads.batches(showtimes, eventLevel,
+                st -> snapshot.stream().filter(t -> st.getId() != null && st.getId().equals(t.getShowtimeId()))
+                        .collect(Collectors.toList()));
+        if (batches.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "NO_TICKETS_TO_SYNC");
+        }
+        syncAndMark(event, batches);
+        return mapToEventResponse(event);
+    }
+
+    private List<EventCreateRequest.TicketCreateRequest> parseSnapshot(String json) {
+        if (json == null || json.isBlank()) return new ArrayList<>();
+        try {
+            List<EventCreateRequest.TicketCreateRequest> parsed = objectMapper.readValue(json,
+                    new com.fasterxml.jackson.core.type.TypeReference<List<EventCreateRequest.TicketCreateRequest>>() {});
+            // older snapshots can hold showtime-shaped rows (no ticket name): not tickets
+            return parsed.stream().filter(t -> t != null && t.getName() != null).collect(Collectors.toList());
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
+    private List<EventCreateRequest.TicketCreateRequest> ownTicketsOf(EventShowtime st, EventCreateRequest request) {
+        if (request.getShowtimes() == null || st.getName() == null) return null;
+        for (EventCreateRequest.EventShowtimeRequest stReq : request.getShowtimes()) {
+            if (st.getName().equals(stReq.getName())) return stReq.getTickets();
+        }
+        return null;
+    }
+
+    /** Syncs, then records SYNCED or FAILED on the event (in memory and in a short transaction). Nothing to send: no change. */
+    private void syncAndMark(Event event, List<Batch> batches) {
+        if (batches.isEmpty()) return;
+        try {
+            ticketSyncService.syncAll(event.getId(), batches);
+        } catch (TicketSyncRejectedException rejected) {
+            mark(event, TicketSyncStatus.FAILED, rejected.getCode());
+            throw rejected;
+        } catch (TicketSyncFailedException failed) {
+            mark(event, TicketSyncStatus.FAILED, failed.getErrorCode());
+            throw failed;
+        }
+        mark(event, TicketSyncStatus.SYNCED, null);
+    }
+
+    private void mark(Event event, TicketSyncStatus status, String error) {
+        event.setTicketsSyncStatus(status);
+        event.setTicketsSyncError(status == TicketSyncStatus.SYNCED ? null : error);
+        if (status == TicketSyncStatus.SYNCED) event.setTicketsSyncedAt(LocalDateTime.now());
+        try {
+            catalogWriter.markSync(event.getId(), status, error);
+        } catch (Exception e) {
+            log.warn("Could not record the ticket sync status of event {}", event.getId() == null ? null : event.getId().substring(0, Math.min(8, event.getId().length())));
+        }
     }
 
     private OrganizerEligibilityResponse requireEligibleOrganizer(String authorization) {
@@ -405,12 +216,6 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-    /** Who may change an event: OWNER or ADMIN of the event (ACTIVE assignment) or a platform admin. */
-    private boolean mayEdit(Event event, String userId) {
-        return eventPermissions.forUser(userId, event.getId(), com.haloticket.event_service.service.EventAccessService.isPlatformAdmin())
-                .has(com.haloticket.event_service.authz.Permission.EVENT_EDIT);
-    }
-
     /** The person told about an approval or a rejection: the active OWNER of the event's staff assignments. */
     private String recipientOf(Event event) {
         return staffAssignmentRepository.findByEventId(event.getId()).stream()
@@ -419,15 +224,6 @@ public class EventServiceImpl implements EventService {
                 .map(StaffAssignment::getUserId).findFirst().orElse("user_default_id");
     }
 
-    private void syncTicketsToTicketService(String eventId, String showtimeId, List<EventCreateRequest.TicketCreateRequest> tickets) {
-        if (eventId == null || tickets == null || tickets.isEmpty())
-            return;
-        try {
-            ticketServiceClient.syncTicketTypesForEvent(eventId, showtimeId, tickets);
-        } catch (Exception e) {
-            System.err.println("Warning: Could not sync tickets to ticket-service: " + e.getMessage());
-        }
-    }
 
     private void syncPayoutAccountToPaymentService(String userId, EventCreateRequest request, String authorization) {
         if (userId == null || request.getAccountHolder() == null || request.getAccountHolder().trim().isEmpty())
@@ -451,7 +247,7 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-    private Object fetchTicketsFromTicketService(String eventId) {
+    private Object fetchTicketsFromTicketService(String eventId, boolean[] unavailable) {
         if (eventId == null)
             return null;
         try {
@@ -461,6 +257,7 @@ public class EventServiceImpl implements EventService {
             }
             return ticketServiceClient.getTicketTypesByEventId(eventId);
         } catch (Exception e) {
+            unavailable[0] = true;
             return null;
         }
     }
@@ -564,7 +361,8 @@ public class EventServiceImpl implements EventService {
         String poster = event.getBannerUrl() != null ? event.getBannerUrl() : event.getThumbnailUrl();
 
         // fetch tickets dynamically from ticket-service, fallback to local JSON
-        Object ticketsObj = fetchTicketsFromTicketService(event.getId());
+        boolean[] ticketsUnavailable = new boolean[1];
+        Object ticketsObj = fetchTicketsFromTicketService(event.getId(), ticketsUnavailable);
         if (ticketsObj instanceof List<?> list) {
             List<Object> activeTickets = new ArrayList<>();
             for (Object t : list) {
@@ -688,6 +486,13 @@ public class EventServiceImpl implements EventService {
                 .tickets(ticketsObj)
                 .customQuestions(customQuestionsObj)
                 .organizer(organizerDto)
+                .ticketsSync(ticketsUnavailable[0]
+                        // ticket-service could not be read: the list above (if any) is the local snapshot, not saved truth
+                        ? TicketsSyncDto.builder().status("UNAVAILABLE").error("TICKET_SERVICE_UNAVAILABLE")
+                                .syncedAt(event.getTicketsSyncedAt()).build()
+                        : TicketsSyncDto.builder()
+                                .status(event.getTicketsSyncStatus() != null ? event.getTicketsSyncStatus().name() : null)
+                                .error(event.getTicketsSyncError()).syncedAt(event.getTicketsSyncedAt()).build())
                 .staffAssignments(staffAssignmentRepository.findByEventId(event.getId()).stream()
                         .map(a -> EventMemberResponse.builder()
                                 .id(a.getId())

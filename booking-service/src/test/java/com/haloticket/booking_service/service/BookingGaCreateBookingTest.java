@@ -94,7 +94,7 @@ class BookingGaCreateBookingTest {
         properties.setInternalToken(TOKEN);
         GaReservationService ga = new GaReservationService(properties, stockClient, new ObjectMapper());
         service = new BookingServiceImpl(bookings, seatReservations, outbox, redisson, redis, new ObjectMapper(),
-                mock(EventServiceClient.class), mock(TicketServiceClient.class), ga, mock(OrderLimitValidator.class));
+                mock(EventServiceClient.class), mock(TicketServiceClient.class), ga, mock(OrderLimitValidator.class), new OrderShapeValidator());
     }
 
     private static BookingItemRequest item(String typeId, int quantity, Boolean ga) {
@@ -158,6 +158,22 @@ class BookingGaCreateBookingTest {
         verify(seatReservations, never()).saveAll(any());
         verify(outbox, never()).save(any());
         verifyNoInteractions(valueOps, setOps);
+    }
+
+    // --- early shape validation ---------------------------------------------
+
+    @Test
+    void invalidOrderShapeIsRefusedBeforeAnythingIsHeldOrSaved() {
+        BookingCreateRequest request = request("u1", List.of("seat_1_2", "seat_1_3"), item(VIP, 1, null));
+
+        assertThatThrownBy(() -> service.createBooking(request)).isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+            assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+            assertThat(e.getReason()).isEqualTo("SEAT_COUNT_EXCEEDS_QUANTITY");
+        });
+
+        verifyNoInteractions(stockClient, valueOps, setOps, redisson);
+        verify(bookings, never()).save(any());
+        verify(outbox, never()).save(any());
     }
 
     // --- seat flows -------------------------------------------

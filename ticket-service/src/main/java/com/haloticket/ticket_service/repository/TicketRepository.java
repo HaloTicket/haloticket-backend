@@ -33,4 +33,12 @@ public interface TicketRepository extends JpaRepository<Ticket, String> {
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Ticket t SET t.status = com.haloticket.ticket_service.enums.TicketStatus.USED, t.usedAt = :now WHERE t.id = :id AND t.status = com.haloticket.ticket_service.enums.TicketStatus.VALID")
     int markTicketUsedIfValid(@Param("id") String id, @Param("now") LocalDateTime now);
+
+    boolean existsByTicketType_Id(String ticketTypeId);
+
+    /** Primary-issued, non-revoked tickets per booking (same set as the stock reconciliation). Rows: bookingId, count. */
+    @Query("SELECT t.bookingId, COUNT(t) FROM Ticket t WHERE t.bookingId IN :bookingIds "
+            + "AND t.status <> com.haloticket.ticket_service.enums.TicketStatus.REVOKED "
+            + "AND (t.acquisitionType IS NULL OR t.acquisitionType = 'PRIMARY') GROUP BY t.bookingId")
+    List<Object[]> countIssuedByBookingIds(@Param("bookingIds") java.util.Collection<String> bookingIds);
 }

@@ -108,9 +108,14 @@ public class GaReservationService {
         try {
             ticketStockClient.reserve(token, body);
         } catch (FeignException.Conflict conflict) {
-            if (isSoldOut(conflict)) {
+            String code = codeOf(conflict);
+            if ("TICKET_SOLD_OUT".equals(code)) {
                 log.info("[GA_RESERVATION] sold out bookingId={}", shortId(bookingId));
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "TICKET_SOLD_OUT");
+            }
+            if ("RESERVATION_CLOSED".equals(code)) {
+                log.info("[GA_RESERVATION] reservation already closed bookingId={}", shortId(bookingId));
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "RESERVATION_CLOSED");
             }
             log.warn("[GA_RESERVATION] reserve refused bookingId={}: {}", shortId(bookingId), conflict.status());
             throw new ResponseStatusException(HttpStatus.CONFLICT, "TICKET_RESERVATION_REFUSED");
@@ -155,12 +160,52 @@ public class GaReservationService {
         }
     }
 
-    private boolean isSoldOut(FeignException exception) {
+    /**
+     * Takes back the hold of a booking that was cancelled or expired before its payment arrived. Refusals that
+     * change nothing (sold out, not reopenable) are an answer; anything else (unreachable, token) throws so the
+     * caller can retry.
+     */
+    public ReopenOutcome reopen(String bookingId, Instant expiresAt) {
+        String token = properties.getInternalToken();
+        if (token == null || token.isBlank()) {
+            throw new IllegalStateException("TICKET_STOCK_UNAVAILABLE: internal token is not configured");
+        }
+        try {
+            ticketStockClient.reopen(token, bookingId, Map.of("expiresAt", expiresAt.toString()));
+        } catch (FeignException.Conflict conflict) {
+            String code = codeOf(conflict);
+            if ("TICKET_SOLD_OUT".equals(code) || "RESERVATION_NOT_REOPENABLE".equals(code)) {
+                log.info("[GA_RESERVATION] reopen refused bookingId={} code={}", shortId(bookingId), code);
+                return new ReopenOutcome(false, code);
+            }
+            throw new IllegalStateException("TICKET_STOCK_UNAVAILABLE: reopen refused with code " + code, conflict);
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("TICKET_STOCK_UNAVAILABLE: reopen failed", e);
+        }
+        // the booking goes back to PAID in the caller's transaction; if that does not commit, give the stock back
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                    if (status != STATUS_COMMITTED) {
+                        releaseQuietly(bookingId);
+                    }
+                }
+            });
+        }
+        log.info("[GA_RESERVATION] reopened bookingId={}", shortId(bookingId));
+        return new ReopenOutcome(true, null);
+    }
+
+    /** reopened=false means ticket-service refused with {@code code} and changed nothing. */
+    public record ReopenOutcome(boolean reopened, String code) {}
+
+    private String codeOf(FeignException exception) {
         try {
             JsonNode node = objectMapper.readTree(exception.contentUTF8());
-            return "TICKET_SOLD_OUT".equals(node.path("code").asText());
+            return node.path("code").asText("");
         } catch (Exception e) {
-            return false;
+            return "";
         }
     }
 

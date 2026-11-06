@@ -2,6 +2,7 @@ package com.haloticket.event_service.entity;
 
 import com.haloticket.event_service.enums.EventApprovalStatus;
 import com.haloticket.event_service.enums.EventStatus;
+import com.haloticket.event_service.enums.TicketSyncStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -110,6 +111,16 @@ public class Event {
 
     @Column(name = "tickets_data", columnDefinition = "TEXT")
     private String ticketsData;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tickets_sync_status", length = 16)
+    private TicketSyncStatus ticketsSyncStatus;
+
+    @Column(name = "tickets_sync_error", length = 64)
+    private String ticketsSyncError;
+
+    @Column(name = "tickets_synced_at")
+    private LocalDateTime ticketsSyncedAt;
 
     @Column(name = "custom_questions_data", columnDefinition = "TEXT")
     private String customQuestionsData;

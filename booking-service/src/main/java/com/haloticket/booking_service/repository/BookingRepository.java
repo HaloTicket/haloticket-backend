@@ -32,6 +32,21 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
               "FROM Booking b LEFT JOIN b.items i WHERE b.id IN :bookingIds GROUP BY b.id, b.eventId, b.status")
        List<ReportFact> findReportFactsByBookingIds(@Param("bookingIds") Collection<String> bookingIds);
 
+       interface PaidCandidate {
+              String getBookingId();
+              String getBookingCode();
+              LocalDateTime getPaidAt();
+              Long getExpectedTickets();
+       }
+
+       /** Orders that should have tickets (PAID, CONFIRMED) paid in [from, to), oldest first. */
+       @Query("SELECT b.id AS bookingId, b.bookingCode AS bookingCode, b.updatedAt AS paidAt, COALESCE(SUM(i.quantity), 0) AS expectedTickets " +
+              "FROM Booking b LEFT JOIN b.items i " +
+              "WHERE b.status IN (com.haloticket.booking_service.enums.BookingStatus.PAID, com.haloticket.booking_service.enums.BookingStatus.CONFIRMED) " +
+              "AND b.updatedAt >= :from AND b.updatedAt < :to " +
+              "GROUP BY b.id, b.bookingCode, b.updatedAt ORDER BY b.updatedAt ASC, b.id ASC")
+       List<PaidCandidate> findPaidCandidates(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to, Pageable pageable);
+
        @Lock(LockModeType.PESSIMISTIC_WRITE)
        @Query("SELECT b FROM Booking b WHERE b.id = :id")
        Optional<Booking> findByIdForUpdate(@Param("id") String id);

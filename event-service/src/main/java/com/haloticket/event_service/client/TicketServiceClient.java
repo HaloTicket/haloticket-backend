@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@FeignClient(name = "ticket-service", path = "/api/tickets", configuration = InternalTokenFeignConfig.class)
+@FeignClient(name = "ticket-service", path = "/api/tickets", configuration = {InternalTokenFeignConfig.class, TicketServiceErrorConfig.class})
 public interface TicketServiceClient {
 
     @PostMapping("/types/sync/{eventId}")

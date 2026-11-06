@@ -47,6 +47,7 @@ class TicketEventListenerTest {
                         "tierId":"old-pro"}],"zones":{"rh_vip":{"name":"TẦNG 1","tierId":"old-pro"}}}
                         """).build()));
         when(seats.findById("seat_rh_24")).thenReturn(Optional.empty());
+        when(types.decrementTotalQuantityAtomic(anyString())).thenReturn(1);
         when(entityManager.createNativeQuery(anyString())).thenReturn(lockQuery);
         when(lockQuery.setParameter(eq("bookingId"), eq("booking"))).thenReturn(lockQuery);
         when(lockQuery.getSingleResult()).thenReturn(1);

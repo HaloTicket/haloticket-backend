@@ -56,4 +56,5 @@ public class EventResponse {
     private String taxCode;
     private OrganizerDto organizer;
     private List<EventMemberResponse> staffAssignments;
+    private TicketsSyncDto ticketsSync;
 }

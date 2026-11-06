@@ -19,5 +19,7 @@ public interface EventService {
     List<EventResponse> getApprovalEvents(String status);
     EventResponse approveEvent(String id);
     EventResponse rejectEvent(String id, String reason, String notes);
+    /** Re-sends the stored ticket snapshot to ticket-service. Throws TicketSyncFailedException / TicketSyncRejectedException. */
+    EventResponse resyncTickets(String eventId);
     EventResponse updateEvent(String id, EventCreateRequest request, String authorization);
 }

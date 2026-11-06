@@ -46,7 +46,14 @@ class GatewayAuthorizationTest {
             new Route("GET", "/api/users/admin"),
             new Route("GET", "/api/users/admin/some-id"),
             new Route("PUT", "/api/users/admin/some-id/roles"),
-            new Route("PUT", "/api/users/admin/some-id/status"));
+            new Route("PUT", "/api/users/admin/some-id/status"),
+            // order reconciliation: admin only at the gateway, before the generic /api/bookings/** login rule
+            new Route("GET", "/api/bookings/admin/reconciliation/summary"),
+            new Route("GET", "/api/bookings/admin/reconciliation/exceptions"),
+            new Route("POST", "/api/bookings/admin/reconciliation/exceptions/some-id/resolve"),
+            new Route("GET", "/api/bookings/admin/reconciliation/paid-without-tickets"),
+            new Route("GET", "/api/bookings/admin/reconciliation/stock-discrepancies"),
+            new Route("POST", "/api/bookings/admin/some-id/republish-confirmed"));
 
     /** a login is enough, no role: 401 without a token, 200 for any valid token (event staff may hold only ROLE_USER) */
     private static final List<Route> LOGIN_REQUIRED = List.of(

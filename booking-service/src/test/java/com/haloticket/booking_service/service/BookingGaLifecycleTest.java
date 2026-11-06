@@ -83,7 +83,9 @@ class BookingGaLifecycleTest {
 
     private BookingEventListener listener() {
         return new BookingEventListener(bookings, seatReservations, outbox, redis, new ObjectMapper(),
-                mock(SeatWebsocketService.class), mock(EventServiceClient.class), ga);
+                mock(SeatWebsocketService.class), mock(EventServiceClient.class), ga,
+                mock(com.haloticket.booking_service.service.PaymentExceptionService.class),
+                new com.haloticket.booking_service.config.LatePaymentProperties());
     }
 
     // --- expiry ------------------------------------------------------------------
@@ -155,21 +157,18 @@ class BookingGaLifecycleTest {
     // --- payment completed -------------------------------------------------------
 
     @Test
-    void latePaymentAfterExpiryIsLoggedAsAnErrorAndChangesNothing() {
+    void latePaymentAfterExpiryWithStockLeftReopensTheHoldAndConfirms() {
         Booking expired = booking("late-1", BookingStatus.CANCELLED, true);
         when(bookings.findByIdForUpdate("late-1")).thenReturn(Optional.of(expired));
+        when(seatReservations.findByBooking(expired)).thenReturn(List.of());
 
         listener().handlePaymentCompleted("{\"bookingId\":\"late-1\",\"paymentId\":\"pay-9\",\"amount\":200000,\"provider\":\"VNPAY\"}");
 
-        assertThat(expired.getStatus()).isEqualTo(BookingStatus.CANCELLED);
-        verify(bookings, never()).save(any());
-        verify(outbox, never()).save(any());
-        verifyNoInteractions(stockClient);
-        assertThat(logs.list).anyMatch(e -> e.getLevel().toString().equals("ERROR")
-                && e.getFormattedMessage().contains("[LATE_PAYMENT]")
-                && e.getFormattedMessage().contains("bookingId=late-1")
-                && e.getFormattedMessage().contains("gaReserved=true")
-                && e.getFormattedMessage().contains("paymentId=pay-9"));
+        verify(stockClient).reopen(eq(TOKEN), eq("late-1"), any());
+        assertThat(expired.getStatus()).isEqualTo(BookingStatus.PAID);
+        verify(outbox, times(1)).save(any());
+        assertThat(logs.list).anyMatch(e -> e.getFormattedMessage().contains("[LATE_PAYMENT]")
+                && e.getFormattedMessage().contains("bookingId=late-1") && e.getFormattedMessage().contains("paymentId=pay-9"));
     }
 
     @Test
@@ -179,7 +178,8 @@ class BookingGaLifecycleTest {
 
         listener().handlePaymentCompleted("{\"bookingId\":\"paid-1\"}");
 
-        assertThat(logs.list).noneMatch(e -> e.getFormattedMessage().contains("[LATE_PAYMENT]"));
+        assertThat(logs.list).noneMatch(e -> e.getFormattedMessage().contains("[LATE_PAYMENT]")
+                && !e.getLevel().toString().equals("INFO"));
         verify(outbox, never()).save(any());
     }
 

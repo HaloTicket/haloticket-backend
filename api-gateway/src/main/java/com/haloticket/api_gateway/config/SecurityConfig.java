@@ -87,7 +87,9 @@ public class SecurityConfig {
                     // routes (data-analysis, voucher-strategy) only need a login: ai-assistant limits an organizer to the
                     // events they manage. The organizer agent is not scoped and needs ROLE_ADMIN.
                     exchange.pathMatchers("/api/organizer/agent-chat").access(SecurityConfig::adminOnly);
-                    exchange.pathMatchers("/api/admin/**", "/api/payouts/admin/**", "/api/users/admin", "/api/users/admin/**")
+                    exchange.pathMatchers("/api/admin/**", "/api/payouts/admin/**", "/api/users/admin", "/api/users/admin/**",
+                            // before the generic /api/bookings/** rule below, which only asks for a login
+                            "/api/bookings/admin/**")
                             .access(SecurityConfig::adminOnly);
                     // open to anonymous visitors: event, ticket-type and seat-map reads, the view and search counters,
                     // the homepage configuration. Everything else that writes needs a login.

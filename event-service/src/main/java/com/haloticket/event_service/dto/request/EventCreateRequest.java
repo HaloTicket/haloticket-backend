@@ -74,12 +74,14 @@ public class EventCreateRequest {
     }
 
     @Data
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
     public static class TicketCreateRequest {
         private String id;
         private String showtimeId;
         private String name;
         private Double price;
         private Boolean isFree;
+        private Integer initialQuantity;
         private Integer totalQuantity;
         private Integer minPerOrder;
         private Integer maxPerOrder;

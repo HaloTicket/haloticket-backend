@@ -11,6 +11,7 @@ public class TicketTypeCreateRequest {
     private Double price;
     private Boolean isFree;
     private Integer totalQuantity;
+    private Integer initialQuantity;
     private Integer minPerOrder;
     private Integer maxPerOrder;
     private String description;

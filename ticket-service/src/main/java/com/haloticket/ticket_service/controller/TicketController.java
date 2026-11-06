@@ -5,12 +5,14 @@ import com.haloticket.ticket_service.dto.request.SeatLayoutRequest;
 import com.haloticket.ticket_service.dto.request.TicketTypeCreateRequest;
 import com.haloticket.ticket_service.dto.response.SeatLayoutResponse;
 import com.haloticket.ticket_service.dto.response.TicketTypeResponse;
+import com.haloticket.ticket_service.exception.QuantityBelowSoldAndHeldException;
 import com.haloticket.ticket_service.service.TicketService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -40,14 +42,26 @@ public class TicketController {
     }
 
     @PostMapping("/types/sync/{eventId}")
-    public ResponseEntity<List<TicketTypeResponse>> syncTicketTypesForEvent(@PathVariable("eventId") String eventId,
+    public ResponseEntity<?> syncTicketTypesForEvent(@PathVariable("eventId") String eventId,
                                                                              @RequestParam(value = "showtimeId", required = false) String showtimeId,
                                                                              @RequestBody List<TicketTypeCreateRequest> requests,
                                                                              @RequestHeader(value = "Authorization", required = false) String authorization,
                                                                              @RequestHeader(value = INTERNAL_TOKEN_HEADER, required = false) String internalToken) {
         requireEventEdit(eventId, authorization, internalToken);
-        List<TicketTypeResponse> response = ticketService.syncTicketTypesForEvent(eventId, showtimeId, requests);
-        return ResponseEntity.ok(response);
+        try {
+            List<TicketTypeResponse> response = ticketService.syncTicketTypesForEvent(eventId, showtimeId, requests);
+            return ResponseEntity.ok(response);
+        } catch (QuantityBelowSoldAndHeldException below) {
+            // the service transaction is already rolled back: nothing of this sync was applied
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("code", "QUANTITY_BELOW_SOLD_AND_HELD");
+            body.put("ticketTypeId", below.getTicketTypeId());
+            body.put("name", below.getTicketTypeName());
+            body.put("sold", below.getSold());
+            body.put("held", below.getHeld());
+            body.put("minAllowed", below.getMinAllowed());
+            return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);
+        }
     }
 
     @GetMapping("/types/event/{eventId}")

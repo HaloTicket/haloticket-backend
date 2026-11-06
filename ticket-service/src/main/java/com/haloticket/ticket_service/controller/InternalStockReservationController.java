@@ -65,6 +65,31 @@ public class InternalStockReservationController {
         return Map.of("released", stockReservations.release(bookingId));
     }
 
+    public record ReopenRequest(Instant expiresAt) {}
+
+    @PostMapping("/{bookingId}/reopen")
+    public ResponseEntity<Map<String, Object>> reopen(@PathVariable String bookingId, @RequestBody ReopenRequest request,
+            @RequestHeader(value = TOKEN_HEADER, required = false) String token) {
+        requireToken(token);
+        try {
+            stockReservations.reopen(bookingId, request == null ? null : request.expiresAt());
+        } catch (StockReservationService.SoldOutException soldOut) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("code", "TICKET_SOLD_OUT");
+            body.put("ticketTypeId", soldOut.getTicketTypeId());
+            body.put("available", soldOut.getAvailable());
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        } catch (ResponseStatusException notReopenable) {
+            if (notReopenable.getStatusCode().value() == HttpStatus.CONFLICT.value()) {
+                Map<String, Object> body = new LinkedHashMap<>();
+                body.put("code", notReopenable.getReason());
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+            }
+            throw notReopenable;
+        }
+        return ResponseEntity.ok(Map.of("reopened", true));
+    }
+
     private void requireToken(String token) {
         if (serviceToken.isBlank() || token == null || !MessageDigest.isEqual(
                 serviceToken.getBytes(StandardCharsets.UTF_8), token.getBytes(StandardCharsets.UTF_8))) {

@@ -143,11 +143,37 @@ class GaReservationServiceTest {
     }
 
     @Test
-    void otherConflictIsNotReportedAsSoldOut() {
+    void reservationClosedIsForwardedAsItsOwnCode() {
         doThrow(conflict("{\"code\":\"RESERVATION_CLOSED\"}")).when(client).reserve(anyString(), any());
 
         assertThatThrownBy(() -> service.reserve("b", request(List.of(), item(GA, 1, null)), gaPlan(1), LocalDateTime.now().plusMinutes(15)))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> {
+                    assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(e.getReason()).isEqualTo("RESERVATION_CLOSED");
+                });
+    }
+
+    @Test
+    void otherConflictIsNotReportedAsSoldOut() {
+        doThrow(conflict("{\"code\":\"SOMETHING_ELSE\"}")).when(client).reserve(anyString(), any());
+
+        assertThatThrownBy(() -> service.reserve("b", request(List.of(), item(GA, 1, null)), gaPlan(1), LocalDateTime.now().plusMinutes(15)))
                 .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getReason()).isEqualTo("TICKET_RESERVATION_REFUSED"));
+    }
+
+    @Test
+    void reopenReportsRefusalsAsAnswersAndOutagesAsExceptions() {
+        doThrow(conflict("{\"code\":\"TICKET_SOLD_OUT\"}")).when(client).reopen(anyString(), anyString(), any());
+        assertThat(service.reopen("b", java.time.Instant.now())).isEqualTo(new GaReservationService.ReopenOutcome(false, "TICKET_SOLD_OUT"));
+
+        doThrow(conflict("{\"code\":\"RESERVATION_NOT_REOPENABLE\"}")).when(client).reopen(anyString(), anyString(), any());
+        assertThat(service.reopen("b", java.time.Instant.now()).code()).isEqualTo("RESERVATION_NOT_REOPENABLE");
+
+        doThrow(new RuntimeException("connection refused")).when(client).reopen(anyString(), anyString(), any());
+        assertThatThrownBy(() -> service.reopen("b", java.time.Instant.now())).isInstanceOf(IllegalStateException.class);
+
+        doThrow(conflict("{\"code\":\"SOMETHING_ELSE\"}")).when(client).reopen(anyString(), anyString(), any());
+        assertThatThrownBy(() -> service.reopen("b", java.time.Instant.now())).isInstanceOf(IllegalStateException.class);
     }
 
     @Test

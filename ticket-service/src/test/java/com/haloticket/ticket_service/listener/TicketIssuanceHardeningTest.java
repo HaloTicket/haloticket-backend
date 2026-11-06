@@ -234,7 +234,7 @@ class TicketIssuanceHardeningTest {
     }
 
     @Test
-    @DisplayName("Concurrency: 20 concurrent bookings competing for 5 tickets: total_quantity never negative, extra 15 log OVERSOLD_ON_ISSUE")
+    @DisplayName("Concurrency: 20 concurrent bookings competing for 5 tickets: total_quantity never negative, the extra 15 fail with OVERSOLD_ON_ISSUE and issue nothing")
     void testConcurrentBookingsOversold() throws Exception {
         TicketType vip = TicketType.builder().id("tier-hot").eventId("event-1").showtimeId("show-1").name("HOT").price(1000.0).totalQuantity(5).build();
         stockMap.put("tier-hot", new AtomicInteger(5)); // Exactly 5 tickets in stock
@@ -243,6 +243,7 @@ class TicketIssuanceHardeningTest {
         when(layouts.findFirstByEventIdAndStatusOrderByUpdatedAtDesc("event-1", SeatLayoutStatus.PUBLISHED)).thenReturn(Optional.empty());
 
         int threadCount = 20;
+        AtomicInteger failures = new AtomicInteger();
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch doneLatch = new CountDownLatch(threadCount);
@@ -267,7 +268,8 @@ class TicketIssuanceHardeningTest {
                             """.formatted(bookingId, idx, idx);
                     listener.handleBookingConfirmed(json);
                 } catch (Exception e) {
-                    // ignore
+                    assertThat(e.getCause().getMessage()).startsWith("OVERSOLD_ON_ISSUE");
+                    failures.incrementAndGet();
                 } finally {
                     doneLatch.countDown();
                 }
@@ -280,8 +282,9 @@ class TicketIssuanceHardeningTest {
 
         // Stock was 5, 20 bookings processed -> stock MUST be 0, NEVER negative
         assertThat(stockMap.get("tier-hot").get()).isEqualTo(0);
-        // All 20 tickets were issued because customers already paid
-        assertThat(allSavedTickets).hasSize(20);
+        // only the 5 that could decrement stock got a ticket; the other 15 threw OVERSOLD_ON_ISSUE (rolled back, no ticket)
+        assertThat(allSavedTickets).hasSize(5);
+        assertThat(failures.get()).isEqualTo(15);
     }
 
     @Test

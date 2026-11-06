@@ -13,6 +13,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.core.Authentication;
 
+import com.haloticket.event_service.authz.Permission;
+import com.haloticket.event_service.exception.TicketSyncFailedException;
+import com.haloticket.event_service.exception.TicketSyncRejectedException;
+import com.haloticket.event_service.service.EventAccessService;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -22,6 +27,7 @@ import java.util.Map;
 public class EventController {
 
     private final EventService eventService;
+    private final EventAccessService eventAccessService;
 
     @PostMapping("/test-questions")
     public ResponseEntity<String> testQuestions(@RequestBody EventCreateRequest request) {
@@ -47,6 +53,35 @@ public class EventController {
             @RequestBody EventCreateRequest request
     ) {
         return ResponseEntity.ok(eventService.updateEvent(id, request, authorization));
+    }
+
+    /** Re-sends the stored ticket snapshot to ticket-service. Same permission as editing the event (EVENT_EDIT; ROLE_ADMIN passes). */
+    @PostMapping("/{id}/tickets/resync")
+    public ResponseEntity<EventResponse> resyncTickets(
+            @PathVariable String id,
+            @RequestHeader("Authorization") String authorization
+    ) {
+        eventAccessService.require(id, Permission.EVENT_EDIT, authorization);
+        return ResponseEntity.ok(eventService.resyncTickets(id));
+    }
+
+    @ExceptionHandler(TicketSyncRejectedException.class)
+    public ResponseEntity<Map<String, Object>> ticketSyncRejected(TicketSyncRejectedException exception) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("code", exception.getCode());
+        body.put("eventId", exception.getEventId());
+        body.put("message", exception.getCode());
+        body.putAll(exception.getDetails()); // ticketTypeId, name, sold, held, minAllowed
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);
+    }
+
+    @ExceptionHandler(TicketSyncFailedException.class)
+    public ResponseEntity<Map<String, Object>> ticketSyncFailed(TicketSyncFailedException exception) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("code", "TICKETS_SYNC_FAILED");
+        body.put("eventId", exception.getEventId());
+        body.put("message", "Event saved but its ticket types could not be synchronized. Try again with resync.");
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(body);
     }
 
     @GetMapping("/organizer-profile")
