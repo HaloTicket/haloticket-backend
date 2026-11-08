@@ -55,7 +55,9 @@ def client(monkeypatch, calls, tmp_path):
     monkeypatch.setattr(organizer, "sql_engine", SimpleNamespace(analyze_data=analyze))
     monkeypatch.setattr(organizer, "organizer_agent", SimpleNamespace(
         chat=lambda **kwargs: calls.append(("agent-chat",)) or {"reply": "ok"},
-        generate_event_content=lambda title, points: calls.append(("generate",)) or {"description": "d", "terms_and_conditions": "t"},
+    ))
+    monkeypatch.setattr(organizer, "event_content", SimpleNamespace(
+        generate_event_content=lambda title, points, actor=None: calls.append(("generate",)) or {"description": "d", "terms_and_conditions": "t"},
     ))
     monkeypatch.setattr(customer.booking_agent, "chat", lambda m, h, db: {"reply": "ok", "system_actions": []})
     log_file = tmp_path / "event-error.log"
@@ -250,7 +252,7 @@ def test_system_logs_return_only_the_latest_lines(admin_client, monkeypatch, tmp
     big.write_text("\n".join(f"INFO line {i}" for i in range(500)), encoding="utf-8")
     monkeypatch.setattr(settings, "ai_system_log_file", str(big))
     monkeypatch.setattr(settings, "ai_system_log_max_lines", 7)
-    lines = admin_client.get("/api/admin/system-logs").json()
+    lines = admin_client.get("/api/admin/system-logs").json()["entries"]
     assert len(lines) == 7
     assert lines[-1]["details"] == "INFO line 499"
 

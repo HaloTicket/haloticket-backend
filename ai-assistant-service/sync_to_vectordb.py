@@ -1,3 +1,25 @@
+"""Manual job: (re)build the event_vectors table used by the customer chat-search (RAG).
+
+This is the ONLY way event_vectors is filled now (the Kafka consumer that used to do it was removed).
+Without a run, vector search has no data and chat-search relies on its keyword fallback.
+
+What it does: reads APPROVED events whose sale has not ended (event_db) with their showtimes (event_db) and ticket
+types (ticket_db), builds one JSON document per event, embeds it with the configured embedding model (needs
+GEMINI_API_KEY; this makes one embedding call per event) and upserts it into event_vectors (merge by id).
+Safe to re-run: existing rows are overwritten, nothing is deleted (rows of ended events stay until removed by hand).
+
+Required environment (no defaults on purpose; the script exits with a clear message when one is missing):
+  EVENT_DB_URL   SQLAlchemy URL of event_db,  e.g. postgresql+psycopg2://<user>:<password>@postgres:5432/event_db
+  TICKET_DB_URL  SQLAlchemy URL of ticket_db, e.g. postgresql+psycopg2://<user>:<password>@postgres:5432/ticket_db
+  GEMINI_API_KEY (read by the app settings) for the embedding model.
+The account needs write access to event_vectors in event_db and read access to the tables above. The ai-assistant
+container already has EVENT_DB_URL, TICKET_DB_URL and GEMINI_API_KEY from docker-compose.
+
+Run inside the container (from /app):
+  docker exec -it haloticket-ai-assistant python sync_to_vectordb.py
+Run locally (from ai-assistant-service/, with the venv active and the variables exported):
+  python sync_to_vectordb.py
+"""
 import os
 import sys
 import json
@@ -5,14 +27,29 @@ from datetime import datetime
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
+def _require_env(name):
+    value = os.getenv(name, "").strip()
+    if not value:
+        sys.exit(
+            f"ERROR: environment variable {name} is not set. "
+            "Set EVENT_DB_URL and TICKET_DB_URL (SQLAlchemy URLs, e.g. "
+            "postgresql+psycopg2://<user>:<password>@<host>:5432/<db>) before running this script."
+        )
+    return value
+
+
+if __name__ == "__main__":  # fail fast, before the app imports
+    _require_env("EVENT_DB_URL")
+    _require_env("TICKET_DB_URL")
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from app.models.event_vector import EventVector
 from app.services.ai.rag_engine import rag_engine
 
-EVENT_DB_URL = os.getenv("EVENT_DB_URL", "postgresql+psycopg2://haloticket:secretpassword@postgres:5432/event_db")
-TICKET_DB_URL = os.getenv("TICKET_DB_URL", "postgresql+psycopg2://haloticket:secretpassword@postgres:5432/ticket_db")
 
 def sync_events_to_vectordb():
+    EVENT_DB_URL = _require_env("EVENT_DB_URL")
+    TICKET_DB_URL = _require_env("TICKET_DB_URL")
     print("Connecting to Event DB and Ticket DB...")
     event_engine = create_engine(EVENT_DB_URL)
     EventSession = sessionmaker(bind=event_engine)

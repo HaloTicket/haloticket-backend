@@ -34,8 +34,8 @@ class SQLEngine:
     The query runs in a read-only transaction with a statement timeout and its result is capped.
     """
 
-    def __init__(self):
-        self.llm = get_fast_llm()
+    def __init__(self, llm=None):
+        self.llm = llm if llm is not None else get_fast_llm()
         self._engine = None
         self._schema_texts = {}  # allowed relations -> (text, loaded at)
 

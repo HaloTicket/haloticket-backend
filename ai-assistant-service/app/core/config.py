@@ -4,11 +4,10 @@ class Settings(BaseSettings):
     app_name: str = "ai-assistant-service"
     port: int = 8089
     eureka_server: str = "http://localhost:8761/eureka"
-    database_url: str = "postgresql+psycopg2://haloticket:secretpassword@localhost:5433/event_db"
+    database_url: str = ""  # DATABASE_URL; no default credentials. Empty = DB-backed routes answer 503 AI_DB_NOT_CONFIGURED
     gemini_api_key: str = "your-default-key-if-missing"
     groq_api_key: str = ""
     openai_api_key: str = ""
-    kafka_bootstrap_servers: str = "localhost:9092"
     llm_timeout_seconds: int = 45  # per call to a chat model; LLM_TIMEOUT_SECONDS overrides
 
     # verification of the Keycloak access token on the admin / analysis routes
@@ -44,6 +43,38 @@ class Settings(BaseSettings):
     ai_system_log_max_lines: int = 25
     alert_ssl_domains: str = "haloticket.duckdns.org"  # ALERT_SSL_DOMAINS: the only domains /ssl-status will look at
 
+    # model calls (app/services/ai/ai_call.py): numeric limits only
+    ai_llm_deadline_seconds: int = 20
+    ai_max_tokens_customer_chat: int = 600
+    ai_max_tokens_admin_assistant: int = 700
+    ai_max_tokens_risk_scoring: int = 400
+    ai_max_tokens_event_content: int = 1200
+    ai_max_tokens_analysis: int = 900
+    ai_max_tokens_voucher_strategy: int = 900
+    ai_daily_call_budget: int = 2000
+    ai_search_cache_seconds: int = 300
+    ai_trusted_proxy_cidrs: str = "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8,::1"
+
+    # addresses (empty = feature degrades, service still starts)
+    redis_url: str = ""
+    ai_ops_database_url: str = ""
+    chatbot_event_database_url: str = ""
+    chatbot_ticket_database_url: str = ""
+
+    # rate limits (fixed windows)
+    ai_rl_customer_search_per_minute: int = 20
+    ai_rl_customer_chat_ip_per_minute: int = 6
+    ai_rl_customer_chat_ip_per_hour: int = 60
+    ai_rl_customer_chat_account_per_minute: int = 10
+    ai_rl_customer_chat_account_per_hour: int = 120
+    ai_rl_event_content_per_hour: int = 5
+    ai_rl_event_content_per_day: int = 20
+    ai_rl_voucher_strategy_per_hour: int = 10
+    ai_rl_voucher_strategy_per_day: int = 30
+    ai_rl_data_analysis_per_hour: int = 20
+    ai_rl_data_analysis_per_day: int = 100
+    ai_rl_admin_assistant_per_hour: int = 60
+    ai_rl_risk_scoring_per_hour: int = 60
 
     class Config:
         env_file = ".env"

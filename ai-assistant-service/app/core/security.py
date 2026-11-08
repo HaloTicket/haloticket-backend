@@ -79,10 +79,12 @@ def require_login(request: Request, verifier: Optional[TokenVerifier] = Depends(
     if scheme.lower() != "bearer" or not token.strip():
         raise _reject(401, "UNAUTHENTICATED", "Cần đăng nhập.")
     try:
-        return verifier.verify(token.strip())
+        claims = verifier.verify(token.strip())
     except Exception as failure:  # PyJWTError, but also a Keycloak that cannot be reached for the keys
         log.warning("Token refused: %s", type(failure).__name__)
         raise _reject(401, "INVALID_TOKEN", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn.")
+    request.state.claims = claims  # read by app.core.ratelimit so the token is verified once per request
+    return claims
 
 
 def require_admin(claims: dict = Depends(require_login)) -> dict:
@@ -90,4 +92,28 @@ def require_admin(claims: dict = Depends(require_login)) -> dict:
     if not (roles_of(claims) & ADMIN_ROLES):
         log.warning("Admin-only route refused for a non-admin (subject %s)", str(claims.get("sub", "?"))[:8])
         raise _reject(403, "ADMIN_ONLY", "Chỉ quản trị viên được phép sử dụng chức năng này.")
+    return claims
+
+
+def get_optional_claims(request: Request) -> Optional[dict]:
+    """Claims of a valid bearer token, or None (no header, bad token, auth not configured). Never raises."""
+    cached = getattr(request.state, "claims", None)
+    if cached is not None:
+        return cached
+    header = request.headers.get("Authorization", "")
+    if not header:
+        return None
+    scheme, _, token = header.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return None
+    try:
+        resolve = request.app.dependency_overrides.get(get_verifier, get_verifier)  # honours test overrides
+        verifier = resolve()
+        if verifier is None:
+            return None
+        claims = verifier.verify(token.strip())
+    except Exception as failure:
+        log.info("Optional token ignored: %s", type(failure).__name__)
+        return None
+    request.state.claims = claims
     return claims

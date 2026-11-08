@@ -8,7 +8,10 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.endpoints import customer
+from app.core import ratelimit
+from app.core.errors import install_error_handlers
 from app.db.session import get_db
+from app.services.ai import search_cache
 
 
 class FakeResult:
@@ -24,10 +27,33 @@ class FakeDb:
     def rollback(self):
         pass
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class FakeEngine:
+    """The read-only chatbot engine: connect() gives a connection that finds nothing."""
+    def connect(self):
+        return FakeDb()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_limits_and_cache(monkeypatch):
+    ratelimit.reset_for_tests()
+    search_cache.reset_for_tests()
+    monkeypatch.setattr(customer, "get_chatbot_engine", lambda kind: FakeEngine())
+    yield
+    ratelimit.reset_for_tests()
+    search_cache.reset_for_tests()
+
 
 @pytest.fixture
 def client(monkeypatch):
     app = FastAPI()
+    install_error_handlers(app)
     app.include_router(customer.router, prefix="/api/customer")
     app.dependency_overrides[get_db] = lambda: FakeDb()
     monkeypatch.setattr(customer.rag_engine, "search_events", lambda db, query, top_k=3: [])
@@ -104,15 +130,16 @@ def test_empty_body_is_still_422_and_a_blank_question_still_answers_200_with_not
     assert blank.json() == {"query": "   ", "total": 0, "matches": [], "events": []}
 
 
-def test_chat_failures_still_answer_with_the_apology_text(client, monkeypatch):
+def test_chat_failures_are_an_error_status_not_an_apology_with_200(client, monkeypatch):
+    """Changed by the AI foundation (error contract): a failure is 503 AI_UNAVAILABLE, never 200 + apology text."""
     def broken(message, history, db):
         raise RuntimeError("llm down")
 
     monkeypatch.setattr(customer.booking_agent, "chat", broken)
     response = client.post("/api/customer/smart-booking-chat", json={"message": "hi"})
-    assert response.status_code == 200
-    assert response.json()["system_actions"] == []
-    assert "sự cố" in response.json()["reply"]
+    assert response.status_code == 503
+    assert response.json()["code"] == "AI_UNAVAILABLE"
+    assert "llm down" not in response.text
 
 
 def test_no_code_uses_a_session_connection_as_a_context_manager():

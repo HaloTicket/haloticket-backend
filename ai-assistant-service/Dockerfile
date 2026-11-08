@@ -4,8 +4,7 @@ FROM python:3.14-slim
 # Set the working directory in the container
 WORKDIR /app
 
-# Fix the error of missing C++ library when installing psycopg2
-RUN apt-get update && apt-get install -y libpq-dev gcc && rm -rf /var/lib/apt/lists/*
+# No libpq-dev/gcc needed: psycopg2-binary ships its own libpq.
 
 # Copy file requirements and install
 COPY requirements.txt .
@@ -17,5 +16,5 @@ COPY . .
 # Open port 8089 to the outside
 EXPOSE 8089
 
-# Command to start the server when the container starts
+# Command to start the server (single worker: the in-process rate-limit fallback assumes one process) when the container starts
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8089"]

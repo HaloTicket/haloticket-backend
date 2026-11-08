@@ -1,12 +1,30 @@
-from langchain_core.tools import tool
+"""Tools of the customer chatbot. Read-only: they never write; request_user_confirmation only describes what the user may
+confirm in the web app.
+
+Engines are the narrow read-only chatbot roles, obtained lazily at call time (nothing is created at import):
+  event_db  -> events, event_showtimes
+  ticket_db -> ticket_types, seat_layouts, seats, seat_rows, seat_zones
+Database failures are not turned into success results: they raise AiError (AI_DB_NOT_CONFIGURED / AI_UNAVAILABLE).
+"""
 import json
-import os
-from typing import List, Dict, Any
+import logging
+import re
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import text
-from app.db.session import make_engine
+from decimal import Decimal, InvalidOperation
+from typing import Any, Dict, List, Optional
+
+from langchain_core.tools import tool
+from sqlalchemy import bindparam, text
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.core.errors import AiError, ai_error, AI_UNAVAILABLE
+from app.db.engines import get_chatbot_engine
+from app.services.ai.customer_sql import VALID_EVENT_FILTER
+
+log = logging.getLogger("ai.tools")
 
 VN_TZ = timezone(timedelta(hours=7))
+
 
 def to_naive_vn_datetime(dt):
     if dt is None:
@@ -20,322 +38,524 @@ def to_naive_vn_datetime(dt):
         return dt.astimezone(VN_TZ).replace(tzinfo=None)
     return dt
 
-EVENT_DB_URL = os.getenv("EVENT_DB_URL", "postgresql+psycopg2://haloticket:secretpassword@postgres:5432/event_db")
-TICKET_DB_URL = os.getenv("TICKET_DB_URL", "postgresql+psycopg2://haloticket:secretpassword@postgres:5432/ticket_db")
 
-event_engine = make_engine(EVENT_DB_URL)
-ticket_engine = make_engine(TICKET_DB_URL)
+def event_db():
+    """Read-only engine of event_db (created on first use)."""
+    return get_chatbot_engine("event")
 
-# the model chooses the id list; one query per id, so it is capped
+
+def ticket_db():
+    """Read-only engine of ticket_db (created on first use)."""
+    return get_chatbot_engine("ticket")
+
+
+def _db_unavailable(failure: Exception) -> AiError:
+    log.warning("chatbot tool database error: %s", type(failure).__name__)
+    return ai_error(AI_UNAVAILABLE)
+
+
+# the model chooses the id list, so it is capped
 MAX_EVENT_CARDS = 10
+MAX_SEATS_PER_REQUEST = 10
+MAX_TICKETS_PER_ORDER = 20
+
+SEAT_MAP_RECHECK_NOTE = (
+    "Lưu ý: ghế đang được người khác giữ chỗ tạm thời không hiển thị cho trợ lý, "
+    "vui lòng kiểm tra lại trên sơ đồ ghế trước khi đặt."
+)
+
+
+# seats
+def _natural_key(value) -> list:
+    """Sort key that never compares int with str: '2' < '10' < 'A1' < 'B2'."""
+    parts = re.split(r"(\d+)", str(value))
+    return [(0, int(p), "") if p.isdigit() else (1, 0, p.lower()) for p in parts if p != ""]
+
+
+def _as_int(value) -> Optional[int]:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
+def _seat_number(seat: dict):
+    number = seat.get("number")
+    if number is None or number == "":
+        number = seat.get("col")
+    return number
+
+
+def _zone_list(zones) -> List[Dict[str, Any]]:
+    """[{'id','name','tier'}] from a layout whose zones are a dict (id -> zone) or a list."""
+    out = []
+    if isinstance(zones, dict):
+        for zid, zobj in zones.items():
+            zobj = zobj if isinstance(zobj, dict) else {"name": str(zobj)}
+            out.append({"id": str(zid), "name": str(zobj.get("name") or zid), "tier": zobj.get("tierId")})
+    elif isinstance(zones, list):
+        for idx, zobj in enumerate(zones):
+            if isinstance(zobj, dict):
+                zid = zobj.get("id", idx)
+                out.append({"id": str(zid), "name": str(zobj.get("name") or zid), "tier": zobj.get("tierId")})
+    return out
+
+
+def _match_zone(zones: List[Dict[str, Any]], wanted: str) -> Optional[Dict[str, Any]]:
+    w = (wanted or "").strip().lower()
+    if not w:
+        return None
+    for z in zones:
+        if z["name"].strip().lower() == w:
+            return z
+    for z in zones:
+        n = z["name"].strip().lower()
+        if n and (w in n or n in w):
+            return z
+    return None
+
+
+def _json(payload: dict) -> str:
+    return json.dumps(payload, ensure_ascii=False)
+
 
 @tool
 def find_adjacent_seats(event_id: str, zone: str, num_seats: int) -> str:
-
     """
-    Tìm các ghế trống nằm cạnh nhau trong một khu vực (zone) cụ thể của một sự kiện
-    dựa trên sơ đồ ghế thực tế từ cơ sở dữ liệu.
-    
+    Tìm các ghế trống nằm cạnh nhau (cùng khu vực, cùng hàng, số ghế liên tiếp) trong một khu vực (zone) của một sự kiện
+    dựa trên sơ đồ ghế trong cơ sở dữ liệu. Nếu không có đủ ghế liền kề, kết quả có status 'no_adjacent_seats'
+    (kèm gợi ý ghế gần nhau nhưng KHÔNG liền kề, được ghi rõ).
+
     Args:
         event_id: Mã sự kiện (Ví dụ: "xoay-tron-concert-hoang-dung")
         zone: Tên khu vực muốn ngồi (Ví dụ: "VIP", "Standard", "Khu A")
         num_seats: Số lượng ghế liền kề cần tìm (Ví dụ: 2, 3, 4)
     """
-    print(f"[HỆ THỐNG] Truy xuất Database tìm {num_seats} ghế liền kề khu '{zone}' cho sự kiện '{event_id}'...")
-    
+    n = _as_int(num_seats)
+    if n is None or n < 1 or n > MAX_SEATS_PER_REQUEST:
+        return _json({"status": "invalid_request", "event_id": event_id,
+                      "message": f"Số ghế cần tìm phải từ 1 đến {MAX_SEATS_PER_REQUEST}."})
+    zone = zone or ""
+
     try:
-        # retrieve the seat map from ticket_db
-        with ticket_engine.connect() as conn:
-            query = text('''
-                SELECT draft_json, image_url 
-                FROM seat_layouts 
-                WHERE event_id = :eid 
-                ORDER BY (status = 'PUBLISHED') DESC, updated_at DESC NULLS LAST 
+        with ticket_db().connect() as conn:
+            layout_row = conn.execute(text('''
+                SELECT id, draft_json, image_url
+                FROM seat_layouts
+                WHERE event_id = :eid
+                ORDER BY (status = 'PUBLISHED') DESC, updated_at DESC NULLS LAST
                 LIMIT 1
-            ''')
-            layout_row = conn.execute(query, {"eid": event_id}).fetchone()
+            '''), {"eid": event_id}).fetchone()
 
-        if not layout_row or not layout_row.draft_json:
-            # no seat map -> check general admission tickets
-            with event_engine.connect() as conn:
-                tquery = text('''
-                    SELECT name, price 
-                    FROM ticket_types 
-                    WHERE event_id = :eid AND ticket_type_status = 'ACTIVE'
-                    ORDER BY price ASC
-                ''')
-                types = conn.execute(tquery, {"eid": event_id}).fetchall()
-                if types:
-                    matched_type = next((t for t in types if zone.lower() in t.name.lower()), types[0])
-                    return json.dumps({
-                        "status": "general_admission",
-                        "event_id": event_id,
-                        "zone": matched_type.name,
-                        "quantity": num_seats,
-                        "price_per_seat": float(matched_type.price),
-                        "total_price": float(matched_type.price) * num_seats,
-                        "message": f"Sự kiện này áp dụng vé tự do (không đánh số ghế cố định). Bạn có thể đặt {num_seats} vé hạng '{matched_type.name}'."
-                    }, ensure_ascii=False)
-                else:
-                    return json.dumps({
-                        "status": "not_found",
-                        "event_id": event_id,
-                        "message": f"Không tìm thấy dữ liệu sơ đồ ghế hoặc hạng vé cho sự kiện '{event_id}'."
-                    }, ensure_ascii=False)
+            if not layout_row or not layout_row.draft_json:
+                return _general_admission(conn, event_id, zone, n)
 
-        # parse layout_data from JSON
-        data = json.loads(layout_row.draft_json)
-        seats = data.get("seats", [])
-        zones = data.get("zones", {})
-        tiers_list = data.get("ticketTiers", [])
-        tier_price_map = {t["id"]: float(t.get("price", 0)) for t in tiers_list if "id" in t}
+            try:
+                data = json.loads(layout_row.draft_json)
+                if not isinstance(data, dict):
+                    raise ValueError("layout is not an object")
+            except ValueError:
+                return _json({"status": "error", "event_id": event_id,
+                              "message": "Không đọc được dữ liệu sơ đồ ghế của sự kiện này."})
 
-        # find zoneId matching the requested zone name
-        target_zone_id = None
-        target_zone_name = zone
-        target_tier_id = None
+            seats = [s for s in (data.get("seats") or []) if isinstance(s, dict)]
+            zones = _zone_list(data.get("zones"))
+            tier_price = {}
+            for t in data.get("ticketTiers") or []:
+                if isinstance(t, dict) and "id" in t:
+                    try:
+                        tier_price[t["id"]] = float(t.get("price", 0) or 0)
+                    except (TypeError, ValueError):
+                        pass
 
-        if isinstance(zones, dict):
-            for zid, zobj in zones.items():
-                zname = zobj.get("name", "") if isinstance(zobj, dict) else str(zobj)
-                if zone.lower() in zname.lower() or zname.lower() in zone.lower():
-                    target_zone_id = zid
-                    target_zone_name = zname
-                    target_tier_id = zobj.get("tierId") if isinstance(zobj, dict) else None
-                    break
-        elif isinstance(zones, list):
-            for zobj in zones:
-                zname = zobj.get("name", "")
-                if zone.lower() in zname.lower() or zname.lower() in zone.lower():
-                    target_zone_id = zobj.get("id")
-                    target_zone_name = zname
-                    target_tier_id = zobj.get("tierId")
-                    break
+            target = _match_zone(zones, zone)
+            if zone.strip() and target is None and zones:
+                return _json({
+                    "status": "zone_not_found", "event_id": event_id,
+                    "available_zones": [z["name"] for z in zones][:30],
+                    "message": f"Không tìm thấy khu vực '{zone.strip()[:60]}' trong sự kiện này.",
+                })
+            zone_name_by_id = {z["id"]: z for z in zones}
 
-        # filter available seats in zone
-        available_seats = []
-        for s in seats:
-            seat_status = s.get("status", "available")
-            if seat_status != "available":
-                continue
-            
-            # match zoneId if found, or collect all available seats if zone is general
-            if target_zone_id and s.get("zoneId") != target_zone_id:
-                continue
-                
-            available_seats.append(s)
+            unavailable = _unavailable_from_table(conn, layout_row.id)
 
-        if not available_seats:
-            return json.dumps({
-                "status": "no_seats",
-                "event_id": event_id,
-                "zone": target_zone_name,
-                "message": f"Khu vực '{target_zone_name}' hiện đã hết ghế trống."
-            }, ensure_ascii=False)
+            groups: Dict[tuple, list] = {}
+            for s in seats:
+                if str(s.get("status", "available")).lower() != "available":
+                    continue
+                zid = str(s.get("zoneId")) if s.get("zoneId") is not None else ""
+                if target is not None and zid != target["id"]:
+                    continue
+                z = zone_name_by_id.get(zid)
+                zname = z["name"] if z else zid
+                row = str(s.get("row") if s.get("row") is not None else "")
+                number = _seat_number(s)
+                if number is None:
+                    continue
+                if (zname.strip().lower(), row.strip().lower(), str(number).strip().lower()) in unavailable:
+                    continue  # the seats table says it is taken
+                groups.setdefault((zid, row), []).append((number, _as_int(number), s, zname, z))
 
-        # group seats by row and find consecutive seats
-        rows_map: Dict[str, List[Dict[str, Any]]] = {}
-        for s in available_seats:
-            row_key = s.get("row", "A")
-            rows_map.setdefault(row_key, []).append(s)
+            if not groups:
+                return _json({"status": "no_seats", "event_id": event_id,
+                              "zone": target["name"] if target else (zone.strip() or None),
+                              "message": "Khu vực này hiện không còn ghế trống. " + SEAT_MAP_RECHECK_NOTE})
 
-        found_consecutive = None
-        found_row = None
+            zone_order = {z["id"]: i for i, z in enumerate(zones)}
+            ordered_keys = sorted(groups, key=lambda k: (zone_order.get(k[0], 10**6), _natural_key(k[1])))
 
-        for row_key, row_seats in rows_map.items():
-            # sort by seat number
-            row_seats.sort(key=lambda x: (x.get("number") or x.get("col") or 0))
-            
-            # find num_seats consecutive seats
-            for i in range(len(row_seats) - num_seats + 1):
-                window = row_seats[i : i + num_seats]
-                numbers = [w.get("number") or w.get("col") or 0 for w in window]
-                
-                # check if seat numbers are consecutive
-                is_consecutive = all(numbers[j] == numbers[j-1] + 1 for j in range(1, len(numbers)))
-                if is_consecutive or len(numbers) == 1:
-                    found_consecutive = window
-                    found_row = row_key
-                    break
-            
-            if found_consecutive:
-                break
+            for key in ordered_keys:
+                run = _adjacent_run(groups[key], n)
+                if run:
+                    return _success_adjacent(conn, event_id, key, run, tier_price, n)
 
-        # if no perfect consecutive seats found, take the nearest seats in the same row
-        if not found_consecutive:
-            for row_key, row_seats in rows_map.items():
-                if len(row_seats) >= num_seats:
-                    found_consecutive = row_seats[:num_seats]
-                    found_row = row_key
-                    break
+            return _no_adjacent(event_id, target, groups, ordered_keys, n)
+    except AiError:
+        raise
+    except SQLAlchemyError as failure:
+        raise _db_unavailable(failure)
 
-        if not found_consecutive:
-            return json.dumps({
-                "status": "no_adjacent",
-                "event_id": event_id,
-                "zone": target_zone_name,
-                "message": f"Khu vực '{target_zone_name}' hiện không còn đủ {num_seats} ghế liền kề nhau."
-            }, ensure_ascii=False)
 
-        # calculate actual ticket price
-        first_seat = found_consecutive[0]
-        seat_tier_id = first_seat.get("tierId") or target_tier_id
-        price_per_seat = tier_price_map.get(seat_tier_id, 0)
+def _unavailable_from_table(conn, layout_id) -> set:
+    """Seats the `seats` table marks as not AVAILABLE, keyed (zone name, row, number) lower-cased. Empty when the layout
+    has no rows in the table (the draft is then the only source)."""
+    rows = conn.execute(text('''
+        SELECT sz.name AS zone_name, sr.label AS row_label, s.seat_number AS seat_number, s.seat_status AS seat_status
+        FROM seats s
+        JOIN seat_rows sr ON sr.id = s.seat_row_id
+        JOIN seat_zones sz ON sz.id = sr.seat_zone_id
+        WHERE sz.seat_layout_id = :lid
+    '''), {"lid": layout_id}).fetchall()
+    taken = set()
+    for r in rows:
+        if str(r.seat_status).upper() != "AVAILABLE":
+            taken.add((str(r.zone_name or "").strip().lower(), str(r.row_label or "").strip().lower(),
+                       str(r.seat_number).strip().lower()))
+    return taken
 
-        # if no price in layout_data, query price from ticket_types table
-        if price_per_seat == 0:
-            with event_engine.connect() as conn:
-                pquery = text("SELECT price FROM ticket_types WHERE event_id = :eid ORDER BY price ASC LIMIT 1")
-                prow = conn.execute(pquery, {"eid": event_id}).fetchone()
-                if prow:
-                    price_per_seat = float(prow.price)
 
-        seat_labels = [f"{found_row}{s.get('number') or s.get('col')}" for s in found_consecutive]
-        
-        result = {
-            "status": "success",
-            "event_id": event_id,
-            "zone": target_zone_name,
-            "row": found_row,
-            "seats": seat_labels,
-            "seat_ids": [s.get("id") for s in found_consecutive],
-            "num_seats": num_seats,
-            "price_per_seat": price_per_seat,
-            "total_price": price_per_seat * num_seats,
-            "message": f"Đã tìm thấy {num_seats} ghế liền kề tại Hàng {found_row} ({', '.join(seat_labels)}) thuộc khu vực {target_zone_name}."
-        }
-        return json.dumps(result, ensure_ascii=False)
+def _adjacent_run(entries: list, n: int) -> Optional[list]:
+    """n seats of ONE (zone, row) with consecutive integer numbers, or None. Non-numeric numbers never form a run."""
+    numeric = {}
+    for number, as_int, seat, zname, z in entries:
+        if as_int is not None and as_int not in numeric:
+            numeric[as_int] = (number, seat, zname, z)
+    ordered = sorted(numeric)
+    for i in range(len(ordered) - n + 1):
+        if ordered[i + n - 1] - ordered[i] == n - 1:
+            return [numeric[v] for v in ordered[i:i + n]]
+    return None
 
-    except Exception as e:
-        print(f"[LỖI find_adjacent_seats] {e}")
-        return json.dumps({
-            "status": "error",
-            "event_id": event_id,
-            "zone": zone,
-            "message": f"Đã xảy ra lỗi khi tìm ghế: {str(e)}"
-        }, ensure_ascii=False)
 
-@tool
-def search_events(keyword: str = "") -> str:
-    """
-    Sử dụng công cụ này BẮT BUỘC khi người dùng hỏi về danh sách sự kiện, tìm kiếm sự kiện, có sự kiện gì hot, v.v.
-    Args:
-        keyword: Từ khóa tìm kiếm (Ví dụ: "âm nhạc", "sự kiện gần đây"). Nếu người dùng hỏi chung chung, hãy truyền chuỗi rỗng "".
-    """
-    return "SEARCH_EVENTS"
+def _general_admission(conn, event_id: str, zone: str, n: int) -> str:
+    types = conn.execute(text('''
+        SELECT name, price
+        FROM ticket_types
+        WHERE event_id = :eid AND ticket_type_status = 'ACTIVE'
+        ORDER BY price ASC
+    '''), {"eid": event_id}).fetchall()
+    if not types:
+        return _json({"status": "not_found", "event_id": event_id,
+                      "message": "Không tìm thấy dữ liệu sơ đồ ghế hoặc hạng vé cho sự kiện này."})
+    wanted = zone.strip().lower()
+    matched = next((t for t in types if wanted and wanted in t.name.lower()), types[0])
+    price = float(matched.price)
+    return _json({
+        "status": "general_admission",
+        "event_id": event_id,
+        "zone": matched.name,
+        "quantity": n,
+        "price_per_seat": price,
+        "total_price": price * n,
+        "message": f"Sự kiện này áp dụng vé tự do (không đánh số ghế cố định). Bạn có thể đặt {n} vé hạng '{matched.name}'.",
+    })
+
+
+def _success_adjacent(conn, event_id, key, run, tier_price, n) -> str:
+    zid, row = key
+    first_number, first_seat, zname, zobj = run[0]
+    tier_id = first_seat.get("tierId") or (zobj or {}).get("tier")
+    price = tier_price.get(tier_id, 0)
+    if not price:
+        prow = conn.execute(text(
+            "SELECT price FROM ticket_types WHERE event_id = :eid AND ticket_type_status = 'ACTIVE' ORDER BY price ASC LIMIT 1"
+        ), {"eid": event_id}).fetchone()
+        if prow:
+            price = float(prow.price)
+    labels = [f"{row}{number}" for number, _, _, _ in run]
+    return _json({
+        "status": "success",
+        "event_id": event_id,
+        "zone": zname,
+        "row": row,
+        "seats": labels,
+        "seat_ids": [seat.get("id") for _, seat, _, _ in run],
+        "num_seats": n,
+        "adjacent": True,
+        "price_per_seat": price,
+        "total_price": price * n,
+        "message": f"Đã tìm thấy {n} ghế liền kề tại Hàng {row} ({', '.join(labels)}) thuộc khu vực {zname}. "
+                   + SEAT_MAP_RECHECK_NOTE,
+    })
+
+
+def _no_adjacent(event_id, target, groups, ordered_keys, n) -> str:
+    best = max(ordered_keys, key=lambda k: len(groups[k]))  # first of the fullest rows
+    entries = sorted(groups[best], key=lambda e: _natural_key(e[0]))[:n]
+    zname = entries[0][3] if entries else (target["name"] if target else "")
+    labels = [f"{best[1]}{e[0]}" for e in entries]
+    return _json({
+        "status": "no_adjacent_seats",
+        "event_id": event_id,
+        "zone": target["name"] if target else None,
+        "num_seats": n,
+        "nearby_not_adjacent": {"adjacent": False, "zone": zname, "row": best[1], "seats": labels},
+        "message": f"Không còn {n} ghế liền kề nhau (cùng hàng, số liên tiếp). Các ghế trống gần nhau dưới đây "
+                   f"KHÔNG liền kề: {', '.join(labels)}. " + SEAT_MAP_RECHECK_NOTE,
+    })
+
+
+# confirmation (prices computed here)
+def _money(value) -> Optional[Decimal]:
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _norm_name(value) -> str:
+    return " ".join(str(value or "").lower().split())
+
+
+def _confirmation_error(message: str) -> str:
+    return _json({"status": "error", "action_type": "BOOK_TICKETS", "message": message})
+
 
 @tool
 def request_user_confirmation(action_type: str, data: str) -> str:
     """
-    Sử dụng công cụ này khi bạn cần NGƯỜI DÙNG XÁC NHẬN MỘT THAO TÁC GHI (như Đặt Vé, Thanh Toán). 
+    Sử dụng công cụ này khi bạn cần NGƯỜI DÙNG XÁC NHẬN MỘT THAO TÁC GHI (như Đặt Vé, Thanh Toán).
     Bạn (AI) không có quyền tự ghi dữ liệu. Mọi thao tác ghi phải thông qua người dùng.
-    
+    Giá và tổng tiền do HỆ THỐNG tự tính từ bảng giá thật; mọi con số giá bạn đưa vào đều bị bỏ qua.
+
     Args:
         action_type: Loại thao tác (BẮT BUỘC là "BOOK_TICKETS")
-        data: Dữ liệu cần xác nhận (JSON string chứa event_id, event_title, seats, tier_name, quantity, total_price, v.v.)
+        data: Chuỗi JSON: {"event_id": "...", "showtime_id": "...", "tickets": [{"ticket_type_id": "...", "tier_name": "...", "quantity": 2}], "seats": ["A1", "A2"]}
     """
-    return json.dumps({"status": "waiting_for_user", "action_type": action_type, "data": data}, ensure_ascii=False)
+    if str(action_type).strip().upper() != "BOOK_TICKETS":
+        return _confirmation_error("Loại thao tác không được hỗ trợ.")
+    try:
+        payload = json.loads(data) if isinstance(data, str) else data
+    except ValueError:
+        return _confirmation_error("Dữ liệu xác nhận không hợp lệ.")
+    if not isinstance(payload, dict):
+        return _confirmation_error("Dữ liệu xác nhận không hợp lệ.")
 
+    event_id = payload.get("event_id")
+    lines = payload.get("tickets")
+    if not isinstance(event_id, str) or not event_id.strip() or not isinstance(lines, list) or not lines:
+        return _confirmation_error("Thiếu mã sự kiện hoặc danh sách vé cần đặt.")
+    if len(lines) > 10:
+        return _confirmation_error("Quá nhiều loại vé trong một đơn.")
+    event_id = event_id.strip()
+
+    try:
+        with event_db().connect() as conn:
+            ev = conn.execute(text(f"SELECT e.id, e.title FROM events e WHERE e.id = :eid AND {VALID_EVENT_FILTER}"),
+                              {"eid": event_id}).fetchone()
+            showtimes = conn.execute(text("SELECT id, name FROM event_showtimes WHERE event_id = :eid"),
+                                     {"eid": event_id}).fetchall()
+        if not ev:
+            return _confirmation_error("Không tìm thấy sự kiện hoặc sự kiện không còn mở bán.")
+        with ticket_db().connect() as conn:
+            types = conn.execute(text('''
+                SELECT id, showtime_id, name, price, ticket_type_status, min_per_order, max_per_order
+                FROM ticket_types
+                WHERE event_id = :eid AND ticket_type_status = 'ACTIVE'
+            '''), {"eid": event_id}).fetchall()
+    except AiError:
+        raise
+    except SQLAlchemyError as failure:
+        raise _db_unavailable(failure)
+
+    wanted_showtime = str(payload.get("showtime_id") or "").strip()
+    out_lines, total, total_qty, showtime_ids = [], Decimal(0), 0, set()
+    for line in lines:
+        if not isinstance(line, dict):
+            return _confirmation_error("Dòng vé không hợp lệ.")
+        qty = _as_int(line.get("quantity"))
+        if qty is None or qty < 1 or qty > MAX_TICKETS_PER_ORDER:
+            return _confirmation_error(f"Số lượng vé phải từ 1 đến {MAX_TICKETS_PER_ORDER}.")
+        tid = str(line.get("ticket_type_id") or line.get("id") or "").strip()
+        name = _norm_name(line.get("tier_name") or line.get("name"))
+        candidates = [t for t in types if tid and str(t.id) == tid]
+        if not candidates and name:
+            candidates = [t for t in types if _norm_name(t.name) == name]
+            if wanted_showtime and len(candidates) > 1:
+                candidates = [t for t in candidates if t.showtime_id is None or str(t.showtime_id) == wanted_showtime]
+        if not candidates:
+            return _confirmation_error("Không tìm thấy hạng vé đã chọn trong hệ thống. Vui lòng chọn lại hạng vé.")
+        if len(candidates) > 1:
+            return _confirmation_error("Hạng vé trùng tên ở nhiều suất diễn. Vui lòng chọn rõ suất diễn.")
+        t = candidates[0]
+        price = _money(t.price)
+        if price is None or price < 0:
+            return _confirmation_error("Giá vé của hạng này không hợp lệ.")
+        if (t.min_per_order and qty < t.min_per_order) or (t.max_per_order and qty > t.max_per_order):
+            return _confirmation_error(
+                f"Hạng vé '{t.name}' chỉ cho đặt từ {t.min_per_order or 1} đến {t.max_per_order or MAX_TICKETS_PER_ORDER} vé mỗi đơn.")
+        subtotal = price * qty
+        total += subtotal
+        total_qty += qty
+        if t.showtime_id:
+            showtime_ids.add(str(t.showtime_id))
+        out_lines.append({"ticket_type_id": str(t.id), "tier_name": t.name, "quantity": qty,
+                          "price": float(price), "subtotal": float(subtotal)})
+
+    seats = payload.get("seats")
+    if seats is None:
+        seats = []
+    if not isinstance(seats, list) or any(not isinstance(s, str) or not s.strip() or len(s) > 20 for s in seats):
+        return _confirmation_error("Danh sách ghế không hợp lệ.")
+    if seats and len(seats) != total_qty:
+        return _confirmation_error("Số ghế không khớp với số lượng vé.")
+
+    showtime_id = None
+    if len(showtime_ids) == 1:
+        showtime_id = next(iter(showtime_ids))
+    elif wanted_showtime and any(str(s.id) == wanted_showtime for s in showtimes):
+        showtime_id = wanted_showtime
+    showtime_name = next((s.name for s in showtimes if showtime_id and str(s.id) == showtime_id), None)
+
+    confirmed = {
+        "event_id": ev.id,
+        "event_title": ev.title,
+        "showtime_id": showtime_id,
+        "showtime_name": showtime_name,
+        "tickets": out_lines,
+        "seats": [s.strip() for s in seats],
+        "total_price": float(total),
+        "prices_source": "server",
+    }
+    return _json({"status": "waiting_for_user", "action_type": "BOOK_TICKETS", "data": _json(confirmed)})
+
+
+# cards
 @tool
 def show_event_cards(event_ids: List[str]) -> str:
     """
     Sử dụng công cụ này ĐỂ HIỂN THỊ THẺ SỰ KIỆN (CARDS) (Thuộc Bước 1).
     TUYỆT ĐỐI KHÔNG GỌI CÔNG CỤ NÀY NẾU NGƯỜI DÙNG ĐÃ CHỌN SỰ KIỆN HOẶC ĐÃ CUNG CẤP MÃ SỰ KIỆN.
-    
+
     Args:
         event_ids: Danh sách (List) chứa các MÃ SỰ KIỆN (event_id) mà bạn muốn hiển thị.
     """
+    wanted = []
+    for eid in event_ids or []:
+        if isinstance(eid, str) and eid.strip() and eid.strip() not in wanted:
+            wanted.append(eid.strip())
+    wanted = wanted[:MAX_EVENT_CARDS]
     cards_data = []
-    with event_engine.connect() as conn:
-        for eid in event_ids[:MAX_EVENT_CARDS]:
-            query = text('''
-                SELECT e.id, e.title, e.banner_url, e.thumbnail_url, e.location_name, e.city, e.dates_summary, e.min_price
-                FROM events e 
-                WHERE e.id = :eid
-                  AND (e.event_status IN ('LIVE', 'APPROVED') OR e.event_approval_status = 'APPROVED')
-                  AND (e.end_time IS NULL OR e.end_time >= NOW())
-            ''')
-            result = conn.execute(query, {"eid": eid}).fetchone()
-            if result:
-                # query ticket_db for real minimum ticket price among active tiers
-                min_price_val = result.min_price
-                try:
-                    with ticket_engine.connect() as t_conn:
-                        min_p_row = t_conn.execute(
-                            text("SELECT MIN(price) FROM ticket_types WHERE event_id = :eid AND ticket_type_status != 'HIDDEN'"),
-                            {"eid": eid}
-                        ).fetchone()
-                        if min_p_row and min_p_row[0] is not None:
-                            min_price_val = float(min_p_row[0])
-                except Exception as ex:
-                    print("Error getting min_price from ticket_db:", ex)
+    if wanted:
+        try:
+            with event_db().connect() as conn:
+                rows = conn.execute(
+                    text(f'''
+                        SELECT e.id, e.title, e.banner_url, e.thumbnail_url, e.location_name, e.city, e.dates_summary, e.min_price
+                        FROM events e
+                        WHERE e.id IN :eids AND {VALID_EVENT_FILTER}
+                    ''').bindparams(bindparam("eids", expanding=True)),
+                    {"eids": wanted},
+                ).fetchall()
+            by_id = {r.id: r for r in rows}
+            min_prices = {}
+            if by_id:
+                with ticket_db().connect() as conn:
+                    for r in conn.execute(
+                        text("SELECT event_id, MIN(price) AS min_price FROM ticket_types "
+                             "WHERE event_id IN :eids AND ticket_type_status != 'HIDDEN' GROUP BY event_id"
+                             ).bindparams(bindparam("eids", expanding=True)),
+                        {"eids": list(by_id)},
+                    ).fetchall():
+                        if r.min_price is not None:
+                            min_prices[r.event_id] = float(r.min_price)
+        except AiError:
+            raise
+        except SQLAlchemyError as failure:
+            raise _db_unavailable(failure)
 
-                cards_data.append({
-                    "event_id": result.id,
-                    "title": result.title,
-                    "banner_url": result.banner_url or result.thumbnail_url or "",
-                    "min_price": float(min_price_val) if min_price_val is not None else 0,
-                    "location": f"{result.location_name or ''}, {result.city or ''}".strip(", "),
-                    "dates_summary": result.dates_summary or ""
-                })
-                
+        for eid in wanted:
+            result = by_id.get(eid)
+            if not result:
+                continue
+            min_price_val = min_prices.get(eid, result.min_price)
+            cards_data.append({
+                "event_id": result.id,
+                "title": result.title,
+                "banner_url": result.banner_url or result.thumbnail_url or "",
+                "min_price": float(min_price_val) if min_price_val is not None else 0,
+                "location": f"{result.location_name or ''}, {result.city or ''}".strip(", "),
+                "dates_summary": result.dates_summary or ""
+            })
+
     return json.dumps({"status": "show_cards", "action_type": "SHOW_EVENT_CARDS", "data": json.dumps(cards_data, ensure_ascii=False)}, ensure_ascii=False)
+
 
 @tool
 def show_seatmap(event_id: str) -> str:
     """
     Sử dụng công cụ này BẮT BUỘC khi người dùng muốn xem sơ đồ ghế (seatmap), chọn ghế, hoặc hỏi về vị trí khu vực sự kiện.
-    
+
     Args:
         event_id: Mã sự kiện (Ví dụ: "1ad0cfc7-6ec7-4af8-a38c-a621882ea4d6")
     """
     seatmap_url = None
     has_canvas = False
-    event_title = ""
     tiers_info = []
 
-    # 1. get event title from event_db
     try:
-        with event_engine.connect() as conn:
-            query = text("SELECT title FROM events WHERE id = :eid")
-            result = conn.execute(query, {"eid": event_id}).fetchone()
-            if result:
-                event_title = result.title or ""
-    except Exception as e:
-        print(f"[LỖI show_seatmap event_db] {e}")
+        with event_db().connect() as conn:
+            result = conn.execute(text(f"SELECT e.title FROM events e WHERE e.id = :eid AND {VALID_EVENT_FILTER}"),
+                                  {"eid": event_id}).fetchone()
+        if not result:
+            return _json({"status": "not_found", "event_id": event_id,
+                          "message": "Không tìm thấy sự kiện hoặc sự kiện không còn mở bán."})
+        event_title = result.title or ""
 
-    # 2. check seat layout and ticket tiers from ticket_db
-    try:
-        with ticket_engine.connect() as conn:
-            query = text("""
-                SELECT id, image_url, status, LENGTH(draft_json) as dlen 
-                FROM seat_layouts 
-                WHERE event_id = :eid 
-                ORDER BY (status = 'PUBLISHED') DESC 
+        with ticket_db().connect() as conn:
+            layout = conn.execute(text("""
+                SELECT id, image_url, status, LENGTH(draft_json) as dlen
+                FROM seat_layouts
+                WHERE event_id = :eid
+                ORDER BY (status = 'PUBLISHED') DESC, updated_at DESC NULLS LAST
                 LIMIT 1
-            """)
-            result = conn.execute(query, {"eid": event_id}).fetchone()
-            if result:
-                if result.dlen and result.dlen > 50:
+            """), {"eid": event_id}).fetchone()
+            if layout:
+                if layout.dlen and layout.dlen > 50:
                     has_canvas = True
-                if result.image_url:
-                    seatmap_url = result.image_url
+                if layout.image_url:
+                    seatmap_url = layout.image_url
 
-            # Also fetch ticket types for tiers summary
-            tt_query = text("""
-                SELECT id, name, price, description 
-                FROM ticket_types 
+            for tt in conn.execute(text("""
+                SELECT id, name, price
+                FROM ticket_types
                 WHERE event_id = :eid AND ticket_type_status != 'HIDDEN'
                 ORDER BY price ASC
-            """)
-            for tt in conn.execute(tt_query, {"eid": event_id}).fetchall():
+            """), {"eid": event_id}).fetchall():
                 tiers_info.append({
                     "id": str(tt.id),
                     "name": tt.name,
                     "price": float(tt.price) if tt.price else 0
                 })
-    except Exception as e:
-        print(f"[LỖI show_seatmap ticket_db] {e}")
+    except AiError:
+        raise
+    except SQLAlchemyError as failure:
+        raise _db_unavailable(failure)
 
     return json.dumps({
         "status": "success",
@@ -357,8 +577,17 @@ def show_ticket_types(event_id: str) -> str:
     Args:
         event_id: Mã sự kiện (Ví dụ: "xoay-tron-concert-hoang-dung")
     """
+    try:
+        return _ticket_types_payload(event_id)
+    except AiError:
+        raise
+    except SQLAlchemyError as failure:
+        raise _db_unavailable(failure)
+
+
+def _ticket_types_payload(event_id: str) -> str:
     # fetch event info from event_db
-    with event_engine.connect() as conn:
+    with event_db().connect() as conn:
         ev_query = text("""
             SELECT id, title, banner_url, thumbnail_url, location_name, city, 
                    start_time, end_time, sale_start_time, sale_end_time
@@ -382,7 +611,7 @@ def show_ticket_types(event_id: str) -> str:
         showtimes_rows = conn.execute(st_query, {"eid": event_id}).fetchall()
 
     # fetch ticket types from ticket_db
-    with ticket_engine.connect() as conn:
+    with ticket_db().connect() as conn:
         tt_query = text("""
             SELECT id, showtime_id, name, price, description, ticket_type_status, 
                    total_quantity, min_per_order, max_per_order
@@ -433,7 +662,7 @@ def show_ticket_types(event_id: str) -> str:
                         clean_z_name = z_name.lower().replace(" ", "").replace("-", "")
                         tier_seated_map[clean_z_name] = is_seated
             except Exception as e:
-                print("Error parsing layout JSON:", e)
+                log.warning("Could not parse the seat layout JSON: %s", type(e).__name__)
 
     now = datetime.now(VN_TZ).replace(tzinfo=None)
     

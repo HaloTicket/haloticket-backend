@@ -17,6 +17,7 @@ haloticket-backend/
 ├── payment-service/           # Payment Processing & Gateway Integration (Port 8085)
 ├── notification-service/      # Email Delivery & Kafka OTP Consumer (Port 8086)
 ├── media-service/             # Image Upload & Asset Storage (Port 8087)
+├── ai-assistant-service/      # AI chatbot & assistants, FastAPI (Port 8089)
 ├── haloticket-infrastructure/ # PostgreSQL Init Scripts, Keycloak Realm & Themes
 ├── docker-compose.yml         # Single unified Compose specification for all 13 containers
 ├── Dockerfile                 # Multi-stage build using Eclipse Temurin 21 JRE Alpine
@@ -36,9 +37,10 @@ haloticket-backend/
 - **Payment Service** (Port `8085`) — Payment processing and transaction verification.
 - **Notification Service** (Port `8086`) — Transactional emails and Kafka OTP consumer.
 - **Media Service** (Port `8087`) — Image upload, asset storage, and S3 integration.
+- **AI Assistant Service** (Port `8089`) — FastAPI service for the customer chatbot and AI search, organizer and admin assistants (Groq, OpenAI, Gemini). Rate limited per IP/account via Redis; usage metered in the `ai_ops` database.
 - **Keycloak IAM** (Port `9080`) — Identity provider, OAuth2/OIDC, Google login, and role management.
 - **PostgreSQL 16** (Port `5433`) — Primary relational database.
-- **Redis 7** (Port `6379`) — In-memory caching and distributed locking.
+- **Redis 7** (Port `6379`) — In-memory caching, distributed locking and AI rate-limit counters.
 - **Apache Kafka** (Port `9092`) — KRaft event streaming and message broker.
 
 ---
@@ -107,10 +109,17 @@ cd user-service
 | **Payment Service** | `8085` | `8085` | HTTP | Payment status & webhooks |
 | **Notification Service** | `8086` | `8086` | HTTP | Email notifications & Kafka consumers |
 | **Media Service** | `8087` | `8087` | HTTP | Media upload & S3 storage handler |
+| **AI Assistant Service** | `8089` | `8089` | HTTP | Chatbot, AI search & assistants (FastAPI) |
 | **Keycloak IAM** | `9080` | `8080` | HTTP | OAuth2/OIDC, Google login & RBAC |
 | **PostgreSQL 16** | `5433` | `5432` | TCP | Relational database (multi-DB) |
-| **Redis 7** | `6379` | `6379` | TCP | Distributed caching & locking |
+| **Redis 7** | `6379` | `6379` | TCP | Distributed caching, locking & AI rate limits |
 | **Apache Kafka** | `9092` | `9092` | TCP | KRaft event broker & message queue |
+
+---
+
+## AI Assistant
+
+`ai-assistant-service` (Python, FastAPI, port `8089`) serves the customer chatbot and AI search (`/api/customer/**`), organizer tools (`/api/organizer/**`) and admin tools (`/api/admin/**`) through the gateway. Model calls go to Groq first, then OpenAI or Gemini, with a hard deadline, a per-route token cap and a daily call budget. Rate limits live in the service (Redis database 1, in-process fallback). Optional usage metering writes to a separate `ai_ops` database. The chatbot reads Postgres through a column-limited read-only role. The container is image-only (no source bind mount). Required keys and tunables are documented in `.env.example`; database roles are created by hand with the scripts in `haloticket-infrastructure/postgres/ai-ops/` and `ai-chatbot/`. See `DEPLOYMENT.md` for the rollout order.
 
 ---
 
