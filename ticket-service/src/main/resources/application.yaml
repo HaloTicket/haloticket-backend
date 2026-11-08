@@ -35,7 +35,7 @@ eureka:
 
 logging:
   level:
-    org.springframework.security: TRACE
+    org.springframework.security: WARN  # was TRACE: every request wrote a dozen security lines, now also into the log file the admin page reads
 
 checkin:
   window:

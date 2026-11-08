@@ -40,9 +40,24 @@ def process_memory(status_path: str = "/proc/self/status") -> Optional[str]:
     return None
 
 
+_cpu_sample = {"cpu": 0.0, "at": 0.0}
+
+
+def process_cpu() -> Optional[str]:
+    """CPU use of this process since the previous call (since start on the first call), as a percentage of one core."""
+    now, used = time.monotonic(), time.process_time()
+    previous_at = _cpu_sample["at"] or (now - max(1.0, time.time() - _PROCESS_STARTED))
+    previous_cpu = _cpu_sample["cpu"]
+    _cpu_sample.update(cpu=used, at=now)
+    elapsed = now - previous_at
+    if elapsed < 0.5:
+        return None
+    return f"{max(0.0, (used - previous_cpu) / elapsed) * 100:.1f}%"
+
+
 def self_entry(port: Optional[int] = None) -> dict:
     return {"name": "ai-assistant-service", "port": port if port is not None else settings.port, "type": "FastAPI Service",
-            "status": "UP", "uptime": process_uptime(), "latencyMs": None, "memoryUsage": process_memory(), "cpuLoad": None}
+            "status": "UP", "uptime": process_uptime(), "latencyMs": None, "memoryUsage": process_memory(), "cpuLoad": process_cpu()}
 
 
 def _entry(name: str, port, kind: str, status: str, latency=None) -> dict:

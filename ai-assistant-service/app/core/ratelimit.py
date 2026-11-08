@@ -170,6 +170,8 @@ def _limits_for(bucket: str, authenticated: bool):
         return [("h", _HOUR, s.ai_rl_admin_assistant_per_hour)]
     if bucket == "risk_scoring":
         return [("h", _HOUR, s.ai_rl_risk_scoring_per_hour)]
+    if bucket == "dashboard_summary":
+        return [("d", _DAY, s.ai_rl_dashboard_summary_per_day)]
     raise ValueError(f"unknown rate limit bucket: {bucket}")
 
 

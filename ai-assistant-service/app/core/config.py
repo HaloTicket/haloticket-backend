@@ -39,18 +39,21 @@ class Settings(BaseSettings):
     user_service_timeout_seconds: float = 8.0  # the first call after a user-service start can be slow
 
     # admin screens
-    ai_system_log_file: str = "/app/event-error.log"
-    ai_system_log_max_lines: int = 25
+    ai_system_log_file: str = "/app/event-error.log"  # legacy single file; used only when ai_system_log_dir is empty
+    ai_system_log_dir: str = ""  # AI_SYSTEM_LOG_DIR: folder with one <service>.log per service (compose mounts it read only)
+    ai_system_log_max_lines: int = 100
+    ai_actuator_port: int = 9091  # management port of the Spring services (not published outside the compose network)
     alert_ssl_domains: str = "haloticket.duckdns.org"  # ALERT_SSL_DOMAINS: the only domains /ssl-status will look at
 
     # model calls (app/services/ai/ai_call.py): numeric limits only
     ai_llm_deadline_seconds: int = 20
     ai_max_tokens_customer_chat: int = 600
     ai_max_tokens_admin_assistant: int = 700
-    ai_max_tokens_risk_scoring: int = 400
+    ai_max_tokens_risk_scoring: int = 800
     ai_max_tokens_event_content: int = 1200
     ai_max_tokens_analysis: int = 900
     ai_max_tokens_voucher_strategy: int = 900
+    ai_max_tokens_dashboard_summary: int = 800
     ai_daily_call_budget: int = 2000
     ai_search_cache_seconds: int = 300
     ai_trusted_proxy_cidrs: str = "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8,::1"
@@ -58,6 +61,9 @@ class Settings(BaseSettings):
     # addresses (empty = feature degrades, service still starts)
     redis_url: str = ""
     ai_ops_database_url: str = ""
+    ai_admin_database_url: str = ""  # role ai_admin_rw on ai_ops: risk assessments, decisions, pins, dashboard summaries
+    internal_api_base_url: str = "http://api-gateway:8888"  # admin data is read through the gateway with the admin's own token
+    internal_api_timeout_seconds: float = 3.0
     chatbot_event_database_url: str = ""
     chatbot_ticket_database_url: str = ""
 
@@ -75,6 +81,20 @@ class Settings(BaseSettings):
     ai_rl_data_analysis_per_day: int = 100
     ai_rl_admin_assistant_per_hour: int = 60
     ai_rl_risk_scoring_per_hour: int = 60
+    ai_rl_dashboard_summary_per_day: int = 10
+
+    # admin intelligence (risk assessment, dashboard KPIs, attention feed). Numbers only; every one has a default.
+    risk_medium_threshold: int = 30
+    risk_high_threshold: int = 60
+    risk_block_floor: int = 70  # a BLOCK rule (prohibited goods, guaranteed profit) never scores below this
+    risk_ai_max_points: int = 30  # the language-model layer can add at most this many points
+    attn_high_risk_pending_hours: int = 12
+    attn_critical_pending_hours: int = 24
+    attn_late_payment_minutes: int = 30
+    attn_paid_without_tickets_minutes: int = 15
+    attn_resale_pending_hours: int = 24
+    ai_pins_max_per_admin: int = 12
+    admin_cache_seconds: int = 30  # attention feed; the KPI cache is twice this
 
     class Config:
         env_file = ".env"

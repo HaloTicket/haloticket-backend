@@ -28,5 +28,8 @@ public interface TicketListingRepository extends JpaRepository<TicketListing,Str
     Page<TicketListing> findByEventId(String eventId, Pageable pageable);
     Page<TicketListing> findByEventIdAndStatus(String eventId, ListingStatus status, Pageable pageable);
     long countByEventIdAndStatus(String eventId, ListingStatus status);
+    long countByStatus(ListingStatus status);
+    @Query("select min(l.createdAt) from TicketListing l where l.status = :status")
+    java.time.Instant oldestCreatedAtByStatus(@Param("status") ListingStatus status);
     List<TicketListing> findByEventIdAndStatus(String eventId, ListingStatus status);
 }

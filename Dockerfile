@@ -16,7 +16,7 @@ RUN --mount=type=cache,id=haloticket-maven,target=/root/.m2,sharing=locked \
 
 FROM ${RUNTIME_IMAGE} AS runtime
 WORKDIR /app
-RUN addgroup -S app && adduser -S app -G app
+RUN addgroup -S app && adduser -S app -G app && mkdir -p /logs && chown app:app /logs
 COPY --from=build --chown=app:app /build/extracted/dependencies/ ./
 COPY --from=build --chown=app:app /build/extracted/spring-boot-loader/ ./
 COPY --from=build --chown=app:app /build/extracted/snapshot-dependencies/ ./

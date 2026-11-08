@@ -2,6 +2,7 @@ package com.haloticket.api_gateway.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -35,15 +36,35 @@ public class InternalPathBlockFilter implements WebFilter {
     private static final Set<String> BLOCKED_FIRST_SEGMENTS = Set.of("actuator", "eureka");
     private static final int MAX_DECODE_ROUNDS = 4;
 
+    /**
+     * Actuator runs on its own port (management.server.port), which is not published: only containers in the compose network
+     * reach it. A request that really arrived on that port may read /actuator/**; everything on the public port stays blocked.
+     */
+    @Value("${management.server.port:0}")
+    private int managementPort;
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String rawPath = exchange.getRequest().getURI().getRawPath();
+        if (arrivedOnManagementPort(exchange.getRequest().getLocalAddress(), managementPort) && isActuatorPath(rawPath)) {
+            return chain.filter(exchange);
+        }
         if (isBlocked(rawPath)) {
             log.warn("Blocked internal/management path {} {}", exchange.getRequest().getMethod(), printable(rawPath));
             exchange.getResponse().setStatusCode(HttpStatus.NOT_FOUND);
             return exchange.getResponse().setComplete();
         }
         return chain.filter(exchange);
+    }
+
+    static boolean arrivedOnManagementPort(java.net.InetSocketAddress local, int managementPort) {
+        return local != null && managementPort > 0 && local.getPort() == managementPort;
+    }
+
+    /** Only a plain /actuator or /actuator/... path: no encoded or dotted tricks (those still go through isBlocked). */
+    static boolean isActuatorPath(String rawPath) {
+        return rawPath != null && (rawPath.equals("/actuator") || rawPath.startsWith("/actuator/")) && !rawPath.contains("%")
+                && !rawPath.contains("..") && !rawPath.contains("\\") && !rawPath.contains(";");
     }
 
     static boolean isBlocked(String rawPath) {

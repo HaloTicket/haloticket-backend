@@ -109,6 +109,9 @@ The service is image-only: there is **no bind mount** of the source code any mor
 | `KEYCLOAK_*`, `AI_DB_USER`, `AI_DB_PASSWORD` | token validation; read-only role `ai_readonly` for data analysis | as before |
 | `CHATBOT_EVENT_DATABASE_URL`, `CHATBOT_TICKET_DATABASE_URL` | full URLs of role `ai_chatbot_ro` on event_db / ticket_db | required for the customer chatbot (else 503 `AI_DB_NOT_CONFIGURED`) |
 | `AI_OPS_DATABASE_URL` | full URL of role `ai_writer` on ai_ops | optional (empty = metering off) |
+| `AI_ADMIN_DATABASE_URL` | full URL of role `ai_admin_rw` on ai_ops (admin intelligence: stored risk scores, decisions, pinned reports, dashboard summary) | optional (empty = scores not stored; pins/summary cache/decisions answer 503 `AI_DB_NOT_CONFIGURED`) |
+| `INTERNAL_API_BASE_URL` | gateway address ai-assistant uses to read events, users, reconciliation and resale with the admin's own token; default `http://api-gateway:8888` | optional |
+| `RISK_*`, `ATTN_*`, `AI_RL_DASHBOARD_SUMMARY_PER_DAY`, `AI_MAX_TOKENS_DASHBOARD_SUMMARY` | risk level thresholds and "needs attention" thresholds; defaults in `docker-compose.yml` | optional |
 | `AI_ASSISTANT_MEMORY_LIMIT` | container memory cap, default `384m` | optional |
 | `AI_LLM_DEADLINE_SECONDS`, `AI_DAILY_CALL_BUDGET`, `AI_SEARCH_CACHE_SECONDS`, `AI_TRUSTED_PROXY_CIDRS`, `AI_RL_*`, `AI_MAX_TOKENS_*` | cost control and rate limits; defaults in `docker-compose.yml` and `.env.example` | optional |
 
@@ -119,6 +122,7 @@ The service is image-only: there is **no bind mount** of the source code any mor
    2. `.../ai-ops/02-ai-ops-schema.sql` on `ai_ops` (creates `ai_writer`)
    3. `.../ai-chatbot/01-ai-chatbot-ro-event-db.sql` on `event_db` (creates `ai_chatbot_ro`)
    4. `.../ai-chatbot/02-ai-chatbot-ro-ticket-db.sql` on `ticket_db` (same password as step 3)
+   5. (admin intelligence, after step 2) `.../ai-admin/01-ai-admin-schema.sql` on `ai_ops`: `psql -U <owner> -d ai_ops -v ON_ERROR_STOP=1 -v ai_password='<new password>' -f 01-ai-admin-schema.sql` (creates the four tables and the role `ai_admin_rw`; the last SELECT in the file verifies the grants). Then set `AI_ADMIN_DATABASE_URL` in `.env`.
 2. Set the environment variables in `.env` (the table above).
 3. Deploy the backend (CI builds the image; see below), then deploy the web app.
 
@@ -136,6 +140,15 @@ Environment variables and compose changes are only read when the container is re
 ### Reverse proxy and client IP
 
 The VPS uses Caddy v2: `reverse_proxy localhost:8888` with `header_up X-Forwarded-For {remote_host}`. ai-assistant takes the client IP from `X-Forwarded-For` (left-most value) only when the direct peer is inside `AI_TRUSTED_PROXY_CIDRS`; keep the gateway and ai-assistant ports bound to `127.0.0.1` so a client cannot reach them directly and forge the header.
+
+### System monitoring data (CPU, memory, uptime, logs)
+
+Every Spring service now runs Actuator on its own port 9091 (only `health` and `metrics`; the port is **not published**, the gateway
+refuses `/actuator/**` on its public port 8888) and writes its log to `/logs/<service>.log` in the shared volume
+`haloticket-service-logs` (rotated, 5 MB x 2). ai-assistant reads both inside the compose network. Nothing to configure: rebuild and
+redeploy **all** Java services (new `spring-boot-starter-actuator` dependency, `/logs` in the image) and `ai-assistant-service`.
+A service that was not rebuilt shows "no data" for CPU/memory/uptime; it never shows made-up numbers.
+Check from the server: `docker run --rm --network haloticket-network curlimages/curl -s http://ticket-service:9091/actuator/metrics/process.uptime`.
 
 ### Post-deploy checks
 

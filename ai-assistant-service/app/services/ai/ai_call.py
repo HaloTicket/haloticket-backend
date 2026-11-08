@@ -52,6 +52,7 @@ def _build_profiles() -> dict:
         "event_content": AiProfile("event_content", "smart", settings.ai_max_tokens_event_content, d),
         "analysis": AiProfile("analysis", "fast", settings.ai_max_tokens_analysis, d),
         "voucher_strategy": AiProfile("voucher_strategy", "fast", settings.ai_max_tokens_voucher_strategy, d),
+        "dashboard_summary": AiProfile("dashboard_summary", "fast", settings.ai_max_tokens_dashboard_summary, d),
         "ai_probe": AiProfile("ai_probe", "fast", 1, d),
     }
 

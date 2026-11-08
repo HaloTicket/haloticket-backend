@@ -41,6 +41,9 @@ public class SecurityConfig {
         return decoder;
     }
 
+    @Value("${management.server.port:0}")
+    private int managementPort;
+
     @Value("${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://localhost:5174,https://haloticket-web.pages.dev}")
     private String allowedOrigins;
 
@@ -76,6 +79,13 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchange -> {
                     exchange
+                            // actuator on the management port (not published) is for the other containers; on the public port
+                            // the next rule still refuses /actuator/**
+                            .matchers(request -> InternalPathBlockFilter.arrivedOnManagementPort(request.getRequest().getLocalAddress(), managementPort)
+                                    && InternalPathBlockFilter.isActuatorPath(request.getRequest().getURI().getRawPath())
+                                    ? org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher.MatchResult.match()
+                                    : org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher.MatchResult.notMatch())
+                            .permitAll()
                             // second layer behind InternalPathBlockFilter
                             .pathMatchers("/api/internal/**", "/*/api/internal/**", "/actuator/**", "/eureka/**").denyAll()
                             .pathMatchers(HttpMethod.OPTIONS).permitAll()
@@ -89,7 +99,9 @@ public class SecurityConfig {
                     exchange.pathMatchers("/api/organizer/agent-chat").access(SecurityConfig::adminOnly);
                     exchange.pathMatchers("/api/admin/**", "/api/payouts/admin/**", "/api/users/admin", "/api/users/admin/**",
                             // before the generic /api/bookings/** rule below, which only asks for a login
-                            "/api/bookings/admin/**")
+                            "/api/bookings/admin/**",
+                            // read-only admin counters; marketplace has no role mapping, so the gateway rule is the first lock
+                            "/api/marketplace/admin/**")
                             .access(SecurityConfig::adminOnly);
                     // open to anonymous visitors: event, ticket-type and seat-map reads, the view and search counters,
                     // the homepage configuration. Everything else that writes needs a login.

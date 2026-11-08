@@ -14,6 +14,9 @@ x-runtime: &runtime
   read_only: true
   tmpfs:
     - /tmp:size=32m,mode=1777
+  # each service writes its own log file here (LOGGING_FILE_NAME below); ai-assistant mounts the same volume read-only
+  volumes:
+    - service-logs:/logs
   security_opt: [no-new-privileges:true]
   cap_drop: [ALL]
   logging: *logging
@@ -40,6 +43,16 @@ x-environment: &environment
   SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-secretpassword}
   KAFKA_BOOTSTRAP_SERVERS: kafka:29092
   SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+  # system monitoring: Actuator on its own port (9091 is NOT published, only reachable inside the compose network) with only
+  # health and metrics; the gateway also refuses /actuator/** from outside. ai-assistant reads CPU, memory and uptime from it.
+  MANAGEMENT_SERVER_PORT: "9091"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics
+  MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: never
+  # one log file per service in the shared volume, rotated (the Docker json logs stay as they are)
+  LOGGING_FILE_NAME: /logs/$${spring.application.name}.log
+  LOGGING_LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE: 5MB
+  LOGGING_LOGBACK_ROLLINGPOLICY_MAX_HISTORY: "2"
+  LOGGING_LOGBACK_ROLLINGPOLICY_TOTAL_SIZE_CAP: 20MB
 
 x-event-scope: &event-scope
   AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN: ${AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN:-}
@@ -473,6 +486,22 @@ services:
       - BOOKING_DB_URL=postgresql+psycopg2://${POSTGRES_USER:-haloticket}:${POSTGRES_PASSWORD}@postgres:5432/booking_db
       # full URLs set by the operator in .env (see .env.example). Empty = metering off / chatbot routes answer 503 AI_DB_NOT_CONFIGURED.
       - AI_OPS_DATABASE_URL=${AI_OPS_DATABASE_URL:-}
+      # admin intelligence: role ai_admin_rw on ai_ops (risk assessments, decisions, pins, dashboard summary). Empty = scores are
+      # still returned but not stored; pins, summary cache and decisions answer 503 AI_DB_NOT_CONFIGURED.
+      - AI_ADMIN_DATABASE_URL=${AI_ADMIN_DATABASE_URL:-}
+      # admin data (events, users, reconciliation, resale) is read through the gateway with the admin's own token
+      - INTERNAL_API_BASE_URL=${INTERNAL_API_BASE_URL:-http://api-gateway:8888}
+      - RISK_MEDIUM_THRESHOLD=${RISK_MEDIUM_THRESHOLD:-30}
+      - RISK_HIGH_THRESHOLD=${RISK_HIGH_THRESHOLD:-60}
+      - RISK_BLOCK_FLOOR=${RISK_BLOCK_FLOOR:-70}
+      - RISK_AI_MAX_POINTS=${RISK_AI_MAX_POINTS:-30}
+      - ATTN_HIGH_RISK_PENDING_HOURS=${ATTN_HIGH_RISK_PENDING_HOURS:-12}
+      - ATTN_CRITICAL_PENDING_HOURS=${ATTN_CRITICAL_PENDING_HOURS:-24}
+      - ATTN_LATE_PAYMENT_MINUTES=${ATTN_LATE_PAYMENT_MINUTES:-30}
+      - ATTN_PAID_WITHOUT_TICKETS_MINUTES=${ATTN_PAID_WITHOUT_TICKETS_MINUTES:-15}
+      - ATTN_RESALE_PENDING_HOURS=${ATTN_RESALE_PENDING_HOURS:-24}
+      - AI_RL_DASHBOARD_SUMMARY_PER_DAY=${AI_RL_DASHBOARD_SUMMARY_PER_DAY:-10}
+      - AI_MAX_TOKENS_DASHBOARD_SUMMARY=${AI_MAX_TOKENS_DASHBOARD_SUMMARY:-800}
       - CHATBOT_EVENT_DATABASE_URL=${CHATBOT_EVENT_DATABASE_URL:-}
       - CHATBOT_TICKET_DATABASE_URL=${CHATBOT_TICKET_DATABASE_URL:-}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
@@ -510,10 +539,15 @@ services:
       - AI_RL_RISK_SCORING_PER_HOUR=${AI_RL_RISK_SCORING_PER_HOUR:-60}
       - AI_MAX_TOKENS_CUSTOMER_CHAT=${AI_MAX_TOKENS_CUSTOMER_CHAT:-600}
       - AI_MAX_TOKENS_ADMIN_ASSISTANT=${AI_MAX_TOKENS_ADMIN_ASSISTANT:-700}
-      - AI_MAX_TOKENS_RISK_SCORING=${AI_MAX_TOKENS_RISK_SCORING:-400}
+      - AI_MAX_TOKENS_RISK_SCORING=${AI_MAX_TOKENS_RISK_SCORING:-800}
       - AI_MAX_TOKENS_EVENT_CONTENT=${AI_MAX_TOKENS_EVENT_CONTENT:-1200}
       - AI_MAX_TOKENS_ANALYSIS=${AI_MAX_TOKENS_ANALYSIS:-900}
       - AI_MAX_TOKENS_VOUCHER_STRATEGY=${AI_MAX_TOKENS_VOUCHER_STRATEGY:-900}
+      # system monitoring: the services' log files (read only) and their Actuator port
+      - AI_SYSTEM_LOG_DIR=/logs
+      - AI_ACTUATOR_PORT=${AI_ACTUATOR_PORT:-9091}
+    volumes:
+      - service-logs:/logs:ro
     # process check only: no database or model dependency.
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8089/health', timeout=4)"]
@@ -535,6 +569,8 @@ volumes:
     name: haloticket-redis-data
   kafka_data:
     name: haloticket-kafka-data
+  service-logs:
+    name: haloticket-service-logs
 
 networks:
   haloticket-network:
