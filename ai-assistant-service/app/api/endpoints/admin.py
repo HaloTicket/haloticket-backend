@@ -314,15 +314,16 @@ def _eureka_status(raw) -> str:
 
 
 async def _head_latency(client, url: str) -> Optional[int]:
-    """Milliseconds of a HEAD request, only when it answered with a status below 400; otherwise None."""
+    """Round-trip milliseconds of a HEAD request. Any HTTP answer below 500 proves the service is reachable (a protected
+    or route-less root answers 401/403/404 and that is still a real measurement); no answer or a 5xx gives None."""
     if not url:
         return None
     started = time.monotonic()
     try:
-        response = await client.head(url, timeout=0.5)
+        response = await client.head(url, timeout=1.5)
     except Exception:
         return None
-    if response.status_code >= 400:
+    if response.status_code >= 500:
         return None
     return int((time.monotonic() - started) * 1000)
 
