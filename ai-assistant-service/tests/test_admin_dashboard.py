@@ -284,3 +284,24 @@ def test_the_sales_report_is_asked_with_a_page_size_the_event_service_accepts(mo
     upstream.sales_timeline("Bearer x", "2026-11-02", "2026-11-08")
     assert seen["url"].endswith("/api/events/admin/reports") and seen["auth"] == "Bearer x"
     assert seen["params"]["size"] in (10, 20, 50) and seen["params"]["page"] == 1  # the report refuses every other size with a 400
+
+
+def test_a_broken_admin_database_is_a_flat_503_not_a_500(monkeypatch):
+    """The VPS case: the URL is set but the tables do not exist (or the password is wrong)."""
+    from sqlalchemy.exc import ProgrammingError
+    from app.services.admin_intel import store
+
+    class Broken:
+        def connect(self):
+            raise ProgrammingError("SELECT 1", {}, Exception('relation "ai_admin_pins" does not exist'))
+
+        begin = connect
+
+    monkeypatch.setattr(settings, "ai_admin_database_url", "postgresql+psycopg2://x")
+    monkeypatch.setattr(store, "require_engine", lambda: Broken())
+    FakeUpstream(monkeypatch, [])
+    client = make_client()
+    for path in ("/api/admin/pins", "/api/admin/risk/agreement?days=30"):
+        response = client.get(path)
+        assert response.status_code == 503 and response.json()["code"] == "AI_DB_UNAVAILABLE", path
+        assert "ai_admin_pins" not in response.text  # the driver's text stays in the log

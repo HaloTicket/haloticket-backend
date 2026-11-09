@@ -11,10 +11,13 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import functools
+
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
-from app.core.errors import ai_error, AI_DB_NOT_CONFIGURED
+from app.core.errors import ai_error, AiError, AI_DB_NOT_CONFIGURED, AI_DB_UNAVAILABLE
 from app.db.session import make_engine
 
 log = logging.getLogger("ai.admin.store")
@@ -197,3 +200,24 @@ def put_summary(day: str, lang: str, summary: str, kpi_hash: str) -> None:
         conn.execute(text("INSERT INTO ai_dashboard_summaries (day, lang, summary, kpi_hash) VALUES (:d, :l, :s, :h) "
                           "ON CONFLICT (day, lang) DO UPDATE SET summary = EXCLUDED.summary, kpi_hash = EXCLUDED.kpi_hash, created_at = now()"),
                      {"d": day, "l": lang, "s": summary, "h": kpi_hash})
+
+
+def _guarded(function):
+    """A database failure (tables not created, wrong password, server down) becomes a flat 503 AI_DB_UNAVAILABLE instead of a 500.
+    The log names the driver's first line (for example: relation "ai_admin_pins" does not exist); it never holds the URL."""
+    @functools.wraps(function)
+    def wrapper(*args, **kwargs):
+        try:
+            return function(*args, **kwargs)
+        except AiError:
+            raise
+        except SQLAlchemyError as failure:
+            detail = str(getattr(failure, "orig", failure)).strip().splitlines()[:1]
+            log.error("Admin store %s failed: %s %s", function.__name__, type(failure).__name__, detail[0][:160] if detail else "")
+            raise ai_error(AI_DB_UNAVAILABLE)
+    return wrapper
+
+
+for _name in ("latest_assessment", "latest_assessments", "assessment_history", "save_assessment", "save_decision", "decisions_since",
+              "assessed_since", "count_pins", "list_pins", "create_pin", "update_pin_snapshot", "delete_pin", "get_summary", "put_summary"):
+    globals()[_name] = _guarded(globals()[_name])

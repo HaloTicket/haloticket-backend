@@ -13,6 +13,7 @@ AI_RATE_LIMITED = "AI_RATE_LIMITED"
 AI_BUDGET_EXHAUSTED = "AI_BUDGET_EXHAUSTED"
 AI_UNAVAILABLE = "AI_UNAVAILABLE"
 AI_DB_NOT_CONFIGURED = "AI_DB_NOT_CONFIGURED"
+AI_DB_UNAVAILABLE = "AI_DB_UNAVAILABLE"
 AI_GENERATION_FAILED = "AI_GENERATION_FAILED"
 AI_QUESTION_REFUSED = "AI_QUESTION_REFUSED"
 
@@ -22,6 +23,7 @@ _TABLE = {
     AI_BUDGET_EXHAUSTED: (429, "Hệ thống AI đã hết lượt sử dụng trong ngày. Vui lòng thử lại vào ngày mai."),
     AI_UNAVAILABLE: (503, "Dịch vụ AI tạm thời không khả dụng. Vui lòng thử lại sau."),
     AI_DB_NOT_CONFIGURED: (503, "Dịch vụ AI chưa được cấu hình cơ sở dữ liệu."),
+    AI_DB_UNAVAILABLE: (503, "Cơ sở dữ liệu của chức năng quản trị AI tạm thời không truy cập được."),
     AI_GENERATION_FAILED: (502, "AI không tạo được kết quả hợp lệ. Vui lòng thử lại."),
     AI_QUESTION_REFUSED: (422, "Câu hỏi này không được hỗ trợ."),
 }
