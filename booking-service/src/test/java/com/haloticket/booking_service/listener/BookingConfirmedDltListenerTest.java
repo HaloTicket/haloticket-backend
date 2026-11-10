@@ -70,8 +70,21 @@ class BookingConfirmedDltListenerTest {
         assertThat(record.getPaymentId()).isNull();
         assertThat(record.getAmount()).isEqualTo(300000d);
         assertThat(record.getProvider()).isEqualTo("MOMO");
-        assertThat(record.getDetail()).contains("y".repeat(300)).doesNotContain("y".repeat(301));
+        assertThat(record.getDetail()).contains("y".repeat(400)).doesNotContain("y".repeat(401));
         verify(outbox, times(1)).save(any());
+    }
+
+    @Test
+    void theDetailKeepsTheRealReasonAndDropsTheSpringListenerWrapper() {
+        String header = "Listener method 'public void com.haloticket.ticket_service.listener.TicketEventListener.handleBookingConfirmed(java.lang.String)'"
+                + " threw exception; Ticket issuance failed: IllegalArgumentException: Unknown ticket type: t-9";
+
+        listener.handleDeadLetter(dead("b-1", "{\"bookingId\":\"b-1\"}", header));
+
+        ArgumentCaptor<PaymentException> saved = ArgumentCaptor.forClass(PaymentException.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getDetail())
+                .isEqualTo("Ticket issuance failed after all retries: Ticket issuance failed: IllegalArgumentException: Unknown ticket type: t-9");
     }
 
     @Test

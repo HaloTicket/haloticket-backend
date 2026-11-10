@@ -31,7 +31,9 @@ public class BookingConfirmedDltListener {
     public static final String DLT_TOPIC = "haloticket.booking.confirmed.v1.DLT";
     // KafkaHeaders.DLT_EXCEPTION_MESSAGE
     static final String EXCEPTION_MESSAGE_HEADER = "kafka_dlt-exception-message";
-    static final int MESSAGE_MAX = 300;
+    static final int MESSAGE_MAX = 400;
+    /** Spring wraps the real failure: "Listener method '...' threw exception; <what the listener said>". Only the second part is the reason. */
+    private static final String LISTENER_PREFIX = "threw exception;";
 
     private final BookingRepository bookingRepository;
     private final PaymentServiceClient paymentServiceClient;
@@ -72,7 +74,9 @@ public class BookingConfirmedDltListener {
     private String exceptionMessage(ConsumerRecord<String, String> record) {
         Header header = record.headers() == null ? null : record.headers().lastHeader(EXCEPTION_MESSAGE_HEADER);
         if (header == null || header.value() == null) return "";
-        String text = new String(header.value(), StandardCharsets.UTF_8).replaceAll("\s+", " ").trim();
+        String text = new String(header.value(), StandardCharsets.UTF_8).replaceAll("\\s+", " ").trim();
+        int at = text.indexOf(LISTENER_PREFIX);
+        if (at >= 0 && at + LISTENER_PREFIX.length() < text.length()) text = text.substring(at + LISTENER_PREFIX.length()).trim();
         return text.length() <= MESSAGE_MAX ? text : text.substring(0, MESSAGE_MAX);
     }
 

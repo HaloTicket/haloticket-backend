@@ -19,7 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Locale;
 import java.util.Map;
 
-/** Admin order reconciliation. No emails or other personal data in any response. */
+/** Admin order reconciliation (ROLE_ADMIN only). The rows carry the customer name, e-mail and phone so a person can contact them; never log them. */
 @RestController
 @RequestMapping("/api/bookings/admin/reconciliation")
 @PreAuthorize("hasRole('ADMIN')")

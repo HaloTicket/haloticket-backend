@@ -40,14 +40,42 @@ public class ReconciliationService {
     public static final String SOURCE_UNAVAILABLE = "RECONCILIATION_SOURCE_UNAVAILABLE";
     static final int ISSUED_COUNTS_MAX = 200;
 
+    /** The last six fields (customer, payment method, event) are filled by ReconciliationDetails and are null when a lookup failed. */
     public record ExceptionItem(String id, String bookingId, String bookingCode, String paymentId, String kind, Double amount,
                                 String provider, String status, String detail, LocalDateTime createdAt,
-                                LocalDateTime resolvedAt, String resolvedBy, String resolutionNote) {}
+                                LocalDateTime resolvedAt, String resolvedBy, String resolutionNote,
+                                String customerName, String customerEmail, String customerPhone, String paymentMethod,
+                                String eventId, String eventTitle) {
+        public ExceptionItem(String id, String bookingId, String bookingCode, String paymentId, String kind, Double amount,
+                             String provider, String status, String detail, LocalDateTime createdAt,
+                             LocalDateTime resolvedAt, String resolvedBy, String resolutionNote) {
+            this(id, bookingId, bookingCode, paymentId, kind, amount, provider, status, detail, createdAt, resolvedAt, resolvedBy,
+                    resolutionNote, null, null, null, null, null, null);
+        }
+
+        public ExceptionItem withDetails(String name, String email, String phone, String method, String eventId, String eventTitle) {
+            return new ExceptionItem(id, bookingId, bookingCode, paymentId, kind, amount, provider, status, detail, createdAt,
+                    resolvedAt, resolvedBy, resolutionNote, name, email, phone, method, eventId, eventTitle);
+        }
+    }
 
     public record ExceptionPage(List<ExceptionItem> items, long total, int page, int size) {}
 
     public record PaidWithoutTicketsItem(String bookingId, String bookingCode, LocalDateTime paidAt, long expectedTickets,
-                                         long issuedTickets, long minutesSincePaid) {}
+                                         long issuedTickets, long minutesSincePaid,
+                                         String customerName, String customerEmail, String customerPhone, String paymentMethod,
+                                         Double amount, String eventId, String eventTitle) {
+        public PaidWithoutTicketsItem(String bookingId, String bookingCode, LocalDateTime paidAt, long expectedTickets,
+                                      long issuedTickets, long minutesSincePaid) {
+            this(bookingId, bookingCode, paidAt, expectedTickets, issuedTickets, minutesSincePaid, null, null, null, null, null, null, null);
+        }
+
+        public PaidWithoutTicketsItem withDetails(String name, String email, String phone, String method, Double amount,
+                                                  String eventId, String eventTitle) {
+            return new PaidWithoutTicketsItem(bookingId, bookingCode, paidAt, expectedTickets, issuedTickets, minutesSincePaid,
+                    name, email, phone, method, amount, eventId, eventTitle);
+        }
+    }
 
     public record PaidWithoutTickets(List<PaidWithoutTicketsItem> items, int total, boolean truncated) {}
 
@@ -58,6 +86,10 @@ public class ReconciliationService {
     private final TicketStockClient ticketStockClient;
     private final GaReservationProperties ticketProperties;
     private final ReconciliationProperties properties;
+
+    /** Customer, payment and event names for the rows. Optional: without it the rows carry codes and amounts only. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ReconciliationDetails details;
 
     /** A count is null when its source could not be read. */
     public Map<String, Object> summary() {
@@ -85,7 +117,7 @@ public class ReconciliationService {
                         result.getContent().stream().map(PaymentException::getBookingId).distinct().toList())
                 .stream().collect(Collectors.toMap(Booking::getId, Booking::getBookingCode, (a, b) -> a));
         List<ExceptionItem> items = result.getContent().stream().map(e -> toItem(e, codes.get(e.getBookingId()))).toList();
-        return new ExceptionPage(items, result.getTotalElements(), page, size);
+        return new ExceptionPage(details == null ? items : details.exceptionItems(items), result.getTotalElements(), page, size);
     }
 
     /** Marks an exception handled. The booking is not touched. */
@@ -146,14 +178,14 @@ public class ReconciliationService {
             if (candidates.size() < batch) break;
             if (pageIndex == maxBatches - 1) truncated = true;
         }
-        return new PaidWithoutTickets(found, found.size(), truncated);
+        return new PaidWithoutTickets(details == null ? found : details.paidItems(found), found.size(), truncated);
     }
 
     public StockDiscrepancies stockDiscrepancies() {
         List<Map<String, Object>> rows = fromTicketService(
                 () -> ticketStockClient.stockReconciliation(token(), Math.max(1, properties.getStockLimit())));
         if (rows == null) throw unavailable("stock-reconciliation returned no body", null);
-        return new StockDiscrepancies(rows, rows.size());
+        return new StockDiscrepancies(details == null ? rows : details.stockRows(rows), rows.size());
     }
 
     private Map<String, Integer> issuedCounts(List<String> bookingIds) {

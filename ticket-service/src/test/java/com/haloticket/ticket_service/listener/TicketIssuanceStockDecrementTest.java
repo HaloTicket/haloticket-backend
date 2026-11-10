@@ -207,6 +207,7 @@ class TicketIssuanceStockDecrementTest {
 
         assertThatThrownBy(() -> deliver(booking("b1", "", item(ga, 2))))
                 .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasMessageStartingWith("Ticket issuance failed: IllegalStateException: OVERSOLD_ON_ISSUE") // the reason is in the message the admin reads
                 .rootCause().hasMessageContaining("OVERSOLD_ON_ISSUE");
 
         assertThat(reload(ga).getTotalQuantity()).isEqualTo(1); // the first decrement was rolled back too

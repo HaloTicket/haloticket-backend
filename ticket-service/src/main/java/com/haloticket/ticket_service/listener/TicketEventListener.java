@@ -39,8 +39,32 @@ public class TicketEventListener {
         try {
             issueBooking(objectMapper.readTree(message));
         } catch (Exception e) {
-            log.error("Failed to issue tickets for BOOKING_CONFIRMED", e);
-            throw new IllegalStateException("Ticket issuance failed", e);
+            // the reason travels with the exception: it ends up in the dead-letter header and on the admin reconciliation page
+            Throwable root = rootCause(e);
+            String reason = root.getClass().getSimpleName() + (root.getMessage() == null ? "" : ": " + shorten(root.getMessage(), 200));
+            log.error("[ISSUANCE_FAILED] bookingId={} reason={}", bookingIdOf(message), reason, e);
+            throw new IllegalStateException("Ticket issuance failed: " + reason, e);
+        }
+    }
+
+    private static Throwable rootCause(Throwable failure) {
+        Throwable current = failure;
+        for (int depth = 0; depth < 20 && current.getCause() != null && current.getCause() != current; depth++) current = current.getCause();
+        return current;
+    }
+
+    private static String shorten(String text, int max) {
+        String value = text.replaceAll("\\s+", " ").trim();
+        return value.length() <= max ? value : value.substring(0, max);
+    }
+
+    private String bookingIdOf(String message) {
+        try {
+            JsonNode node = objectMapper.readTree(message);
+            String id = node == null ? null : text(node, "bookingId");
+            return id == null ? "?" : id;
+        } catch (Exception ignored) {
+            return "?";
         }
     }
 
