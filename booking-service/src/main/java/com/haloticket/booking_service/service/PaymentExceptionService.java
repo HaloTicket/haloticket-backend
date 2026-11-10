@@ -44,6 +44,7 @@ public class PaymentExceptionService {
                 : repository.existsByBookingIdAndKind(bookingId, kind);
         if (exists) {
             log.info("[PAYMENT_EXCEPTION] already recorded bookingId={} kind={}", shortId(bookingId), kind);
+            refreshOpenIssuanceDetail(bookingId, kind, detail);
             return false;
         }
         repository.save(PaymentException.builder()
@@ -60,6 +61,18 @@ public class PaymentExceptionService {
         log.warn("[PAYMENT_EXCEPTION] recorded bookingId={} kind={} paymentId={}", shortId(bookingId), kind,
                 hasPayment ? shortId(paymentId) : "-");
         return true;
+    }
+
+    /** An order whose tickets failed again (admin re-issue, redelivery): the record shows the LATEST reason, not the first one. */
+    private void refreshOpenIssuanceDetail(String bookingId, PaymentExceptionKind kind, String detail) {
+        if (kind != PaymentExceptionKind.ISSUANCE_FAILED || detail == null || detail.isBlank()) return;
+        repository.findFirstByBookingIdAndKindAndStatus(bookingId, kind, PaymentExceptionStatus.OPEN).ifPresent(open -> {
+            String latest = truncate(detail, DETAIL_MAX);
+            if (!latest.equals(open.getDetail())) {
+                open.setDetail(latest);
+                repository.save(open);
+            }
+        });
     }
 
     private void notifyAdmins(String bookingId, String bookingCode, PaymentExceptionKind kind, Double amount) {

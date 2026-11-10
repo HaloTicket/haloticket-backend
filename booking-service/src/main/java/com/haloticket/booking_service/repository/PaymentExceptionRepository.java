@@ -1,8 +1,11 @@
 package com.haloticket.booking_service.repository;
 
+import java.util.Optional;
+
 import com.haloticket.booking_service.entity.PaymentException;
 import com.haloticket.booking_service.enums.PaymentExceptionKind;
 import com.haloticket.booking_service.enums.PaymentExceptionStatus;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,6 +16,9 @@ public interface PaymentExceptionRepository extends JpaRepository<PaymentExcepti
     boolean existsByPaymentIdAndKind(String paymentId, PaymentExceptionKind kind);
 
     boolean existsByBookingIdAndKind(String bookingId, PaymentExceptionKind kind);
+
+    Optional<PaymentException> findFirstByBookingIdAndKindAndStatus(String bookingId, PaymentExceptionKind kind,
+                                                                             PaymentExceptionStatus status);
 
     Page<PaymentException> findByStatus(PaymentExceptionStatus status, Pageable pageable);
 

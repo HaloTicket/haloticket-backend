@@ -58,6 +58,32 @@ class PaymentExceptionServiceTest {
     }
 
     @Test
+    void aSecondIssuanceFailureOfTheSameOrderUpdatesTheReasonOfTheOpenRecord() {
+        PaymentException open = PaymentException.builder().bookingId("b-1").kind(PaymentExceptionKind.ISSUANCE_FAILED)
+                .status(PaymentExceptionStatus.OPEN).detail("first reason").build();
+        when(repository.existsByBookingIdAndKind("b-1", PaymentExceptionKind.ISSUANCE_FAILED)).thenReturn(true);
+        when(repository.findFirstByBookingIdAndKindAndStatus("b-1", PaymentExceptionKind.ISSUANCE_FAILED, PaymentExceptionStatus.OPEN))
+                .thenReturn(java.util.Optional.of(open));
+
+        boolean created = service.record("b-1", "HALO-1", null, PaymentExceptionKind.ISSUANCE_FAILED, 1d, "VIETQR", "latest reason");
+
+        assertThat(created).isFalse();
+        assertThat(open.getDetail()).isEqualTo("latest reason");
+        verify(repository).save(open);
+        verify(outbox, never()).save(any()); // no second notification for the same order
+    }
+
+    @Test
+    void aRepeatedLatePaymentRecordKeepsItsOriginalDetail() {
+        when(repository.existsByPaymentIdAndKind("pay-1", PaymentExceptionKind.LATE_PAYMENT_NO_STOCK)).thenReturn(true);
+
+        service.record("b-1", "HALO-1", "pay-1", PaymentExceptionKind.LATE_PAYMENT_NO_STOCK, 1d, "VNPAY", "new text");
+
+        verify(repository, never()).findFirstByBookingIdAndKindAndStatus(any(), any(), any());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
     void repeatedRecordForTheSamePaymentAndKindCreatesNothing() {
         when(repository.existsByPaymentIdAndKind("pay-1", PaymentExceptionKind.LATE_PAYMENT_NO_STOCK)).thenReturn(true);
 

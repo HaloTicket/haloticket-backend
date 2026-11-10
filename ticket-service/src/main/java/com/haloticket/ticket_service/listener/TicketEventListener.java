@@ -83,7 +83,8 @@ public class TicketEventListener {
         stockReservations.consumeForBooking(bookingId);
         List<TicketType> showtimeTypes = showtimeId == null ? List.of() : ticketTypeRepository.findByShowtimeId(showtimeId);
         if (showtimeId != null && showtimeTypes.isEmpty()) {
-            throw new IllegalArgumentException("No ticket types for showtime: " + showtimeId);
+            log.warn("[ISSUANCE] no ticket type is linked to showtime {} of booking {}: issuing against the type that was bought",
+                    showtimeId, bookingId);
         }
         JsonNode items = booking.path("items");
         if (!items.isArray() || items.isEmpty()) throw new IllegalArgumentException("Booking has no ticket items");

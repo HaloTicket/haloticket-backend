@@ -125,6 +125,29 @@ class TicketIssuanceStockDecrementTest {
     }
 
     @Test
+    void aPaidOrderIsIssuedEvenWhenNoTicketTypeIsLinkedToItsShowtime() {
+        // an event whose ticket types were never tied to the showtime of the booking: the hold accepted the type as it is,
+        // so issuance must too, instead of leaving a paid order without tickets
+        TicketType unlinked = types.save(TicketType.builder().eventId(EVENT).showtimeId(null).name("GA").price(100000d)
+                .totalQuantity(10).initialQuantity(10).build());
+
+        deliver(booking("b-unlinked", "", item(unlinked, 3)));
+
+        assertThat(tickets.findByBookingId("b-unlinked")).hasSize(3);
+        assertThat(reload(unlinked).getTotalQuantity()).isEqualTo(7);
+    }
+
+    @Test
+    void aTicketTypeOfAnotherEventIsStillRefusedWhenTheShowtimeHasNoTypes() {
+        TicketType foreign = types.save(TicketType.builder().eventId("another-event").showtimeId(null).name("GA").price(100000d)
+                .totalQuantity(10).initialQuantity(10).build());
+
+        assertThatThrownBy(() -> deliver(booking("b-foreign", "", item(foreign, 1))))
+                .hasMessageStartingWith("Ticket issuance failed: IllegalArgumentException: Ticket type belongs to another event");
+        assertThat(tickets.findByBookingId("b-foreign")).isEmpty();
+    }
+
+    @Test
     void withoutAHoldStockDropsOncePerTicket() {
         TicketType ga = type("GA", 10);
         deliver(booking("b1", "", item(ga, 2)));
