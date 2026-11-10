@@ -259,4 +259,87 @@ class ReconciliationServiceTest {
                 e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
         verify(exceptions, never()).save(any());
     }
+
+    // --- auto-resolve of issuance failures ---------------------------------------------
+
+    private static PaymentException issuanceFailure(String id, String bookingId) {
+        PaymentException e = new PaymentException();
+        e.setId(id);
+        e.setBookingId(bookingId);
+        e.setKind(PaymentExceptionKind.ISSUANCE_FAILED);
+        e.setStatus(PaymentExceptionStatus.OPEN);
+        return e;
+    }
+
+    private static BookingRepository.ReportFact fact(String bookingId, long tickets) {
+        return new BookingRepository.ReportFact() {
+            public String getBookingId() { return bookingId; }
+            public String getEventId() { return "ev"; }
+            public Long getTickets() { return tickets; }
+            public com.haloticket.booking_service.enums.BookingStatus getStatus() { return null; }
+        };
+    }
+
+    @Test
+    void anIssuanceFailureWhoseTicketsNowExistIsClosedBySystem() {
+        PaymentException done = issuanceFailure("e-done", "b-done");
+        PaymentException partial = issuanceFailure("e-partial", "b-partial");
+        when(exceptions.findTop200ByKindAndStatus(PaymentExceptionKind.ISSUANCE_FAILED, PaymentExceptionStatus.OPEN))
+                .thenReturn(List.of(done, partial));
+        when(bookings.findReportFactsByBookingIds(any())).thenReturn(List.of(fact("b-done", 2), fact("b-partial", 3)));
+        issued(Map.of("b-done", 2, "b-partial", 1));
+
+        int closed = service.autoResolveIssued();
+
+        assertThat(closed).isEqualTo(1);
+        assertThat(done.getStatus()).isEqualTo(PaymentExceptionStatus.RESOLVED);
+        assertThat(done.getResolvedBy()).isEqualTo("system");
+        assertThat(done.getResolvedAt()).isNotNull();
+        assertThat(partial.getStatus()).isEqualTo(PaymentExceptionStatus.OPEN);
+        verify(exceptions).saveAll(List.of(done));
+    }
+
+    @Test
+    void nothingIsClosedWhenTicketServiceCannotAnswer() {
+        PaymentException open = issuanceFailure("e-1", "b-1");
+        when(exceptions.findTop200ByKindAndStatus(any(), any())).thenReturn(List.of(open));
+        when(bookings.findReportFactsByBookingIds(any())).thenReturn(List.of(fact("b-1", 1)));
+        when(tickets.issuedCounts(any(), any())).thenThrow(new IllegalStateException("down"));
+
+        assertThat(service.autoResolveIssued()).isZero();
+        assertThat(open.getStatus()).isEqualTo(PaymentExceptionStatus.OPEN);
+        verify(exceptions, never()).saveAll(any());
+    }
+
+    @Test
+    void anOrderWithNoKnownTicketCountIsNeverAutoClosed() {
+        PaymentException open = issuanceFailure("e-1", "gone");
+        when(exceptions.findTop200ByKindAndStatus(any(), any())).thenReturn(List.of(open));
+        when(bookings.findReportFactsByBookingIds(any())).thenReturn(List.of());
+        issued(Map.of("gone", 5));
+
+        assertThat(service.autoResolveIssued()).isZero();
+        assertThat(open.getStatus()).isEqualTo(PaymentExceptionStatus.OPEN);
+    }
+
+    // --- stock fix ------------------------------------------------------------------------
+
+    @Test
+    void fixStockReturnsTheRepairedRow() {
+        when(tickets.fixStock("tok", "tt-1")).thenReturn(Map.of("ticketTypeId", "tt-1", "remaining", 999));
+
+        assertThat(service.fixStock("tt-1")).containsEntry("remaining", 999);
+    }
+
+    @Test
+    void fixStockPassesOnRefusalsAndReportsAnOutageAs502() {
+        feign.Request request = feign.Request.create(feign.Request.HttpMethod.POST, "http://ticket/x", Map.of(), null, null, null);
+        when(tickets.fixStock("tok", "tt-409")).thenThrow(new feign.FeignException.Conflict("c", request, null, Map.of()));
+        when(tickets.fixStock("tok", "tt-500")).thenThrow(new feign.FeignException.InternalServerError("x", request, null, Map.of()));
+
+        assertThatThrownBy(() -> service.fixStock("tt-409")).isInstanceOfSatisfying(ResponseStatusException.class,
+                e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
+        assertThatThrownBy(() -> service.fixStock("tt-500")).isInstanceOfSatisfying(ResponseStatusException.class,
+                e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY));
+    }
 }

@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import org.springframework.beans.factory.annotation.Autowired;
+
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -88,11 +90,12 @@ public class ReconciliationService {
     private final ReconciliationProperties properties;
 
     /** Customer, payment and event names for the rows. Optional: without it the rows carry codes and amounts only. */
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @Autowired(required = false)
     private ReconciliationDetails details;
 
     /** A count is null when its source could not be read. */
     public Map<String, Object> summary() {
+        autoResolveIssued();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("openExceptions", exceptionRepository.countByStatus(PaymentExceptionStatus.OPEN));
         out.put("paidWithoutTickets", countOrNull(() -> paidWithoutTickets().total()));
@@ -108,8 +111,71 @@ public class ReconciliationService {
         }
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * An open ISSUANCE_FAILED exception whose order now has all its tickets (re-issued by the admin, the customer, the scheduler
+     * or after a fix) is closed here, by "system", so nobody has to mark it by hand. Best effort: when ticket-service cannot
+     * answer nothing is closed.
+     */
+    public int autoResolveIssued() {
+        try {
+            List<PaymentException> open = exceptionRepository.findTop200ByKindAndStatus(
+                    com.haloticket.booking_service.enums.PaymentExceptionKind.ISSUANCE_FAILED, PaymentExceptionStatus.OPEN);
+            if (open.isEmpty()) return 0;
+            List<String> ids = open.stream().map(PaymentException::getBookingId).distinct().toList();
+            Map<String, Long> expected = bookingRepository.findReportFactsByBookingIds(ids).stream()
+                    .collect(Collectors.toMap(BookingRepository.ReportFact::getBookingId,
+                            f -> f.getTickets() == null ? 0L : f.getTickets(), (a, b) -> a));
+            Map<String, Integer> issued = new HashMap<>();
+            for (int i = 0; i < ids.size(); i += ISSUED_COUNTS_MAX) {
+                issued.putAll(issuedCounts(ids.subList(i, Math.min(ids.size(), i + ISSUED_COUNTS_MAX))));
+            }
+            List<PaymentException> done = new ArrayList<>();
+            LocalDateTime now = LocalDateTime.now();
+            for (PaymentException e : open) {
+                long want = expected.getOrDefault(e.getBookingId(), 0L);
+                if (want > 0 && issued.getOrDefault(e.getBookingId(), 0) >= want) {
+                    e.setStatus(PaymentExceptionStatus.RESOLVED);
+                    e.setResolvedAt(now);
+                    e.setResolvedBy("system");
+                    e.setResolutionNote("Vé đã được phát hành đầy đủ, hệ thống tự ghi nhận.");
+                    done.add(e);
+                }
+            }
+            if (!done.isEmpty()) {
+                exceptionRepository.saveAll(done);
+                log.info("[PAYMENT_EXCEPTION] auto-resolved {} issuance exception(s) whose tickets now exist", done.size());
+            }
+            return done.size();
+        } catch (RuntimeException e) {
+            log.warn("[PAYMENT_EXCEPTION] auto-resolve skipped: {}", e.getClass().getSimpleName());
+            return 0;
+        }
+    }
+
+    /** Repairs the remaining stock of one ticket type in ticket-service; its refusals (404/409/422) are passed on unchanged. */
+    public Map<String, Object> fixStock(String ticketTypeId) {
+        Map<String, Object> row;
+        try {
+            row = ticketStockClient.fixStock(token(), ticketTypeId);
+        } catch (feign.FeignException e) {
+            int code = e.status();
+            if (code == 404 || code == 409 || code == 422) {
+                throw new ResponseStatusException(HttpStatus.valueOf(code), "STOCK_FIX_REFUSED_" + code, e);
+            }
+            throw unavailable("stock fix failed with status " + code, e);
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw unavailable(e.getClass().getSimpleName(), e);
+        }
+        if (row == null) throw unavailable("stock fix returned no body", null);
+        log.info("[RECONCILIATION] stock fixed ticketTypeId={}", ticketTypeId);
+        List<Map<String, Object>> single = List.of(row);
+        return (details == null ? single : details.stockRows(single)).get(0);
+    }
+
     public ExceptionPage exceptions(PaymentExceptionStatus status, int page, int size) {
+        autoResolveIssued();
         PageRequest request = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by("id")));
         Page<PaymentException> result = status == null ? exceptionRepository.findAll(request)
                 : exceptionRepository.findByStatus(status, request);

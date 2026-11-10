@@ -41,4 +41,9 @@ public interface TicketRepository extends JpaRepository<Ticket, String> {
             + "AND t.status <> com.haloticket.ticket_service.enums.TicketStatus.REVOKED "
             + "AND (t.acquisitionType IS NULL OR t.acquisitionType = 'PRIMARY') GROUP BY t.bookingId")
     List<Object[]> countIssuedByBookingIds(@Param("bookingIds") java.util.Collection<String> bookingIds);
+
+    /** Primary-sale tickets of a type that count against its stock (same rule as the stock reconciliation query). */
+    @Query("SELECT COUNT(t) FROM Ticket t WHERE t.ticketType.id = :typeId AND t.status <> com.haloticket.ticket_service.enums.TicketStatus.REVOKED "
+            + "AND (t.acquisitionType IS NULL OR t.acquisitionType = 'PRIMARY')")
+    long countPrimaryIssuedByTicketType(@Param("typeId") String typeId);
 }

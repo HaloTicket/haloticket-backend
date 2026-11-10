@@ -77,6 +77,93 @@ class InternalReconciliationControllerTest {
                 .acquisitionType(acquisition).status(status).issueKey(java.util.UUID.randomUUID().toString()).build());
     }
 
+    private MockMvc real() {
+        return mvc(tickets, types, TOKEN);
+    }
+
+    @Test
+    void aLegacyRowThatOnlyLacksAnInitialNumberIsNotListedButOneWithSoldTicketsIs() throws Exception {
+        type("legacy-mock", null, 200, 0); // old seed data: nothing sold, nothing to reconcile
+        TicketType sold = type("legacy-sold", null, 99, 0);
+        ticket(sold, "b1", "PRIMARY", TicketStatus.VALID);
+
+        var body = real().perform(get("/api/internal/tickets/stock-reconciliation").header(H, TOKEN))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        assertThat(body).contains("legacy-sold").doesNotContain("legacy-mock");
+    }
+
+    @Test
+    void fixStockSetsRemainingToInitialMinusIssued() throws Exception {
+        // the case seen in production: 1000 issued number, one ticket sold, remaining still 1000
+        TicketType drifted = type("STANDARD", 1000, 1000, 0);
+        ticket(drifted, "b1", "PRIMARY", TicketStatus.VALID);
+        ticket(drifted, "b2", "PRIMARY", TicketStatus.REVOKED); // does not count
+
+        real().perform(post("/api/internal/tickets/stock-reconciliation/" + drifted.getId() + "/fix").header(H, TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.initial").value(1000))
+                .andExpect(jsonPath("$.remaining").value(999))
+                .andExpect(jsonPath("$.issued").value(1))
+                .andExpect(jsonPath("$.diffStockVsIssued").value(0));
+        assertThat(types.findById(drifted.getId()).orElseThrow().getTotalQuantity()).isEqualTo(999);
+    }
+
+    @Test
+    void fixStockOfARowWithoutAnInitialNumberDerivesItFromRemainingPlusIssued() throws Exception {
+        TicketType legacy = type("old", null, 98, 0);
+        ticket(legacy, "b1", "PRIMARY", TicketStatus.VALID);
+        ticket(legacy, "b2", "PRIMARY", TicketStatus.VALID);
+
+        real().perform(post("/api/internal/tickets/stock-reconciliation/" + legacy.getId() + "/fix").header(H, TOKEN))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.initial").value(100)).andExpect(jsonPath("$.remaining").value(98));
+    }
+
+    @Test
+    void fixStockRefusesWhatWouldBeWrongAndChangesNothing() throws Exception {
+        TicketType tooFew = type("too-few", 1, 1, 0);
+        ticket(tooFew, "b1", "PRIMARY", TicketStatus.VALID);
+        ticket(tooFew, "b2", "PRIMARY", TicketStatus.VALID);
+        TicketType held = type("held", 10, 10, 9);
+        ticket(held, "b3", "PRIMARY", TicketStatus.VALID);
+        ticket(held, "b4", "PRIMARY", TicketStatus.VALID);
+        TicketType unknown = type("unknown", null, null, 0);
+
+        real().perform(post("/api/internal/tickets/stock-reconciliation/" + tooFew.getId() + "/fix").header(H, TOKEN))
+                .andExpect(status().isConflict());
+        real().perform(post("/api/internal/tickets/stock-reconciliation/" + held.getId() + "/fix").header(H, TOKEN))
+                .andExpect(status().isConflict()); // remaining would be 8, below the 9 held by unpaid bookings
+        real().perform(post("/api/internal/tickets/stock-reconciliation/" + unknown.getId() + "/fix").header(H, TOKEN))
+                .andExpect(status().isUnprocessableEntity());
+        real().perform(post("/api/internal/tickets/stock-reconciliation/missing/fix").header(H, TOKEN))
+                .andExpect(status().isNotFound());
+        assertThat(types.findById(tooFew.getId()).orElseThrow().getTotalQuantity()).isEqualTo(1);
+        assertThat(types.findById(held.getId()).orElseThrow().getTotalQuantity()).isEqualTo(10);
+    }
+
+    @Test
+    void fixStockNeedsTheToken() throws Exception {
+        TicketType t = type("x", 10, 10, 0);
+        real().perform(post("/api/internal/tickets/stock-reconciliation/" + t.getId() + "/fix")).andExpect(status().isForbidden());
+        real().perform(post("/api/internal/tickets/stock-reconciliation/" + t.getId() + "/fix").header(H, "nope")).andExpect(status().isForbidden());
+    }
+
+    @Test
+    @Transactional // the service that calls these updates is transactional in production
+    void anOrganiserEditOfARowWithoutAnInitialNumberKeepsTheTicketsAlreadySold() {
+        // before: sync computed sold = 0 for such a row and reset the remaining stock to the new number
+        TicketType legacy = type("old", null, 99, 0);
+        ticket(legacy, "b1", "PRIMARY", TicketStatus.VALID);
+
+        types.backfillInitialQuantityAtomic(legacy.getId());
+        int updated = types.applyIssuedQuantityAtomic(legacy.getId(), 1000, "old", 1d, false, 1, 5, null, java.time.LocalDateTime.now());
+
+        assertThat(updated).isEqualTo(1);
+        TicketType after = types.findById(legacy.getId()).orElseThrow();
+        assertThat(after.getInitialQuantity()).isEqualTo(1000);
+        assertThat(after.getTotalQuantity()).isEqualTo(999); // 1000 - the one ticket sold
+    }
+
     @Test
     void tokenIsRequiredOnBothEndpointsAndNothingIsQueriedWithoutIt() throws Exception {
         TicketRepository t = mock(TicketRepository.class);
@@ -156,6 +243,8 @@ class InternalReconciliationControllerTest {
         ticket(overwritten, "b2", "PRIMARY", TicketStatus.VALID);
         TicketType phantomHold = type("PHANTOM-HOLD", 10, 10, 3); // reserved with no HELD reservation rows
         TicketType legacy = type("LEGACY", null, 5, 0);
+        ticket(legacy, "bl", "PRIMARY", TicketStatus.VALID); // a legacy row WITH a sold ticket is still listed (a legacy row with none is not)
+        type("LEGACY-UNUSED", null, 7, 0);
 
         String body = mvc(tickets, types, TOKEN).perform(get("/api/internal/tickets/stock-reconciliation?limit=50").header(H, TOKEN))
                 .andExpect(status().isOk())

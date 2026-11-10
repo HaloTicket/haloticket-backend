@@ -63,6 +63,13 @@ public class Booking {
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<SeatReservation> seatReservations;
 
+    // when ticket issuance was last asked for again, and how many times (customer button, admin button or the scheduler)
+    @Column(name = "last_reissue_at")
+    private LocalDateTime lastReissueAt;
+
+    @Column(name = "reissue_attempts")
+    private Integer reissueAttempts;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

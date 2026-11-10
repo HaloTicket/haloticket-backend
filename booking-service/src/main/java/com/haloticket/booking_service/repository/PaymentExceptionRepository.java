@@ -1,5 +1,6 @@
 package com.haloticket.booking_service.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.haloticket.booking_service.entity.PaymentException;
@@ -19,6 +20,8 @@ public interface PaymentExceptionRepository extends JpaRepository<PaymentExcepti
 
     Optional<PaymentException> findFirstByBookingIdAndKindAndStatus(String bookingId, PaymentExceptionKind kind,
                                                                              PaymentExceptionStatus status);
+
+    List<PaymentException> findTop200ByKindAndStatus(PaymentExceptionKind kind, PaymentExceptionStatus status);
 
     Page<PaymentException> findByStatus(PaymentExceptionStatus status, Pageable pageable);
 

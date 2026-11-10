@@ -1,13 +1,16 @@
 package com.haloticket.booking_service.repository;
 
 import com.haloticket.booking_service.entity.Booking;
+
 import jakarta.persistence.LockModeType;
+
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import com.haloticket.booking_service.enums.BookingStatus;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -18,6 +21,9 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
 import java.util.Collection;
+
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, String> {
@@ -52,6 +58,12 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
        Optional<Booking> findByIdForUpdate(@Param("id") String id);
 
        Optional<Booking> findByBookingCode(String bookingCode);
+
+       /** Bulk update on purpose: it does not fire @PreUpdate, so updated_at (the paid time the reconciliation reads) stays put. */
+       @Modifying
+       @Transactional
+       @Query("UPDATE Booking b SET b.lastReissueAt = :now, b.reissueAttempts = COALESCE(b.reissueAttempts, 0) + 1 WHERE b.id = :id")
+       int markReissueRequested(@Param("id") String id, @Param("now") LocalDateTime now);
        @Lock(LockModeType.PESSIMISTIC_WRITE)
        List<Booking> findByStatusAndExpiredAtBefore(BookingStatus status, LocalDateTime dateTime);
 

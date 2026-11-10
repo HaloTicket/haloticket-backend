@@ -49,7 +49,7 @@ class SagaNotificationListenerTest {
     @Test
     void issuedBatchEmailShowsExactOrderAndEscapesTicketText() {
         when(templateRepository.findByTypeAndChannelAndStatus(any(), any(), any())).thenReturn(Optional.of(template));
-        when(notificationService.processEvent(any())).thenReturn(NotificationResponse.builder().id("notification-1")
+        when(notificationService.processEvent(any(), any(), any(), any())).thenReturn(NotificationResponse.builder().id("notification-1")
                 .status(NotificationStatus.PENDING).build());
         String payload = """
                 {"bookingId":"booking-1","bookingCode":"HT-123","customerId":"customer-1",
@@ -69,12 +69,15 @@ class SagaNotificationListenerTest {
         assertThat(html).contains("&#123;&#123;ticketRows&#125;&#125;");
         assertThat(html).doesNotContain("<script>", "http://localhost:5173/my-tickets");
         verify(notificationService).markAsSent("notification-1");
+        // the bell entry is typed and readable, and names the order
+        verify(notificationService).processEvent(any(), eq("TICKETS_ISSUED"), eq("Vé của bạn đã sẵn sàng"),
+                org.mockito.ArgumentMatchers.contains("HT-123"));
     }
 
     @Test
     void replayOfSentBatchDoesNotSendAgain() {
         when(templateRepository.findByTypeAndChannelAndStatus(any(), any(), any())).thenReturn(Optional.of(template));
-        when(notificationService.processEvent(any())).thenReturn(NotificationResponse.builder().id("notification-1")
+        when(notificationService.processEvent(any(), any(), any(), any())).thenReturn(NotificationResponse.builder().id("notification-1")
                 .status(NotificationStatus.SENT).build());
 
         listener.handleTicketsIssuedNotification("""

@@ -106,6 +106,48 @@ public class InternalReconciliationController {
         return result;
     }
 
+    /**
+     * Repairs one ticket type: remaining := initial - issued (a row without an initial number gets initial := remaining + issued).
+     * Refused, without changing anything, when that would be negative or below what unpaid bookings hold.
+     */
+    @PostMapping("/stock-reconciliation/{ticketTypeId}/fix")
+    @Transactional
+    public Map<String, Object> fixStock(@PathVariable String ticketTypeId,
+            @RequestHeader(value = TOKEN_HEADER, required = false) String token) {
+        requireToken(token);
+        var type = ticketTypes.findById(ticketTypeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "TICKET_TYPE_NOT_FOUND"));
+        long issued = tickets.countPrimaryIssuedByTicketType(ticketTypeId);
+        if (type.getInitialQuantity() == null) {
+            if (type.getTotalQuantity() == null) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "INITIAL_QUANTITY_UNKNOWN");
+            ticketTypes.backfillInitialQuantityAtomic(ticketTypeId);
+        } else {
+            long target = type.getInitialQuantity() - issued;
+            if (target < 0) throw new ResponseStatusException(HttpStatus.CONFLICT, "INITIAL_BELOW_ISSUED");
+            if (ticketTypes.setTotalQuantityAtomic(ticketTypeId, (int) target) == 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "REMAINING_BELOW_HELD");
+            }
+        }
+        var fresh = ticketTypes.findById(ticketTypeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "TICKET_TYPE_NOT_FOUND"));
+        Integer initial = fresh.getInitialQuantity();
+        Integer remaining = fresh.getTotalQuantity();
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("ticketTypeId", fresh.getId());
+        row.put("eventId", fresh.getEventId());
+        row.put("showtimeId", fresh.getShowtimeId());
+        row.put("name", fresh.getName());
+        row.put("initial", initial);
+        row.put("remaining", remaining);
+        row.put("held", fresh.getReservedQuantity() == null ? 0 : fresh.getReservedQuantity());
+        row.put("issued", issued);
+        row.put("heldByReservations", null);
+        row.put("diffStockVsIssued", initial == null || remaining == null ? null : Math.max(0, initial - remaining) - issued);
+        row.put("diffHeldVsReservations", null);
+        row.put("note", null);
+        return row;
+    }
+
     private static Integer intOrNull(Object value) {
         return value == null ? null : ((Number) value).intValue();
     }

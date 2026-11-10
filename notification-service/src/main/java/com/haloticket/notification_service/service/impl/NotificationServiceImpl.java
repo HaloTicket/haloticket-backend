@@ -123,6 +123,12 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public NotificationResponse processEvent(NotificationEvent event) {
+        return processEvent(event, null, null, null);
+    }
+
+    /** Same, but the in-app entry also gets a type, title and message so the bell shows something readable and can link somewhere. */
+    @Override
+    public NotificationResponse processEvent(NotificationEvent event, String type, String title, String message) {
         NotificationResponse res = notificationRepository.findByEventId(event.eventId())
                 .map(this::toNotificationResponse)
                 .orElseGet(() -> {
@@ -131,6 +137,9 @@ public class NotificationServiceImpl implements NotificationService {
                             .userId(event.userId() == null || event.userId().isBlank()
                                     ? event.recipientEmail() : event.userId())
                             .recipientEmail(event.recipientEmail())
+                            .type(type)
+                            .title(title)
+                            .message(message)
                             .variablesJson(toVariablesJson(event.variables()))
                             .channel(event.channel())
                             .status(NotificationStatus.PENDING)

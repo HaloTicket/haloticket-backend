@@ -168,6 +168,9 @@ public class TicketServiceImpl implements TicketService {
         if (newInitial < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_QUANTITY");
         }
+        if (existing.getInitialQuantity() == null) {
+            ticketTypeRepository.backfillInitialQuantityAtomic(existing.getId()); // so tickets already sold are not forgotten below
+        }
         int updated = ticketTypeRepository.applyIssuedQuantityAtomic(existing.getId(), newInitial, name, price, isFree, min, max, description, now);
         if (updated == 0) {
             TicketType current = ticketTypeRepository.findById(existing.getId())

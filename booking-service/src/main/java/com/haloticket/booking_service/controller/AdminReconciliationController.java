@@ -69,6 +69,12 @@ public class AdminReconciliationController {
         return reconciliationService.paidWithoutTickets();
     }
 
+    /** "Đồng bộ lại kho" for one row: remaining := initial - issued. Refusals (404/409/422) are passed on with nothing changed. */
+    @PostMapping("/stock/{ticketTypeId}/fix")
+    public Map<String, Object> fixStock(@PathVariable String ticketTypeId) {
+        return reconciliationService.fixStock(ticketTypeId);
+    }
+
     @GetMapping("/stock-discrepancies")
     public ReconciliationService.StockDiscrepancies stockDiscrepancies() {
         return reconciliationService.stockDiscrepancies();

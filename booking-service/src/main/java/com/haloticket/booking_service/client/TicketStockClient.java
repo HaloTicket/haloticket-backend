@@ -31,6 +31,10 @@ public interface TicketStockClient {
     Map<String, Map<String, Integer>> issuedCounts(@RequestHeader("X-Internal-Token") String token,
                                                    @RequestBody Map<String, Object> body);
 
+    /** Repairs one ticket type's remaining stock. 404 / 409 / 422 change nothing. */
+    @PostMapping("/api/internal/tickets/stock-reconciliation/{ticketTypeId}/fix")
+    Map<String, Object> fixStock(@RequestHeader("X-Internal-Token") String token, @PathVariable("ticketTypeId") String ticketTypeId);
+
     @GetMapping("/api/internal/tickets/stock-reconciliation")
     List<Map<String, Object>> stockReconciliation(@RequestHeader("X-Internal-Token") String token,
                                                   @RequestParam("limit") int limit);

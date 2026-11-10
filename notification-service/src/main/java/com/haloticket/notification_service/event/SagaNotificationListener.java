@@ -71,7 +71,10 @@ public class SagaNotificationListener {
             NotificationEvent event = new NotificationEvent("order-confirmation:" + bookingId,
                     template.getId(), node.path("customerId").asText(""), customerEmail,
                     NotificationChannel.EMAIL, vars, null);
-            var notification = notificationService.processEvent(event);
+            // the bell entry names the order and links to it (the web reads bookingCode from the variables)
+            var notification = notificationService.processEvent(event, "TICKETS_ISSUED", "Vé của bạn đã sẵn sàng",
+                    "Đơn " + bookingCode + " (" + vars.get("eventTitle") + "): " + vars.get("ticketCount")
+                            + " đã được phát hành. Nhấn để xem vé.");
             if (notification.getStatus() == NotificationStatus.SENT) return;
 
             emailSender.send(template, customerEmail, vars);

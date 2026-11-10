@@ -25,6 +25,25 @@ public interface TicketTypeRepository extends JpaRepository<TicketType, String> 
     @Query("UPDATE TicketType t SET t.totalQuantity = t.totalQuantity - 1, t.version = t.version + 1 WHERE t.id = :id AND t.totalQuantity > 0")
     int decrementTotalQuantityAtomic(@Param("id") String id);
 
+    /**
+     * A row from before initial_quantity existed has only the (already decremented) remaining stock. The organiser sync computes
+     * sold = initial - total, which is 0 for such a row, so the first edit used to reset the stock to the new number and forget
+     * every ticket already sold. This writes initial = remaining + issued first, so sold is right afterwards.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query(value = "UPDATE ticket_types SET initial_quantity = total_quantity + (SELECT COUNT(*) FROM tickets k WHERE k.ticket_type_id = ticket_types.id "
+            + "AND k.status <> 'REVOKED' AND (k.acquisition_type IS NULL OR k.acquisition_type = 'PRIMARY')), version = version + 1 "
+            + "WHERE id = :id AND initial_quantity IS NULL AND total_quantity IS NOT NULL", nativeQuery = true)
+    int backfillInitialQuantityAtomic(@Param("id") String id);
+
+    /** Admin stock repair: remaining := value, only when it still covers the held quantity. */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query("UPDATE TicketType t SET t.totalQuantity = :total, t.version = t.version + 1 "
+            + "WHERE t.id = :id AND :total >= 0 AND COALESCE(t.reservedQuantity, 0) <= :total")
+    int setTotalQuantityAtomic(@Param("id") String id, @Param("total") int total);
+
     /** Holds stock only while total - reserved still covers the quantity; returns 0 rows when it does not. */
     @Modifying
     @Query("UPDATE TicketType t SET t.reservedQuantity = COALESCE(t.reservedQuantity, 0) + :qty, t.version = t.version + 1 "
@@ -78,7 +97,7 @@ public interface TicketTypeRepository extends JpaRepository<TicketType, String> 
             + "COALESCE(i.n, 0) AS issued, COALESCE(h.n, 0) AS held_res "
             + "FROM ticket_types tt LEFT JOIN issued i ON i.tid = tt.id LEFT JOIN held h ON h.tid = tt.id) x "
             + "WHERE x.held <> x.held_res "
-            + "OR x.initial_quantity IS NULL OR x.total_quantity IS NULL "
+            + "OR (x.initial_quantity IS NULL AND x.issued > 0) OR x.total_quantity IS NULL "
             + "OR x.total_quantity < 0 OR x.held > x.total_quantity OR x.total_quantity > x.initial_quantity "
             + "OR GREATEST(0, x.initial_quantity - x.total_quantity) <> x.issued "
             + "ORDER BY x.event_id, x.name, x.id LIMIT :limit", nativeQuery = true)
