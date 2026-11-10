@@ -125,6 +125,25 @@ class TicketIssuanceStockDecrementTest {
     }
 
     @Test
+    void standingTicketsBookedThroughTheChatbotAreIssuedAsGeneralAdmission() {
+        // the chatbot checkout sends "<ticketTypeId>-AI-<timestamp>-<n>" as the seat id of a standing ticket; issuance used to answer
+        // "Seat not found in layout" (order HALO-1794282228280)
+        TicketType fan = type("FANZONE", 10);
+        TicketType ga = type("GA", 10);
+        String seats = "\"" + fan.getId() + "-AI-1794281846929-1\",\"" + fan.getId() + "-AI-1794281846929-2\",\"" + ga.getId() + "-AI-1794281846929-3\"";
+
+        deliver(booking("b-chatbot", seats, item(fan, 2) + "," + item(ga, 1)));
+
+        var issued = tickets.findByBookingId("b-chatbot");
+        assertThat(issued).hasSize(3);
+        assertThat(issued).allSatisfy(t -> assertThat(t.getSeat()).isNull());
+        assertThat(issued.stream().filter(t -> t.getTicketType().getId().equals(fan.getId()))).hasSize(2);
+        assertThat(issued.stream().filter(t -> t.getTicketType().getId().equals(ga.getId()))).hasSize(1);
+        assertThat(reload(fan).getTotalQuantity()).isEqualTo(8);
+        assertThat(reload(ga).getTotalQuantity()).isEqualTo(9);
+    }
+
+    @Test
     void aPaidOrderIsIssuedEvenWhenNoTicketTypeIsLinkedToItsShowtime() {
         // an event whose ticket types were never tied to the showtime of the booking: the hold accepted the type as it is,
         // so issuance must too, instead of leaving a paid order without tickets

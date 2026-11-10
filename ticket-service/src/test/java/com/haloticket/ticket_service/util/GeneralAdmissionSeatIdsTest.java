@@ -23,7 +23,9 @@ class GeneralAdmissionSeatIdsTest {
             "abc-STT-12",
             "e7351c0a-edc3-4757-ab1c-45be5e2e853d-STT-1",
             "tier123-GA-999",
-            "zone_A-STT-0"
+            "zone_A-STT-0",
+            "95bfcbd6-0b55-4961-84c7-8afd68ae57c9-AI-1794281846929-1", // what the customer chatbot sends (order HALO-1794282228280)
+            "tier-AI-1794281846929-12"
     })
     @DisplayName("Valid GA or STT patterns should return true")
     void testValidGaPatterns(String seatId) {
@@ -46,11 +48,24 @@ class GeneralAdmissionSeatIdsTest {
             "abc-STT-",
             "abc-GA-xyz",
             "abcGA1",
-            "contains-GA-inside-not-ending-with-number"
+            "contains-GA-inside-not-ending-with-number",
+            "-AI-1794281846929-1",
+            "tier-AI-1794281846929",
+            "tier-AI-abc-1",
+            "seat-AI-row-3"
     })
     @DisplayName("Invalid, empty, real seat UUID or malformed strings should return false")
     void testInvalidSeatIds(String seatId) {
         assertFalse(GeneralAdmissionSeatIds.isGeneralAdmission(seatId));
+    }
+
+    @Test
+    @DisplayName("the ticket type id is taken from a chatbot standing-ticket id")
+    void testExtractFromChatbotId() {
+        assertEquals("95bfcbd6-0b55-4961-84c7-8afd68ae57c9",
+                GeneralAdmissionSeatIds.extractTicketTypeId("95bfcbd6-0b55-4961-84c7-8afd68ae57c9-AI-1794281846929-1"));
+        assertEquals("tier", GeneralAdmissionSeatIds.extractTicketTypeId("tier-AI-17-3"));
+        assertNull(GeneralAdmissionSeatIds.extractTicketTypeId("seat-AI-row-3"));
     }
 
     @Test

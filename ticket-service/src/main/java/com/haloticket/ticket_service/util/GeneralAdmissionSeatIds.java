@@ -8,6 +8,8 @@ public final class GeneralAdmissionSeatIds {
     private static final String EXACT_GA = "GENERAL_ADMISSION";
     private static final Pattern GA_STT_PATTERN = Pattern.compile("^.+-(GA|STT)-\\d+$");
     private static final Pattern EXTRACT_TYPE_ID_PATTERN = Pattern.compile("^(.+)-(GA|STT)-\\d+$");
+    /** What the customer chatbot sends for a standing ticket: "<zoneId>-AI-<timestamp>-<n>" (web AIChatMessage). */
+    private static final Pattern CHATBOT_PATTERN = Pattern.compile("^(.+)-AI-\\d+-\\d+$");
 
     private GeneralAdmissionSeatIds() {
         // utility class
@@ -31,7 +33,7 @@ public final class GeneralAdmissionSeatIds {
         if (EXACT_GA.equalsIgnoreCase(trimmed)) {
             return true;
         }
-        return GA_STT_PATTERN.matcher(trimmed).matches();
+        return GA_STT_PATTERN.matcher(trimmed).matches() || CHATBOT_PATTERN.matcher(trimmed).matches();
     }
 
     /**
@@ -49,6 +51,10 @@ public final class GeneralAdmissionSeatIds {
         Matcher matcher = EXTRACT_TYPE_ID_PATTERN.matcher(trimmed);
         if (matcher.matches()) {
             return matcher.group(1);
+        }
+        Matcher chatbot = CHATBOT_PATTERN.matcher(trimmed);
+        if (chatbot.matches()) {
+            return chatbot.group(1);
         }
         return null;
     }
