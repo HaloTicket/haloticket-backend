@@ -179,12 +179,70 @@ def test_the_model_call_goes_through_ai_invoke_with_the_customer_profile(monkeyp
     assert calls[0]["profile"] == "customer_chat" and calls[0]["tools"] == agent.tools
 
 
-def test_fast_tier_by_default_and_smart_only_for_booking_or_seat_requests(monkeypatch):
+def test_the_call_that_chooses_the_tool_always_uses_the_stronger_model(monkeypatch):
     agent, calls, _ = agent_with_fake_model(monkeypatch, [fakes.FakeMessage("a"), fakes.FakeMessage("b"), fakes.FakeMessage("c")])
     agent.chat("hi", [])
     agent.chat("tìm cho tôi 2 ghế khu VIP", [])
     agent.chat("tôi đồng ý đặt vé", [])
-    assert [c["tier"] for c in calls] == [None, "smart", "smart"]
+    assert [c["tier"] for c in calls] == ["smart", "smart", "smart"]
+
+
+def test_wording_the_tool_result_is_fast_unless_it_is_a_booking_or_seat_request(monkeypatch):
+    call = fakes.FakeMessage("", tool_calls=[{"name": "show_event_cards", "args": {"event_ids": []}, "id": "t1"}])
+    agent, calls, _ = agent_with_fake_model(monkeypatch, [call, fakes.FakeMessage("xong"), call, fakes.FakeMessage("xong")])
+    agent.chat("có show nhạc nào không", [])
+    agent.chat("tìm cho tôi 2 ghế khu VIP", [])
+    assert [c["tier"] for c in calls] == ["smart", None, "smart", "smart"]
+
+
+def test_earlier_answers_of_the_assistant_stay_plain_text_and_cannot_teach_the_block_format(monkeypatch):
+    agent, calls, _ = agent_with_fake_model(monkeypatch, [fakes.FakeMessage("ok")])
+    leaked = "<<<DATA-868743ada610 tin nhắn của khách\nChào bạn!\nDATA-868743ada610>>>"
+    agent.chat("hi", [{"role": "user", "content": "xin chào"}, {"role": "assistant", "content": leaked}])
+    user_turn, assistant_turn = calls[0]["messages"][1], calls[0]["messages"][2]
+    assert user_turn.content.startswith("<<<DATA-")  # what a customer wrote is still fenced
+    assert assistant_turn.type == "ai" and "<<<" not in assistant_turn.content and "DATA-" not in assistant_turn.content
+    assert "Chào bạn!" in assistant_turn.content
+
+
+@pytest.mark.parametrize("raw,clean", [
+    ("<<<DATA-868743ada610 tin nhắn của khách\nChào bạn! 👋\nDATA-868743ada610>>>", "Chào bạn! 👋"),
+    ("<<<DATA-66428cf5849a tin nhắn của khách Chào bạn! DATA-66428cf5849a>>>", "Chào bạn!"),
+    ("Xin chào\n<<<DATA-abcdef12 kết quả công cụ\nnội dung\nDATA-abcdef12>>>", "Xin chào\nnội dung"),
+    ("Không có dấu hiệu nào", "Không có dấu hiệu nào"),
+    ("", ""),
+])
+def test_block_markup_a_model_echoed_is_removed_from_the_reply(raw, clean):
+    from app.services.ai.prompt_safety import strip_markers
+    assert strip_markers(raw) == clean
+
+
+def test_the_reply_never_carries_the_block_markup(monkeypatch):
+    leaked = "<<<DATA-868743ada610 tin nhắn của khách\nChào bạn!\nDATA-868743ada610>>>"
+    agent, _, _ = agent_with_fake_model(monkeypatch, [fakes.FakeMessage(leaked)])
+    assert agent.chat("xin chào", [])["reply"] == "Chào bạn!"
+
+
+def browse_agent(monkeypatch, message_events):
+    agent, calls, engines = agent_with_fake_model(monkeypatch, [fakes.FakeMessage("ok")])
+    monkeypatch.setattr(agent, "_vector_events", lambda text: [])
+    engines.event = [("ILIKE", []), ("ORDER BY e.created_at DESC", [fakes.row(id="ev-1", title="Show A", city="HCM")] if message_events else [])]
+    return agent, calls
+
+
+def test_a_general_question_browses_the_newest_events_instead_of_saying_nothing_matches(monkeypatch):
+    agent, calls = browse_agent(monkeypatch, True)
+    agent.chat("có sự kiện nào gần đây không", [])
+    human = calls[0]["messages"][-1].content
+    assert "Khách hỏi chung" in human and "show_event_cards" in human and "ev-1" in human
+    assert "không có sự kiện nào khớp" not in human
+
+
+def test_a_named_topic_with_no_match_still_says_so(monkeypatch):
+    agent, calls = browse_agent(monkeypatch, True)
+    agent.chat("kịch thiếu nhi", [])
+    human = calls[0]["messages"][-1].content
+    assert "không có sự kiện nào khớp" in human and "Khách hỏi chung" not in human
 
 
 def test_model_failure_propagates_as_an_error_not_an_apology(monkeypatch):

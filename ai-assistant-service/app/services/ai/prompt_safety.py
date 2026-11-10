@@ -13,6 +13,8 @@ import secrets
 
 DEFAULT_MAX_CHARS = 600
 _MARKER_RE = re.compile(r"<<<|>>>|DATA-[0-9A-Za-z]{6,}")
+_BLOCK_OPEN_RE = re.compile(r"<{2,}\s*DATA[-_][0-9A-Za-z]{4,}(?:[ \t]+(?:tin nhắn của khách|lịch sử hội thoại|dữ liệu sự kiện từ cơ sở dữ liệu|dữ liệu sự kiện đang có|kết quả công cụ|tên sự kiện))?[ \t]*\n?")
+_BLOCK_CLOSE_RE = re.compile(r"\n?[ \t]*DATA[-_][0-9A-Za-z]{4,}[ \t]*>{2,}")
 
 
 class DataBlocks:
@@ -47,3 +49,13 @@ class DataBlocks:
         if isinstance(value, dict):
             return {k: self._clean_json(v, limit) for k, v in value.items()}
         return value
+
+
+def strip_markers(text) -> str:
+    """Removes data-block markup a model echoed into its own answer (an opening line with its label, a closing delimiter,
+    stray <<< / >>>). The answer must be plain wording for the customer, never the block format of the prompt."""
+    value = "" if text is None else str(text)
+    value = _BLOCK_OPEN_RE.sub("", value)
+    value = _BLOCK_CLOSE_RE.sub("", value)
+    value = re.sub(r"<{3,}|>{3,}", "", value)
+    return value.strip()

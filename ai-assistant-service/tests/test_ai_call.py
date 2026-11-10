@@ -174,3 +174,28 @@ def test_profiles():
     assert p["event_content"].tier == "smart" and p["ai_probe"].max_tokens == 1
     for name in ("customer_chat", "admin_assistant", "risk_scoring", "analysis", "voucher_strategy", "ai_probe"):
         assert p[name].tier == "fast"
+
+
+def test_groq_gpt_oss_runs_with_low_reasoning_effort(monkeypatch):
+    monkeypatch.setattr(settings, "groq_api_key", "g")
+    monkeypatch.setattr(settings, "openai_api_key", "")
+    monkeypatch.setattr(settings, "gemini_api_key", "")
+    BEHAVIOR["groq"] = lambda: FakeMsg("ok")
+    ai_call.ai_invoke("risk_scoring", "x")
+    assert BUILT[0][0] == "groq" and BUILT[0][1]["reasoning_effort"] == "low"
+
+
+def test_a_provider_that_just_failed_twice_is_tried_last(monkeypatch):
+    monkeypatch.setattr(settings, "groq_api_key", "g")
+    monkeypatch.setattr(settings, "openai_api_key", "o")
+    monkeypatch.setattr(settings, "gemini_api_key", "real-gemini")
+    ai_call.reset_for_tests()
+    assert [c[0] for c in ai_call._candidates("fast")] == ["groq", "openai"]
+    ai_call._note("groq", False, "EMPTY_RESPONSE")
+    assert [c[0] for c in ai_call._candidates("fast")] == ["groq", "openai"]  # one failure is not enough to demote
+    ai_call._note("groq", False, "EMPTY_RESPONSE")
+    ai_call._note("openai", False, "OpenAIRateLimitError")
+    ai_call._note("openai", False, "OpenAIRateLimitError")
+    assert [c[0] for c in ai_call._candidates("fast")] == ["gemini", "groq"]  # both recently failing: gemini first, order kept after
+    ai_call._note("openai", True, None)
+    assert "openai" in [c[0] for c in ai_call._candidates("fast")]

@@ -93,7 +93,23 @@ def _candidates(tier: str) -> list:
     gemini = [k for k in _split_keys(settings.gemini_api_key) if k != _PLACEHOLDER_KEY]
     if gemini:
         out.append(("gemini", "gemini-pro-latest" if smart else "gemini-flash-latest", temp, gemini[0]))
-    return out[:MAX_PROVIDERS_PER_CALL]
+    return _healthy_first(out)[:MAX_PROVIDERS_PER_CALL]
+
+
+RECENT_FAILURE_SECONDS = 120
+
+
+def _healthy_first(candidates: list) -> list:
+    """A provider whose last two outcomes were both failures within the last two minutes (quota exhausted, rate limited, down) goes
+    to the end, so the next one is tried instead of calling it again. Order is otherwise unchanged; nothing is ever dropped."""
+    now = time.time()
+
+    def failing(provider: str) -> bool:
+        with _ring_lock:
+            last = list(_ring[provider])[-2:]
+        return len(last) == 2 and all(not ok and now - ts < RECENT_FAILURE_SECONDS for ts, ok, _code in last)
+
+    return sorted(candidates, key=lambda c: failing(c[0]))  # sorted is stable: False (healthy) first
 
 
 def _model_for(provider: str, model: str, temp: float, key: str, max_tokens: int, timeout: float):
@@ -103,7 +119,9 @@ def _model_for(provider: str, model: str, temp: float, key: str, max_tokens: int
         if cached is not None:
             return cached
         if provider == "groq":
-            built = ChatGroq(api_key=key, model=model, temperature=temp, timeout=timeout, max_retries=1, max_tokens=max_tokens)
+            extra = {"reasoning_effort": "low"} if "gpt-oss" in model else {}
+            # a reasoning model spends max_tokens on its thinking first: at the default effort a short answer can come back empty
+            built = ChatGroq(api_key=key, model=model, temperature=temp, timeout=timeout, max_retries=1, max_tokens=max_tokens, **extra)
         elif provider == "openai":
             built = ChatOpenAI(api_key=key, model=model, temperature=temp, timeout=timeout, max_retries=1, max_tokens=max_tokens)
         else:
