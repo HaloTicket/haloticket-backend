@@ -36,6 +36,7 @@ import com.haloticket.event_service.repository.EventRepository;
 import com.haloticket.event_service.repository.SearchLogRepository;
 import com.haloticket.event_service.repository.StaffAssignmentRepository;
 import com.haloticket.event_service.service.EventService;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -545,12 +546,13 @@ public class EventServiceImpl implements EventService {
             }
         }
 
+        Map<String, Object> approvalVariables = eventNotificationVariables(saved, List.of());
         if (prevStatus == EventApprovalStatus.UPDATE_PENDING) {
             publishNotification(recipientUserId, "EVENT_UPDATE_APPROVED", "Sự kiện đã được phê duyệt cập nhật!",
-                    "Các thay đổi cập nhật cho sự kiện \"" + saved.getTitle() + "\" đã được phê duyệt.");
+                    "Các thay đổi cập nhật cho sự kiện \"" + saved.getTitle() + "\" đã được phê duyệt.", approvalVariables);
         } else {
             publishNotification(recipientUserId, "EVENT_APPROVED", "Sự kiện đã được phê duyệt!",
-                    "Sự kiện \"" + saved.getTitle() + "\" của bạn đã được phê duyệt chính thức.");
+                    "Sự kiện \"" + saved.getTitle() + "\" của bạn đã được phê duyệt chính thức.", approvalVariables);
         }
 
         return mapToEventResponse(saved);
@@ -568,14 +570,58 @@ public class EventServiceImpl implements EventService {
 
         String recipientUserId = recipientOf(saved);
 
+        List<String> flagged = flaggedFieldsOf(notes);
+        String where = flagged.isEmpty() ? "" : " Mục cần sửa: "
+                + flagged.stream().map(f -> FLAG_LABELS.get(f)).collect(Collectors.joining(", ")) + ".";
         publishNotification(recipientUserId, "EVENT_REJECTED", "Sự kiện đã bị từ chối, xem lý do.",
                 "Sự kiện \"" + saved.getTitle() + "\" của bạn bị từ chối phê duyệt. Lý do: "
-                        + (reason != null ? reason : "Cần chỉnh sửa lại thông tin.") + ". Nhấn vào để xem và khắc phục.");
+                        + shorten(reason != null && !reason.isBlank() ? reason : "Cần chỉnh sửa lại thông tin.", 500) + "."
+                        + where + " Nhấn vào để xem chi tiết và chỉnh sửa.",
+                eventNotificationVariables(saved, flagged));
 
         return mapToEventResponse(saved);
     }
 
+    /** Items of the rejection form an admin can flag, with the label the organiser reads in the notification. */
+    private static final Map<String, String> FLAG_LABELS = Map.of(
+            "posterImage", "Poster & Banner", "title", "Tên & Mô tả", "dates", "Thời gian",
+            "tickets", "Hạng vé", "location", "Địa điểm", "paymentInfo", "Thanh toán");
+
+    /** The flagged fields the admin ticked (rejection notes are JSON: flaggedFields, noteText, flaggedQuotes); unknown names are dropped. */
+    private List<String> flaggedFieldsOf(String notes) {
+        if (notes == null || notes.isBlank()) return List.of();
+        try {
+            JsonNode root = objectMapper.readTree(notes);
+            List<String> out = new ArrayList<>();
+            for (JsonNode field : root.path("flaggedFields")) {
+                String name = field.asText("");
+                if (FLAG_LABELS.containsKey(name) && !out.contains(name)) out.add(name);
+            }
+            return out;
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    /** What the web needs to open the right event from the notification: the event id, where to go, and what to fix. */
+    private static Map<String, Object> eventNotificationVariables(Event event, List<String> flaggedFields) {
+        Map<String, Object> variables = new LinkedHashMap<>();
+        variables.put("eventId", event.getId());
+        variables.put("link", "/organizer/events/" + event.getId() + "/manage/edit");
+        if (!flaggedFields.isEmpty()) variables.put("flaggedFields", flaggedFields);
+        return variables;
+    }
+
+    private static String shorten(String text, int max) {
+        String value = text == null ? "" : text.strip();
+        return value.length() <= max ? value : value.substring(0, max - 1) + "…";
+    }
+
     private void publishNotification(String userId, String type, String title, String message) {
+        publishNotification(userId, type, title, message, null);
+    }
+
+    private void publishNotification(String userId, String type, String title, String message, Map<String, Object> variables) {
         if (userId == null || userId.isBlank()) return;
 
         Map<String, String> payload = new HashMap<>();
@@ -585,6 +631,13 @@ public class EventServiceImpl implements EventService {
         payload.put("title", title);
         payload.put("message", message);
         payload.put("timestamp", LocalDateTime.now().toString());
+        if (variables != null && !variables.isEmpty()) {
+            try {
+                payload.put("variables", objectMapper.writeValueAsString(variables));
+            } catch (Exception e) {
+                // the notification is still sent, without the extra data
+            }
+        }
 
         if (kafkaTemplate != null) {
             try {

@@ -9,11 +9,11 @@ from typing import Optional
 
 from app.core.config import settings
 
-AI_FLAG_POINTS = {"CODED_CONTACT": 15, "VEILED_PROHIBITED": 25, "OVERPROMISE": 10, "SCAM_PATTERN": 20}
+AI_FLAG_POINTS = {"VEILED_PROHIBITED": 25, "OVERPROMISE": 10, "SCAM_PATTERN": 20, "SOCIAL_CONTACT": 15}
 AI_FLAG_MESSAGES = {
-    "CODED_CONTACT": "Có cách ghi thông tin liên lạc cá nhân được che chữ để tránh bị phát hiện.",
     "VEILED_PROHIBITED": "Có dấu hiệu quảng bá hàng hóa, dịch vụ bị cấm bằng cách nói vòng.",
     "OVERPROMISE": "Có lời hứa phóng đại hoặc cam kết không thực tế.",
+    "SOCIAL_CONTACT": "Dẫn khách liên hệ hoặc mua vé qua mạng xã hội / ứng dụng chat (kể cả viết che chữ) thay vì qua HaloTicket.",
     "SCAM_PATTERN": "Nội dung có dấu hiệu lừa đảo (thu tiền trước ngoài hệ thống, hứa hẹn bất thường).",
 }
 CONFIDENCE_FACTOR = {"HIGH": 1.0, "MEDIUM": 0.7, "LOW": 0.4}
@@ -108,7 +108,7 @@ def combine(rule_findings: Optional[list], signal_results: list, ai_state: str, 
         "risk_score": score,
         "risk_level": level_for(score),
         "reason_items": reasons,
-        "reasons": [r["message"] for r in reasons if r.get("status") != "not_assessed"],
+        "reasons": [r["message"] for r in reasons if r.get("status") != "not_assessed" and r["weight"] > 0],
         "ruleset_version": ruleset_version,
         "coverage": {"rules": rule_findings is not None,
                      "signals": {"assessed": assessed, "total": len(signal_results), "missing": ["UNAVAILABLE:" + m for m in missing]},

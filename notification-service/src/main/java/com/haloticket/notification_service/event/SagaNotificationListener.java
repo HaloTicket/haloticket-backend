@@ -343,9 +343,10 @@ public class SagaNotificationListener {
             String type = node.path("type").asText();
             String title = node.path("title").asText();
             String message = node.path("message").asText();
+            String variables = node.hasNonNull("variables") ? node.path("variables").asText() : null;
 
             if (!recipientUserId.isBlank() && !type.isBlank()) {
-                notificationService.publishDirectNotification(recipientUserId, type, title, message);
+                notificationService.publishDirectNotification(recipientUserId, type, title, message, variables);
                 log.info("Sent direct/payout notification to {} (type: {})", recipientUserId, type);
             }
         } catch (Exception e) {

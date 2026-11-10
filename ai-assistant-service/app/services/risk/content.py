@@ -8,9 +8,18 @@ _TAG = re.compile(r"<[^>]+>")
 _SPACE = re.compile(r"[ \t\r\f\v]+")
 
 
+_BLOCK_END = re.compile(r"</\s*(?:p|div|li|ul|ol|h[1-6]|tr|table|section|blockquote)\s*>|<\s*br\s*/?\s*>", re.IGNORECASE)
+_LIST_ITEM = re.compile(r"<\s*li(?:\s[^>]*)?>", re.IGNORECASE)
+
+
 def plain_text(value) -> str:
-    text = html.unescape(_TAG.sub(" ", str(value or "")))
-    return _SPACE.sub(" ", text).strip()
+    """Text of a description. Paragraph, line and list tags of an HTML description become line breaks (and list items a bullet),
+    so the rules can tell a list from the sentence that introduces it."""
+    raw = str(value or "")
+    raw = _LIST_ITEM.sub("\n● ", _BLOCK_END.sub("\n", raw))
+    text = html.unescape(_TAG.sub(" ", raw))
+    lines = [_SPACE.sub(" ", line).strip() for line in text.split("\n")]
+    return "\n".join(line for line in lines if line)
 
 
 def _tickets(event: dict) -> list:

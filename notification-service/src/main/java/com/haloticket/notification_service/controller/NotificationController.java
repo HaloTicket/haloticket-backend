@@ -73,6 +73,6 @@ public class NotificationController {
         String type = body.getOrDefault("type", "GENERAL");
         String title = body.getOrDefault("title", "Thông báo mới");
         String message = body.getOrDefault("message", "");
-        return ResponseEntity.ok(notificationService.publishDirectNotification(userId, type, title, message));
+        return ResponseEntity.ok(notificationService.publishDirectNotification(userId, type, title, message, body.get("variables")));
     }
 }

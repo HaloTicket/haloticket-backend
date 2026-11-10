@@ -9,7 +9,7 @@ from app.services.admin_intel import risk_service, upstream
 from tests.admin_fakes import FakeModel, FakeStore, FakeUpstream, admin_token, event, make_client
 
 CLEAN = event("e1")
-PHONE = event("e2", description="Liên hệ 0901234567 để mua vé giá rẻ")
+PHONE = event("e2", description="Bán vũ khí quân dụng giá rẻ, liên hệ 0901234567")
 BODY = {"event_id": "e1", "title": "x", "description": "y", "organizer_name": "z"}
 
 
@@ -32,7 +32,7 @@ def test_a_clean_event_gets_all_three_layers_and_the_old_fields(world):
     assert response.status_code == 200
     body = response.json()
     assert body["risk_score"] == 0 and body["risk_level"] == "LOW" and body["reasons"] == []  # old contract
-    assert body["coverage"]["ai"] == "ran" and body["complete"] is True and body["ruleset_version"] == "1"
+    assert body["coverage"]["ai"] == "ran" and body["complete"] is True and body["ruleset_version"] == "3"
     assert body["stored"] is True and body["cached"] is False and body["assessment_id"]
     assert model.calls[0]["profile"] == "risk_scoring" and model.calls[0]["actor"].startswith("sub:")
 
@@ -41,7 +41,7 @@ def test_the_event_is_read_from_the_event_service_not_from_the_client(world):
     _, _, _, client = world
     body = post(client, event_id="e2", description="văn bản sạch do client gửi").json()
     assert body["risk_level"] != "LOW" or body["risk_score"] > 0
-    assert any(r["code"] == "contact_phone" for r in body["reason_items"])  # found in the stored event, not in the client text
+    assert any(r["code"] == "prohibited_goods" for r in body["reason_items"])  # found in the stored event, not in the client text
 
 
 def test_a_stored_score_for_the_same_content_is_returned_without_a_model_call(world):
@@ -68,8 +68,8 @@ def test_an_ai_failure_still_scores_and_says_so(world, monkeypatch):
     monkeypatch.setattr(risk_service, "ai_invoke", FakeModel(ai_error(AI_UNAVAILABLE)))
     body = post(client, event_id="e2").json()
     assert body["coverage"]["ai"] == "failed" and body["complete"] is False
-    assert body["risk_score"] >= 25 and body["risk_level"] in ("MEDIUM", "HIGH", "LOW")
-    assert any(r["code"] == "contact_phone" for r in body["reason_items"])
+    assert body["risk_score"] >= 60 and body["risk_level"] in ("MEDIUM", "HIGH", "LOW")
+    assert any(r["code"] == "prohibited_goods" for r in body["reason_items"])
 
 
 def test_bad_model_output_is_a_failed_layer_not_a_zero(world, monkeypatch):
@@ -80,7 +80,7 @@ def test_bad_model_output_is_a_failed_layer_not_a_zero(world, monkeypatch):
 
 def test_a_model_flag_adds_points_only_for_a_real_quote(world, monkeypatch):
     _, _, _, client = world
-    quote = "Liên hệ 0901234567"
+    quote = "Bán vũ khí quân dụng giá rẻ"
     monkeypatch.setattr(risk_service, "ai_invoke", FakeModel(json.dumps({"flags": [
         {"code": "SCAM_PATTERN", "quote": quote, "confidence": "HIGH"}, {"code": "SCAM_PATTERN", "quote": "invented", "confidence": "HIGH"}]})))
     items = post(client, event_id="e2").json()["reason_items"]
@@ -91,9 +91,9 @@ def test_a_model_flag_adds_points_only_for_a_real_quote(world, monkeypatch):
 def test_unreadable_event_uses_the_client_text_and_is_marked(world):
     up, _, _, client = world
     up.values["approvals"] = RuntimeError("gateway down")
-    body = post(client, description="Gọi 0901234567").json()
+    body = post(client, description="Bán vũ khí quân dụng giá rẻ").json()
     assert body["complete"] is False and "UNAVAILABLE:event_fetch" in body["coverage"]["signals"]["missing"]
-    assert any(r["code"] == "contact_phone" for r in body["reason_items"])
+    assert any(r["code"] == "prohibited_goods" for r in body["reason_items"])
 
 
 def test_without_storage_the_score_is_still_returned(monkeypatch):
@@ -169,7 +169,7 @@ def test_decisions_need_storage(monkeypatch):
 
 def test_agreement_counts_recorded_and_derived_decisions(world):
     up, st, _, client = world
-    events = [event(f"h{i}", description="Gọi 0901234567 inbox facebook.com/x bán vũ khí") for i in range(2)] + [event(f"l{i}") for i in range(2)] + [event("m", description="Gọi 0901234567 hoặc inbox facebook.com/x")]
+    events = [event(f"h{i}", description="Bán vũ khí quân dụng giá rẻ") for i in range(2)] + [event(f"l{i}") for i in range(2)] + [event("m", description="Tài trợ bởi thuốc lá điện tử XYZ")]
     up.values["approvals"] = events
     client.post("/api/admin/risk/batch", json={"event_ids": [e["id"] for e in events]})
     # h0 rejected (agree, recorded), h1 approved (disagree, derived from status), l0 approved (agree, derived), l1 still pending, m is medium

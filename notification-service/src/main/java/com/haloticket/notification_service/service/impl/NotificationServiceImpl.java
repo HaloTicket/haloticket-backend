@@ -143,12 +143,13 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
-    public NotificationResponse publishDirectNotification(String userId, String type, String title, String message) {
+    public NotificationResponse publishDirectNotification(String userId, String type, String title, String message, String variablesJson) {
         Notification notification = Notification.builder()
                 .userId(userId)
                 .type(type)
                 .title(title)
                 .message(message)
+                .variablesJson(validVariables(variablesJson))
                 .readStatus(false)
                 .channel(com.haloticket.notification_service.enums.NotificationChannel.EMAIL)
                 .status(NotificationStatus.SENT)
@@ -157,6 +158,16 @@ public class NotificationServiceImpl implements NotificationService {
         NotificationResponse response = toNotificationResponse(saved);
         broadcastStompNotification(response);
         return response;
+    }
+
+    /** Extra data for the web (event id, link, flagged fields): kept only when it is a JSON object of reasonable size. */
+    private String validVariables(String raw) {
+        if (raw == null || raw.isBlank() || raw.length() > 4000) return null;
+        try {
+            return objectMapper.readTree(raw).isObject() ? raw : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void broadcastStompNotification(NotificationResponse response) {

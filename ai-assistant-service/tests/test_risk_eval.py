@@ -50,7 +50,7 @@ def test_the_files_have_the_promised_size_and_unique_ids():
     assert len(RISK) == 30 and len(QUESTIONS) == 20
     assert len({c["id"] for c in RISK}) == 30 and len({q["id"] for q in QUESTIONS}) == 20
     categories = {c["category"] for c in RISK}
-    assert {"clean", "phone", "social", "prohibited", "injection", "price", "duplicate", "missing"} <= categories
+    assert {"clean", "contact_allowed", "social", "ban_context", "prohibited", "injection", "price", "duplicate", "missing"} <= categories
 
 
 def test_the_question_file_has_the_fields_a5_needs():
@@ -73,11 +73,11 @@ def test_risk_case(case):
         assert code not in codes, (code, codes)
     if expect["complete"] is not None:
         assert result["complete"] is expect["complete"]
-    assert result["ruleset_version"] == "1"
+    assert result["ruleset_version"] == "3"
 
 
 def test_injection_cases_score_exactly_like_the_same_text_without_the_instruction():
     case = next(c for c in RISK if c["category"] == "injection")
     plain = json.loads(json.dumps(case))
-    plain["event"]["descriptionText"] = plain["event"]["description"] = "Liên hệ 0901234567"
+    plain["event"]["descriptionText"] = plain["event"]["description"] = "Bán thuốc lá điện tử giá rẻ."
     assert assess(case)["risk_score"] == assess(plain)["risk_score"]

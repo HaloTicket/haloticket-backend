@@ -90,13 +90,13 @@ TEXTS = {"title": "Đêm nhạc", "description": "Inbox số 09-0-1-2-3 mười 
 
 
 def test_ai_flags_need_a_verbatim_quote():
-    flags = [{"code": "CODED_CONTACT", "quote": "09-0-1-2-3 mười một", "confidence": "HIGH"},
-             {"code": "SCAM_PATTERN", "quote": "không có trong văn bản", "confidence": "HIGH"},
+    flags = [{"code": "SCAM_PATTERN", "quote": "09-0-1-2-3 mười một", "confidence": "HIGH"},
+             {"code": "VEILED_PROHIBITED", "quote": "không có trong văn bản", "confidence": "HIGH"},
              {"code": "NOT_A_CODE", "quote": "Inbox số", "confidence": "HIGH"},
              {"code": "OVERPROMISE", "quote": "vé giá rẻ", "confidence": "SURE"},
              "garbage", {"code": "OVERPROMISE", "quote": "vé", "confidence": "LOW"}]
     kept = engine.validate_ai_flags(flags, TEXTS)
-    assert [f["code"] for f in kept] == ["CODED_CONTACT"]
+    assert [f["code"] for f in kept] == ["SCAM_PATTERN"]
     assert kept[0]["evidence"]["field"] == "description" and TEXTS["description"][kept[0]["evidence"]["start"]:kept[0]["evidence"]["end"]] == "09-0-1-2-3 mười một"
     assert engine.validate_ai_flags("not a list", TEXTS) == []
 
@@ -104,7 +104,7 @@ def test_ai_flags_need_a_verbatim_quote():
 def test_the_model_layer_only_adds_and_is_capped():
     base = engine.combine([], [], "skipped", [], "1")["risk_score"]
     flags = [{"code": c, "confidence": "HIGH", "evidence": {"field": "description", "start": 0, "end": 3, "text": "abc"}}
-             for c in ("CODED_CONTACT", "VEILED_PROHIBITED", "SCAM_PATTERN", "OVERPROMISE")]
+             for c in ("VEILED_PROHIBITED", "SCAM_PATTERN", "OVERPROMISE")]
     result = engine.combine([], [], "ran", flags, "1")
     assert base == 0 and 0 < result["risk_score"] <= settings.risk_ai_max_points
 

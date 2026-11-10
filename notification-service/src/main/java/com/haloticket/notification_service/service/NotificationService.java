@@ -27,6 +27,10 @@ public interface NotificationService {
 
     NotificationResponse processEvent(NotificationEvent event);
 
-    NotificationResponse publishDirectNotification(String userId, String type, String title, String message);
+    NotificationResponse publishDirectNotification(String userId, String type, String title, String message, String variablesJson);
+
+    default NotificationResponse publishDirectNotification(String userId, String type, String title, String message) {
+        return publishDirectNotification(userId, type, title, message, null);
+    }
 }
 
