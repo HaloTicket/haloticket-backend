@@ -17,6 +17,15 @@ AI_FLAG_MESSAGES = {
     "SCAM_PATTERN": "Nội dung có dấu hiệu lừa đảo (thu tiền trước ngoài hệ thống, hứa hẹn bất thường).",
 }
 CONFIDENCE_FACTOR = {"HIGH": 1.0, "MEDIUM": 0.7, "LOW": 0.4}
+# the organiser signals move together (a new account is usually also unverified), so they share one capped budget
+ORGANIZER_SIGNAL_CODES = ("organizer_account_new", "organizer_account_young", "organizer_ekyc_not_approved", "organizer_history_rejected")
+# a model flag that points at the same words as the rule that already scored them adds nothing
+AI_RULE_EQUIVALENT = {
+    "SOCIAL_CONTACT": ("contact_social",),
+    "VEILED_PROHIBITED": ("prohibited_goods", "prohibited_ads"),
+    "SCAM_PATTERN": ("profit_guarantee",),
+    "OVERPROMISE": ("overpromise",),
+}
 LEVEL_ORDER = {"LOW": 0, "MEDIUM": 1, "HIGH": 2}
 
 
@@ -59,6 +68,46 @@ def validate_ai_flags(raw_flags, texts: dict) -> list:
     return kept
 
 
+def _overlaps(a: dict, b: dict) -> bool:
+    if a.get("field") != b.get("field"):
+        return False
+    try:
+        return a["start"] < b["end"] and b["start"] < a["end"]
+    except (KeyError, TypeError):
+        return False
+
+
+def drop_flags_already_scored(valid_flags: list, rule_findings: list) -> tuple:
+    """(kept, dropped_count). A flag is dropped when its quote overlaps the evidence of the rule that covers the same kind of
+    violation: the rule already scored those words, counting them again would inflate the score."""
+    kept, dropped = [], 0
+    for flag in valid_flags:
+        covered = AI_RULE_EQUIVALENT.get(flag["code"], ())
+        duplicate = any(f.get("code") in covered and f.get("weight", 0) > 0 and any(_overlaps(flag["evidence"], e) for e in f.get("evidence", []))
+                        for f in rule_findings)
+        if duplicate:
+            dropped += 1
+        else:
+            kept.append(flag)
+    return kept, dropped
+
+
+def cap_organizer_signals(findings: list) -> list:
+    """The organiser signals share settings.risk_organizer_signal_cap points; the largest are kept whole, the one that crosses
+    the cap is cut, the rest score 0. They stay in the reasons (capped=True) so the reviewer still sees them."""
+    cap = settings.risk_organizer_signal_cap
+    group = sorted((f for f in findings if f.get("code") in ORGANIZER_SIGNAL_CODES), key=lambda f: -f["weight"])
+    if sum(f["weight"] for f in group) <= cap:
+        return findings
+    left, replaced = cap, {}
+    for f in group:
+        weight = min(f["weight"], left)
+        left -= weight
+        if weight != f["weight"]:
+            replaced[id(f)] = dict(f, weight=weight, capped=True)
+    return [replaced.get(id(f), f) for f in findings]
+
+
 def ai_findings(valid_flags: list) -> list:
     findings = []
     budget = settings.risk_ai_max_points
@@ -75,7 +124,7 @@ def ai_findings(valid_flags: list) -> list:
 
 
 def combine(rule_findings: Optional[list], signal_results: list, ai_state: str, ai_flags: list,
-            ruleset_version: Optional[str]) -> dict:
+            ruleset_version: Optional[str], ai_meta: Optional[dict] = None) -> dict:
     """rule_findings None = layer A unavailable. signal_results: [{name, status, finding?}]. ai_state: ran|failed|skipped."""
     findings = list(rule_findings or [])
     missing = []
@@ -87,7 +136,11 @@ def combine(rule_findings: Optional[list], signal_results: list, ai_state: str, 
                 findings.append(result["finding"])
         else:
             missing.append(result["name"])
+    findings = cap_organizer_signals(findings)
     base = sum(f["weight"] for f in findings)
+    overlap_dropped = 0
+    if ai_state == "ran":
+        ai_flags, overlap_dropped = drop_flags_already_scored(ai_flags, rule_findings or [])
     ai_items = ai_findings(ai_flags) if ai_state == "ran" else []
     findings.extend(ai_items)
     score = base + sum(f["weight"] for f in ai_items)
@@ -112,6 +165,6 @@ def combine(rule_findings: Optional[list], signal_results: list, ai_state: str, 
         "ruleset_version": ruleset_version,
         "coverage": {"rules": rule_findings is not None,
                      "signals": {"assessed": assessed, "total": len(signal_results), "missing": ["UNAVAILABLE:" + m for m in missing]},
-                     "ai": ai_state},
+                     "ai": ai_state, "ai_overlap_dropped": overlap_dropped, **({"ai_meta": ai_meta} if ai_meta else {})},
         "complete": complete,
     }

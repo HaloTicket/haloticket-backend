@@ -32,7 +32,7 @@ def test_a_clean_event_gets_all_three_layers_and_the_old_fields(world):
     assert response.status_code == 200
     body = response.json()
     assert body["risk_score"] == 0 and body["risk_level"] == "LOW" and body["reasons"] == []  # old contract
-    assert body["coverage"]["ai"] == "ran" and body["complete"] is True and body["ruleset_version"] == "3"
+    assert body["coverage"]["ai"] == "ran" and body["complete"] is True and body["ruleset_version"] == "4"
     assert body["stored"] is True and body["cached"] is False and body["assessment_id"]
     assert model.calls[0]["profile"] == "risk_scoring" and model.calls[0]["actor"].startswith("sub:")
 

@@ -88,6 +88,7 @@ class Settings(BaseSettings):
     risk_high_threshold: int = 60
     risk_block_floor: int = 70  # a BLOCK rule (prohibited goods, guaranteed profit) never scores below this
     risk_ai_max_points: int = 30  # the language-model layer can add at most this many points
+    risk_organizer_signal_cap: int = 30  # account age, eKYC and rejection history are correlated: together they add at most this much
     attn_high_risk_pending_hours: int = 12
     attn_critical_pending_hours: int = 24
     attn_late_payment_minutes: int = 30

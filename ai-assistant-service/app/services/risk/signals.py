@@ -136,6 +136,9 @@ def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datet
         for other in events()[:MAX_DUPLICATE_CANDIDATES]:
             if str(other.get("id")) == event_id:
                 continue
+            other_organizer = other.get("organizer") if isinstance(other.get("organizer"), dict) else {}
+            if user_id and other_organizer.get("userId") == user_id and other.get("eventApprovalStatus") == "APPROVED":
+                continue  # a show the same organiser already had approved (a series, a new season) is not a copy of someone else
             other_text = f"{other.get('title', '')} {other.get('descriptionText') or other.get('description') or ''}"
             score = similarity(mine, other_text)
             if score > best_score:

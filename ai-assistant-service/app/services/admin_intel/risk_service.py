@@ -38,26 +38,40 @@ def find_event(authorization: str, event_id: str) -> Optional[dict]:
     return None
 
 
-def _compute(event: dict, built: dict, authorization: str, ai_state: str, ai_flags: list) -> dict:
+def _compute(event: dict, built: dict, authorization: str, ai_state: str, ai_flags: list, ai_meta: Optional[dict] = None) -> dict:
     ruleset = rules.load_rules()
     findings = rules.evaluate(built["texts"], ruleset) if ruleset else None
     results = signals.evaluate(event, built["texts"], _source(authorization))
-    return engine.combine(findings, results, ai_state, ai_flags, ruleset.version if ruleset else None)
+    return engine.combine(findings, results, ai_state, ai_flags, ruleset.version if ruleset else None, ai_meta)
 
 
 def _run_ai(built: dict, actor: str, invoke: Callable, check_limit: Optional[Callable]) -> tuple:
-    """(state, valid_flags). A rate-limit refusal propagates (the caller gets 429); every other failure is 'failed'."""
+    """(state, valid_flags, meta). A rate-limit refusal propagates (the caller gets 429); every other failure is 'failed'.
+    Flags that pass the quote check get a second reading (semantic.verify) that can only remove them. When that reading itself
+    fails the flags are kept and meta says so: losing a real finding to an outage would be the worse error."""
     if check_limit:
         check_limit()
     try:
-        raw = semantic.run(invoke, built["texts"], built["organizer_name"], actor)
-        return "ran", engine.validate_ai_flags(raw, built["texts"])
+        raw, meta = semantic.run_with_meta(invoke, built["texts"], built["organizer_name"], actor)
+        flags = engine.validate_ai_flags(raw, built["texts"])
+        meta["flags_proposed"] = len(raw)
+        meta["verify"] = "skipped"
+        if flags:
+            try:
+                confirmed = semantic.verify(invoke, built["texts"], flags, actor)
+                meta["verify"] = "ran"
+                meta["verify_removed"] = [f["code"] for f in flags if f["code"] not in confirmed]
+                flags = [f for f in flags if f["code"] in confirmed]
+            except Exception as failure:
+                meta["verify"] = "failed"
+                log.warning("Risk flag verification failed: %s", getattr(failure, "code", type(failure).__name__))
+        return "ran", flags, meta
     except AiError as failure:
         log.warning("Risk AI layer failed: %s", failure.code)
-        return "failed", []
+        return "failed", [], {}
     except Exception as failure:
         log.warning("Risk AI layer failed: %s", type(failure).__name__)
-        return "failed", []
+        return "failed", [], {}
 
 
 def _finish(result: dict, event_id: str, built: dict, trigger: str, created_by: str, cached: bool = False) -> dict:
@@ -108,10 +122,10 @@ def assess(authorization: str, actor: str, event_id: str, *, fallback: Optional[
                 and (latest["ai_layer"] == "ran" or not run_ai):
             return _finish(_from_stored(latest), event_id, built, trigger, actor, cached=True)
 
-    ai_state, flags = "skipped", []
+    ai_state, flags, ai_meta = "skipped", [], {}
     if run_ai:
-        ai_state, flags = _run_ai(built, actor, invoke or ai_invoke, check_limit)
-    result = _compute(event, built, authorization, ai_state, flags)
+        ai_state, flags, ai_meta = _run_ai(built, actor, invoke or ai_invoke, check_limit)
+    result = _compute(event, built, authorization, ai_state, flags, ai_meta)
     if not from_event:  # the content came from the client: say so, it is not a verified reading of the event
         result["reason_items"].append({"layer": "SIGNAL", "code": "UNAVAILABLE:event_fetch", "severity": "INFO", "weight": 0,
                                        "status": "not_assessed", "evidence": [],

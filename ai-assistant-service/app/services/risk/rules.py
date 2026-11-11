@@ -27,6 +27,13 @@ MAX_EVIDENCE_PER_RULE = 3
 MAX_TEXT_CHARS = 20000
 MAX_SCOPE_LOOKBACK = 30  # segments above a list item that are searched for the sentence that introduces the list
 
+# characters that print as nothing, and letters from other alphabets that look like Latin ones, used to dodge keyword lists
+_ZERO_WIDTH = frozenset("\u200b\u200c\u200d\u2060\ufeff\u00ad")
+_LOOKALIKE = {"а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "х": "x", "у": "y", "і": "i", "ѕ": "s", "ј": "j",
+              "ο": "o", "α": "a", "ε": "e", "ι": "i", "ν": "v", "ρ": "p", "τ": "t"}
+_SPACED_RUN = re.compile(r"(?<![a-z0-9])[a-z0-9](?:[ .\-_*]+[a-z0-9]){2,}(?![a-z0-9])")  # "z a l o", "i.n.b.o.x"
+_PHRASE_SEPARATORS = re.compile(r"[ .\-_*/:]")
+MIN_COLLAPSED_PHRASE = 4  # shorter than this and a spaced-out run would match by accident
 _ALCOHOL = re.compile(r"ruou[^.\n]{0,40}?(\d{2})\s*(?:do\b|%)")
 _SEGMENT = re.compile(r"(?:[●•▪■◦]\s*)?[^\n●•▪■◦]+")
 _SENTENCE_END = ".;!?"
@@ -88,10 +95,14 @@ def normalise(text: str, obfuscation: Optional[dict] = None) -> tuple:
     """(normalised, index) with len(normalised) == len(index); index[i] is the position in `text` of normalised[i]."""
     out, index = [], []
     for position, char in enumerate(text):
+        if char in _ZERO_WIDTH:
+            continue  # prints as nothing: "za<zero-width>lo" must read as "zalo"
         if char in ("đ", "Đ"):
             base = "d"
+        elif char.lower() in _LOOKALIKE:
+            base = _LOOKALIKE[char.lower()]
         else:
-            decomposed = unicodedata.normalize("NFD", char)
+            decomposed = unicodedata.normalize("NFKD", char)  # also folds full-width letters (ｆａｃｅ) to plain ones
             base = "".join(c for c in decomposed if not unicodedata.combining(c))
             if not base:
                 continue  # a loose combining mark
@@ -104,6 +115,44 @@ def normalise(text: str, obfuscation: Optional[dict] = None) -> tuple:
         out.append(base)
         index.append(position)
     return "".join(out), index
+
+
+def collapse_spaced_runs(norm: str, index: list) -> tuple:
+    """(collapsed, index, runs). Letters written one by one with separators between them ("z a l o", "i.n.b.o.x") are joined;
+    runs lists the [start, end) of every joined run in the collapsed text. Only such runs change, the rest is kept as is."""
+    out, idx, runs, last = [], [], [], 0
+    size = 0
+    for m in _SPACED_RUN.finditer(norm):
+        out.append(norm[last:m.start()])
+        idx.extend(index[last:m.start()])
+        size += m.start() - last
+        begin = size
+        for position in range(m.start(), m.end()):
+            if norm[position].isalnum():
+                out.append(norm[position])
+                idx.append(index[position])
+                size += 1
+        runs.append((begin, size))
+        last = m.end()
+    out.append(norm[last:])
+    idx.extend(index[last:])
+    return "".join(out), idx, runs
+
+
+def _spans_in_runs(collapsed: str, runs: list, phrase: str):
+    """Spans of the phrase (written without spaces and dots) that lie wholly inside one joined run."""
+    needle = _PHRASE_SEPARATORS.sub("", phrase)
+    if len(needle) < MIN_COLLAPSED_PHRASE:
+        return
+    start = 0
+    while True:
+        at = collapsed.find(needle, start)
+        if at < 0:
+            return
+        end = at + len(needle)
+        if any(a <= at and end <= b for a, b in runs):
+            yield at, end
+        start = at + 1
 
 
 def _spans_for_phrase(norm: str, phrase: str):
@@ -126,7 +175,7 @@ def _evidence(field_name: str, original: str, index: list, start: int, end: int)
     return {"field": field_name, "start": first, "end": last, "text": original[first:last][:160]}
 
 
-def _scan(rule: Rule, field_name: str, original: str, norm: str, index: list, norm_obf: str) -> list:
+def _scan(rule: Rule, field_name: str, original: str, norm: str, index: list, norm_obf: str, collapsed=None) -> list:
     found = []
     if rule.kind == "alcohol":
         for m in _ALCOHOL.finditer(norm):
@@ -142,6 +191,14 @@ def _scan(rule: Rule, field_name: str, original: str, norm: str, index: list, no
                     spans.add(span)
         for start, end in sorted(spans):
             found.append(_evidence(field_name, original, index, start, end))
+        if rule.obfuscated and collapsed is not None:
+            joined, joined_index, runs = collapsed
+            if runs:
+                joined_spans = set()
+                for phrase in rule.phrases:
+                    joined_spans.update(_spans_in_runs(joined, runs, phrase))
+                for start, end in sorted(joined_spans):
+                    found.append(_evidence(field_name, original, joined_index, start, end))
     return found
 
 
@@ -214,15 +271,15 @@ def evaluate(texts: dict, ruleset: RuleSet) -> list:
     for field_name, raw in texts.items():
         original = (raw or "")[:MAX_TEXT_CHARS]
         norm, index = normalise(original)
-        norm_obf, _ = normalise(original, ruleset.obfuscation)
-        prepared[field_name] = (original, norm, index, norm_obf, _segments(original))
+        norm_obf, index_obf = normalise(original, ruleset.obfuscation)
+        prepared[field_name] = (original, norm, index, norm_obf, _segments(original), collapse_spaced_runs(norm_obf, index_obf))
     findings, ignored = [], []
     for rule in ruleset.rules:
         evidence = []
-        for field_name, (original, norm, index, norm_obf, segments) in prepared.items():
+        for field_name, (original, norm, index, norm_obf, segments, collapsed) in prepared.items():
             if not norm:
                 continue
-            for item in _scan(rule, field_name, original, norm, index, norm_obf):
+            for item in _scan(rule, field_name, original, norm, index, norm_obf, collapsed):
                 if is_prohibition_context(original, segments, item["start"], item["end"], ruleset):
                     ignored.append(item)
                 else:

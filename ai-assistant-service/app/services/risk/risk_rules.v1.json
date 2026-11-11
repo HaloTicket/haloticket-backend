@@ -1,5 +1,5 @@
 {
-  "version": "3",
+  "version": "4",
   "source": "Quy định kiểm duyệt HaloTicket: hàng cấm kinh doanh, hàng cấm quảng cáo, cam kết lợi nhuận, liên hệ qua mạng xã hội. Email và số điện thoại của ban tổ chức là hợp lệ và KHÔNG bị chấm điểm; liên kết hoặc lời mời liên hệ qua mạng xã hội / ứng dụng chat thì KHÔNG được phép.",
   "context": {
     "strong_ban": [
@@ -10,7 +10,7 @@
   },
   "rules": [
     {
-      "code": "contact_social", "kind": "phrases", "severity": "HIGH", "weight": 25,
+      "code": "contact_social", "kind": "phrases", "severity": "HIGH", "weight": 25, "obfuscated": true,
       "message": "Có liên kết hoặc lời mời liên hệ qua mạng xã hội / ứng dụng chat (Facebook, Zalo, Telegram...). Không được dẫn khách sang kênh ngoài HaloTicket.",
       "phrases": ["facebook.com", "fb.com", "fb.me", "m.me/", "zalo.me", "zalo.com", "t.me/", "telegram", "wa.me/", "whatsapp", "instagram.com", "tiktok.com", "inbox", "ib zalo", "add zalo", "kb zalo", "lien he zalo", "lien he facebook", "nhan tin zalo", "nhan tin facebook", "fanpage", "group facebook"]
     },
