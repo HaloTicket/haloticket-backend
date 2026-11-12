@@ -1,5 +1,5 @@
 package com.haloticket.payment_service.enums;
 
 public enum PayoutStatus {
-    PENDING, PROCESSING, COMPLETED, FAILED, DISPUTE
+    PENDING, APPROVED, PROCESSING, COMPLETED, FAILED, REJECTED, CANCELLED, NEEDS_VERIFICATION, DISPUTE
 }

@@ -60,6 +60,9 @@ public class OrganizerPayoutAccount {
     @Column(name = "verification_reference")
     private String verificationReference;
 
+    @Column(name = "verified_by")
+    private String verifiedBy;
+
     @Column(name = "verified_at")
     private LocalDateTime verifiedAt;
 
