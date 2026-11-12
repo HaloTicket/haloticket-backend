@@ -57,6 +57,7 @@ public class InternalReportSecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/bookings/by-code/**").authenticated()
+                        .requestMatchers("/api/bookings/events/*/organizer/finance-facts").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/bookings/*/cancel").authenticated()
                         .anyRequest().permitAll())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

@@ -3,6 +3,7 @@ package com.haloticket.booking_service.controller;
 import com.haloticket.booking_service.authz.EventAccessClient;
 import com.haloticket.booking_service.authz.EventScopeProperties;
 import com.haloticket.booking_service.client.PaymentServiceClient;
+import com.haloticket.booking_service.client.EventServiceClient;
 import com.haloticket.booking_service.dto.response.BookingDetailDto;
 import com.haloticket.booking_service.entity.Booking;
 import com.haloticket.booking_service.repository.BookingRepository;
@@ -12,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 import java.util.Map;
@@ -26,6 +28,7 @@ public class OrganizerBookingController {
     private final PaymentServiceClient paymentServiceClient;
     private final EventAccessClient eventAccess;
     private final EventScopeProperties scope;
+    private final EventServiceClient eventServiceClient;
 
     @GetMapping
     public ResponseEntity<Page<BookingDetailDto>> getEventBookings(
@@ -76,4 +79,18 @@ public class OrganizerBookingController {
                 
         return ResponseEntity.ok(dtoPage);
     }
+
+    @GetMapping("/finance-facts")
+    public ResponseEntity<FinanceFactsResponse> getFinanceFacts(@PathVariable String eventId,
+            @RequestHeader("Authorization") String authorization) {
+        boolean admin = SecurityContextHolder.getContext().getAuthentication().getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+        boolean owner = admin || eventServiceClient.getMyEvents(authorization).stream().anyMatch(event -> eventId.equals(event.getId()));
+        if (!owner) return ResponseEntity.notFound().build();
+        List<BookingRepository.FinanceFact> rows = bookingRepository.findPaidFinanceFactsByEventId(eventId);
+        return ResponseEntity.ok(new FinanceFactsResponse(eventId, rows.stream().map(BookingRepository.FinanceFact::getBookingId).toList(),
+                rows.stream().mapToLong(row -> row.getAmount() == null ? 0L : Math.round(row.getAmount())).sum()));
+    }
+
+    public record FinanceFactsResponse(String eventId, List<String> paidBookingIds, long paidBookingAmount) {}
 }

@@ -66,7 +66,7 @@ class EventScopedBookingAuthorizationTest {
         scope.setCacheSeconds(0);
         access = new EventAccessClient(events, scope);
         bookingController = new BookingController(bookings, mock(BookingCancellationService.class), access, scope);
-        organizerController = new OrganizerBookingController(repository, payments, access, scope);
+        organizerController = new OrganizerBookingController(repository, payments, access, scope, mock(com.haloticket.booking_service.client.EventServiceClient.class));
         seatController = new SeatController(seatHolds, scope);
         when(events.getMyAccess(anyString(), anyString())).thenAnswer(call -> {
             String event = call.getArgument(0);
