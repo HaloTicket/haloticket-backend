@@ -44,6 +44,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+import com.haloticket.event_service.client.BookingInternalServiceClient;
+import com.haloticket.event_service.service.EventCatalogWriter;
+import com.haloticket.event_service.service.TicketSyncService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -68,12 +71,16 @@ public class EventServiceImpl implements EventService {
     private final UserServiceClient userServiceClient;
     private final UserInternalServiceClient userInternalServiceClient;
     private final StaffAssignmentRepository staffAssignmentRepository;
-    private final com.haloticket.event_service.service.EventCatalogWriter catalogWriter;
-    private final com.haloticket.event_service.service.TicketSyncService ticketSyncService;
+    private final EventCatalogWriter catalogWriter;
+    private final TicketSyncService ticketSyncService;
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EventServiceImpl.class);
 
     @Autowired(required = false)
     private NotificationServiceClient notificationServiceClient;
+
+    /** Paid tickets of an event; asked before an approval is taken back. */
+    @Autowired(required = false)
+    private BookingInternalServiceClient bookingStatsClient;
 
     @Autowired(required = false)
     private KafkaTemplate<String, Object> kafkaTemplate;
@@ -580,6 +587,84 @@ public class EventServiceImpl implements EventService {
                 eventNotificationVariables(saved, flagged));
 
         return mapToEventResponse(saved);
+    }
+
+    @Override
+    public EventResponse revertApproval(String id, String reason) {
+        Event event = eventRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sự kiện với ID: " + id));
+
+        if (event.getEventApprovalStatus() != EventApprovalStatus.APPROVED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ có thể hoàn tác sự kiện đã được phê duyệt.");
+        }
+        requireNoTicketsSold(id);
+
+        event.setEventApprovalStatus(EventApprovalStatus.PENDING);
+        event.setEventStatus(EventStatus.PENDING);
+        event.setRejectionReason(reason != null ? reason : "Hoàn tác phê duyệt nhầm bởi Quản trị viên");
+        Event saved = eventRepository.save(event);
+
+        String recipientUserId = recipientOf(saved);
+        publishNotification(recipientUserId, "EVENT_APPROVAL_REVERTED", "Thu hồi phê duyệt sự kiện",
+                "Phê duyệt cho sự kiện \"" + saved.getTitle() + "\" đã được Quản trị viên thu hồi để kiểm duyệt lại. Lý do: "
+                        + (reason != null && !reason.isBlank() ? reason : "Xem xét điều chỉnh lại thông tin."));
+
+        return mapToEventResponse(saved);
+    }
+
+    @Override
+    public EventResponse cancelApprovalRequest(String id, String authorization) {
+        Event event = eventRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sự kiện với ID: " + id));
+
+        OrganizerEligibilityResponse eligibility = requireEligibleOrganizer(authorization);
+        String uid = eligibility.userId();
+
+        boolean isOwner = (event.getOrganizers() != null && event.getOrganizers().stream()
+                .anyMatch(org -> uid != null && uid.equals(org.getUserId())))
+                || staffAssignmentRepository.findByEventId(id).stream().anyMatch(a ->
+                        a.getRole() == com.haloticket.event_service.enums.StaffRole.OWNER
+                                && a.getStatus() == StaffAssignmentStatus.ACTIVE && uid != null && uid.equals(a.getUserId()));
+        if (!isOwner) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Bạn không phải chủ sở hữu của sự kiện này.");
+        }
+
+        if (event.getEventApprovalStatus() == EventApprovalStatus.UPDATE_PENDING) {
+            // the edits of an approved event are already live while they wait for review; cancelling would keep them without a review
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Sự kiện đang mở bán với nội dung cập nhật chờ duyệt. Vui lòng chờ quản trị viên xử lý hoặc chỉnh sửa lại nội dung.");
+        }
+        if (event.getEventApprovalStatus() != EventApprovalStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chỉ có thể hoàn tác yêu cầu duyệt khi sự kiện đang ở trạng thái chờ duyệt.");
+        }
+
+        event.setEventApprovalStatus(EventApprovalStatus.DRAFT);
+        event.setEventStatus(EventStatus.DRAFT);
+        Event saved = eventRepository.save(event);
+
+        publishNotification("ADMIN", "EVENT_APPROVAL_CANCELLED", "Hủy yêu cầu duyệt sự kiện",
+                "Ban tổ chức đã thu hồi yêu cầu phê duyệt cho sự kiện \"" + saved.getTitle() + "\".");
+
+        return mapToEventResponse(saved);
+    }
+
+    /** Taking an approval back would leave buyers with tickets to an event that is no longer approved. */
+    private void requireNoTicketsSold(String eventId) {
+        if (bookingStatsClient == null) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Chưa kiểm tra được số vé đã bán, vui lòng thử lại.");
+        }
+        com.haloticket.event_service.client.BookingStatsResponse stats;
+        try {
+            stats = bookingStatsClient.getEventBookingStats(eventId);
+        } catch (Exception e) {
+            log.warn("Cannot read the sold tickets of event {} before reverting its approval: {}", eventId, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Chưa kiểm tra được số vé đã bán, vui lòng thử lại.");
+        }
+        long sold = stats == null ? 0 : stats.getTotalTicketsSold();
+        if (sold > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Sự kiện đã bán " + sold + " vé nên không thể hoàn tác phê duyệt. Hãy xử lý các đơn đã bán trước.");
+        }
     }
 
     /** Items of the rejection form an admin can flag, with the label the organiser reads in the notification. */

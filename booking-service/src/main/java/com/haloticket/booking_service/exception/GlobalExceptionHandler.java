@@ -24,6 +24,13 @@ public class GlobalExceptionHandler {
         private Instant timestamp;
     }
 
+    @ExceptionHandler(VoucherNotApplicableException.class)
+    public ResponseEntity<ErrorResponse> handleVoucherNotApplicable(VoucherNotApplicableException exception) {
+        log.info("Voucher refused: {}", exception.getMessage());
+        return ResponseEntity.badRequest().body(new ErrorResponse(
+                "VOUCHER_NOT_APPLICABLE", exception.getMessage(), Instant.now()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleBadRequest(IllegalArgumentException exception) {
         log.warn("Invalid argument: {}", exception.getMessage());

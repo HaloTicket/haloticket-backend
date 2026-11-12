@@ -2,6 +2,7 @@ package com.haloticket.event_service.dto.request;
 
 import com.haloticket.event_service.enums.ApplyScope;
 import com.haloticket.event_service.enums.DiscountType;
+import com.haloticket.event_service.enums.VoucherStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -31,4 +32,5 @@ public class VoucherCreateRequest {
     private List<String> applicableShowtimes;
     private String startDate;
     private String endDate;
+    private VoucherStatus status;
 }

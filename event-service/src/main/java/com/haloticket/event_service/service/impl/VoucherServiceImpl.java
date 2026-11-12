@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +46,19 @@ public class VoucherServiceImpl implements VoucherService {
         Voucher voucher = voucherRepository.findById(voucherId)
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND, "VOUCHER_NOT_FOUND"));
         return voucher.getEvent() == null ? null : voucher.getEvent().getId();
+    }
+
+    /** One order never holds more tickets than this, so a larger count is a wrong call, not a big order. */
+    static final int MAX_TICKETS_PER_USE = 100;
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<VoucherResponse> findReleasedByCode(String eventId, String code) {
+        if (code == null || code.isBlank()) return java.util.Optional.empty();
+        String wanted = code.trim();
+        return voucherRepository.findByEventIdOrderByCreatedAtDesc(eventId).stream()
+                .filter(v -> v.getStatus() != VoucherStatus.DRAFT && wanted.equalsIgnoreCase(v.getCode()))
+                .findFirst().map(this::mapToVoucherResponse);
     }
 
     @Override
@@ -141,6 +155,30 @@ public class VoucherServiceImpl implements VoucherService {
     }
 
     @Override
+    @Transactional
+    public VoucherResponse useVoucher(String voucherId, int count) {
+        if (count < 1 || count > MAX_TICKETS_PER_USE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_VOUCHER_USE_COUNT");
+        }
+        Voucher voucher = voucherRepository.findByIdForUpdate(voucherId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "VOUCHER_NOT_FOUND"));
+
+        int currentUsed = voucher.getUsedCount() != null ? voucher.getUsedCount() : 0;
+        int increment = count;
+        voucher.setUsedCount(currentUsed + increment);
+
+        // check if ticket limit reached
+        if ("LIMITED".equalsIgnoreCase(voucher.getApplyTicketLimitType()) && voucher.getTicketLimitCount() != null) {
+            if (voucher.getUsedCount() >= voucher.getTicketLimitCount()) {
+                voucher.setStatus(VoucherStatus.INACTIVE);
+            }
+        }
+
+        Voucher updated = voucherRepository.save(voucher);
+        return mapToVoucherResponse(updated);
+    }
+
+    @Override
     public void deleteVoucher(String voucherId) {
         if (!voucherRepository.existsById(voucherId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "VOUCHER_NOT_FOUND");
@@ -174,7 +212,7 @@ public class VoucherServiceImpl implements VoucherService {
                 .applicableShowtimes(showtimesJson)
                 .startAt(parseDateTime(request.getStartDate()))
                 .endAt(parseDateTime(request.getEndDate()))
-                .status(VoucherStatus.ACTIVE)
+                .status(request.getStatus() != null ? request.getStatus() : VoucherStatus.ACTIVE)
                 .usedCount(0)
                 .build();
     }

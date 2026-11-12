@@ -16,6 +16,7 @@ import com.haloticket.booking_service.repository.OutboxEventRepository;
 import com.haloticket.booking_service.repository.SeatReservationRepository;
 import com.haloticket.booking_service.service.BookingService;
 import com.haloticket.booking_service.service.GaReservationService;
+import com.haloticket.booking_service.service.VoucherPolicy;
 import com.haloticket.booking_service.client.TicketServiceClient;
 import com.haloticket.booking_service.service.OrderLimitValidator;
 import com.haloticket.booking_service.service.OrderShapeValidator;
@@ -187,15 +188,19 @@ public class BookingServiceImpl implements BookingService {
                             .orElse(null);
                 }
 
-                if (appliedVoucher != null && (appliedVoucher.getIsActive() != null && appliedVoucher.getIsActive())) {
-                    if ("PERCENTAGE".equals(appliedVoucher.getDiscountType())) {
-                        discountAmount = Math.round(subtotal * (appliedVoucher.getDiscountValue() / 100.0));
-                    } else {
-                        discountAmount = appliedVoucher.getDiscountValue() != null ? appliedVoucher.getDiscountValue()
-                                : 0.0;
-                    }
-                    discountAmount = Math.min(discountAmount, subtotal);
+                int orderTicketsCount = 0;
+                if (request.getItems() != null && !request.getItems().isEmpty()) {
+                    orderTicketsCount = request.getItems().stream().mapToInt(it -> it.getQuantity() != null ? it.getQuantity() : 1).sum();
+                } else if (seatIds != null) {
+                    orderTicketsCount = seatIds.size();
                 }
+                final String voucherBuyer = request.getCustomerId();
+                final VoucherResponse voucherToApply = appliedVoucher;
+                // refused with the reason (400) when it does not apply; never ignored, so the buyer is not charged in full by surprise
+                discountAmount = VoucherPolicy.discountFor(appliedVoucher, orderTicketsCount, subtotal, request.getShowtimeId(),
+                        LocalDateTime.now(),
+                        () -> voucherBuyer == null || "ANONYMOUS".equals(voucherBuyer) ? 0L
+                                : bookingRepository.countByCustomerIdAndVoucherId(voucherBuyer, voucherToApply.getId()));
             }
 
             double finalTotal = Math.max(0.0, subtotal - discountAmount);

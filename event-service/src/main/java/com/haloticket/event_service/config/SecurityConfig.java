@@ -41,9 +41,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/events/organizer-profile").authenticated()
                         .requestMatchers("/api/events/my-events").authenticated()
                         .requestMatchers("/api/events/admin/reports/**").hasRole("ADMIN")
-                        .requestMatchers("/api/events/approvals", "/api/events/*/approve", "/api/events/*/reject").hasRole("ADMIN")
+                        .requestMatchers("/api/events/approvals", "/api/events/*/approve", "/api/events/*/reject", "/api/events/*/revert-approval").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/events/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/events/*/view").permitAll()
+                        // booking-service counts a voucher use with the shared internal token; the controller checks it
+                        .requestMatchers(HttpMethod.POST, "/api/events/vouchers/*/use").permitAll()
                         .requestMatchers("/api/events/test-questions").permitAll()
                         .requestMatchers("/api/events/**").authenticated()
                         .anyRequest().authenticated())

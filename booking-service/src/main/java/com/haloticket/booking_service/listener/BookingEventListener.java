@@ -149,6 +149,23 @@ public class BookingEventListener {
         } catch (RuntimeException e) {
             log.warn("Event details unavailable for booking {}", booking.getId(), e);
         }
+
+        // if booking used a voucher, increment voucher used count
+        if (booking.getVoucherId() != null && !booking.getVoucherId().isBlank()
+                && booking.getDiscountAmount() != null && booking.getDiscountAmount() > 0) {
+            try {
+                int totalTickets = 0;
+                if (booking.getItems() != null && !booking.getItems().isEmpty()) {
+                    totalTickets = booking.getItems().stream().mapToInt(it -> it.getQuantity() != null ? it.getQuantity() : 1).sum();
+                } else if (seatIds != null) {
+                    totalTickets = seatIds.size();
+                }
+                eventServiceClient.useVoucher(booking.getVoucherId(), Math.max(1, totalTickets));
+                log.info("Counted {} ticket(s) against voucher {} for booking {}", totalTickets, booking.getVoucherId(), booking.getBookingCode());
+            } catch (Exception ex) {
+                log.error("Voucher use was NOT counted for booking {} (voucherId {}): {}", booking.getBookingCode(), booking.getVoucherId(), ex.getMessage());
+            }
+        }
         
         List<Map<String, Object>> itemsList = new ArrayList<>();
         if (booking.getItems() != null) {

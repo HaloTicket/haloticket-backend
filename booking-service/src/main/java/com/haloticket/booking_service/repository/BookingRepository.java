@@ -48,10 +48,15 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
        /** Orders that should have tickets (PAID, CONFIRMED) paid in [from, to), oldest first. */
        @Query("SELECT b.id AS bookingId, b.bookingCode AS bookingCode, b.updatedAt AS paidAt, COALESCE(SUM(i.quantity), 0) AS expectedTickets " +
               "FROM Booking b LEFT JOIN b.items i " +
-              "WHERE b.status IN (com.haloticket.booking_service.enums.BookingStatus.PAID, com.haloticket.booking_service.enums.BookingStatus.CONFIRMED) " +
+              "WHERE b.status IN :statuses " +
               "AND b.updatedAt >= :from AND b.updatedAt < :to " +
               "GROUP BY b.id, b.bookingCode, b.updatedAt ORDER BY b.updatedAt ASC, b.id ASC")
-       List<PaidCandidate> findPaidCandidates(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to, Pageable pageable);
+       List<PaidCandidate> findCandidatesWithStatus(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to,
+                                                    @Param("statuses") Collection<BookingStatus> statuses, Pageable pageable);
+
+       default List<PaidCandidate> findPaidCandidates(LocalDateTime from, LocalDateTime to, Pageable pageable) {
+              return findCandidatesWithStatus(from, to, List.of(BookingStatus.PAID, BookingStatus.CONFIRMED), pageable);
+       }
 
        @Lock(LockModeType.PESSIMISTIC_WRITE)
        @Query("SELECT b FROM Booking b WHERE b.id = :id")
@@ -66,6 +71,13 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
        int markReissueRequested(@Param("id") String id, @Param("now") LocalDateTime now);
        @Lock(LockModeType.PESSIMISTIC_WRITE)
        List<Booking> findByStatusAndExpiredAtBefore(BookingStatus status, LocalDateTime dateTime);
+
+       long countByCustomerIdAndVoucherIdAndStatusIn(String customerId, String voucherId, Collection<BookingStatus> statuses);
+
+       /** Paid orders of a buyer that used the voucher (counts toward its orders-per-buyer limit). */
+       default long countByCustomerIdAndVoucherId(String customerId, String voucherId) {
+              return countByCustomerIdAndVoucherIdAndStatusIn(customerId, voucherId, List.of(BookingStatus.PAID, BookingStatus.CONFIRMED));
+       }
 
        @Query("SELECT COUNT(DISTINCT b.customerId) FROM Booking b WHERE b.eventId = :eventId AND b.status = 'PAID'")
        long countUniqueBuyersByEventId(@Param("eventId") String eventId);

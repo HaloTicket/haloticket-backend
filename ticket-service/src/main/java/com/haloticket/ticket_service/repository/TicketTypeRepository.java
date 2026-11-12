@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
+import com.haloticket.ticket_service.enums.TicketTypeStatus;
 
 @Repository
 public interface TicketTypeRepository extends JpaRepository<TicketType, String> {
@@ -47,9 +48,13 @@ public interface TicketTypeRepository extends JpaRepository<TicketType, String> 
     /** Holds stock only while total - reserved still covers the quantity; returns 0 rows when it does not. */
     @Modifying
     @Query("UPDATE TicketType t SET t.reservedQuantity = COALESCE(t.reservedQuantity, 0) + :qty, t.version = t.version + 1 "
-            + "WHERE t.id = :id AND (t.ticketTypeStatus IS NULL OR t.ticketTypeStatus <> com.haloticket.ticket_service.enums.TicketTypeStatus.HIDDEN) "
+            + "WHERE t.id = :id AND (t.ticketTypeStatus IS NULL OR t.ticketTypeStatus <> :hidden) "
             + "AND COALESCE(t.totalQuantity, 0) - COALESCE(t.reservedQuantity, 0) >= :qty")
-    int reserveAtomic(@Param("id") String id, @Param("qty") int qty);
+    int reserveUnlessStatus(@Param("id") String id, @Param("qty") int qty, @Param("hidden") TicketTypeStatus hidden);
+
+    default int reserveAtomic(String id, int qty) {
+        return reserveUnlessStatus(id, qty, TicketTypeStatus.HIDDEN);
+    }
 
     @Modifying
     @Query("UPDATE TicketType t SET t.reservedQuantity = CASE WHEN COALESCE(t.reservedQuantity, 0) > :qty THEN COALESCE(t.reservedQuantity, 0) - :qty ELSE 0 END, "

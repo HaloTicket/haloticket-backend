@@ -133,6 +133,21 @@ public class EventController {
         return ResponseEntity.ok(eventService.approveEvent(id));
     }
 
+    @PatchMapping("/{id}/revert-approval")
+    public ResponseEntity<EventResponse> revertApproval(
+            @PathVariable String id,
+            @RequestBody(required = false) Map<String, String> body) {
+        String reason = body != null ? body.get("reason") : "Hoàn tác phê duyệt nhầm bởi Quản trị viên";
+        return ResponseEntity.ok(eventService.revertApproval(id, reason));
+    }
+
+    @PatchMapping("/{id}/cancel-approval-request")
+    public ResponseEntity<EventResponse> cancelApprovalRequest(
+            @PathVariable String id,
+            @RequestHeader("Authorization") String authorization) {
+        return ResponseEntity.ok(eventService.cancelApprovalRequest(id, authorization));
+    }
+
     @PatchMapping("/{id}/reject")
     public ResponseEntity<EventResponse> rejectEvent(
             @PathVariable String id,
