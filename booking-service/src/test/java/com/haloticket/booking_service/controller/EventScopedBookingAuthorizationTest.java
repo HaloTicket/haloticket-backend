@@ -62,7 +62,7 @@ class EventScopedBookingAuthorizationTest {
         scope.setCacheSeconds(0);
         access = new EventAccessClient(events, scope);
         bookingController = new BookingController(bookings, mock(BookingCancellationService.class), access);
-        organizerController = new OrganizerBookingController(repository, payments, access);
+        organizerController = new OrganizerBookingController(repository, payments, access, events);
         seatController = new SeatController(seatHolds);
         when(events.getMyAccess(anyString(), anyString())).thenAnswer(call -> {
             String event = call.getArgument(0);

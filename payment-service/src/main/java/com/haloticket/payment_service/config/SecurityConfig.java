@@ -44,6 +44,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/**", "/health").permitAll()
                         .requestMatchers("/api/payments/admin/report-payments").hasRole("ADMIN")
+                        .requestMatchers("/api/payouts/admin/policy/**", "/api/payouts/admin/policy")
+                        .hasAnyRole("ADMIN", "FINANCE_ADMIN", "FINANCE_CONFIG", "SUPER_ADMIN")
+                        .requestMatchers("/api/payouts/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/payouts/organizer/**").authenticated()
                         .requestMatchers(
                                 "/api/payments/vnpay/**",
                                 "/api/payments/vietqr/**",
@@ -53,9 +57,9 @@ public class SecurityConfig {
                                 "/api/payments/shopeepay/**",
                                 "/api/payments/verify/**",
                                 "/api/payments/methods/bulk",
-                                "/api/payments/organizer-payout-account/**",
                                 "/api/payments"
                         ).permitAll()
+                        .requestMatchers("/api/payments/organizer-payout-account/**").authenticated()
                         .requestMatchers("/api/payments/**").authenticated()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt
