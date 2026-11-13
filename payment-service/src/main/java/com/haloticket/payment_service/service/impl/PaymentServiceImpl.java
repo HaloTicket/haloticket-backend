@@ -88,7 +88,7 @@ public class PaymentServiceImpl implements PaymentService {
         if (request == null || request.getOrganizerUserId() == null) return null;
 
         OrganizerPayoutAccount account = organizerPayoutAccountRepository
-                .findByOrganizerUserId(request.getOrganizerUserId())
+                .findForUpdate(request.getOrganizerUserId())
                 .orElseGet(() -> OrganizerPayoutAccount.builder()
                         .organizerUserId(request.getOrganizerUserId())
                         .isVerified(false)

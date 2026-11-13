@@ -22,7 +22,10 @@ public interface EventServiceClient {
 
     @GetMapping("/api/events/{id}/vouchers")
     List<VoucherResponse> getVouchersByEventId(@PathVariable("id") String id);
-
+    
     @PostMapping("/api/events/vouchers/{voucherId}/use")
     VoucherResponse useVoucher(@PathVariable("voucherId") String voucherId, @RequestParam("count") int count);
+    
+    @GetMapping("/api/events/my-events")
+    List<EventResponse> getMyEvents(@RequestHeader("Authorization") String authorization);
 }

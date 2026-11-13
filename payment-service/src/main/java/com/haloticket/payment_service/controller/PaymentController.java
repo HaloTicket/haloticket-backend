@@ -166,9 +166,14 @@ public class PaymentController {
 
     @GetMapping("/organizer-payout-account/{userId}")
     public ResponseEntity<OrganizerPayoutAccountResponse> getPayoutAccountByUserId(
-            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestHeader("Authorization") String authorization,
             @PathVariable("userId") String userId
     ) {
+        var eligibility = requireEligibleOrganizer(authorization);
+        if (!userId.equals(eligibility.userId())) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN,
+                    "Payout account can only be viewed by its owner");
+        }
         OrganizerPayoutAccountResponse response = paymentService.getPayoutAccountByUserId(userId);
         return ResponseEntity.ok(response);
     }

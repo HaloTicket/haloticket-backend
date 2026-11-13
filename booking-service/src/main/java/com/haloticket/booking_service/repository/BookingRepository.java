@@ -33,6 +33,9 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
               Long getTickets();
               BookingStatus getStatus();
        }
+       interface FinanceFact { String getBookingId(); Double getAmount(); }
+       @Query("SELECT b.id AS bookingId, b.totalAmount AS amount FROM Booking b WHERE b.eventId=:eventId AND b.status='PAID'")
+       List<FinanceFact> findPaidFinanceFactsByEventId(@Param("eventId") String eventId);
 
        @Query("SELECT b.id AS bookingId, b.eventId AS eventId, COALESCE(SUM(i.quantity), 0) AS tickets, b.status AS status " +
               "FROM Booking b LEFT JOIN b.items i WHERE b.id IN :bookingIds GROUP BY b.id, b.eventId, b.status")

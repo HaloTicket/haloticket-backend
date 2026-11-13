@@ -78,6 +78,8 @@ class PaymentReportControllerTest {
             public String getPaymentId() { return payment; }
             public LocalDateTime getConfirmedAt() { return at; }
             public Double getRevenue() { return revenue; }
+            public Double getRefunds() { return 0D; }
+            public Double getPendingRefunds() { return 0D; }
         };
     }
 }
