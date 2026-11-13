@@ -50,6 +50,7 @@ class Rule:
     phrases: tuple = ()
     obfuscated: bool = False
     min_degrees: int = 15
+    min_level: str = "LOW"  # the lowest level this finding alone may produce (policy floor)
 
 
 @dataclass(frozen=True)
@@ -59,6 +60,12 @@ class RuleSet:
     obfuscation: dict
     strong_ban: tuple = field(default_factory=tuple)
     lift: tuple = field(default_factory=tuple)
+
+
+def _level(value, code: str) -> str:
+    if value not in ("LOW", "MEDIUM", "HIGH"):
+        raise ValueError(f"bad min_level {code}")
+    return value
 
 
 def load_rules(path: str = RULES_PATH) -> Optional[RuleSet]:
@@ -81,7 +88,7 @@ def load_rules(path: str = RULES_PATH) -> Optional[RuleSet]:
             if kind == "phrases" and not phrases:
                 raise ValueError(f"no phrases {code}")
             rules.append(Rule(code, kind, severity, weight, str(raw["message"]), phrases,
-                              bool(raw.get("obfuscated", False)), int(raw.get("min_degrees", 15))))
+                              bool(raw.get("obfuscated", False)), int(raw.get("min_degrees", 15)), _level(raw.get("min_level", "LOW"), code)))
         context = data.get("context", {})
         strong = tuple(unicodedata.normalize("NFC", str(m)).lower() for m in context.get("strong_ban", ()))
         lift = tuple(unicodedata.normalize("NFC", str(m)).lower() for m in context.get("lift", ()))
@@ -294,6 +301,7 @@ def evaluate(texts: dict, ruleset: RuleSet) -> list:
             findings.append({
                 "layer": "RULE", "code": rule.code, "severity": rule.severity, "weight": rule.weight,
                 "message": rule.message, "evidence": unique[:MAX_EVIDENCE_PER_RULE], "ruleset_version": ruleset.version,
+                "min_level": rule.min_level,
             })
     if ignored:
         unique, seen = [], set()

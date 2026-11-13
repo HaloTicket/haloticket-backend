@@ -14,6 +14,8 @@ log = logging.getLogger("ai.risk.signals")
 
 MIN_PRICE_SAMPLES = 5
 DUPLICATE_THRESHOLD = 0.6
+DUPLICATE_TITLE_THRESHOLD = 0.5  # "Giải cờ vua Đà Nẵng" against "Giải cờ vua Cần Thơ" scores 0.56: a changed city still counts as the same title
+DUPLICATE_CERTAIN = 0.9  # description alone this close to another event is a copy whatever the title says
 MAX_DUPLICATE_CANDIDATES = 500
 
 
@@ -24,8 +26,16 @@ class SignalSource:
     category_prices: Callable[[str], list]      # min_price of APPROVED events of a category (v_events)
 
 
-def _finding(code: str, weight: int, message: str, severity: str = "MEDIUM", evidence: Optional[list] = None) -> dict:
-    return {"layer": "SIGNAL", "code": code, "severity": severity, "weight": weight, "message": message, "evidence": evidence or []}
+def _finding(code: str, weight: int, message: str, severity: str = "MEDIUM", evidence: Optional[list] = None, min_level: str = "LOW") -> dict:
+    return {"layer": "SIGNAL", "code": code, "severity": severity, "weight": weight, "message": message, "evidence": evidence or [],
+            "min_level": min_level}
+
+
+def title_similarity(a: str, b: str) -> float:
+    """Word-level Jaccard of two titles (a city or year changed in an otherwise equal title still scores high)."""
+    words = lambda text: set(re.findall(r"\w+", (text or "").lower()))
+    left, right = words(a), words(b)
+    return len(left & right) / len(left | right) if left | right else 0.0
 
 
 def _parse_time(value) -> Optional[datetime]:
@@ -88,7 +98,7 @@ def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datet
         age = now - created
         if age < timedelta(days=7):
             return _finding("organizer_account_new", 12, "Tài khoản ban tổ chức mới tạo chưa đầy 7 ngày.", "MEDIUM",
-                            [{"field": "organizer", "text": f"tạo {age.days} ngày trước"}])
+                            [{"field": "organizer", "text": f"tạo {age.days} ngày trước"}], "MEDIUM")
         if age < timedelta(days=30):
             return _finding("organizer_account_young", 6, "Tài khoản ban tổ chức tạo chưa đầy 30 ngày.", "MEDIUM",
                             [{"field": "organizer", "text": f"tạo {age.days} ngày trước"}])
@@ -112,7 +122,7 @@ def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datet
         rejected = sum(1 for e in others if e.get("eventApprovalStatus") == "REJECTED")
         if rejected >= 2 and rejected > approved:
             return _finding("organizer_history_rejected", 15, "Ban tổ chức từng bị từ chối nhiều sự kiện hơn số sự kiện được duyệt.", "HIGH",
-                            [{"field": "organizer", "text": f"đã duyệt {approved}, từ chối {rejected}"}])
+                            [{"field": "organizer", "text": f"đã duyệt {approved}, từ chối {rejected}"}], "MEDIUM")
         return None
 
     def price():
@@ -127,7 +137,7 @@ def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datet
         price_now = float(price_now)
         if price_now > median * 5 or 0 < price_now < median * 0.1:
             return _finding("price_outlier", 10, "Giá vé thấp nhất lệch xa trung vị của cùng thể loại.", "MEDIUM",
-                            [{"field": "price", "text": f"{int(price_now)} so với trung vị {int(median)}"}])
+                            [{"field": "price", "text": f"{int(price_now)} so với trung vị {int(median)}"}], "MEDIUM")
         return None
 
     def duplicate():
@@ -141,11 +151,15 @@ def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datet
                 continue  # a show the same organiser already had approved (a series, a new season) is not a copy of someone else
             other_text = f"{other.get('title', '')} {other.get('descriptionText') or other.get('description') or ''}"
             score = similarity(mine, other_text)
-            if score > best_score:
+            # a copy keeps the title (or changes only a city or a year): similar text under an unrelated title is not enough
+            same_description = similarity(texts.get("description", ""), str(other.get("descriptionText") or other.get("description") or ""))
+            counts = same_description >= DUPLICATE_CERTAIN or (score >= DUPLICATE_THRESHOLD
+                                                              and title_similarity(texts.get("title", ""), other.get("title", "")) >= DUPLICATE_TITLE_THRESHOLD)
+            if counts and score > best_score:
                 best_score, best_event = score, other
-        if best_event is not None and best_score >= DUPLICATE_THRESHOLD:
+        if best_event is not None:
             return _finding("near_duplicate", 25, "Nội dung gần trùng với một sự kiện khác.", "HIGH",
-                            [{"field": "description", "text": f"{int(best_score * 100)}% giống '{str(best_event.get('title'))[:80]}'"}])
+                            [{"field": "description", "text": f"{int(best_score * 100)}% giống '{str(best_event.get('title'))[:80]}'"}], "MEDIUM")
         return None
 
     def schedule():
@@ -164,7 +178,7 @@ def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datet
         if not issues:
             return None
         return _finding("schedule_anomaly", min(20, 10 * len(issues)), "Địa điểm hoặc thời gian bất thường: " + "; ".join(issues) + ".",
-                        "MEDIUM", [{"field": "schedule", "text": "; ".join(issues)}])
+                        "MEDIUM", [{"field": "schedule", "text": "; ".join(issues)}], "MEDIUM")
 
     return [_guard("organizer_account", account), _guard("organizer_ekyc", ekyc), _guard("organizer_history", history),
             _guard("price_outlier", price), _guard("near_duplicate", duplicate), _guard("schedule", schedule)]

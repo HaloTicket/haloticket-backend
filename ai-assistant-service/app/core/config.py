@@ -98,7 +98,7 @@ class Settings(BaseSettings):
     admin_cache_seconds: int = 30  # attention feed; the KPI cache is twice this
 
     class Config:
-        env_file = ".env"
+        env_file = [".env", "../.env"]
         extra = "ignore" # skip undefined env
 
 settings = Settings()

@@ -12,7 +12,7 @@ log = logging.getLogger("ai.risk.semantic")
 
 MAX_TEXT = 4000
 # stored with every assessment so a score can be tied to the prompt that produced it
-PROMPT_VERSION = "risk-c-v2"
+PROMPT_VERSION = "risk-c-v3"
 FLAG_DEFINITIONS = {
     "VEILED_PROHIBITED": "chào bán hoặc quảng bá hàng hóa, dịch vụ bị cấm bằng cách nói vòng",
     "OVERPROMISE": "lời hứa phóng đại hoặc cam kết tuyệt đối, không thực tế",
@@ -21,7 +21,22 @@ FLAG_DEFINITIONS = {
 }
 
 
+# v3: tells the model what the rule layer cannot (kept generic on purpose: no list of example phrases)
+FLAG_GUIDANCE = (
+    "\nLưu ý thêm khi đọc:\n"
+    "- Cam kết lợi nhuận, lãi suất, đầu tư sinh lời, kiếm tiền dễ dàng là SCAM_PATTERN, KHÔNG phải OVERPROMISE. OVERPROMISE chỉ dành "
+    "cho lời hứa phóng đại về chất lượng hay kết quả của chính sự kiện.\n"
+    "- Hiểu cả tiếng lóng và cách nói vòng về ma túy, vũ khí và các chất hoặc hàng bị cấm; câu mập mờ nhưng ngầm chào bán thì vẫn là "
+    "VEILED_PROHIBITED.\n"
+    "- Lời dẫn khách mua vé hoặc liên hệ qua một kênh chat không nêu tên cũng là SOCIAL_CONTACT.\n"
+)
+
+
 def build_prompt(title: str, description: str, organizer_name: str, delimiter: str) -> str:
+    return (_prompt_body(title, description, organizer_name, delimiter) + FLAG_GUIDANCE)
+
+
+def _prompt_body(title: str, description: str, organizer_name: str, delimiter: str) -> str:
     return (
         "Bạn kiểm duyệt nội dung sự kiện cho HaloTicket. Chỉ tìm các dấu hiệu mà bộ lọc từ khóa bỏ sót.\n"
         "Quy định: cấm CHÀO BÁN hoặc quảng bá vũ khí, ma túy, cá độ, đánh bạc, văn hóa phẩm đồi trụy; cấm quảng cáo thuốc lá, "

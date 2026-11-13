@@ -1,5 +1,5 @@
 {
-  "version": "4",
+  "version": "5",
   "source": "Quy định kiểm duyệt HaloTicket: hàng cấm kinh doanh, hàng cấm quảng cáo, cam kết lợi nhuận, liên hệ qua mạng xã hội. Email và số điện thoại của ban tổ chức là hợp lệ và KHÔNG bị chấm điểm; liên kết hoặc lời mời liên hệ qua mạng xã hội / ứng dụng chat thì KHÔNG được phép.",
   "context": {
     "strong_ban": [
@@ -10,31 +10,31 @@
   },
   "rules": [
     {
-      "code": "contact_social", "kind": "phrases", "severity": "HIGH", "weight": 25, "obfuscated": true,
+      "code": "contact_social", "kind": "phrases", "severity": "HIGH", "weight": 25, "min_level": "MEDIUM", "obfuscated": true,
       "message": "Có liên kết hoặc lời mời liên hệ qua mạng xã hội / ứng dụng chat (Facebook, Zalo, Telegram...). Không được dẫn khách sang kênh ngoài HaloTicket.",
       "phrases": ["facebook.com", "fb.com", "fb.me", "m.me/", "zalo.me", "zalo.com", "t.me/", "telegram", "wa.me/", "whatsapp", "instagram.com", "tiktok.com", "inbox", "ib zalo", "add zalo", "kb zalo", "lien he zalo", "lien he facebook", "nhan tin zalo", "nhan tin facebook", "fanpage", "group facebook"]
     },
     {
-      "code": "prohibited_goods", "kind": "phrases", "severity": "BLOCK", "weight": 60, "obfuscated": true,
+      "code": "prohibited_goods", "kind": "phrases", "severity": "BLOCK", "weight": 60, "min_level": "HIGH", "obfuscated": true,
       "message": "Chào bán hoặc quảng bá hàng hóa, dịch vụ cấm kinh doanh (vũ khí, ma túy, cá độ, đánh bạc, văn hóa phẩm đồi trụy...).",
       "phrases": ["vu khi", "sung dan", "sung quan dung", "quan trang", "quan dung", "khi tai quan su", "ma tuy", "can sa", "heroin", "cocaine", "thuoc lac", "ke tamine", "ketamine", "ecstasy", "chat kich thich", "danh bac", "ca do", "co bac", "casino online", "so de", "lo de", "nha cai", "van hoa pham doi truy", "phan dong"]
     },
     {
-      "code": "prohibited_ads", "kind": "phrases", "severity": "HIGH", "weight": 40, "obfuscated": true,
+      "code": "prohibited_ads", "kind": "phrases", "severity": "HIGH", "weight": 40, "min_level": "HIGH", "obfuscated": true,
       "message": "Quảng cáo hàng hóa bị cấm quảng cáo (thuốc lá, rượu từ 15 độ, sữa thay thế sữa mẹ, thuốc kê đơn).",
       "phrases": ["thuoc la", "thuoc la dien tu", "vape", "shisha", "ruou manh", "vodka", "whisky", "whiskey", "tequila", "sua thay the sua me", "sua cong thuc", "thuoc ke don"]
     },
     {
-      "code": "alcohol_strength", "kind": "alcohol", "severity": "HIGH", "weight": 40, "min_degrees": 15,
+      "code": "alcohol_strength", "kind": "alcohol", "severity": "HIGH", "weight": 40, "min_level": "HIGH", "min_degrees": 15,
       "message": "Quảng cáo rượu có nồng độ cồn từ 15 độ trở lên."
     },
     {
-      "code": "profit_guarantee", "kind": "phrases", "severity": "BLOCK", "weight": 60, "obfuscated": true,
+      "code": "profit_guarantee", "kind": "phrases", "severity": "BLOCK", "weight": 60, "min_level": "HIGH", "obfuscated": true,
       "message": "Cam kết lợi nhuận hoặc lãi suất bảo đảm, dấu hiệu lừa đảo đầu tư.",
       "phrases": ["bao dam loi nhuan", "dam bao loi nhuan", "cam ket loi nhuan", "cam ket lai suat", "lai suat cao", "lai suat co dinh", "kiem tien de dang", "dau tu sinh loi", "khong rui ro"]
     },
     {
-      "code": "overpromise", "kind": "phrases", "severity": "MEDIUM", "weight": 10,
+      "code": "overpromise", "kind": "phrases", "severity": "MEDIUM", "weight": 10, "min_level": "MEDIUM",
       "message": "Có lời hứa mang tính tuyệt đối hoặc phóng đại ('chắc chắn', 'cam kết 100%').",
       "phrases": ["chac chan 100", "cam ket 100", "dam bao 100", "hoan tien 100 khong dieu kien", "duoc duyet chac chan", "cam ket hoan tien"]
     }

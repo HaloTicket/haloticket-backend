@@ -32,7 +32,7 @@ def test_a_clean_event_gets_all_three_layers_and_the_old_fields(world):
     assert response.status_code == 200
     body = response.json()
     assert body["risk_score"] == 0 and body["risk_level"] == "LOW" and body["reasons"] == []  # old contract
-    assert body["coverage"]["ai"] == "ran" and body["complete"] is True and body["ruleset_version"] == "4"
+    assert body["coverage"]["ai"] == "ran" and body["complete"] is True and body["ruleset_version"] == "5"
     assert body["stored"] is True and body["cached"] is False and body["assessment_id"]
     assert model.calls[0]["profile"] == "risk_scoring" and model.calls[0]["actor"].startswith("sub:")
 
@@ -169,17 +169,18 @@ def test_decisions_need_storage(monkeypatch):
 
 def test_agreement_counts_recorded_and_derived_decisions(world):
     up, st, _, client = world
-    events = [event(f"h{i}", description="Bán vũ khí quân dụng giá rẻ") for i in range(2)] + [event(f"l{i}") for i in range(2)] + [event("m", description="Tài trợ bởi thuốc lá điện tử XYZ")]
+    events = [event(f"h{i}", description="Bán vũ khí quân dụng giá rẻ") for i in range(2)] + [event(f"l{i}", title=f"Đêm nhạc số {i}", description=f"Chương trình số {i} gồm các tiết mục khác nhau") for i in range(2)] + [event("m", description="Tài trợ bởi thuốc lá điện tử XYZ", title="Hòa nhạc tài trợ")]
     up.values["approvals"] = events
     client.post("/api/admin/risk/batch", json={"event_ids": [e["id"] for e in events]})
-    # h0 rejected (agree, recorded), h1 approved (disagree, derived from status), l0 approved (agree, derived), l1 still pending, m is medium
+    # h0 rejected (agree, recorded), h1 approved (disagree, derived from status), l0 approved (agree, derived), l1 still pending;
+    # m advertises tobacco: the policy puts that at HIGH, so approving it is a disagreement
     up.values["approvals"] = [{**events[0], "eventApprovalStatus": "REJECTED"}, {**events[1], "eventApprovalStatus": "APPROVED"},
                               {**events[2], "eventApprovalStatus": "APPROVED"}, events[3], {**events[4], "eventApprovalStatus": "APPROVED"}]
     st.decisions.append({"event_id": "h0", "decision": "REJECTED", "reason": "", "decided_by": "admin-1", "source": "web"})
     body = client.get("/api/admin/risk/agreement?days=30").json()
     assert body["decided"] == 4 and body["pending"] == 1
-    assert body["agree"] == 2 and body["disagree"] == 1 and body["neutral"] == 1 and body["derived"] == 3
-    assert body["by_level"]["HIGH"] == {"APPROVED": 1, "REJECTED": 1}
+    assert body["agree"] == 2 and body["disagree"] == 2 and body["neutral"] == 0 and body["derived"] == 3
+    assert body["by_level"]["HIGH"] == {"APPROVED": 2, "REJECTED": 1}
 
 
 def test_the_new_routes_are_admin_only(world):

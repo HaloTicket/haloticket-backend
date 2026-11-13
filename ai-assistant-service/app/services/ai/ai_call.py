@@ -92,7 +92,7 @@ def _candidates(tier: str) -> list:
         out.append(("openai", "gpt-4o-mini", temp, settings.openai_api_key))
     gemini = [k for k in _split_keys(settings.gemini_api_key) if k != _PLACEHOLDER_KEY]
     if gemini:
-        out.append(("gemini", "gemini-pro-latest" if smart else "gemini-flash-latest", temp, gemini[0]))
+        out.append(("gemini", "gemini-3.5-flash", temp, gemini[0]))
     return _healthy_first(out)[:MAX_PROVIDERS_PER_CALL]
 
 

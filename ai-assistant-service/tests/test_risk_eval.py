@@ -73,7 +73,7 @@ def test_risk_case(case):
         assert code not in codes, (code, codes)
     if expect["complete"] is not None:
         assert result["complete"] is expect["complete"]
-    assert result["ruleset_version"] == "4"
+    assert result["ruleset_version"] == "5"
 
 
 def test_injection_cases_score_exactly_like_the_same_text_without_the_instruction():

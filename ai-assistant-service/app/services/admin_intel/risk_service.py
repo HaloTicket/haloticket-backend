@@ -61,7 +61,8 @@ def _run_ai(built: dict, actor: str, invoke: Callable, check_limit: Optional[Cal
                 confirmed = semantic.verify(invoke, built["texts"], flags, actor)
                 meta["verify"] = "ran"
                 meta["verify_removed"] = [f["code"] for f in flags if f["code"] not in confirmed]
-                flags = [f for f in flags if f["code"] in confirmed]
+                # a flag that survived the second reading is marked: only such a flag may carry the HIGH minimum (engine.ai_findings)
+                flags = [{**f, "verified": True} for f in flags if f["code"] in confirmed]
             except Exception as failure:
                 meta["verify"] = "failed"
                 log.warning("Risk flag verification failed: %s", getattr(failure, "code", type(failure).__name__))

@@ -24,7 +24,7 @@ AI_RULE_EQUIVALENT = {
     "SOCIAL_CONTACT": ("contact_social",),
     "VEILED_PROHIBITED": ("prohibited_goods", "prohibited_ads"),
     "SCAM_PATTERN": ("profit_guarantee",),
-    "OVERPROMISE": ("overpromise",),
+    "OVERPROMISE": ("overpromise", "profit_guarantee"),  # a guaranteed profit is a scam pattern by definition, not an exaggeration
 }
 LEVEL_ORDER = {"LOW": 0, "MEDIUM": 1, "HIGH": 2}
 
@@ -108,6 +108,31 @@ def cap_organizer_signals(findings: list) -> list:
     return [replaced.get(id(f), f) for f in findings]
 
 
+def policy_floor(findings: list) -> tuple:
+    """(level, codes): the lowest level the findings force, from the policy in LABELING_GUIDE.md. A finding that names a violation
+    carries its own minimum (min_level); two profile signals that are weak alone force MEDIUM together (a new account that is
+    also not verified; an account under 30 days that is not verified); a content violation together with any profile signal is HIGH. The additive score still orders the queue and adds
+    up weak evidence; the floor only keeps a clear violation from being filed as LOW because its weight was small."""
+    level, because = "LOW", []
+    for f in findings:
+        floor = f.get("min_level", "LOW")
+        if f.get("weight", 0) > 0 and LEVEL_ORDER.get(floor, 0) > 0:
+            because.append(f["code"])
+            if LEVEL_ORDER[floor] > LEVEL_ORDER[level]:
+                level = floor
+    codes = {f["code"] for f in findings if f.get("weight", 0) > 0}
+    if "organizer_ekyc_not_approved" in codes and codes & {"organizer_account_new", "organizer_account_young"}:
+        because.append("organizer_account+ekyc")
+        level = level if LEVEL_ORDER[level] >= 1 else "MEDIUM"
+    # independent indicators together: a content violation (rule, or a checked model flag) and a weak profile signal on the
+    # same event is HIGH ("many suspicious signs at once", guide section 3), though each alone is MEDIUM at most
+    content = any(f.get("layer") in ("RULE", "AI") and f.get("weight", 0) > 0 for f in findings)
+    if content and codes & set(ORGANIZER_SIGNAL_CODES):
+        because.append("content+organizer")
+        level = "HIGH"
+    return level, because
+
+
 def ai_findings(valid_flags: list) -> list:
     findings = []
     budget = settings.risk_ai_max_points
@@ -119,6 +144,9 @@ def ai_findings(valid_flags: list) -> list:
         findings.append({
             "layer": "AI", "code": flag["code"], "severity": "HIGH" if points >= 15 else "MEDIUM", "weight": points,
             "message": AI_FLAG_MESSAGES[flag["code"]], "evidence": [flag["evidence"]], "confidence": flag["confidence"],
+            # a checked flag is a violation signal: at least MEDIUM. HIGH only for an explicit one (high confidence, veiled prohibited
+            # goods) that also passed the second reading; any other flag alone stays at MEDIUM, like the 30-point cap
+            "min_level": "HIGH" if flag.get("verified") and flag["confidence"] == "HIGH" and flag["code"] == "VEILED_PROHIBITED" else "MEDIUM",
         })
     return findings
 
@@ -146,6 +174,9 @@ def combine(rule_findings: Optional[list], signal_results: list, ai_state: str, 
     score = base + sum(f["weight"] for f in ai_items)
     if any(f.get("severity") == "BLOCK" for f in findings if f["layer"] == "RULE"):
         score = max(score, settings.risk_block_floor)
+    floor, floor_codes = policy_floor(findings)
+    if floor != "LOW":
+        score = max(score, settings.risk_high_threshold if floor == "HIGH" else settings.risk_medium_threshold)
     score = max(0, min(100, int(score)))
 
     reasons = list(findings)
@@ -165,6 +196,7 @@ def combine(rule_findings: Optional[list], signal_results: list, ai_state: str, 
         "ruleset_version": ruleset_version,
         "coverage": {"rules": rule_findings is not None,
                      "signals": {"assessed": assessed, "total": len(signal_results), "missing": ["UNAVAILABLE:" + m for m in missing]},
-                     "ai": ai_state, "ai_overlap_dropped": overlap_dropped, **({"ai_meta": ai_meta} if ai_meta else {})},
+                     "ai": ai_state, "ai_overlap_dropped": overlap_dropped, **({"ai_meta": ai_meta} if ai_meta else {}),
+                     **({"policy_floor": {"level": floor, "because": floor_codes}} if floor != "LOW" else {})},
         "complete": complete,
     }

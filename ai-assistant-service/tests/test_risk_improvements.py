@@ -51,7 +51,9 @@ def test_a_model_flag_elsewhere_or_of_another_kind_still_counts():
 def test_an_informational_rule_finding_does_not_hide_a_model_flag():
     info = {"layer": "RULE", "code": "contact_social", "severity": "INFO", "weight": 0, "message": "m",
             "evidence": [{"field": "description", "start": 10, "end": 17, "text": "x"}]}
-    assert engine.combine([info], [], "ran", [_flag("SOCIAL_CONTACT", 10, 17)], "4")["risk_score"] == 15
+    result = engine.combine([info], [], "ran", [_flag("SOCIAL_CONTACT", 10, 17)], "5")
+    assert any(r["layer"] == "AI" and r["weight"] == 15 for r in result["reason_items"])
+    assert result["risk_score"] == 30  # 15 points of evidence, lifted to the MEDIUM minimum a checked violation flag carries
 
 
 # --- one budget for the organiser signals ---------------------------------------------------------------------------

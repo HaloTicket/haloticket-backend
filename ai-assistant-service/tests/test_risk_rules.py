@@ -22,7 +22,7 @@ def scored(title="", description=""):
 
 
 def test_the_rule_file_loads_with_a_version_and_has_no_phone_or_email_rule():
-    assert RS is not None and RS.version == "4"
+    assert RS is not None and RS.version == "5"
     assert {r.code for r in RS.rules} == {"contact_social", "prohibited_goods", "prohibited_ads", "alcohol_strength", "profit_guarantee", "overpromise"}
 
 
@@ -172,7 +172,7 @@ def test_a_rule_fires_once_with_at_most_three_distinct_evidence_items():
 
 def test_every_finding_carries_the_ruleset_version():
     for finding in findings(description="bán vũ khí; thuốc lá điện tử miễn phí"):
-        assert finding["ruleset_version"] == "4" and finding["layer"] == "RULE"
+        assert finding["ruleset_version"] == "5" and finding["layer"] == "RULE"
 
 
 def test_a_broken_rule_file_is_reported_not_swallowed(tmp_path):
