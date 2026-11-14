@@ -16,4 +16,10 @@ public interface EventViewLogRepository extends JpaRepository<EventViewLog, Stri
 
     @Query("SELECT COUNT(DISTINCT v.sessionId) FROM EventViewLog v WHERE v.eventId = :eventId AND v.viewedAt >= :since")
     long countUniqueViewsSince(@Param("eventId") String eventId, @Param("since") LocalDateTime since);
+
+    @Query("SELECT COUNT(v) FROM EventViewLog v WHERE v.eventId = :eventId AND v.viewedAt >= :from AND v.viewedAt < :to")
+    long countViewsBetween(@Param("eventId") String eventId, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
+    @Query("SELECT COUNT(DISTINCT v.sessionId) FROM EventViewLog v WHERE v.eventId = :eventId AND v.viewedAt >= :from AND v.viewedAt < :to")
+    long countUniqueViewsBetween(@Param("eventId") String eventId, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 }

@@ -105,6 +105,12 @@ public class SecurityConfig {
                             .access(SecurityConfig::adminOnly);
                     // open to anonymous visitors: event, ticket-type and seat-map reads, the view and search counters,
                     // the homepage configuration. Everything else that writes needs a login.
+                    // changing the homepage configuration, categories and venues is for the platform admin (event-service checks it
+                    // too); the reads below stay open, the homepage needs them
+                    for (HttpMethod write : Arrays.asList(HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE)) {
+                        exchange.pathMatchers(write, "/api/events/admin/config/**", "/api/events/categories", "/api/events/categories/**",
+                                "/api/events/venues", "/api/events/venues/**").access(SecurityConfig::adminOnly);
+                    }
                     exchange.pathMatchers(HttpMethod.POST, "/api/events/*/view", "/api/events/search-log").permitAll()
                             .pathMatchers(HttpMethod.GET, "/api/events/*/analytics", "/api/events/my-events", "/api/events/organizer-profile",
                                     "/api/events/*/members", "/api/events/*/members/**", "/api/events/*/transfer-settings").authenticated()

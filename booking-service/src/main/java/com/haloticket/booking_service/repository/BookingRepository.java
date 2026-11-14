@@ -57,6 +57,21 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
        List<PaidCandidate> findCandidatesWithStatus(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to,
                                                     @Param("statuses") Collection<BookingStatus> statuses, Pageable pageable);
 
+       interface PaidOrderRow {
+              String getCustomerId();
+              LocalDateTime getPaidAt();
+              Double getAmount();
+              Long getTickets();
+       }
+
+       /** Paid orders (statuses chosen by the caller) of an event, paid in [from, to). Summed in Java so the day buckets follow the caller's zone. */
+       @Query("SELECT b.customerId AS customerId, b.updatedAt AS paidAt, b.totalAmount AS amount, COALESCE(SUM(i.quantity), 0) AS tickets " +
+              "FROM Booking b LEFT JOIN b.items i " +
+              "WHERE b.eventId = :eventId AND b.status IN :statuses AND b.updatedAt >= :from AND b.updatedAt < :to " +
+              "GROUP BY b.id, b.customerId, b.updatedAt, b.totalAmount")
+       List<PaidOrderRow> findPaidOrderRows(@Param("eventId") String eventId, @Param("statuses") Collection<BookingStatus> statuses,
+                                            @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
+
        default List<PaidCandidate> findPaidCandidates(LocalDateTime from, LocalDateTime to, Pageable pageable) {
               return findCandidatesWithStatus(from, to, List.of(BookingStatus.PAID, BookingStatus.CONFIRMED), pageable);
        }

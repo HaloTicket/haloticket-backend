@@ -1,9 +1,1 @@
-labels/
-results/
-cache/
-experiments/
-data/*
-!data/t2/
-data/t2/*
-!data/t2/cases_blind.jsonl
 *.zip

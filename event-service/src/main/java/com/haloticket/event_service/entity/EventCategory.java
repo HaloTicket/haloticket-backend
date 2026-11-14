@@ -28,7 +28,14 @@ public class EventCategory {
     private String slug;
     
     private String imageUrl;
-    
+
+    /** name of an icon the apps know how to draw; empty means the default one */
+    private String icon;
+
+    /** position in the category lists, smallest first; null counts as the end */
+    @Column(name = "sort_order")
+    private Integer sortOrder;
+
     @Column(nullable = false, columnDefinition = "boolean default true")
     private boolean active = true;
 

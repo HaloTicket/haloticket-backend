@@ -320,7 +320,7 @@ public class EventServiceImpl implements EventService {
 
     @Override
     public List<EventCategoryResponse> getAllCategories() {
-        return eventCategoryRepository.findAll().stream()
+        return eventCategoryRepository.findAllByOrderBySortOrderAscNameAsc().stream()
                 .map(this::mapToCategoryResponse)
                 .collect(Collectors.toList());
     }
@@ -750,6 +750,10 @@ public class EventServiceImpl implements EventService {
                 .name(category.getName())
                 .description(category.getDescription())
                 .status(category.getStatus() != null ? category.getStatus().name() : "ACTIVE")
+                .slug(category.getSlug())
+                .imageUrl(category.getImageUrl())
+                .icon(category.getIcon())
+                .sortOrder(category.getSortOrder())
                 .build();
     }
 }

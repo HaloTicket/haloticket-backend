@@ -14,4 +14,8 @@ public class EventCategoryResponse {
     private String name;
     private String description;
     private String status;
+    private String slug;
+    private String imageUrl;
+    private String icon;
+    private Integer sortOrder;
 }

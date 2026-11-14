@@ -312,9 +312,10 @@ class EventScopedAuthorizationTest {
     @Test
     void platformConfigurationCanBeChangedByThePlatformAdminOnly() throws Exception {
         List<MockHttpServletRequestBuilder> writes = List.of(
-                put("/api/events/admin/config/system-config").contentType(MediaType.APPLICATION_JSON).content("{}"),
                 put("/api/events/admin/config/homepage/banners").contentType(MediaType.APPLICATION_JSON).content("[]"),
+                put("/api/events/admin/config/homepage/sections").contentType(MediaType.APPLICATION_JSON).content("[]"),
                 post("/api/events/categories").contentType(MediaType.APPLICATION_JSON).content("{}"),
+                put("/api/events/categories/order").contentType(MediaType.APPLICATION_JSON).content("[]"),
                 put("/api/events/categories/c1").contentType(MediaType.APPLICATION_JSON).content("{}"),
                 delete("/api/events/categories/c1"),
                 post("/api/events/venues").contentType(MediaType.APPLICATION_JSON).content("{}"),

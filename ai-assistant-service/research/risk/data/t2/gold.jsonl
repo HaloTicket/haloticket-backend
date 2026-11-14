@@ -1,0 +1,500 @@
+{"id": "T2-0001", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0002", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0003", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0004", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0005", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0006", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0007", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0008", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0009", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0010", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0011", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0012", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0013", "level": "MEDIUM", "codes": ["ORGANIZER_RISK", "DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0014", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0015", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0016", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0017", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK", "DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0018", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0019", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0020", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0021", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0022", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0023", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0024", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0025", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0026", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0027", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0028", "level": "LOW", "codes": [], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0029", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0030", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0031", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0032", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0033", "level": "MEDIUM", "codes": ["OVERPROMISE", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0034", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0035", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0036", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0037", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0038", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0039", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0040", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0041", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0042", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0043", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "LOW"}}
+{"id": "T2-0044", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0045", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0046", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0047", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0048", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0049", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0050", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0051", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0052", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0053", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0054", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0055", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0056", "level": "LOW", "codes": [], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0057", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0058", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0059", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0060", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0061", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0062", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0063", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0064", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0065", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0066", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0067", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0068", "level": "HIGH", "codes": ["SCAM", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0069", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0070", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "LOW"}}
+{"id": "T2-0071", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0072", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0073", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0074", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0075", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0076", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0077", "level": "LOW", "codes": [], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0078", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0079", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0080", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0081", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0082", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0083", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0084", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "LOW"}}
+{"id": "T2-0085", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0086", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0087", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0088", "level": "LOW", "codes": [], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0089", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0090", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0091", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0092", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0093", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0094", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0095", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0096", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0097", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0098", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0099", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0100", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0101", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0102", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0103", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0104", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0105", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0106", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0107", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0108", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0109", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0110", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0111", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0112", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0113", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0114", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0115", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0116", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0117", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0118", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0119", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0120", "level": "LOW", "codes": [], "method": "majority", "votes": {"H1": "LOW", "H2": "LOW", "L": "MEDIUM"}}
+{"id": "T2-0121", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0122", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0123", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0124", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0125", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0126", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0127", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0128", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0129", "level": "LOW", "codes": [], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0130", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0131", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0132", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0133", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0134", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0135", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0136", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0137", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0138", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0139", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0140", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0141", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0142", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0143", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0144", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0145", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0146", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0147", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0148", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0149", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0150", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0151", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0152", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0153", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0154", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0155", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0156", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0157", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0158", "level": "MEDIUM", "codes": ["ORGANIZER_RISK", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0159", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0160", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "LOW"}}
+{"id": "T2-0161", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0162", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0163", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0164", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0165", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0166", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0167", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0168", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0169", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0170", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0171", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0172", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0173", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0174", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK", "DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0175", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0176", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0177", "level": "MEDIUM", "codes": ["ORGANIZER_RISK", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0178", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0179", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0180", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0181", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0182", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0183", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0184", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0185", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0186", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0187", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0188", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0189", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0190", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0191", "level": "LOW", "codes": [], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0192", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0193", "level": "MEDIUM", "codes": ["PRICE_ANOMALY", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0194", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0195", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0196", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0197", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0198", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0199", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0200", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0201", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0202", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0203", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "LOW"}}
+{"id": "T2-0204", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0205", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0206", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0207", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0208", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0209", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0210", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0211", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0212", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0213", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0214", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0215", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0216", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0217", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0218", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0219", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0220", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0221", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0222", "level": "LOW", "codes": [], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0223", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0224", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0225", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "method": "majority", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "MEDIUM"}}
+{"id": "T2-0226", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0227", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0228", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0229", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0230", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0231", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0232", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0233", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0234", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0235", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0236", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0237", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0238", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0239", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0240", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0241", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0242", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0243", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0244", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "LOW"}}
+{"id": "T2-0245", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0246", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0247", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0248", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0249", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0250", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT", "DUPLICATE"], "method": "majority", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "MEDIUM"}}
+{"id": "T2-0251", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "LOW"}}
+{"id": "T2-0252", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0253", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0254", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0255", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0256", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0257", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0258", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0259", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0260", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0261", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0262", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0263", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0264", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0265", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0266", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0267", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0268", "level": "LOW", "codes": [], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0269", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0270", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0271", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0272", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0273", "level": "MEDIUM", "codes": ["ORGANIZER_RISK", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0274", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0275", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0276", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0277", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0278", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0279", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0280", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0281", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0282", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0283", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0284", "level": "LOW", "codes": [], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0285", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0286", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "LOW"}}
+{"id": "T2-0287", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0288", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0289", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0290", "level": "MEDIUM", "codes": ["ORGANIZER_RISK", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0291", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0292", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0293", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0294", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0295", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0296", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0297", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0298", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0299", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0300", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0301", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0302", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "LOW", "L": "MEDIUM"}}
+{"id": "T2-0303", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0304", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0305", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0306", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0307", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0308", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0309", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0310", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "LOW", "L": "MEDIUM"}}
+{"id": "T2-0311", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0312", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0313", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0314", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0315", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0316", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0317", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0318", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0319", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0320", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0321", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0322", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0323", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0324", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0325", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0326", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0327", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0328", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0329", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0330", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0331", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0332", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0333", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0334", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0335", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0336", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0337", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0338", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0339", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0340", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0341", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0342", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0343", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0344", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0345", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0346", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0347", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0348", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0349", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0350", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0351", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0352", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0353", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0354", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0355", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0356", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0357", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0358", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "LOW"}}
+{"id": "T2-0359", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0360", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0361", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "LOW"}}
+{"id": "T2-0362", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0363", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0364", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0365", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0366", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0367", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0368", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0369", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0370", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0371", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0372", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0373", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0374", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0375", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0376", "level": "MEDIUM", "codes": ["PRICE_ANOMALY", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0377", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0378", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0379", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0380", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0381", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0382", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0383", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0384", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0385", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0386", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0387", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0388", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0389", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0390", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0391", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0392", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0393", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0394", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0395", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0396", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0397", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0398", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0399", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0400", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0401", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0402", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0403", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0404", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0405", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0406", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0407", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0408", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0409", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0410", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0411", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0412", "level": "MEDIUM", "codes": ["PRICE_ANOMALY", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0413", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0414", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0415", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0416", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0417", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0418", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0419", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0420", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0421", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0422", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0423", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0424", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0425", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0426", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0427", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0428", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0429", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0430", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0431", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0432", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0433", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0434", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0435", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0436", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "LOW"}}
+{"id": "T2-0437", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0438", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "LOW"}}
+{"id": "T2-0439", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0440", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "LOW", "L": "MEDIUM"}}
+{"id": "T2-0441", "level": "LOW", "codes": [], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0442", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0443", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "LOW"}}
+{"id": "T2-0444", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0445", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0446", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0447", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0448", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0449", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0450", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0451", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0452", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0453", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0454", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0455", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0456", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "LOW"}}
+{"id": "T2-0457", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0458", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0459", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0460", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0461", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0462", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0463", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0464", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0465", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0466", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0467", "level": "MEDIUM", "codes": ["OVERPROMISE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0468", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0469", "level": "MEDIUM", "codes": ["ORGANIZER_RISK", "DUPLICATE"], "method": "majority", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "HIGH"}}
+{"id": "T2-0470", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0471", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0472", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0473", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0474", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0475", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0476", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0477", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0478", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0479", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0480", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0481", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0482", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0483", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0484", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0485", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0486", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0487", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0488", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "method": "majority", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "MEDIUM"}}
+{"id": "T2-0489", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0490", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0491", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0492", "level": "MEDIUM", "codes": ["DUPLICATE"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0493", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0494", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0495", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0496", "level": "LOW", "codes": [], "method": "unanimous", "votes": {"H1": "LOW", "H2": "LOW", "L": "LOW"}}
+{"id": "T2-0497", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}
+{"id": "T2-0498", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK", "DUPLICATE"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0499", "level": "HIGH", "codes": ["SCAM"], "method": "unanimous", "votes": {"H1": "HIGH", "H2": "HIGH", "L": "HIGH"}}
+{"id": "T2-0500", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "method": "unanimous", "votes": {"H1": "MEDIUM", "H2": "MEDIUM", "L": "MEDIUM"}}

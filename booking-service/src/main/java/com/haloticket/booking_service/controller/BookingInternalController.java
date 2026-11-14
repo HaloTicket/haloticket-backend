@@ -1,10 +1,13 @@
 package com.haloticket.booking_service.controller;
 
 import com.haloticket.booking_service.repository.BookingRepository;
+import com.haloticket.booking_service.service.BookingStatsService;
 import lombok.RequiredArgsConstructor;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -17,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class BookingInternalController {
 
     private final BookingRepository bookingRepository;
+    private final BookingStatsService statsService;
 
     @PostMapping("/report-facts")
     public ResponseEntity<List<BookingReportFact>> getReportFacts(@RequestBody List<String> bookingIds) {
@@ -39,15 +43,24 @@ public class BookingInternalController {
 
     public record BookingReportFact(String bookingId, String eventId, long tickets, String status) {}
 
+    /** from and to (ISO local date-time, to excluded) are optional: without them the figures cover the whole life of the event. */
     @GetMapping("/events/{eventId}/stats")
-    public ResponseEntity<BookingStatsResponse> getEventBookingStats(@PathVariable String eventId) {
+    public ResponseEntity<BookingStatsResponse> getEventBookingStats(
+            @PathVariable String eventId,
+            @RequestParam(value = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(value = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+        BookingStatsService.Stats stats = statsService.statsFor(eventId, from, to);
         BookingStatsResponse response = new BookingStatsResponse();
-        response.setBuyersCount(bookingRepository.countUniqueBuyersByEventId(eventId));
-        response.setTotalRevenue(bookingRepository.sumRevenueByEventId(eventId));
-        response.setTotalTicketsSold(bookingRepository.sumTicketsSoldByEventId(eventId));
-        
-        response.setDailyStats(new ArrayList<>());
-        
+        response.setBuyersCount(stats.buyers());
+        response.setTotalTicketsSold(stats.ticketsSold());
+        response.setTotalRevenue(stats.revenue());
+        response.setDailyStats(stats.daily().stream().map(d -> {
+            BookingStatsResponse.DailyStat day = new BookingStatsResponse.DailyStat();
+            day.setDate(d.date().toString());
+            day.setTicketsSold(d.ticketsSold());
+            day.setRevenue(d.revenue());
+            return day;
+        }).toList());
         return ResponseEntity.ok(response);
     }
 
@@ -55,14 +68,14 @@ public class BookingInternalController {
     public static class BookingStatsResponse {
         private long buyersCount;
         private long totalTicketsSold;
-        private double totalRevenue;
+        private long totalRevenue;
         private java.util.List<DailyStat> dailyStats;
 
         @Data
         public static class DailyStat {
             private String date;
             private long ticketsSold;
-            private double revenue;
+            private long revenue;
         }
     }
 }

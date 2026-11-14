@@ -2,6 +2,7 @@ package com.haloticket.booking_service.controller;
 
 import com.haloticket.booking_service.enums.BookingStatus;
 import com.haloticket.booking_service.repository.BookingRepository;
+import com.haloticket.booking_service.service.BookingStatsService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -20,7 +21,7 @@ class BookingInternalReportFactsTest {
             public BookingStatus getStatus() { return BookingStatus.PAID; }
         };
         when(repository.findReportFactsByBookingIds(List.of("booking-1"))).thenReturn(List.of(row));
-        var controller = new BookingInternalController(repository);
+        var controller = new BookingInternalController(repository, new BookingStatsService(repository));
 
         var response = controller.getReportFacts(java.util.Arrays.asList("booking-1", "booking-1", null));
 
@@ -31,7 +32,7 @@ class BookingInternalReportFactsTest {
     @Test
     void emptyIdsNeverQueryAllBookings() {
         BookingRepository repository = mock(BookingRepository.class);
-        var controller = new BookingInternalController(repository);
+        var controller = new BookingInternalController(repository, new BookingStatsService(repository));
 
         assertThat(controller.getReportFacts(List.of()).getBody()).isEmpty();
         verifyNoInteractions(repository);

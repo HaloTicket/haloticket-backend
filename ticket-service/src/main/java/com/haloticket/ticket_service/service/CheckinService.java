@@ -3,6 +3,9 @@ package com.haloticket.ticket_service.service;
 import com.haloticket.ticket_service.client.EventServiceClient;
 import com.haloticket.ticket_service.config.CheckinWindowProperties;
 import com.haloticket.ticket_service.dto.request.CheckinRequest;
+import com.haloticket.ticket_service.dto.response.CheckinPageDTO;
+import com.haloticket.ticket_service.dto.response.CheckinSummaryDTO;
+import com.haloticket.ticket_service.dto.response.CheckinTicketLookupDTO;
 import com.haloticket.ticket_service.dto.response.TicketCheckinDTO;
 import com.haloticket.ticket_service.entity.Checkin;
 import com.haloticket.ticket_service.entity.Ticket;
@@ -20,11 +23,17 @@ import com.haloticket.ticket_service.repository.CheckInAttemptRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -170,7 +179,7 @@ public class CheckinService {
         if (ticket.getStatus() != TicketStatus.VALID) {
             recordRefusedScan(ticket.getId(), request, CheckInAttemptResult.TICKET_LOCKED, "Ticket status is not VALID: " + ticket.getStatus());
             // CRITICAL: Do NOT insert into checkins when status is INVALID!
-            return buildFallbackDTO(infoOf(ticket), CheckInStatus.INVALID, "TICKET_LOCKED");
+            return buildFallbackDTO(infoOf(ticket), CheckInStatus.INVALID, refusalCode(ticket.getStatus()));
         }
 
         // A VALID ticket that already has a check-in row must not get a second one (checkins.ticket_id is unique).
@@ -225,29 +234,111 @@ public class CheckinService {
                 return buildFallbackDTO(refreshed, CheckInStatus.DUPLICATED, "ALREADY_USED");
             } else {
                 recordRefusedScan(refreshedTicket.getId(), request, CheckInAttemptResult.TICKET_LOCKED, "Ticket status is not VALID: " + refreshedTicket.getStatus());
-                return buildFallbackDTO(refreshed, CheckInStatus.INVALID, "TICKET_LOCKED");
+                return buildFallbackDTO(refreshed, CheckInStatus.INVALID, refusalCode(refreshedTicket.getStatus()));
             }
         }
     }
 
     @Transactional(readOnly = true)
     public List<TicketCheckinDTO> getCheckinsByEvent(String eventId, String showtimeId) {
-        List<Checkin> checkins;
-        if (showtimeId != null && !showtimeId.isBlank()) {
-            checkins = checkinRepository.findByEventIdOrderByCheckedInAtDesc(eventId).stream()
-                    .filter(c -> {
-                        String tShowtimeId = c.getTicket().getShowtimeId() != null 
-                            ? c.getTicket().getShowtimeId() 
-                            : (c.getTicket().getTicketType() != null ? c.getTicket().getTicketType().getShowtimeId() : null);
-                        return showtimeId.equals(tShowtimeId);
-                    })
-                    .collect(Collectors.toList());
-        } else {
-            checkins = checkinRepository.findByEventIdOrderByCheckedInAtDesc(eventId);
-        }
-        return checkins.stream()
-                .map(c -> mapToCheckinDTO(c, infoOf(c.getTicket()), null, c.getStatus() == CheckInStatus.VALID ? "SUCCESS" : c.getStatus().name()))
+        return checkinRepository.listByEvent(eventId, showtimeParam(showtimeId)).stream()
+                .map(this::toListItem)
                 .collect(Collectors.toList());
+    }
+
+    /** One page of the people who entered, newest first; size is kept between 1 and 100. */
+    @Transactional(readOnly = true)
+    public CheckinPageDTO getCheckinPage(String eventId, String showtimeId, int page, int size) {
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        Page<Checkin> found = checkinRepository.pageByEvent(eventId, showtimeParam(showtimeId), PageRequest.of(Math.max(page, 0), safeSize));
+        List<TicketCheckinDTO> content = found.getContent().stream().map(this::toListItem).collect(Collectors.toList());
+        return new CheckinPageDTO(content, found.getNumber(), found.getSize(), found.getTotalElements(), found.getTotalPages());
+    }
+
+    /** Tickets that still count towards the door: the holder's own tickets, whether they are free to enter or locked for now. */
+    private static final List<TicketStatus> DOOR_STATUSES = List.of(TicketStatus.VALID, TicketStatus.USED,
+            TicketStatus.LOCKED_FOR_RESALE, TicketStatus.LOCKED_FOR_TRANSFER);
+    private static final int MAX_PAGE_SIZE = 100;
+    private static final int MAX_SEARCH_RESULTS = 30;
+    private static final int MIN_SEARCH_LENGTH = 2;
+
+    /** How many tickets the event has for the door and how many entered, in total, per showtime and per ticket type. */
+    @Transactional(readOnly = true)
+    public CheckinSummaryDTO getSummary(String eventId) {
+        Map<String, long[]> showtimes = new LinkedHashMap<>();
+        Map<String, long[]> types = new LinkedHashMap<>();
+        Map<String, String> typeNames = new LinkedHashMap<>();
+        long total = 0;
+        long in = 0;
+        for (Object[] row : ticketRepository.countByShowtimeTypeAndStatus(eventId, DOOR_STATUSES)) {
+            String showtimeId = row[0] != null ? (String) row[0] : "";
+            String typeId = (String) row[1];
+            long count = ((Number) row[4]).longValue();
+            boolean used = row[3] == TicketStatus.USED;
+            total += count;
+            if (used) in += count;
+            long[] byShowtime = showtimes.computeIfAbsent(showtimeId, k -> new long[2]);
+            byShowtime[0] += count;
+            if (used) byShowtime[1] += count;
+            long[] byType = types.computeIfAbsent(typeId, k -> new long[2]);
+            typeNames.put(typeId, (String) row[2]);
+            byType[0] += count;
+            if (used) byType[1] += count;
+        }
+        List<CheckinSummaryDTO.Group> byShowtime = new ArrayList<>();
+        showtimes.forEach((id, v) -> byShowtime.add(new CheckinSummaryDTO.Group(id.isEmpty() ? null : id, null, v[0], v[1])));
+        List<CheckinSummaryDTO.Group> byType = new ArrayList<>();
+        types.forEach((id, v) -> byType.add(new CheckinSummaryDTO.Group(id, typeNames.get(id), v[0], v[1])));
+        byType.sort(Comparator.comparing(g -> g.name() == null ? "" : g.name()));
+        return new CheckinSummaryDTO(eventId, total, in, byShowtime, byType, LocalDateTime.now());
+    }
+
+    /**
+     * Door-staff search by a fragment of the ticket code, the order (booking) id, the seat reference or the ticket type name.
+     * The ticket knows its owner only by id, so a name, an email or a phone cannot be searched here. The owner is masked,
+     * and the QR hash is returned only for a ticket that can still enter, to a caller who may scan.
+     */
+    @Transactional(readOnly = true)
+    public List<CheckinTicketLookupDTO> search(String eventId, String text, String showtimeId, int limit, boolean maySeeHash) {
+        String q = text == null ? "" : text.trim().toLowerCase();
+        q = q.replace("%", "").replace("_", "").replace("\\", "");
+        if (q.length() < MIN_SEARCH_LENGTH) return List.of();
+        int size = Math.min(Math.max(limit, 1), MAX_SEARCH_RESULTS);
+        List<Ticket> found = ticketRepository.searchForCheckin(eventId, showtimeParam(showtimeId), "%" + q + "%", DOOR_STATUSES,
+                PageRequest.of(0, size));
+        List<CheckinTicketLookupDTO> out = new ArrayList<>();
+        for (Ticket t : found) {
+            TicketInfo info = infoOf(t);
+            boolean entered = t.getStatus() == TicketStatus.USED;
+            out.add(new CheckinTicketLookupDTO(t.getId(), shortCode(t.getId()), t.getBookingId(), maskOwner(t.getOwnerId()),
+                    info.ticketTypeName(), info.seatName(), info.ticketKind(), info.zone(), info.row(), info.seat(), info.showtimeId(),
+                    t.getStatus().name(), entered, entered ? t.getUsedAt() : null,
+                    maySeeHash && t.getStatus() == TicketStatus.VALID ? t.getQrCodeHash() : null));
+        }
+        return out;
+    }
+
+    private static String showtimeParam(String showtimeId) {
+        return showtimeId == null || showtimeId.isBlank() ? "" : showtimeId;
+    }
+
+    private static String shortCode(String ticketId) {
+        return ticketId == null ? "" : ticketId.split("-")[0].toUpperCase();
+    }
+
+    private static String maskOwner(String ownerId) {
+        return ownerId == null || ownerId.length() <= 6 ? "***" : ownerId.substring(0, 4) + "***";
+    }
+
+    /** Why a ticket cannot enter: a revoked (refunded or cancelled) or an already transferred ticket says so, the rest are "locked". */
+    private static String refusalCode(TicketStatus status) {
+        if (status == TicketStatus.REVOKED) return "TICKET_REVOKED";
+        if (status == TicketStatus.TRANSFERED) return "TICKET_TRANSFERRED";
+        return "TICKET_LOCKED";
+    }
+
+    private TicketCheckinDTO toListItem(Checkin c) {
+        return mapToCheckinDTO(c, infoOf(c.getTicket()), null, c.getStatus() == CheckInStatus.VALID ? "SUCCESS" : c.getStatus().name());
     }
 
     private String formatSeatName(Ticket ticket) {
@@ -276,14 +367,34 @@ public class CheckinService {
 
     /** What the responses show about a ticket, read while the ticket is still attached to the persistence context. */
     private record TicketInfo(String id, String qrCodeHash, String ownerId, String ticketTypeName, String seatName,
-                              String showtimeId, LocalDateTime usedAt) {}
+                              String showtimeId, LocalDateTime usedAt, String ticketKind, String zone, String row, String seat) {}
+
+    /** The seat as separate parts: kind (SEATED, STANDING, GENERAL), zone, row, seat. A ticket without a seat is GENERAL. */
+    private static String[] seatParts(Ticket ticket) {
+        if (ticket.getSeat() != null) {
+            Seat seat = ticket.getSeat();
+            SeatRow row = seat.getSeatRow();
+            SeatZone zone = row != null ? row.getSeatZone() : null;
+            String zoneName = zone != null ? zone.getName() : ticket.getSeatSection();
+            boolean hasRow = row != null && row.getLabel() != null && !row.getLabel().trim().isEmpty() && !row.getLabel().equalsIgnoreCase("STANDING");
+            return hasRow ? new String[]{"SEATED", zoneName, row.getLabel(), seat.getSeatNumber()}
+                          : new String[]{"STANDING", zoneName, null, seat.getSeatNumber()};
+        }
+        boolean hasLabels = ticket.getSeatRowLabel() != null && !ticket.getSeatRowLabel().isBlank();
+        if (hasLabels || (ticket.getSeatNumberLabel() != null && !ticket.getSeatNumberLabel().isBlank())) {
+            return new String[]{hasLabels ? "SEATED" : "STANDING", ticket.getSeatSection(),
+                    hasLabels ? ticket.getSeatRowLabel() : null, ticket.getSeatNumberLabel()};
+        }
+        return new String[]{"GENERAL", null, null, null};
+    }
 
     private TicketInfo infoOf(Ticket ticket) {
         String ticketTypeName = ticket.getTicketType() != null ? ticket.getTicketType().getName() : null;
         String showtimeId = ticket.getShowtimeId() != null ? ticket.getShowtimeId()
                 : (ticket.getTicketType() != null ? ticket.getTicketType().getShowtimeId() : null);
+        String[] parts = seatParts(ticket);
         return new TicketInfo(ticket.getId(), ticket.getQrCodeHash(), ticket.getOwnerId(), ticketTypeName,
-                formatSeatName(ticket), showtimeId, ticket.getUsedAt());
+                formatSeatName(ticket), showtimeId, ticket.getUsedAt(), parts[0], parts[1], parts[2], parts[3]);
     }
 
     private TicketCheckinDTO buildFallbackDTO(TicketInfo ticket, CheckInStatus status, String code) {
@@ -297,6 +408,7 @@ public class CheckinService {
                 .checkedInAt(ticket.usedAt() != null ? ticket.usedAt() : LocalDateTime.now())
                 .showtimeId(ticket.showtimeId())
                 .ownerId(ticket.ownerId())
+                .ticketKind(ticket.ticketKind()).zone(ticket.zone()).row(ticket.row()).seat(ticket.seat())
                 .build();
     }
 
@@ -312,6 +424,7 @@ public class CheckinService {
                 .checkedInAt(checkin.getCheckedInAt())
                 .showtimeId(ticket.showtimeId())
                 .ownerId(ticket.ownerId())
+                .ticketKind(ticket.ticketKind()).zone(ticket.zone()).row(ticket.row()).seat(ticket.seat())
                 .build();
     }
 }

@@ -19,4 +19,9 @@ public class TicketCheckinDTO {
     private LocalDateTime checkedInAt;
     private String showtimeId;
     private String ownerId;
+    // the seat as separate fields (seatName above stays the Vietnamese sentence the app already shows)
+    private String ticketKind; // SEATED, STANDING or GENERAL (no seat)
+    private String zone;
+    private String row;
+    private String seat;
 }

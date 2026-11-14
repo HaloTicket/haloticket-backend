@@ -3,6 +3,9 @@ package com.haloticket.ticket_service.controller;
 import com.haloticket.ticket_service.authz.EventAccessClient;
 import com.haloticket.ticket_service.authz.EventAccessView;
 import com.haloticket.ticket_service.dto.request.CheckinRequest;
+import com.haloticket.ticket_service.dto.response.CheckinPageDTO;
+import com.haloticket.ticket_service.dto.response.CheckinSummaryDTO;
+import com.haloticket.ticket_service.dto.response.CheckinTicketLookupDTO;
 import com.haloticket.ticket_service.dto.response.TicketCheckinDTO;
 import com.haloticket.ticket_service.service.CheckinService;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +45,39 @@ public class CheckinController {
         eventAccess.require(eventId, "CHECKIN_VIEW", authorization);
         List<TicketCheckinDTO> results = checkinService.getCheckinsByEvent(eventId, showtimeId);
         return ResponseEntity.ok(results);
+    }
+
+    /** The people who entered, one page at a time (page counts from 0), newest first; showtimeId narrows it to one showtime. */
+    @GetMapping("/events/{eventId}/page")
+    public ResponseEntity<CheckinPageDTO> getCheckinPage(
+            @PathVariable("eventId") String eventId,
+            @RequestParam(value = "showtimeId", required = false) String showtimeId,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        eventAccess.require(eventId, "CHECKIN_VIEW", authorization);
+        return ResponseEntity.ok(checkinService.getCheckinPage(eventId, showtimeId, page, size));
+    }
+
+    /** Entered / total for the door, per showtime and per ticket type. Door staff may read it (same permission as the list). */
+    @GetMapping("/events/{eventId}/summary")
+    public ResponseEntity<CheckinSummaryDTO> getSummary(
+            @PathVariable("eventId") String eventId,
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        eventAccess.require(eventId, "CHECKIN_VIEW", authorization);
+        return ResponseEntity.ok(checkinService.getSummary(eventId));
+    }
+
+    /** Finds tickets by a fragment of the ticket code, order id, seat reference or ticket type name (at least two characters). */
+    @GetMapping("/events/{eventId}/search")
+    public ResponseEntity<List<CheckinTicketLookupDTO>> search(
+            @PathVariable("eventId") String eventId,
+            @RequestParam(value = "q", defaultValue = "") String q,
+            @RequestParam(value = "showtimeId", required = false) String showtimeId,
+            @RequestParam(value = "limit", defaultValue = "20") int limit,
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        EventAccessView access = eventAccess.require(eventId, "CHECKIN_VIEW", authorization);
+        return ResponseEntity.ok(checkinService.search(eventId, q, showtimeId, limit, access.has("CHECKIN_SCAN")));
     }
 
     private static String staffIdOf(EventAccessView access) {

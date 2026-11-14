@@ -1,0 +1,130 @@
+{
+  "description_chars": 28879,
+  "title_chars": 32,
+  "ai_state": "ran",
+  "ai_meta": {
+    "prompt_version": "risk-c-v3",
+    "model": "openai/gpt-oss-20b",
+    "flags_proposed": 0,
+    "verify": "skipped"
+  },
+  "flags_kept": [],
+  "rule_findings": [
+    {
+      "code": "mentioned_in_prohibition",
+      "weight": 0,
+      "severity": "INFO",
+      "evidence": [
+        "chất kích thích",
+        "vũ khí",
+        "thuốc lá"
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "organizer_account",
+      "status": "not_assessed",
+      "finding": null
+    },
+    {
+      "name": "organizer_ekyc",
+      "status": "not_assessed",
+      "finding": null
+    },
+    {
+      "name": "organizer_history",
+      "status": "not_assessed",
+      "finding": null
+    },
+    {
+      "name": "price_outlier",
+      "status": "not_assessed",
+      "finding": null
+    },
+    {
+      "name": "near_duplicate",
+      "status": "not_assessed",
+      "finding": null
+    },
+    {
+      "name": "schedule",
+      "status": "not_assessed",
+      "finding": null
+    }
+  ],
+  "risk_score": 0,
+  "risk_level": "LOW",
+  "complete": false,
+  "coverage": {
+    "rules": true,
+    "signals": {
+      "assessed": 0,
+      "total": 6,
+      "missing": [
+        "UNAVAILABLE:organizer_account",
+        "UNAVAILABLE:organizer_ekyc",
+        "UNAVAILABLE:organizer_history",
+        "UNAVAILABLE:price_outlier",
+        "UNAVAILABLE:near_duplicate",
+        "UNAVAILABLE:schedule"
+      ]
+    },
+    "ai": "ran",
+    "ai_overlap_dropped": 0
+  },
+  "reasons": [
+    {
+      "layer": "SIGNAL",
+      "code": "UNAVAILABLE:near_duplicate",
+      "weight": 0,
+      "status": "not_assessed"
+    },
+    {
+      "layer": "SIGNAL",
+      "code": "UNAVAILABLE:organizer_account",
+      "weight": 0,
+      "status": "not_assessed"
+    },
+    {
+      "layer": "SIGNAL",
+      "code": "UNAVAILABLE:organizer_ekyc",
+      "weight": 0,
+      "status": "not_assessed"
+    },
+    {
+      "layer": "SIGNAL",
+      "code": "UNAVAILABLE:organizer_history",
+      "weight": 0,
+      "status": "not_assessed"
+    },
+    {
+      "layer": "SIGNAL",
+      "code": "UNAVAILABLE:price_outlier",
+      "weight": 0,
+      "status": "not_assessed"
+    },
+    {
+      "layer": "SIGNAL",
+      "code": "UNAVAILABLE:schedule",
+      "weight": 0,
+      "status": "not_assessed"
+    },
+    {
+      "layer": "RULE",
+      "code": "mentioned_in_prohibition",
+      "weight": 0,
+      "status": "assessed"
+    }
+  ],
+  "steps": {
+    "rules_ms": 48.2,
+    "signals_ms": 0.4,
+    "model_wall_ms": 1528.5,
+    "model_live_ms": 1527.7,
+    "model_live_calls": 1,
+    "model_cached_calls": 0,
+    "combine_ms": 0.1,
+    "total_ms": 1583.6
+  }
+}

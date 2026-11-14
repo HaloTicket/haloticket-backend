@@ -15,6 +15,10 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 
 import org.springframework.http.HttpMethod;
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 @Configuration
 @EnableMethodSecurity
@@ -53,6 +57,7 @@ public class InternalReportSecurityConfig {
     @Bean
     @Order(2)
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http, BookingJwtRoleConverter roleConverter) throws Exception {
+        BearerTokenResolver defaultResolver = new DefaultBearerTokenResolver();
         return http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
@@ -61,8 +66,16 @@ public class InternalReportSecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/bookings/*/cancel").authenticated()
                         .anyRequest().permitAll())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt
-                        .decoder(jwtDecoder()).jwtAuthenticationConverter(roleConverter)))
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        // The internal routes left on this chain (service-to-service reads) are public and use no identity.
+                        // A stale or malformed Authorization header must not turn one of them into a 401, so the token is not read.
+                        .bearerTokenResolver(request -> isInternalRoute(request) ? null : defaultResolver.resolve(request))
+                        .jwt(jwt -> jwt.decoder(jwtDecoder()).jwtAuthenticationConverter(roleConverter)))
                 .build();
+    }
+
+    private static boolean isInternalRoute(HttpServletRequest request) {
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        return path.startsWith("/api/internal/");
     }
 }

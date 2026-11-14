@@ -3,6 +3,7 @@ package com.haloticket.user_service.config;
 import com.haloticket.user_service.controller.AdminUserController;
 import com.haloticket.user_service.controller.InternalUserController;
 import com.haloticket.user_service.enums.Role;
+import com.haloticket.user_service.service.AdminUserManagementService;
 import com.haloticket.user_service.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -55,12 +57,13 @@ class UserAdminAuthorizationTest {
 
     @Autowired WebApplicationContext context;
     @Autowired UserService userService;
+    @Autowired AdminUserManagementService management;
     @Autowired JwtRoleConverter converter;
     MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
-        reset(userService);
+        reset(userService, management);
         when(userService.getAdminUsers(any(), any(), any(), any(), any(Pageable.class))).thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 10), 0));
         mockMvc = MockMvcBuilders.webAppContextSetup(context).apply(springSecurity()).build();
     }
@@ -70,6 +73,9 @@ class UserAdminAuthorizationTest {
         List<String[]> calls = List.of(
                 new String[]{"GET", "/api/users/admin"},
                 new String[]{"GET", "/api/users/admin/" + ID},
+                new String[]{"GET", "/api/users/admin/stats"},
+                new String[]{"GET", "/api/users/admin/audit"},
+                new String[]{"POST", "/api/users/admin"},
                 new String[]{"PUT", "/api/users/admin/" + ID + "/status?status=ACTIVE"},
                 new String[]{"PUT", "/api/users/admin/" + ID + "/roles"});
         for (String[] call : calls) {
@@ -88,8 +94,7 @@ class UserAdminAuthorizationTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(put("/api/users/admin/" + ID + "/status").param("status", "ACTIVE").with(token("ROLE_USER")))
                 .andExpect(status().isForbidden());
-        verify(userService, never()).updateUserRoles(anyString(), any());
-        verify(userService, never()).updateAdminUserStatus(anyString(), any());
+        verifyNoInteractions(management);
     }
 
     @Test
@@ -97,7 +102,7 @@ class UserAdminAuthorizationTest {
         mockMvc.perform(put("/api/users/admin/" + ID + "/roles").with(token("ROLE_USER", "ROLE_ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON).content("[\"CUSTOMER\",\"ADMIN\"]"))
                 .andExpect(status().isOk());
-        verify(userService).updateUserRoles(eq(ID), any());
+        verify(management).updateRoles(any(), eq(ID), any());
     }
 
     @Test
@@ -137,6 +142,8 @@ class UserAdminAuthorizationTest {
     private MockHttpServletRequestBuilder request(String method, String path, RequestPostProcessor token) {
         MockHttpServletRequestBuilder builder = method.equals("PUT")
                 ? put(path).contentType(MediaType.APPLICATION_JSON).content("[\"CUSTOMER\"]")
+                : method.equals("POST")
+                ? post(path).contentType(MediaType.APPLICATION_JSON).content("{}")
                 : get(path);
         return token == null ? builder : builder.with(token);
     }
@@ -148,6 +155,11 @@ class UserAdminAuthorizationTest {
         @Bean
         UserService userService() {
             return mock(UserService.class);
+        }
+
+        @Bean
+        AdminUserManagementService adminUserManagementService() {
+            return mock(AdminUserManagementService.class);
         }
     }
 }

@@ -4,9 +4,17 @@ import com.haloticket.event_service.entity.EventCategory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface EventCategoryRepository extends JpaRepository<EventCategory, String> {
     Optional<EventCategory> findByNameContainingIgnoreCase(String name);
+
+    Optional<EventCategory> findByNameIgnoreCase(String name);
+
+    Optional<EventCategory> findBySlugIgnoreCase(String slug);
+
+    /** the order the apps show categories in: by position, categories without one last, then by name */
+    List<EventCategory> findAllByOrderBySortOrderAscNameAsc();
 }

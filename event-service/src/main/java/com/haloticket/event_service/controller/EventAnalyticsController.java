@@ -6,11 +6,13 @@ import com.haloticket.event_service.entity.EventViewLog;
 import com.haloticket.event_service.repository.EventViewLogRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import com.haloticket.event_service.authz.Permission;
 import com.haloticket.event_service.service.EventAccessService;
 import org.springframework.web.bind.annotation.*;
 import java.util.Map;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @RestController
@@ -24,10 +26,13 @@ public class EventAnalyticsController {
     @GetMapping("/api/events/{eventId}/analytics")
     public ResponseEntity<EventAnalyticsResponse> getEventAnalytics(
             @PathVariable String eventId,
-            @RequestParam(defaultValue = "30d") String timeRange
+            @RequestParam(defaultValue = "30d") String timeRange,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "false") boolean compare
     ) {
         access.requireForRequest(eventId, Permission.ANALYTICS_VIEW);
-        return ResponseEntity.ok(analyticsService.getEventAnalytics(eventId, timeRange));
+        return ResponseEntity.ok(analyticsService.getEventAnalytics(eventId, timeRange, from, to, compare));
     }
 
     @PostMapping("/api/events/{eventId}/view")

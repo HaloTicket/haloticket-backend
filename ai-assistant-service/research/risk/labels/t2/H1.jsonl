@@ -1,0 +1,500 @@
+{"id": "T2-0432", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:03:41+00:00", "order": 1, "pilot": true}
+{"id": "T2-0312", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:04:01+00:00", "order": 2, "pilot": true}
+{"id": "T2-0027", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:05:39+00:00", "order": 3, "pilot": true}
+{"id": "T2-0296", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:06:32+00:00", "order": 4, "pilot": true}
+{"id": "T2-0334", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:07:58+00:00", "order": 5, "pilot": true}
+{"id": "T2-0367", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:09:25+00:00", "order": 6, "pilot": true}
+{"id": "T2-0232", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:09:48+00:00", "order": 7, "pilot": true}
+{"id": "T2-0154", "annotator": "H1", "level": "HIGH", "codes": ["SCAM"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:10:04+00:00", "order": 8, "pilot": true}
+{"id": "T2-0482", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:10:19+00:00", "order": 9, "pilot": true}
+{"id": "T2-0045", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:10:32+00:00", "order": 10, "pilot": true}
+{"id": "T2-0025", "annotator": "H1", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:26:02+00:00", "order": 11, "pilot": true}
+{"id": "T2-0248", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:29:07+00:00", "order": 12, "pilot": true}
+{"id": "T2-0109", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:31:02+00:00", "order": 13, "pilot": true}
+{"id": "T2-0202", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:31:25+00:00", "order": 14, "pilot": true}
+{"id": "T2-0371", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:31:41+00:00", "order": 15, "pilot": true}
+{"id": "T2-0368", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:31:56+00:00", "order": 16, "pilot": true}
+{"id": "T2-0286", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:32:25+00:00", "order": 17, "pilot": true}
+{"id": "T2-0327", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:32:50+00:00", "order": 18, "pilot": true}
+{"id": "T2-0131", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:33:21+00:00", "order": 19, "pilot": true}
+{"id": "T2-0101", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:33:36+00:00", "order": 20, "pilot": true}
+{"id": "T2-0151", "annotator": "H1", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:33:58+00:00", "order": 21, "pilot": true}
+{"id": "T2-0420", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:34:17+00:00", "order": 22, "pilot": true}
+{"id": "T2-0165", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:34:31+00:00", "order": 23, "pilot": true}
+{"id": "T2-0018", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:34:56+00:00", "order": 24, "pilot": true}
+{"id": "T2-0494", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:35:21+00:00", "order": 25, "pilot": true}
+{"id": "T2-0460", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:35:42+00:00", "order": 26, "pilot": true}
+{"id": "T2-0421", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:36:20+00:00", "order": 27, "pilot": true}
+{"id": "T2-0275", "annotator": "H1", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:36:37+00:00", "order": 28, "pilot": true}
+{"id": "T2-0057", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:37:02+00:00", "order": 29, "pilot": true}
+{"id": "T2-0119", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:37:24+00:00", "order": 30, "pilot": true}
+{"id": "T2-0125", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:37:39+00:00", "order": 31, "pilot": false}
+{"id": "T2-0121", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:37:55+00:00", "order": 32, "pilot": false}
+{"id": "T2-0074", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:38:13+00:00", "order": 33, "pilot": false}
+{"id": "T2-0228", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:38:28+00:00", "order": 34, "pilot": false}
+{"id": "T2-0449", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:38:45+00:00", "order": 35, "pilot": false}
+{"id": "T2-0231", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:39:01+00:00", "order": 36, "pilot": false}
+{"id": "T2-0316", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:39:20+00:00", "order": 37, "pilot": false}
+{"id": "T2-0120", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:39:32+00:00", "order": 38, "pilot": false}
+{"id": "T2-0363", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:40:11+00:00", "order": 39, "pilot": false}
+{"id": "T2-0348", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:40:25+00:00", "order": 40, "pilot": false}
+{"id": "T2-0034", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:40:40+00:00", "order": 41, "pilot": false}
+{"id": "T2-0322", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:40:57+00:00", "order": 42, "pilot": false}
+{"id": "T2-0096", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:41:35+00:00", "order": 43, "pilot": false}
+{"id": "T2-0147", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:41:48+00:00", "order": 44, "pilot": false}
+{"id": "T2-0197", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:42:05+00:00", "order": 45, "pilot": false}
+{"id": "T2-0396", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:42:18+00:00", "order": 46, "pilot": false}
+{"id": "T2-0388", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": true, "note": "Cụm “lá cỏ chất lượng cao” kèm “kín đáo tuyệt đối” nghi ám chỉ cần sa nhưng chưa đủ căn cứ xác nhận. Ban tổ chức mới tạo tài khoản và chưa xác minh eKYC.", "labelled_at": "2026-11-13T08:42:48+00:00", "order": 47, "pilot": false}
+{"id": "T2-0048", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:43:00+00:00", "order": 48, "pilot": false}
+{"id": "T2-0153", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:43:17+00:00", "order": 49, "pilot": false}
+{"id": "T2-0130", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:43:31+00:00", "order": 50, "pilot": false}
+{"id": "T2-0273", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:43:55+00:00", "order": 51, "pilot": false}
+{"id": "T2-0176", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:44:13+00:00", "order": 52, "pilot": false}
+{"id": "T2-0167", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:44:27+00:00", "order": 53, "pilot": false}
+{"id": "T2-0155", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "unsure": true, "note": "Cụm “hàng nóng” có thể ám chỉ vũ khí hoặc hàng cấm nhưng chưa xác định được mặt hàng cụ thể. Cần xác minh nội dung chào mời.", "labelled_at": "2026-11-13T08:45:06+00:00", "order": 54, "pilot": false}
+{"id": "T2-0323", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:45:17+00:00", "order": 55, "pilot": false}
+{"id": "T2-0046", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:45:31+00:00", "order": 56, "pilot": false}
+{"id": "T2-0488", "annotator": "H1", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:45:41+00:00", "order": 57, "pilot": false}
+{"id": "T2-0144", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:45:58+00:00", "order": 58, "pilot": false}
+{"id": "T2-0233", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:46:09+00:00", "order": 59, "pilot": false}
+{"id": "T2-0282", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:46:22+00:00", "order": 60, "pilot": false}
+{"id": "T2-0495", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:47:09+00:00", "order": 61, "pilot": false}
+{"id": "T2-0462", "annotator": "H1", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:47:20+00:00", "order": 62, "pilot": false}
+{"id": "T2-0196", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:47:35+00:00", "order": 63, "pilot": false}
+{"id": "T2-0051", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:47:50+00:00", "order": 64, "pilot": false}
+{"id": "T2-0453", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:48:03+00:00", "order": 65, "pilot": false}
+{"id": "T2-0408", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:48:16+00:00", "order": 66, "pilot": false}
+{"id": "T2-0463", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "unsure": true, "note": "Cụm “hàng cháy giá mềm” có dấu hiệu chào bán mặt hàng không rõ nguồn gốc hoặc hàng cấm, kèm yêu cầu hỏi riêng. Chưa đủ căn cứ xác định chính xác mặt hàng.", "labelled_at": "2026-11-13T08:48:38+00:00", "order": 67, "pilot": false}
+{"id": "T2-0240", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:48:54+00:00", "order": 68, "pilot": false}
+{"id": "T2-0086", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:49:07+00:00", "order": 69, "pilot": false}
+{"id": "T2-0178", "annotator": "H1", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:49:19+00:00", "order": 70, "pilot": false}
+{"id": "T2-0245", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:49:30+00:00", "order": 71, "pilot": false}
+{"id": "T2-0088", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:49:46+00:00", "order": 72, "pilot": false}
+{"id": "T2-0099", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": true, "note": "Cụm “đồ chơi người lớn nhập ngoại, không cần giấy tờ” có thể ám chỉ mặt hàng bị hạn chế nhưng chưa đủ thông tin xác định chính xác. Rủi ro ban tổ chức rõ ràng do tài khoản mới và chưa xác minh.", "labelled_at": "2026-11-13T08:50:08+00:00", "order": 73, "pilot": false}
+{"id": "T2-0274", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:50:28+00:00", "order": 74, "pilot": false}
+{"id": "T2-0470", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:50:40+00:00", "order": 75, "pilot": false}
+{"id": "T2-0145", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:50:52+00:00", "order": 76, "pilot": false}
+{"id": "T2-0401", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:51:04+00:00", "order": 77, "pilot": false}
+{"id": "T2-0019", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:51:16+00:00", "order": 78, "pilot": false}
+{"id": "T2-0150", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:51:27+00:00", "order": 79, "pilot": false}
+{"id": "T2-0454", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:51:39+00:00", "order": 80, "pilot": false}
+{"id": "T2-0070", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:51:52+00:00", "order": 81, "pilot": false}
+{"id": "T2-0106", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:52:03+00:00", "order": 82, "pilot": false}
+{"id": "T2-0166", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:52:25+00:00", "order": 83, "pilot": false}
+{"id": "T2-0287", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:52:57+00:00", "order": 84, "pilot": false}
+{"id": "T2-0446", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:53:13+00:00", "order": 85, "pilot": false}
+{"id": "T2-0137", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:53:42+00:00", "order": 86, "pilot": false}
+{"id": "T2-0306", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:53:56+00:00", "order": 87, "pilot": false}
+{"id": "T2-0350", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:54:11+00:00", "order": 88, "pilot": false}
+{"id": "T2-0260", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:54:27+00:00", "order": 89, "pilot": false}
+{"id": "T2-0037", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:54:41+00:00", "order": 90, "pilot": false}
+{"id": "T2-0229", "annotator": "H1", "level": "HIGH", "codes": ["SCAM"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:54:55+00:00", "order": 91, "pilot": false}
+{"id": "T2-0218", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:55:09+00:00", "order": 92, "pilot": false}
+{"id": "T2-0253", "annotator": "H1", "level": "HIGH", "codes": ["SCAM"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:55:24+00:00", "order": 93, "pilot": false}
+{"id": "T2-0097", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:55:40+00:00", "order": 94, "pilot": false}
+{"id": "T2-0480", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:56:03+00:00", "order": 95, "pilot": false}
+{"id": "T2-0242", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:56:15+00:00", "order": 96, "pilot": false}
+{"id": "T2-0187", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:56:28+00:00", "order": 97, "pilot": false}
+{"id": "T2-0430", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:56:44+00:00", "order": 98, "pilot": false}
+{"id": "T2-0493", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:56:57+00:00", "order": 99, "pilot": false}
+{"id": "T2-0376", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T08:57:13+00:00", "order": 100, "pilot": false}
+{"id": "T2-0358", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:00:05+00:00", "order": 101, "pilot": false}
+{"id": "T2-0425", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:00:30+00:00", "order": 102, "pilot": false}
+{"id": "T2-0442", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:00:47+00:00", "order": 103, "pilot": false}
+{"id": "T2-0208", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:01:19+00:00", "order": 104, "pilot": false}
+{"id": "T2-0436", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:01:32+00:00", "order": 105, "pilot": false}
+{"id": "T2-0012", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:01:52+00:00", "order": 106, "pilot": false}
+{"id": "T2-0129", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:02:09+00:00", "order": 107, "pilot": false}
+{"id": "T2-0169", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:02:21+00:00", "order": 108, "pilot": false}
+{"id": "T2-0313", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:02:52+00:00", "order": 109, "pilot": false}
+{"id": "T2-0380", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:03:03+00:00", "order": 110, "pilot": false}
+{"id": "T2-0386", "annotator": "H1", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:03:17+00:00", "order": 111, "pilot": false}
+{"id": "T2-0077", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:03:31+00:00", "order": 112, "pilot": false}
+{"id": "T2-0087", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:03:46+00:00", "order": 113, "pilot": false}
+{"id": "T2-0016", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:04:07+00:00", "order": 114, "pilot": false}
+{"id": "T2-0390", "annotator": "H1", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:04:21+00:00", "order": 115, "pilot": false}
+{"id": "T2-0407", "annotator": "H1", "level": "HIGH", "codes": ["SCAM"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:04:35+00:00", "order": 116, "pilot": false}
+{"id": "T2-0310", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:04:53+00:00", "order": 117, "pilot": false}
+{"id": "T2-0346", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:05:06+00:00", "order": 118, "pilot": false}
+{"id": "T2-0124", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:05:25+00:00", "order": 119, "pilot": false}
+{"id": "T2-0001", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:05:43+00:00", "order": 120, "pilot": false}
+{"id": "T2-0413", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "unsure": true, "note": "“Quà tặng đặc biệt dành cho dân chơi” kết hợp với địa điểm gặp riêng ở bãi xe có thể ám chỉ hàng cấm, nhưng chưa đủ bằng chứng xác định mặt hàng.", "labelled_at": "2026-11-13T09:06:19+00:00", "order": 121, "pilot": false}
+{"id": "T2-0317", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": true, "note": "“Hàng nóng” là cách diễn đạt mơ hồ, có thể ám chỉ hàng hóa bị cấm nhưng chưa đủ bằng chứng xác định. Ban tổ chức mới tạo tài khoản và chưa xác minh eKYC.", "labelled_at": "2026-11-13T09:06:40+00:00", "order": 122, "pilot": false}
+{"id": "T2-0400", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:07:24+00:00", "order": 123, "pilot": false}
+{"id": "T2-0492", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:07:41+00:00", "order": 124, "pilot": false}
+{"id": "T2-0461", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:07:57+00:00", "order": 125, "pilot": false}
+{"id": "T2-0305", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:08:12+00:00", "order": 126, "pilot": false}
+{"id": "T2-0050", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:08:31+00:00", "order": 127, "pilot": false}
+{"id": "T2-0384", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:09:14+00:00", "order": 128, "pilot": false}
+{"id": "T2-0108", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:09:25+00:00", "order": 129, "pilot": false}
+{"id": "T2-0324", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:09:42+00:00", "order": 130, "pilot": false}
+{"id": "T2-0300", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:09:56+00:00", "order": 131, "pilot": false}
+{"id": "T2-0320", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:10:16+00:00", "order": 132, "pilot": false}
+{"id": "T2-0168", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:10:45+00:00", "order": 133, "pilot": false}
+{"id": "T2-0079", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:11:06+00:00", "order": 134, "pilot": false}
+{"id": "T2-0285", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:12:00+00:00", "order": 135, "pilot": false}
+{"id": "T2-0469", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:12:21+00:00", "order": 136, "pilot": false}
+{"id": "T2-0290", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:12:37+00:00", "order": 137, "pilot": false}
+{"id": "T2-0209", "annotator": "H1", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:12:49+00:00", "order": 138, "pilot": false}
+{"id": "T2-0394", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:13:05+00:00", "order": 139, "pilot": false}
+{"id": "T2-0308", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:13:19+00:00", "order": 140, "pilot": false}
+{"id": "T2-0254", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:13:38+00:00", "order": 141, "pilot": false}
+{"id": "T2-0091", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:18:12+00:00", "order": 142, "pilot": false}
+{"id": "T2-0357", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:18:28+00:00", "order": 143, "pilot": false}
+{"id": "T2-0484", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:18:46+00:00", "order": 144, "pilot": false}
+{"id": "T2-0497", "annotator": "H1", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:19:01+00:00", "order": 145, "pilot": false}
+{"id": "T2-0080", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:19:21+00:00", "order": 146, "pilot": false}
+{"id": "T2-0261", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:19:33+00:00", "order": 147, "pilot": false}
+{"id": "T2-0227", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:19:58+00:00", "order": 148, "pilot": false}
+{"id": "T2-0375", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:20:10+00:00", "order": 149, "pilot": false}
+{"id": "T2-0075", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:20:23+00:00", "order": 150, "pilot": false}
+{"id": "T2-0026", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:20:39+00:00", "order": 151, "pilot": false}
+{"id": "T2-0359", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:20:53+00:00", "order": 152, "pilot": false}
+{"id": "T2-0439", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:21:10+00:00", "order": 153, "pilot": false}
+{"id": "T2-0219", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:21:23+00:00", "order": 154, "pilot": false}
+{"id": "T2-0267", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:24:00+00:00", "order": 155, "pilot": false}
+{"id": "T2-0263", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:24:14+00:00", "order": 156, "pilot": false}
+{"id": "T2-0478", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:24:29+00:00", "order": 157, "pilot": false}
+{"id": "T2-0212", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:24:48+00:00", "order": 158, "pilot": false}
+{"id": "T2-0319", "annotator": "H1", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:25:04+00:00", "order": 159, "pilot": false}
+{"id": "T2-0476", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:25:16+00:00", "order": 160, "pilot": false}
+{"id": "T2-0133", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:25:31+00:00", "order": 161, "pilot": false}
+{"id": "T2-0205", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:25:47+00:00", "order": 162, "pilot": false}
+{"id": "T2-0139", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:26:02+00:00", "order": 163, "pilot": false}
+{"id": "T2-0256", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:26:14+00:00", "order": 164, "pilot": false}
+{"id": "T2-0397", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:26:29+00:00", "order": 165, "pilot": false}
+{"id": "T2-0411", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:26:49+00:00", "order": 166, "pilot": false}
+{"id": "T2-0364", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:27:05+00:00", "order": 167, "pilot": false}
+{"id": "T2-0487", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:27:20+00:00", "order": 168, "pilot": false}
+{"id": "T2-0076", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:27:41+00:00", "order": 169, "pilot": false}
+{"id": "T2-0210", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:28:09+00:00", "order": 170, "pilot": false}
+{"id": "T2-0265", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:28:20+00:00", "order": 171, "pilot": false}
+{"id": "T2-0362", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:28:36+00:00", "order": 172, "pilot": false}
+{"id": "T2-0003", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:28:55+00:00", "order": 173, "pilot": false}
+{"id": "T2-0415", "annotator": "H1", "level": "HIGH", "codes": ["SCAM"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:29:15+00:00", "order": 174, "pilot": false}
+{"id": "T2-0215", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:29:28+00:00", "order": 175, "pilot": false}
+{"id": "T2-0188", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:29:50+00:00", "order": 176, "pilot": false}
+{"id": "T2-0043", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:31:17+00:00", "order": 177, "pilot": false}
+{"id": "T2-0192", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:31:31+00:00", "order": 178, "pilot": false}
+{"id": "T2-0378", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:31:48+00:00", "order": 179, "pilot": false}
+{"id": "T2-0085", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:32:05+00:00", "order": 180, "pilot": false}
+{"id": "T2-0337", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:37:44+00:00", "order": 181, "pilot": false}
+{"id": "T2-0393", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:39:30+00:00", "order": 182, "pilot": false}
+{"id": "T2-0182", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": true, "note": "vì cụm “kẹo vui” và “bay lắc” mang tính ám chỉ, chưa xác định chắc chắn hàng cấm.", "labelled_at": "2026-11-13T09:40:29+00:00", "order": 183, "pilot": false}
+{"id": "T2-0060", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:42:03+00:00", "order": 184, "pilot": false}
+{"id": "T2-0426", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:42:20+00:00", "order": 185, "pilot": false}
+{"id": "T2-0191", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:42:40+00:00", "order": 186, "pilot": false}
+{"id": "T2-0475", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:42:56+00:00", "order": 187, "pilot": false}
+{"id": "T2-0293", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:43:17+00:00", "order": 188, "pilot": false}
+{"id": "T2-0340", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:43:38+00:00", "order": 189, "pilot": false}
+{"id": "T2-0283", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:43:57+00:00", "order": 190, "pilot": false}
+{"id": "T2-0134", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:44:17+00:00", "order": 191, "pilot": false}
+{"id": "T2-0416", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:44:36+00:00", "order": 192, "pilot": false}
+{"id": "T2-0374", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:44:55+00:00", "order": 193, "pilot": false}
+{"id": "T2-0128", "annotator": "H1", "level": "HIGH", "codes": ["SCAM"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:45:16+00:00", "order": 194, "pilot": false}
+{"id": "T2-0277", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:45:41+00:00", "order": 195, "pilot": false}
+{"id": "T2-0264", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:45:53+00:00", "order": 196, "pilot": false}
+{"id": "T2-0243", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "unsure": true, "note": "Cụm “kẹo vui”, “bay lắc” và “nhắn mình lấy hàng” nghi vấn ám chỉ mua bán chất kích thích hoặc ma túy, nhưng không nêu rõ tên hay loại sản phẩm. Chưa đủ bằng chứng xác định chắc chắn hàng cấm", "labelled_at": "2026-11-13T09:47:18+00:00", "order": 197, "pilot": false}
+{"id": "T2-0090", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:47:32+00:00", "order": 198, "pilot": false}
+{"id": "T2-0148", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:47:47+00:00", "order": 199, "pilot": false}
+{"id": "T2-0152", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:48:02+00:00", "order": 200, "pilot": false}
+{"id": "T2-0140", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:48:19+00:00", "order": 201, "pilot": false}
+{"id": "T2-0465", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:48:34+00:00", "order": 202, "pilot": false}
+{"id": "T2-0014", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:48:53+00:00", "order": 203, "pilot": false}
+{"id": "T2-0500", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:49:13+00:00", "order": 204, "pilot": false}
+{"id": "T2-0276", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:49:30+00:00", "order": 205, "pilot": false}
+{"id": "T2-0017", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK", "DUPLICATE"], "unsure": true, "note": "Cụm “đồ chơi người lớn nhập ngoại, không cần giấy tờ” có thể ám chỉ hàng hóa bị hạn chế hoặc không rõ tính hợp pháp, nhưng không nêu cụ thể sản phẩm nên chưa đủ căn cứ xác nhận chắc chắn thuộc danh mục hàng cấm.", "labelled_at": "2026-11-13T09:50:00+00:00", "order": 206, "pilot": false}
+{"id": "T2-0184", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:50:24+00:00", "order": 207, "pilot": false}
+{"id": "T2-0418", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:50:48+00:00", "order": 208, "pilot": false}
+{"id": "T2-0377", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:51:02+00:00", "order": 209, "pilot": false}
+{"id": "T2-0038", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:51:21+00:00", "order": 210, "pilot": false}
+{"id": "T2-0206", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:51:35+00:00", "order": 211, "pilot": false}
+{"id": "T2-0241", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:51:56+00:00", "order": 212, "pilot": false}
+{"id": "T2-0011", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:52:12+00:00", "order": 213, "pilot": false}
+{"id": "T2-0081", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:52:32+00:00", "order": 214, "pilot": false}
+{"id": "T2-0298", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "unsure": true, "note": "Cụm “kẹo vui”, “bay lắc” và “nhắn mình lấy hàng” nghi vấn ám chỉ mua bán chất kích thích hoặc ma túy, nhưng không nêu rõ tên hay loại sản phẩm. Chưa đủ bằng chứng xác định chắc chắn hàng cấm.", "labelled_at": "2026-11-13T09:53:02+00:00", "order": 215, "pilot": false}
+{"id": "T2-0110", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:53:17+00:00", "order": 216, "pilot": false}
+{"id": "T2-0214", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:53:40+00:00", "order": 217, "pilot": false}
+{"id": "T2-0006", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:54:01+00:00", "order": 218, "pilot": false}
+{"id": "T2-0366", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:54:21+00:00", "order": 219, "pilot": false}
+{"id": "T2-0385", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:54:40+00:00", "order": 220, "pilot": false}
+{"id": "T2-0249", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:54:58+00:00", "order": 221, "pilot": false}
+{"id": "T2-0336", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:55:15+00:00", "order": 222, "pilot": false}
+{"id": "T2-0289", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "unsure": true, "note": "Cụm “hàng cháy giá mềm, số lượng ít, hỏi riêng sau giờ diễn” có thể ám chỉ giao dịch hàng hóa nhạy cảm, nhưng không nêu rõ sản phẩm hoặc hành vi bị cấm. Chưa đủ bằng chứng xác định chắc chắn thuộc nhóm hàng cấm.", "labelled_at": "2026-11-13T09:55:43+00:00", "order": 223, "pilot": false}
+{"id": "T2-0338", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:55:57+00:00", "order": 224, "pilot": false}
+{"id": "T2-0406", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:56:20+00:00", "order": 225, "pilot": false}
+{"id": "T2-0044", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:56:46+00:00", "order": 226, "pilot": false}
+{"id": "T2-0498", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:57:07+00:00", "order": 227, "pilot": false}
+{"id": "T2-0379", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:57:26+00:00", "order": 228, "pilot": false}
+{"id": "T2-0433", "annotator": "H1", "level": "HIGH", "codes": ["SCAM"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:57:43+00:00", "order": 229, "pilot": false}
+{"id": "T2-0105", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:58:23+00:00", "order": 230, "pilot": false}
+{"id": "T2-0419", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:59:03+00:00", "order": 231, "pilot": false}
+{"id": "T2-0292", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:59:19+00:00", "order": 232, "pilot": false}
+{"id": "T2-0441", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T09:59:41+00:00", "order": 233, "pilot": false}
+{"id": "T2-0311", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:00:02+00:00", "order": 234, "pilot": false}
+{"id": "T2-0203", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:00:18+00:00", "order": 235, "pilot": false}
+{"id": "T2-0093", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": true, "note": "Cụm “hàng nóng cho khách quen” có thể ám chỉ hàng cấm nhưng cũng có thể mang nghĩa khác. Nội dung không nêu rõ loại hàng, nguồn gốc hoặc hành vi vi phạm cụ thể nên chưa đủ căn cứ xác nhận chắc chắn mã p.", "labelled_at": "2026-11-13T10:00:46+00:00", "order": 236, "pilot": false}
+{"id": "T2-0200", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:01:00+00:00", "order": 237, "pilot": false}
+{"id": "T2-0303", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:01:17+00:00", "order": 238, "pilot": false}
+{"id": "T2-0424", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:01:39+00:00", "order": 239, "pilot": false}
+{"id": "T2-0271", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": true, "note": "Cụm “hàng cháy giá mềm” có thể là cách nói về hàng hóa nhạy cảm hoặc đơn thuần chỉ hàng bán chạy, giảm giá. Mô tả không nêu rõ sản phẩm nên chưa thể xác nhận chắc chắn thuộc nhóm hàng cấm.", "labelled_at": "2026-11-13T10:02:05+00:00", "order": 240, "pilot": false}
+{"id": "T2-0294", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:02:27+00:00", "order": 241, "pilot": false}
+{"id": "T2-0250", "annotator": "H1", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:04:23+00:00", "order": 242, "pilot": false}
+{"id": "T2-0185", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:04:47+00:00", "order": 243, "pilot": false}
+{"id": "T2-0403", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:05:43+00:00", "order": 244, "pilot": false}
+{"id": "T2-0177", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:05:58+00:00", "order": 245, "pilot": false}
+{"id": "T2-0423", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:06:16+00:00", "order": 246, "pilot": false}
+{"id": "T2-0330", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:06:35+00:00", "order": 247, "pilot": false}
+{"id": "T2-0042", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:06:53+00:00", "order": 248, "pilot": false}
+{"id": "T2-0372", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:08:14+00:00", "order": 249, "pilot": false}
+{"id": "T2-0455", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:08:36+00:00", "order": 250, "pilot": false}
+{"id": "T2-0032", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:09:07+00:00", "order": 251, "pilot": false}
+{"id": "T2-0373", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:09:32+00:00", "order": 252, "pilot": false}
+{"id": "T2-0458", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:09:48+00:00", "order": 253, "pilot": false}
+{"id": "T2-0061", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:10:07+00:00", "order": 254, "pilot": false}
+{"id": "T2-0258", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:10:24+00:00", "order": 255, "pilot": false}
+{"id": "T2-0451", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:10:44+00:00", "order": 256, "pilot": false}
+{"id": "T2-0005", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:11:04+00:00", "order": 257, "pilot": false}
+{"id": "T2-0325", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:11:21+00:00", "order": 258, "pilot": false}
+{"id": "T2-0270", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:11:40+00:00", "order": 259, "pilot": false}
+{"id": "T2-0244", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:11:58+00:00", "order": 260, "pilot": false}
+{"id": "T2-0404", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:12:18+00:00", "order": 261, "pilot": false}
+{"id": "T2-0437", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:12:40+00:00", "order": 262, "pilot": false}
+{"id": "T2-0382", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:12:58+00:00", "order": 263, "pilot": false}
+{"id": "T2-0138", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:13:38+00:00", "order": 264, "pilot": false}
+{"id": "T2-0104", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:13:56+00:00", "order": 265, "pilot": false}
+{"id": "T2-0098", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:14:16+00:00", "order": 266, "pilot": false}
+{"id": "T2-0223", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "unsure": true, "note": "Cần đối chiếu danh mục hàng hóa bị cấm quảng bá trong LABELING_GUIDE v2 và nhóm tuổi sử dụng sản phẩm. Việc bán sữa thay thế sữa mẹ không mặc nhiên đồng nghĩa với bán hàng cấm.", "labelled_at": "2026-11-13T10:15:36+00:00", "order": 267, "pilot": false}
+{"id": "T2-0309", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:15:57+00:00", "order": 268, "pilot": false}
+{"id": "T2-0067", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:16:12+00:00", "order": 269, "pilot": false}
+{"id": "T2-0225", "annotator": "H1", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:16:27+00:00", "order": 270, "pilot": false}
+{"id": "T2-0471", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:16:50+00:00", "order": 271, "pilot": false}
+{"id": "T2-0284", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:17:12+00:00", "order": 272, "pilot": false}
+{"id": "T2-0391", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "unsure": true, "note": "“Hàng nóng” có nhiều cách hiểu, chưa đủ thông tin xác nhận đó là hàng cấm.", "labelled_at": "2026-11-13T10:17:49+00:00", "order": 273, "pilot": false}
+{"id": "T2-0381", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:18:12+00:00", "order": 274, "pilot": false}
+{"id": "T2-0198", "annotator": "H1", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:18:29+00:00", "order": 275, "pilot": false}
+{"id": "T2-0351", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:18:50+00:00", "order": 276, "pilot": false}
+{"id": "T2-0132", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:19:09+00:00", "order": 277, "pilot": false}
+{"id": "T2-0114", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:19:31+00:00", "order": 278, "pilot": false}
+{"id": "T2-0190", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:19:49+00:00", "order": 279, "pilot": false}
+{"id": "T2-0221", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:20:10+00:00", "order": 280, "pilot": false}
+{"id": "T2-0204", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:20:26+00:00", "order": 281, "pilot": false}
+{"id": "T2-0365", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:20:45+00:00", "order": 282, "pilot": false}
+{"id": "T2-0199", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "unsure": true, "note": "Cụm “đồ chơi người lớn nhập ngoại” chưa đủ để xác định đó là hàng cấm; “không cần giấy tờ” làm tăng nghi vấn nhưng không chứng minh được vi phạm cụ thể.", "labelled_at": "2026-11-13T10:24:06+00:00", "order": 283, "pilot": false}
+{"id": "T2-0431", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:24:23+00:00", "order": 284, "pilot": false}
+{"id": "T2-0355", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:24:46+00:00", "order": 285, "pilot": false}
+{"id": "T2-0054", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:25:02+00:00", "order": 286, "pilot": false}
+{"id": "T2-0398", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:25:27+00:00", "order": 287, "pilot": false}
+{"id": "T2-0328", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:25:45+00:00", "order": 288, "pilot": false}
+{"id": "T2-0456", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:26:09+00:00", "order": 289, "pilot": false}
+{"id": "T2-0039", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:26:27+00:00", "order": 290, "pilot": false}
+{"id": "T2-0036", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:27:05+00:00", "order": 291, "pilot": false}
+{"id": "T2-0175", "annotator": "H1", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:27:30+00:00", "order": 292, "pilot": false}
+{"id": "T2-0058", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:27:49+00:00", "order": 293, "pilot": false}
+{"id": "T2-0353", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": true, "note": "Chưa xác định loại sữa thay thế sữa mẹ được tặng kèm có thuộc danh mục sản phẩm bị cấm quảng bá theo LABELING_GUIDE v2 hay không.", "labelled_at": "2026-11-13T10:28:25+00:00", "order": 294, "pilot": false}
+{"id": "T2-0333", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:28:41+00:00", "order": 295, "pilot": false}
+{"id": "T2-0013", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:29:00+00:00", "order": 296, "pilot": false}
+{"id": "T2-0288", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:29:21+00:00", "order": 297, "pilot": false}
+{"id": "T2-0304", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:29:42+00:00", "order": 298, "pilot": false}
+{"id": "T2-0113", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:30:00+00:00", "order": 299, "pilot": false}
+{"id": "T2-0007", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:30:19+00:00", "order": 300, "pilot": false}
+{"id": "T2-0118", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:30:37+00:00", "order": 301, "pilot": false}
+{"id": "T2-0399", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:31:21+00:00", "order": 302, "pilot": false}
+{"id": "T2-0072", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:31:47+00:00", "order": 303, "pilot": false}
+{"id": "T2-0412", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:32:14+00:00", "order": 304, "pilot": false}
+{"id": "T2-0321", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T10:32:41+00:00", "order": 305, "pilot": false}
+{"id": "T2-0281", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:27:12+00:00", "order": 306, "pilot": false}
+{"id": "T2-0414", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "unsure": true, "note": "Chưa xác định cụ thể loại “đồ chơi người lớn nhập ngoại” được bày bán có thuộc danh mục hàng cấm theo LABELING_GUIDE v2 hay không.", "labelled_at": "2026-11-13T12:27:35+00:00", "order": 307, "pilot": false}
+{"id": "T2-0135", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:28:31+00:00", "order": 308, "pilot": false}
+{"id": "T2-0485", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:28:53+00:00", "order": 309, "pilot": false}
+{"id": "T2-0269", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:29:08+00:00", "order": 310, "pilot": false}
+{"id": "T2-0339", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:29:21+00:00", "order": 311, "pilot": false}
+{"id": "T2-0063", "annotator": "H1", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:29:34+00:00", "order": 312, "pilot": false}
+{"id": "T2-0122", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:29:56+00:00", "order": 313, "pilot": false}
+{"id": "T2-0183", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": true, "note": "Cụm “quà tặng đặc biệt dành cho dân chơi” mang tính ám chỉ nhưng chưa xác định được loại hàng hóa cụ thể.", "labelled_at": "2026-11-13T12:30:26+00:00", "order": 314, "pilot": false}
+{"id": "T2-0347", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:30:45+00:00", "order": 315, "pilot": false}
+{"id": "T2-0030", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:31:00+00:00", "order": 316, "pilot": false}
+{"id": "T2-0329", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:31:20+00:00", "order": 317, "pilot": false}
+{"id": "T2-0143", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:31:35+00:00", "order": 318, "pilot": false}
+{"id": "T2-0247", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:31:52+00:00", "order": 319, "pilot": false}
+{"id": "T2-0361", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:32:13+00:00", "order": 320, "pilot": false}
+{"id": "T2-0468", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:32:29+00:00", "order": 321, "pilot": false}
+{"id": "T2-0452", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:48:10+00:00", "order": 322, "pilot": false}
+{"id": "T2-0172", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:50:07+00:00", "order": 323, "pilot": false}
+{"id": "T2-0055", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:51:09+00:00", "order": 324, "pilot": false}
+{"id": "T2-0295", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:51:26+00:00", "order": 325, "pilot": false}
+{"id": "T2-0341", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:51:56+00:00", "order": 326, "pilot": false}
+{"id": "T2-0438", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:52:22+00:00", "order": 327, "pilot": false}
+{"id": "T2-0056", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:52:39+00:00", "order": 328, "pilot": false}
+{"id": "T2-0356", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:53:04+00:00", "order": 329, "pilot": false}
+{"id": "T2-0022", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:53:21+00:00", "order": 330, "pilot": false}
+{"id": "T2-0146", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:53:34+00:00", "order": 331, "pilot": false}
+{"id": "T2-0100", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": true, "note": "“Hàng cháy giá mềm” chưa đủ thông tin để xác nhận đó là hàng cấm.", "labelled_at": "2026-11-13T12:54:06+00:00", "order": 332, "pilot": false}
+{"id": "T2-0224", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:55:00+00:00", "order": 333, "pilot": false}
+{"id": "T2-0299", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:55:21+00:00", "order": 334, "pilot": false}
+{"id": "T2-0352", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:55:52+00:00", "order": 335, "pilot": false}
+{"id": "T2-0489", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:56:11+00:00", "order": 336, "pilot": false}
+{"id": "T2-0211", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:58:01+00:00", "order": 337, "pilot": false}
+{"id": "T2-0222", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:58:23+00:00", "order": 338, "pilot": false}
+{"id": "T2-0161", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T12:59:00+00:00", "order": 339, "pilot": false}
+{"id": "T2-0193", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:00:31+00:00", "order": 340, "pilot": false}
+{"id": "T2-0252", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:00:52+00:00", "order": 341, "pilot": false}
+{"id": "T2-0326", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:01:13+00:00", "order": 342, "pilot": false}
+{"id": "T2-0429", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:01:45+00:00", "order": 343, "pilot": false}
+{"id": "T2-0235", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:02:04+00:00", "order": 344, "pilot": false}
+{"id": "T2-0069", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:02:46+00:00", "order": 345, "pilot": false}
+{"id": "T2-0071", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:03:26+00:00", "order": 346, "pilot": false}
+{"id": "T2-0059", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:03:38+00:00", "order": 347, "pilot": false}
+{"id": "T2-0179", "annotator": "H1", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:04:20+00:00", "order": 348, "pilot": false}
+{"id": "T2-0410", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:05:08+00:00", "order": 349, "pilot": false}
+{"id": "T2-0078", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:05:28+00:00", "order": 350, "pilot": false}
+{"id": "T2-0092", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": true, "note": "“Lá cỏ” có thể ám chỉ cần sa, nhưng chưa đủ thông tin xác nhận đây là chất cấm thay vì sản phẩm thực vật thông thường.", "labelled_at": "2026-11-13T13:06:18+00:00", "order": 351, "pilot": false}
+{"id": "T2-0031", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:06:50+00:00", "order": 352, "pilot": false}
+{"id": "T2-0318", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:08:14+00:00", "order": 353, "pilot": false}
+{"id": "T2-0084", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:09:14+00:00", "order": 354, "pilot": false}
+{"id": "T2-0417", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:10:16+00:00", "order": 355, "pilot": false}
+{"id": "T2-0450", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:11:16+00:00", "order": 356, "pilot": false}
+{"id": "T2-0195", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:11:39+00:00", "order": 357, "pilot": false}
+{"id": "T2-0447", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:12:31+00:00", "order": 358, "pilot": false}
+{"id": "T2-0207", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:13:21+00:00", "order": 359, "pilot": false}
+{"id": "T2-0491", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:13:40+00:00", "order": 360, "pilot": false}
+{"id": "T2-0065", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:14:23+00:00", "order": 361, "pilot": false}
+{"id": "T2-0331", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:14:50+00:00", "order": 362, "pilot": false}
+{"id": "T2-0360", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:15:07+00:00", "order": 363, "pilot": false}
+{"id": "T2-0370", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:15:53+00:00", "order": 364, "pilot": false}
+{"id": "T2-0020", "annotator": "H1", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:16:40+00:00", "order": 365, "pilot": false}
+{"id": "T2-0004", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:17:00+00:00", "order": 366, "pilot": false}
+{"id": "T2-0405", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:17:17+00:00", "order": 367, "pilot": false}
+{"id": "T2-0314", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:17:38+00:00", "order": 368, "pilot": false}
+{"id": "T2-0459", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:18:11+00:00", "order": 369, "pilot": false}
+{"id": "T2-0466", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:18:54+00:00", "order": 370, "pilot": false}
+{"id": "T2-0349", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:19:17+00:00", "order": 371, "pilot": false}
+{"id": "T2-0251", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:19:41+00:00", "order": 372, "pilot": false}
+{"id": "T2-0033", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:20:36+00:00", "order": 373, "pilot": false}
+{"id": "T2-0217", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:21:42+00:00", "order": 374, "pilot": false}
+{"id": "T2-0180", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": true, "note": "Cụm “quà tặng đặc biệt dành cho dân chơi” mang tính ám chỉ nhưng chưa xác định được hàng cấm cụ thể.", "labelled_at": "2026-11-13T13:22:16+00:00", "order": 375, "pilot": false}
+{"id": "T2-0481", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:22:42+00:00", "order": 376, "pilot": false}
+{"id": "T2-0049", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:23:02+00:00", "order": 377, "pilot": false}
+{"id": "T2-0434", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:24:13+00:00", "order": 378, "pilot": false}
+{"id": "T2-0335", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:26:52+00:00", "order": 379, "pilot": false}
+{"id": "T2-0163", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:27:17+00:00", "order": 380, "pilot": false}
+{"id": "T2-0002", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:27:39+00:00", "order": 381, "pilot": false}
+{"id": "T2-0015", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:28:09+00:00", "order": 382, "pilot": false}
+{"id": "T2-0280", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:28:24+00:00", "order": 383, "pilot": false}
+{"id": "T2-0173", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:28:44+00:00", "order": 384, "pilot": false}
+{"id": "T2-0008", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "unsure": true, "note": "“Hàng nóng” có thể ám chỉ vũ khí hoặc hàng hóa bất hợp pháp, nhưng nội dung không xác định rõ loại hàng.", "labelled_at": "2026-11-13T13:29:24+00:00", "order": 385, "pilot": false}
+{"id": "T2-0082", "annotator": "H1", "level": "HIGH", "codes": ["SCAM"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:29:46+00:00", "order": 386, "pilot": false}
+{"id": "T2-0083", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:30:04+00:00", "order": 387, "pilot": false}
+{"id": "T2-0068", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:30:29+00:00", "order": 388, "pilot": false}
+{"id": "T2-0486", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:30:55+00:00", "order": 389, "pilot": false}
+{"id": "T2-0123", "annotator": "H1", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:31:21+00:00", "order": 390, "pilot": false}
+{"id": "T2-0472", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:31:43+00:00", "order": 391, "pilot": false}
+{"id": "T2-0230", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:32:09+00:00", "order": 392, "pilot": false}
+{"id": "T2-0369", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:32:31+00:00", "order": 393, "pilot": false}
+{"id": "T2-0220", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:33:14+00:00", "order": 394, "pilot": false}
+{"id": "T2-0024", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:34:07+00:00", "order": 395, "pilot": false}
+{"id": "T2-0383", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "unsure": true, "note": "Chưa có đủ thông tin để xác định “đồ chơi người lớn nhập ngoại” là hàng bị cấm hay hàng được phép kinh doanh.", "labelled_at": "2026-11-13T13:34:37+00:00", "order": 396, "pilot": false}
+{"id": "T2-0402", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "unsure": true, "note": "Cụm “hàng nóng” có thể ám chỉ vũ khí hoặc hàng hóa bất hợp pháp nhưng chưa đủ thông tin xác nhận.", "labelled_at": "2026-11-13T13:35:12+00:00", "order": 397, "pilot": false}
+{"id": "T2-0259", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:35:33+00:00", "order": 398, "pilot": false}
+{"id": "T2-0089", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:35:59+00:00", "order": 399, "pilot": false}
+{"id": "T2-0149", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:57:03+00:00", "order": 400, "pilot": false}
+{"id": "T2-0107", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:57:42+00:00", "order": 401, "pilot": false}
+{"id": "T2-0009", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:57:57+00:00", "order": 402, "pilot": false}
+{"id": "T2-0262", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:58:31+00:00", "order": 403, "pilot": false}
+{"id": "T2-0116", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T13:59:35+00:00", "order": 404, "pilot": false}
+{"id": "T2-0496", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:00:43+00:00", "order": 405, "pilot": false}
+{"id": "T2-0117", "annotator": "H1", "level": "HIGH", "codes": ["SCAM", "ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:01:29+00:00", "order": 406, "pilot": false}
+{"id": "T2-0171", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:01:48+00:00", "order": 407, "pilot": false}
+{"id": "T2-0268", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:02:22+00:00", "order": 408, "pilot": false}
+{"id": "T2-0127", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:03:25+00:00", "order": 409, "pilot": false}
+{"id": "T2-0342", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:05:46+00:00", "order": 410, "pilot": false}
+{"id": "T2-0164", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:06:33+00:00", "order": 411, "pilot": false}
+{"id": "T2-0473", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:06:54+00:00", "order": 412, "pilot": false}
+{"id": "T2-0344", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:07:13+00:00", "order": 413, "pilot": false}
+{"id": "T2-0126", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:08:00+00:00", "order": 414, "pilot": false}
+{"id": "T2-0315", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:08:18+00:00", "order": 415, "pilot": false}
+{"id": "T2-0170", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:08:38+00:00", "order": 416, "pilot": false}
+{"id": "T2-0035", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:09:20+00:00", "order": 417, "pilot": false}
+{"id": "T2-0194", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:09:40+00:00", "order": 418, "pilot": false}
+{"id": "T2-0216", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:11:40+00:00", "order": 419, "pilot": false}
+{"id": "T2-0477", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:12:01+00:00", "order": 420, "pilot": false}
+{"id": "T2-0159", "annotator": "H1", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:12:30+00:00", "order": 421, "pilot": false}
+{"id": "T2-0236", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:20:10+00:00", "order": 422, "pilot": false}
+{"id": "T2-0354", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:23:07+00:00", "order": 423, "pilot": false}
+{"id": "T2-0103", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:28:12+00:00", "order": 424, "pilot": false}
+{"id": "T2-0435", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS"], "unsure": true, "note": "“Hàng trắng loại một” có thể ám chỉ chất ma túy, nhưng chưa đủ thông tin xác nhận.", "labelled_at": "2026-11-13T14:29:51+00:00", "order": 425, "pilot": false}
+{"id": "T2-0112", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:30:06+00:00", "order": 426, "pilot": false}
+{"id": "T2-0272", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:31:34+00:00", "order": 427, "pilot": false}
+{"id": "T2-0157", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:31:59+00:00", "order": 428, "pilot": false}
+{"id": "T2-0257", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:32:22+00:00", "order": 429, "pilot": false}
+{"id": "T2-0490", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:32:42+00:00", "order": 430, "pilot": false}
+{"id": "T2-0345", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": true, "note": "Chưa có đủ thông tin để khẳng định “đồ chơi người lớn nhập ngoại” thuộc danh mục hàng cấm.", "labelled_at": "2026-11-13T14:34:19+00:00", "order": 431, "pilot": false}
+{"id": "T2-0162", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:35:11+00:00", "order": 432, "pilot": false}
+{"id": "T2-0467", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:36:25+00:00", "order": 433, "pilot": false}
+{"id": "T2-0174", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK", "DUPLICATE"], "unsure": true, "note": "Chưa đủ thông tin xác nhận “đồ chơi người lớn nhập ngoại” là hàng bị cấm.", "labelled_at": "2026-11-13T14:38:30+00:00", "order": 434, "pilot": false}
+{"id": "T2-0041", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:39:39+00:00", "order": 435, "pilot": false}
+{"id": "T2-0343", "annotator": "H1", "level": "HIGH", "codes": ["SCAM"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:40:46+00:00", "order": 436, "pilot": false}
+{"id": "T2-0307", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:42:38+00:00", "order": 437, "pilot": false}
+{"id": "T2-0239", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:44:58+00:00", "order": 438, "pilot": false}
+{"id": "T2-0181", "annotator": "H1", "level": "HIGH", "codes": ["SCAM"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:45:56+00:00", "order": 439, "pilot": false}
+{"id": "T2-0053", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:46:30+00:00", "order": 440, "pilot": false}
+{"id": "T2-0291", "annotator": "H1", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:47:23+00:00", "order": 441, "pilot": false}
+{"id": "T2-0186", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:48:50+00:00", "order": 442, "pilot": false}
+{"id": "T2-0189", "annotator": "H1", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:49:50+00:00", "order": 443, "pilot": false}
+{"id": "T2-0474", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:51:17+00:00", "order": 444, "pilot": false}
+{"id": "T2-0226", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:54:37+00:00", "order": 445, "pilot": false}
+{"id": "T2-0444", "annotator": "H1", "level": "MEDIUM", "codes": ["OVERPROMISE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:55:21+00:00", "order": 446, "pilot": false}
+{"id": "T2-0028", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:56:22+00:00", "order": 447, "pilot": false}
+{"id": "T2-0266", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:57:14+00:00", "order": 448, "pilot": false}
+{"id": "T2-0234", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:57:55+00:00", "order": 449, "pilot": false}
+{"id": "T2-0066", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:58:20+00:00", "order": 450, "pilot": false}
+{"id": "T2-0213", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:58:59+00:00", "order": 451, "pilot": false}
+{"id": "T2-0029", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:59:23+00:00", "order": 452, "pilot": false}
+{"id": "T2-0301", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T14:59:41+00:00", "order": 453, "pilot": false}
+{"id": "T2-0255", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "unsure": true, "note": "Cụm “hàng trắng loại một” có thể ám chỉ ma túy nhưng không nêu rõ tên chất hoặc loại hàng hóa. Chưa đủ bằng chứng xác định đây là hàng cấm", "labelled_at": "2026-11-13T15:00:46+00:00", "order": 454, "pilot": false}
+{"id": "T2-0464", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:02:03+00:00", "order": 455, "pilot": false}
+{"id": "T2-0201", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:02:25+00:00", "order": 456, "pilot": false}
+{"id": "T2-0136", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:03:42+00:00", "order": 457, "pilot": false}
+{"id": "T2-0095", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:04:42+00:00", "order": 458, "pilot": false}
+{"id": "T2-0332", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:05:09+00:00", "order": 459, "pilot": false}
+{"id": "T2-0279", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:05:27+00:00", "order": 460, "pilot": false}
+{"id": "T2-0142", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:06:53+00:00", "order": 461, "pilot": false}
+{"id": "T2-0387", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:07:24+00:00", "order": 462, "pilot": false}
+{"id": "T2-0443", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:07:42+00:00", "order": 463, "pilot": false}
+{"id": "T2-0156", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:08:24+00:00", "order": 464, "pilot": false}
+{"id": "T2-0427", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "DUPLICATE"], "unsure": true, "note": "Cụm “lá cỏ chất lượng cao” kết hợp “kín đáo tuyệt đối” có thể ám chỉ cần sa, nhưng không nêu rõ tên chất hay bản chất sản phẩm. Chưa đủ căn cứ xác định chắc chắn là hàng cấm", "labelled_at": "2026-11-13T15:09:17+00:00", "order": 465, "pilot": false}
+{"id": "T2-0448", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:09:54+00:00", "order": 466, "pilot": false}
+{"id": "T2-0115", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:10:12+00:00", "order": 467, "pilot": false}
+{"id": "T2-0428", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:10:29+00:00", "order": 468, "pilot": false}
+{"id": "T2-0392", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:11:08+00:00", "order": 469, "pilot": false}
+{"id": "T2-0457", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:11:27+00:00", "order": 470, "pilot": false}
+{"id": "T2-0499", "annotator": "H1", "level": "HIGH", "codes": ["SCAM"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:12:34+00:00", "order": 471, "pilot": false}
+{"id": "T2-0483", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:12:56+00:00", "order": 472, "pilot": false}
+{"id": "T2-0094", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:13:21+00:00", "order": 473, "pilot": false}
+{"id": "T2-0246", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:13:37+00:00", "order": 474, "pilot": false}
+{"id": "T2-0047", "annotator": "H1", "level": "MEDIUM", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": true, "note": "Cụm “kẹo vui” kết hợp “bay lắc” và “nhắn mình lấy hàng” có thể ám chỉ thuốc lắc hoặc chất kích thích, nhưng không nêu rõ tên chất hay bản chất sản phẩm. Chưa đủ căn cứ xác định chắc chắn là hàng cấm", "labelled_at": "2026-11-13T15:14:17+00:00", "order": 475, "pilot": false}
+{"id": "T2-0052", "annotator": "H1", "level": "MEDIUM", "codes": ["OFF_PLATFORM_CONTACT", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:14:51+00:00", "order": 476, "pilot": false}
+{"id": "T2-0479", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:15:11+00:00", "order": 477, "pilot": false}
+{"id": "T2-0158", "annotator": "H1", "level": "MEDIUM", "codes": ["ORGANIZER_RISK", "DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:15:28+00:00", "order": 478, "pilot": false}
+{"id": "T2-0160", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:16:20+00:00", "order": 479, "pilot": false}
+{"id": "T2-0111", "annotator": "H1", "level": "HIGH", "codes": ["SCAM"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:16:39+00:00", "order": 480, "pilot": false}
+{"id": "T2-0297", "annotator": "H1", "level": "MEDIUM", "codes": ["PRICE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:17:06+00:00", "order": 481, "pilot": false}
+{"id": "T2-0073", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:17:45+00:00", "order": 482, "pilot": false}
+{"id": "T2-0422", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:18:06+00:00", "order": 483, "pilot": false}
+{"id": "T2-0062", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:18:45+00:00", "order": 484, "pilot": false}
+{"id": "T2-0445", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:19:31+00:00", "order": 485, "pilot": false}
+{"id": "T2-0021", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:20:08+00:00", "order": 486, "pilot": false}
+{"id": "T2-0023", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:20:46+00:00", "order": 487, "pilot": false}
+{"id": "T2-0237", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:21:12+00:00", "order": 488, "pilot": false}
+{"id": "T2-0440", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:21:45+00:00", "order": 489, "pilot": false}
+{"id": "T2-0409", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:22:29+00:00", "order": 490, "pilot": false}
+{"id": "T2-0141", "annotator": "H1", "level": "HIGH", "codes": ["SCAM"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:23:36+00:00", "order": 491, "pilot": false}
+{"id": "T2-0238", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:24:08+00:00", "order": 492, "pilot": false}
+{"id": "T2-0010", "annotator": "H1", "level": "LOW", "codes": [], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:25:30+00:00", "order": 493, "pilot": false}
+{"id": "T2-0395", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:26:00+00:00", "order": 494, "pilot": false}
+{"id": "T2-0302", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:26:47+00:00", "order": 495, "pilot": false}
+{"id": "T2-0278", "annotator": "H1", "level": "HIGH", "codes": ["PROHIBITED_GOODS", "ORGANIZER_RISK"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:27:03+00:00", "order": 496, "pilot": false}
+{"id": "T2-0102", "annotator": "H1", "level": "HIGH", "codes": ["OFF_PLATFORM_CONTACT"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:27:35+00:00", "order": 497, "pilot": false}
+{"id": "T2-0040", "annotator": "H1", "level": "HIGH", "codes": ["SCAM"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:28:58+00:00", "order": 498, "pilot": false}
+{"id": "T2-0064", "annotator": "H1", "level": "MEDIUM", "codes": ["DUPLICATE"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:29:19+00:00", "order": 499, "pilot": false}
+{"id": "T2-0389", "annotator": "H1", "level": "MEDIUM", "codes": ["SCHEDULE_ANOMALY"], "unsure": false, "note": "", "labelled_at": "2026-11-13T15:29:51+00:00", "order": 500, "pilot": false}

@@ -29,6 +29,4 @@ public interface UserService {
     // admin features
     Page<AdminUserListItem> getAdminUsers(String query, String status, String ekycStatus, String role, Pageable pageable);
     AdminUserDetailResponse getAdminUserDetail(String id);
-    void updateAdminUserStatus(String id, UserStatus status);
-    void updateUserRoles(String id, Set<Role> roles);
 }

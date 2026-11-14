@@ -357,24 +357,6 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public void updateAdminUserStatus(String id, UserStatus status) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        user.setStatus(status);
-        userRepository.save(user);
-    }
-
-    @Override
-    @Transactional
-    public void updateUserRoles(String id, Set<Role> roles) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        user.setRoles(roles);
-        userRepository.save(user);
-    }
-
-    @Override
-    @Transactional
     public void addRoleToUser(String id, Role role) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));

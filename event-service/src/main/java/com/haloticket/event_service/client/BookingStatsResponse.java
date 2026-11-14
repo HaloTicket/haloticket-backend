@@ -8,7 +8,7 @@ import java.util.List;
 public class BookingStatsResponse {
     private long buyersCount;
     private long totalTicketsSold;
-    private double totalRevenue;
+    private long totalRevenue;
     
     private List<DailyStat> dailyStats;
 
@@ -16,6 +16,6 @@ public class BookingStatsResponse {
     public static class DailyStat {
         private String date;
         private long ticketsSold;
-        private double revenue;
+        private long revenue;
     }
 }

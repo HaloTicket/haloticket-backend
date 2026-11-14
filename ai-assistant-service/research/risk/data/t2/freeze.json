@@ -1,0 +1,27 @@
+{
+  "frozen_at": "2026-11-13T07:10:34+00:00",
+  "purpose": "final evaluation on set t2 (500 new cases); written BEFORE any label of this set exists",
+  "ruleset_version": "5",
+  "prompt_version": "risk-c-v3",
+  "thresholds": {
+    "medium": 30,
+    "high": 60,
+    "block_floor": 70,
+    "ai_max_points": 30,
+    "organizer_signal_cap": 30
+  },
+  "model": "groq openai/gpt-oss-20b (fast tier, temperature 0.2)",
+  "files_sha256_16": {
+    "app/services/risk/engine.py": "428fc65ec5b0a77d",
+    "app/services/risk/rules.py": "17a1712594d19ba7",
+    "app/services/risk/signals.py": "c8cb55f898db2780",
+    "app/services/risk/semantic.py": "323820a2f51b22e2",
+    "app/services/risk/risk_rules.v1.json": "8a35a2ab2c9797c8",
+    "app/services/risk/content.py": "5c1b1910eccbcb13",
+    "app/services/admin_intel/risk_service.py": "c07c7651b2a7ba9d",
+    "research/risk/run_configs.py": "0e04c93bf543316a",
+    "research/risk/data/t2/cases.jsonl": "59eb0347d6cf8198",
+    "research/risk/LABELING_GUIDE_v2.md": "4d9d5ed1694dfea6"
+  },
+  "note": "no rule, prompt, threshold, mapping or code change after this file may be reported on set t2; labelling guide v2 is locked in the same file list"
+}

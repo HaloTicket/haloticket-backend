@@ -31,6 +31,9 @@ public class SecurityConfig {
         return decoder;
     }
 
+    private static final String[] ADMIN_WRITE_PATHS = {"/api/events/admin/config/**", "/api/events/categories", "/api/events/categories/**",
+            "/api/events/venues", "/api/events/venues/**"};
+
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
@@ -42,6 +45,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/events/my-events").authenticated()
                         .requestMatchers("/api/events/admin/reports/**").hasRole("ADMIN")
                         .requestMatchers("/api/events/approvals", "/api/events/*/approve", "/api/events/*/reject", "/api/events/*/revert-approval").hasRole("ADMIN")
+                        // homepage configuration, categories and venues: reads are public, every write is for the platform admin
+                        // (EventScopeWebConfig checks the same again inside the service)
+                        .requestMatchers(HttpMethod.POST, ADMIN_WRITE_PATHS).hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, ADMIN_WRITE_PATHS).hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, ADMIN_WRITE_PATHS).hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, ADMIN_WRITE_PATHS).hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/events/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/events/*/view").permitAll()
                         // booking-service counts a voucher use with the shared internal token; the controller checks it

@@ -1,0 +1,217 @@
+{"key": "RS-0004|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0007|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0008|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Ai cần vé inbox 049200364 qua zal0 nhé\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0013|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0017|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Chuyên cung cấp vũ khí cho khách tham dự, giao tận nơi\",\"confidence\":\"HIGH\"},{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Đặt vé trực tiếp tại facebook.com/ban-to-chuc-80, không cần qua website\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0018|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0024|flags|0", "text": "{\"flags\":[{\"code\":\"SCAM_PATTERN\",\"quote\":\"Chuyển khoản trực tiếp cho ban tổ chức để giữ chỗ, không qua website, giá rẻ hơn một nửa\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0026|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Liên hệ ib fb mình lấy vé giá gốc.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0029|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0032|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Tại sự kiện có bán m​a​ ​t​ú​y giá rẻ, liên hệ đặt hàng.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0035|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Ban tổ chức bán thuốc lá điện tử tại gian hàng đối tác, chỉ dành cho người trên 18 tuổi.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0039|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Liên hệ ib fb mình lấy vé giá gốc\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0045|flags|0", "text": "{\"flags\":[{\"code\":\"SCAM_PATTERN\",\"quote\":\"Đầu tư sinh lời từ vé sự kiện, đảm bảo lợi nhuận, không rủi ro.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0046|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0047|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Quầy riêng bán vape, số lượng có hạn.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0052|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0054|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0055|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Mua vé nhanh qua Zalo 0931255011, giảm thêm 10%\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0056|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0058|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Mua vé nhanh qua Zalo 0969532078, giảm thêm 10%\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0061|flags|0", "text": "{\"flags\":[{\"code\":\"OVERPROMISE\",\"quote\":\"Cam kết 100% khán giả hài lòng, hoàn tiền gấp đôi nếu không vui\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0062|flags|0", "text": "{\"flags\":[{\"code\":\"SCAM_PATTERN\",\"quote\":\"Kiếm tiền dễ dàng từ việc bán lại vé của chúng tôi, hoàn vốn chắc chắn.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0068|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0070|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0071|flags|0", "text": "{\"flags\":[{\"code\":\"OVERPROMISE\",\"quote\":\"Cam kết 100% khán giả hài lòng, hoàn tiền gấp đôi nếu không vui\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0073|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0081|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0083|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0084|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0091|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0092|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0093|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0103|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Quầy riêng bán thuốc kê đơn không cần toa, số lượng có hạn.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0107|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0111|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Quầy bar trong khuôn viên phục vụ bia và cocktail cho khách từ 18 tuổi trở lên.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0113|flags|0", "text": "{\"flags\":[{\"code\":\"SCAM_PATTERN\",\"quote\":\"Cam kết lợi nhuận 30% mỗi tháng khi mua vé VIP và bán lại cho chúng tôi.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0114|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0116|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0117|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Mua vé nhanh qua Zalo 0938359437, giảm thêm 10%\",\"confidence\":\"HIGH\"},{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Chuyên cung cấp ma tuy cho khách tham dự, giao tận nơi\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0120|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0128|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0129|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0140|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Hàng cháy giá mềm, số lượng ít, hỏi riêng sau giờ diễn\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0145|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0153|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Tại sự kiện có bán ca do giá rẻ, liên hệ đặt hàng.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0155|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0162|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Chuyên cung cấp shisha cho khách tham dự, giao tận nơi\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0167|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0169|flags|0", "text": "{\"flags\":[{\"code\":\"OVERPROMISE\",\"quote\":\"Đảm bảo 100% bạn sẽ thành công sau khi tham dự, hoàn tiền không điều kiện\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0170|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Quầy riêng bán v ũ k h í, số lượng có hạn.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0174|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Khách có thể mua rượu vang tại quầy ẩm thực trong sự kiện, uống có trách nhiệm.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0175|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0178|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0180|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Đặt vé trực tiếp tại facebook.com/ban-to-chuc-13, không cần qua website\",\"confidence\":\"HIGH\"},{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Tại sự kiện có bán c ầ n s a giá rẻ, liên hệ đặt hàng\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0185|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"nhắn mình lấy hàng\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0189|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0190|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0192|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0193|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Mua vé tặng kèm súng đạn\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0199|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0202|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0207|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0208|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0211|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0214|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Cung cấp lá cỏ chất lượng cao cho khách VIP, kín đáo tuyệt đối.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0219|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Inbox fanpage Facebook của ban tổ chức để được giữ chỗ\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0220|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Quầy riêng bán sữa thay thế sữa mẹ, số lượng có hạn.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0224|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Quầy riêng bán c ầ n s a, số lượng có hạn\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0227|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0229|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Đồ chơi người lớn nhập ngoại bày bán ở khu VIP, không cần giấy tờ.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0230|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0231|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Inbox fanpage Facebook của ban tổ chức để được giữ chỗ\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0233|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0243|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0245|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Tại sự kiện có bán vũ khí quân dụng giá rẻ, liên hệ đặt hàng.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0246|flags|0", "text": "{\"flags\":[{\"code\":\"SCAM_PATTERN\",\"quote\":\"Đầu tư sinh lời từ vé sự kiện, đảm bảo lợi nhuận, không rủi ro.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0247|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0248|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0249|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0254|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0256|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Chuyên cung cấp v.ũ.k.h.í cho khách tham dự, giao tận nơi.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0261|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0267|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Mua vé nhanh qua Zalo 0958013059, giảm thêm 10%\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0268|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0271|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Tại sự kiện có bán cần sa giá rẻ, liên hệ đặt hàng\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0272|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0284|flags|0", "text": "{\"flags\":[{\"code\":\"SCAM_PATTERN\",\"quote\":\"Chuyển khoản trực tiếp cho ban tổ chức để giữ chỗ, không qua website, giá rẻ hơn một nửa\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0285|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Quầy riêng bán thuốc lá, số lượng có hạn.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0288|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Kb z a l o 63556651 nha, mình gửi vé trực tiếp\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0291|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Chuyên cung cấp c á đ ộ cho khách tham dự, giao tận nơi.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0293|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Mua vé tặng kèm chat kich thich, hỏi trực tiếp ban tổ chức\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0295|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Chuyên cung cấp rượu vodka cho khách tham dự, giao tận nơi.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0296|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0297|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0299|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0311|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Nhắn tin qua t.e.l.e để chốt vé nhóm\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0314|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0317|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Tại sự kiện có bán thuốc lắc giá rẻ, liên hệ đặt hàng.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0325|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Tại sự kiện có bán v.ũ.k.h.í giá rẻ, liên hệ đặt hàng\",\"confidence\":\"HIGH\"},{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Mua vé nhanh qua Zalo 0929075722, giảm thêm 10%\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0329|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Chuyên cung cấp c​á​ ​đ​ộ cho khách tham dự, giao tận nơi.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0335|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0339|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0345|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0346|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0349|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Quầy riêng bán shisha, số lượng có hạn\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0350|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0359|flags|0", "text": "{\"flags\":[{\"code\":\"OVERPROMISE\",\"quote\":\"Cam kết 100% khán giả hài lòng, hoàn tiền gấp đôi nếu không vui.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0360|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Cung cấp lá cỏ chất lượng cao cho khách VIP, kín đáo tuyệt đối.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0363|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Liên hệ Zalo 0968762867 để đặt vé nhóm\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0364|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Ib mình qua f.b hoặc za lô 69834497 để lấy vé rẻ\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0377|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0380|flags|0", "text": "{\"flags\":[{\"code\":\"SCAM_PATTERN\",\"quote\":\"Mua vé hôm nay, chúng tôi cam kết lãi suất cao gấp ba lần, chuyển tiền trước 24 giờ.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0383|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Inbox fanpage Facebook của ban tổ chức để được giữ chỗ\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0384|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0395|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0396|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Chuyên cung cấp v​ũ​ ​k​h​í cho khách tham dự, giao tận nơi\",\"confidence\":\"HIGH\"},{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Liên hệ Zalo 0981174448 để đặt vé nhóm\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0397|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0399|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0400|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0405|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0407|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Cung cấp lá cỏ chất lượng cao cho khách VIP, kín đáo tuyệt đối.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0411|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0414|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Nhắn tin qua t.e.l.e để chốt vé nhóm\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0415|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0417|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0423|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Kb z a l o 80140490 nha, mình gửi vé trực tiếp\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0425|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0428|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Quầy riêng bán m4 túy\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0429|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0431|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0437|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Mua vé nhanh qua Zalo 0977224735, giảm thêm 10%.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0438|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Mua vé tặng kèm cần sa\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0439|flags|0", "text": "{\"flags\":[{\"code\":\"SCAM_PATTERN\",\"quote\":\"Cam kết lợi nhuận 30% mỗi tháng khi mua vé VIP và bán lại cho chúng tôi.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0442|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0452|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Inbox fanpage Facebook của ban tổ chức để được giữ chỗ\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0455|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0456|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0467|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0471|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0473|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0474|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0479|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0480|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0483|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0485|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Ib mình qua f.b hoặc za lô 65020239 để lấy vé rẻ\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0491|flags|0", "text": "{\"flags\":[{\"code\":\"VEILED_PROHIBITED\",\"quote\":\"Tại sự kiện có bán rượu whisky nhập lậu giá rẻ, liên hệ đặt hàng.\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0495|flags|0", "text": "{\"flags\":[{\"code\":\"SOCIAL_CONTACT\",\"quote\":\"Mua vé nhanh qua Zalo 0980515563, giảm thêm 10%\",\"confidence\":\"HIGH\"}]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0496|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0499|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0500|flags|0", "text": "{\"flags\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0008|verify|0", "text": "{\"confirmed\": [\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0017|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\",\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0024|verify|0", "text": "{\"confirmed\":[\"SCAM_PATTERN\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0026|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0032|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0035|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0039|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0045|verify|0", "text": "{\"confirmed\":[\"SCAM_PATTERN\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0047|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0055|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0058|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0061|verify|0", "text": "{\"confirmed\":[\"OVERPROMISE\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0062|verify|0", "text": "{\"confirmed\":[\"SCAM_PATTERN\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0071|verify|0", "text": "{\"confirmed\":[\"OVERPROMISE\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0103|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0111|verify|0", "text": "{\"confirmed\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0113|verify|0", "text": "{\"confirmed\":[\"SCAM_PATTERN\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0117|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0140|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0153|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0162|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0169|verify|0", "text": "{\"confirmed\":[\"OVERPROMISE\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0170|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0174|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0180|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\",\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0185|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0193|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0214|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0219|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0220|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0224|verify|0", "text": "{\"confirmed\": []}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0229|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0231|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0245|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0246|verify|0", "text": "{\"confirmed\":[\"SCAM_PATTERN\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0256|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0267|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0271|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0284|verify|0", "text": "{\"confirmed\":[\"SCAM_PATTERN\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0285|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0288|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0291|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0293|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0295|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0311|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0317|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0325|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\",\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0329|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0349|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0359|verify|0", "text": "{\"confirmed\":[\"OVERPROMISE\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0360|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0363|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0364|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0380|verify|0", "text": "{\"confirmed\":[\"SCAM_PATTERN\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0383|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0396|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\",\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0407|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0414|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0423|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0428|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0437|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0438|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0439|verify|0", "text": "{\"confirmed\":[\"SCAM_PATTERN\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0452|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0485|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0491|verify|0", "text": "{\"confirmed\":[\"VEILED_PROHIBITED\"]}", "model": "openai/gpt-oss-20b"}
+{"key": "RS-0495|verify|0", "text": "{\"confirmed\":[\"SOCIAL_CONTACT\"]}", "model": "openai/gpt-oss-20b"}

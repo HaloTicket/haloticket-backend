@@ -1,6 +1,7 @@
 package com.haloticket.ticket_service.repository;
 
 import com.haloticket.ticket_service.entity.Ticket;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.Page;
@@ -42,6 +43,22 @@ public interface TicketRepository extends JpaRepository<Ticket, String> {
     }
 
     boolean existsByTicketType_Id(String ticketTypeId);
+
+    /** Rows: showtimeId, ticketTypeId, ticketTypeName, status, count; one row per showtime, type and status. */
+    @Query("SELECT COALESCE(t.showtimeId, tt.showtimeId), tt.id, tt.name, t.status, COUNT(t) FROM Ticket t JOIN t.ticketType tt "
+            + "WHERE t.eventId = :eventId AND t.status IN :statuses "
+            + "GROUP BY COALESCE(t.showtimeId, tt.showtimeId), tt.id, tt.name, t.status")
+    List<Object[]> countByShowtimeTypeAndStatus(@Param("eventId") String eventId, @Param("statuses") java.util.Collection<TicketStatus> statuses);
+
+    /** Door-staff search: the text is a lower-cased fragment of the ticket id, the booking id, the seat reference or the type name. */
+    @EntityGraph(attributePaths = {"ticketType", "seat", "seat.seatRow", "seat.seatRow.seatZone"})
+    @Query("SELECT t FROM Ticket t JOIN t.ticketType tt WHERE t.eventId = :eventId AND t.status IN :statuses "
+            + "AND (:showtimeId = '' OR COALESCE(t.showtimeId, tt.showtimeId) = :showtimeId) "
+            + "AND (LOWER(t.id) LIKE :like OR LOWER(t.bookingId) LIKE :like OR LOWER(t.seatReference) LIKE :like "
+            + "OR LOWER(tt.name) LIKE :like) ORDER BY t.issuedAt DESC")
+    List<Ticket> searchForCheckin(@Param("eventId") String eventId, @Param("showtimeId") String showtimeId,
+                                  @Param("like") String like, @Param("statuses") java.util.Collection<TicketStatus> statuses,
+                                  Pageable pageable);
 
     /** Primary-issued, non-revoked tickets per booking (same set as the stock reconciliation). Rows: bookingId, count. */
     @Query("SELECT t.bookingId, COUNT(t) FROM Ticket t WHERE t.bookingId IN :bookingIds "

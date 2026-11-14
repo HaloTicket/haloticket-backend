@@ -1,0 +1,501 @@
+﻿id,nhóm,nhãn chuẩn (mức),mã nhãn chuẩn,cách chốt nhãn,H1,H2,L,điểm luật,điểm tín hiệu,cờ AI đề xuất,cờ AI giữ,điểm AI,điểm cuối,mức dự đoán,đủ lớp,đúng
+T2-0001,Ranh giới,LOW,-,unanimous,LOW,LOW,LOW,0,0,1,0,0,0,LOW,có,đúng
+T2-0002,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0003,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,1,1,15,30,MEDIUM,có,đúng
+T2-0004,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0005,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,25,15,1,1,0,60,HIGH,có,sai
+T2-0006,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, DUPLICATE",unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,1,1,15,40,MEDIUM,có,đúng
+T2-0007,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,0,0,70,HIGH,có,đúng
+T2-0008,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,PROHIBITED_GOODS,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0009,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0010,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0011,Lừa đảo,HIGH,"SCAM, ORGANIZER_RISK, DUPLICATE",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0012,Ranh giới,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,0,1,1,0,60,HIGH,có,đúng
+T2-0013,Gần trùng sự kiện đã có,MEDIUM,"ORGANIZER_RISK, DUPLICATE",majority,MEDIUM,MEDIUM,HIGH,0,52,0,0,0,52,MEDIUM,có,đúng
+T2-0014,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0015,Rủi ro ban tổ chức,LOW,-,unanimous,LOW,LOW,LOW,0,6,0,0,0,6,LOW,có,đúng
+T2-0016,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0017,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, ORGANIZER_RISK, DUPLICATE",majority,MEDIUM,MEDIUM,HIGH,0,27,1,1,25,60,HIGH,có,sai
+T2-0018,Rủi ro ban tổ chức,MEDIUM,ORGANIZER_RISK,unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,0,0,0,30,MEDIUM,có,đúng
+T2-0019,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0020,Lịch bất thường,MEDIUM,SCHEDULE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0021,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0022,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,85,27,2,2,0,100,HIGH,có,đúng
+T2-0023,Hàng cấm nói thẳng,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0024,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,25,27,1,1,0,60,HIGH,có,sai
+T2-0025,Lịch bất thường,MEDIUM,SCHEDULE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0026,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,85,27,2,2,0,100,HIGH,có,đúng
+T2-0027,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,35,0,0,0,35,MEDIUM,có,đúng
+T2-0028,Điều khoản cấm dài (hợp lệ),LOW,-,majority,MEDIUM,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0029,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0030,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0031,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, DUPLICATE",unanimous,MEDIUM,MEDIUM,MEDIUM,25,15,1,1,0,60,HIGH,có,sai
+T2-0032,Chèn lệnh vào mô tả,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0033,Hứa quá mức,MEDIUM,"OVERPROMISE, DUPLICATE",unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,1,1,0,30,MEDIUM,có,đúng
+T2-0034,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,1,1,10,30,MEDIUM,có,đúng
+T2-0035,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0036,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0037,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0038,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0039,Chèn lệnh vào mô tả,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0040,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0041,Rủi ro ban tổ chức,LOW,-,unanimous,LOW,LOW,LOW,0,6,0,0,0,6,LOW,có,đúng
+T2-0042,"Giá, thiếu mẫu so sánh",LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,không,đúng
+T2-0043,Ranh giới,MEDIUM,DUPLICATE,majority,MEDIUM,MEDIUM,LOW,0,0,0,0,0,0,LOW,có,sai
+T2-0044,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0045,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0046,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0047,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,1,1,15,60,HIGH,có,sai
+T2-0048,Lừa đảo,HIGH,"SCAM, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0049,Lừa đảo,HIGH,"SCAM, ORGANIZER_RISK, DUPLICATE",unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0050,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0051,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0052,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,1,1,15,60,HIGH,có,sai
+T2-0053,Rủi ro ban tổ chức,LOW,-,unanimous,LOW,LOW,LOW,0,15,0,0,0,15,LOW,có,đúng
+T2-0054,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,1,1,0,30,MEDIUM,có,đúng
+T2-0055,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0056,"Giá, thiếu mẫu so sánh",LOW,-,majority,MEDIUM,LOW,LOW,0,0,0,0,0,0,LOW,không,đúng
+T2-0057,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,25,0,1,1,0,30,MEDIUM,có,đúng
+T2-0058,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0059,Hàng cấm nói thẳng,HIGH,"PROHIBITED_GOODS, DUPLICATE",unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0060,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0061,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0062,Ranh giới,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0063,"Liên hệ ngoài nền tảng, nêu tên kênh",HIGH,OFF_PLATFORM_CONTACT,unanimous,HIGH,HIGH,HIGH,0,0,1,1,15,30,MEDIUM,có,sai
+T2-0064,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0065,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0066,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0067,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0068,Lừa đảo,HIGH,"SCAM, DUPLICATE",unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0069,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,0,0,0,30,MEDIUM,có,đúng
+T2-0070,Điều khoản cấm dài (hợp lệ),MEDIUM,DUPLICATE,majority,MEDIUM,MEDIUM,LOW,0,0,0,0,0,0,LOW,có,sai
+T2-0071,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,25,0,1,1,0,30,MEDIUM,có,đúng
+T2-0072,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT",unanimous,HIGH,HIGH,HIGH,85,15,1,1,0,100,HIGH,có,đúng
+T2-0073,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0074,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,0,0,0,30,MEDIUM,có,đúng
+T2-0075,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0076,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0077,Sạch,LOW,-,majority,MEDIUM,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0078,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0079,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0080,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,1,1,0,30,MEDIUM,có,đúng
+T2-0081,Ranh giới,LOW,-,unanimous,LOW,LOW,LOW,0,0,1,1,25,60,HIGH,có,sai
+T2-0082,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0083,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,85,27,1,1,0,100,HIGH,có,đúng
+T2-0084,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,majority,MEDIUM,MEDIUM,LOW,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0085,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, DUPLICATE",majority,MEDIUM,MEDIUM,HIGH,0,0,1,1,15,30,MEDIUM,có,đúng
+T2-0086,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0087,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0088,Sạch,LOW,-,majority,MEDIUM,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0089,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,85,27,2,2,0,100,HIGH,có,đúng
+T2-0090,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0091,Hàng cấm nói thẳng,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0092,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, ORGANIZER_RISK",majority,MEDIUM,MEDIUM,HIGH,0,27,1,1,25,60,HIGH,có,sai
+T2-0093,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, ORGANIZER_RISK",majority,MEDIUM,MEDIUM,HIGH,0,27,0,0,0,30,MEDIUM,có,đúng
+T2-0094,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",majority,MEDIUM,MEDIUM,HIGH,25,27,1,1,0,60,HIGH,có,sai
+T2-0095,Chèn lệnh vào mô tả,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0096,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,0,0,70,HIGH,có,đúng
+T2-0097,Ranh giới,LOW,-,unanimous,LOW,LOW,LOW,0,0,1,0,0,0,LOW,có,đúng
+T2-0098,Lừa đảo,HIGH,"SCAM, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0099,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,0,0,0,30,MEDIUM,có,đúng
+T2-0100,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,0,0,0,30,MEDIUM,có,đúng
+T2-0101,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0102,"Liên hệ ngoài nền tảng, nêu tên kênh",HIGH,OFF_PLATFORM_CONTACT,unanimous,HIGH,HIGH,HIGH,0,0,1,1,15,30,MEDIUM,có,sai
+T2-0103,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,15,1,1,0,60,HIGH,có,đúng
+T2-0104,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0105,Chèn lệnh vào mô tả,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0106,Lừa đảo,HIGH,"SCAM, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0107,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0108,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0109,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,85,27,2,1,0,100,HIGH,có,đúng
+T2-0110,Rủi ro ban tổ chức,LOW,-,unanimous,LOW,LOW,LOW,0,6,0,0,0,6,LOW,có,đúng
+T2-0111,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0112,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,0,1,0,0,60,HIGH,có,đúng
+T2-0113,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0114,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0115,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0116,Chèn lệnh vào mô tả,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0117,Lừa đảo,HIGH,"SCAM, ORGANIZER_RISK, DUPLICATE",unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0118,"Giá, thiếu mẫu so sánh",LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,không,đúng
+T2-0119,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,40,27,1,1,0,67,HIGH,có,đúng
+T2-0120,"Giá, thiếu mẫu so sánh",LOW,-,majority,LOW,LOW,MEDIUM,0,25,0,0,0,30,MEDIUM,không,sai
+T2-0121,"Giá, thiếu mẫu so sánh",LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,không,đúng
+T2-0122,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0123,"Liên hệ ngoài nền tảng, nêu tên kênh",HIGH,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,0,27,1,1,15,60,HIGH,có,đúng
+T2-0124,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0125,Ranh giới,LOW,-,unanimous,LOW,LOW,LOW,0,0,1,1,25,60,HIGH,có,sai
+T2-0126,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0127,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,1,1,15,30,MEDIUM,có,đúng
+T2-0128,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0129,Sạch,LOW,-,majority,MEDIUM,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0130,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0131,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,0,0,87,HIGH,có,đúng
+T2-0132,Rủi ro ban tổ chức,LOW,-,unanimous,LOW,LOW,LOW,0,6,0,0,0,6,LOW,có,đúng
+T2-0133,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,1,1,0,30,MEDIUM,có,đúng
+T2-0134,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,1,1,15,60,HIGH,có,sai
+T2-0135,Rủi ro ban tổ chức,LOW,-,unanimous,LOW,LOW,LOW,0,6,0,0,0,6,LOW,có,đúng
+T2-0136,Hàng cấm nói thẳng,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0137,Chèn lệnh vào mô tả,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0138,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0139,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0140,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0141,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0142,Rủi ro ban tổ chức,LOW,-,unanimous,LOW,LOW,LOW,0,6,0,0,0,6,LOW,có,đúng
+T2-0143,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0144,Chèn lệnh vào mô tả,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0145,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0146,"Giá, thiếu mẫu so sánh",LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,không,đúng
+T2-0147,Hàng cấm nói vòng bằng ngữ nghĩa,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,0,0,0,0,0,0,LOW,có,sai
+T2-0148,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0149,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,25,0,1,1,0,30,MEDIUM,có,đúng
+T2-0150,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,0,0,0,30,MEDIUM,có,đúng
+T2-0151,Lịch bất thường,MEDIUM,SCHEDULE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0152,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0153,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0154,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0155,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,PROHIBITED_GOODS,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0156,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0157,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0158,Gần trùng sự kiện đã có,MEDIUM,"ORGANIZER_RISK, DUPLICATE",unanimous,MEDIUM,MEDIUM,MEDIUM,0,52,0,0,0,52,MEDIUM,có,đúng
+T2-0159,"Liên hệ ngoài nền tảng, không nêu tên kênh",HIGH,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,0,27,1,1,15,60,HIGH,có,đúng
+T2-0160,Rủi ro ban tổ chức,MEDIUM,DUPLICATE,majority,MEDIUM,MEDIUM,LOW,0,6,0,0,0,6,LOW,có,sai
+T2-0161,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0162,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT",unanimous,HIGH,HIGH,HIGH,60,15,2,2,15,90,HIGH,có,đúng
+T2-0163,Chèn lệnh vào mô tả,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0164,Ranh giới,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,0,1,1,0,60,HIGH,có,đúng
+T2-0165,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,1,1,0,30,MEDIUM,có,đúng
+T2-0166,Hàng cấm nói thẳng,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,40,27,1,1,0,67,HIGH,có,đúng
+T2-0167,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,0,0,0,30,MEDIUM,có,đúng
+T2-0168,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,0,0,87,HIGH,có,đúng
+T2-0169,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0170,Hàng cấm nói thẳng,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0171,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,25,0,1,1,0,30,MEDIUM,có,đúng
+T2-0172,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0173,Lừa đảo,HIGH,"SCAM, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0174,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, ORGANIZER_RISK, DUPLICATE",majority,MEDIUM,MEDIUM,HIGH,0,27,1,0,0,30,MEDIUM,có,đúng
+T2-0175,Lịch bất thường,MEDIUM,SCHEDULE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0176,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,25,27,1,1,0,60,HIGH,có,sai
+T2-0177,Gần trùng sự kiện đã có,MEDIUM,"ORGANIZER_RISK, DUPLICATE",unanimous,MEDIUM,MEDIUM,MEDIUM,0,52,0,0,0,52,MEDIUM,có,đúng
+T2-0178,Lịch bất thường,MEDIUM,SCHEDULE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0179,"Liên hệ ngoài nền tảng, không nêu tên kênh",HIGH,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,0,27,1,1,15,60,HIGH,có,đúng
+T2-0180,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,0,0,0,30,MEDIUM,có,đúng
+T2-0181,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0182,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, ORGANIZER_RISK",majority,MEDIUM,MEDIUM,HIGH,0,27,1,1,15,60,HIGH,có,sai
+T2-0183,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,0,0,0,30,MEDIUM,có,đúng
+T2-0184,Hàng cấm nói thẳng,HIGH,"PROHIBITED_GOODS, DUPLICATE",unanimous,HIGH,HIGH,HIGH,40,0,1,1,0,60,HIGH,có,đúng
+T2-0185,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0186,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT",unanimous,HIGH,HIGH,HIGH,85,15,2,1,0,100,HIGH,có,đúng
+T2-0187,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0188,Điều khoản cấm dài (hợp lệ),MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0189,"Liên hệ ngoài nền tảng, nêu tên kênh",HIGH,OFF_PLATFORM_CONTACT,unanimous,HIGH,HIGH,HIGH,0,15,1,1,15,60,HIGH,có,đúng
+T2-0190,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0191,Sạch,LOW,-,majority,MEDIUM,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0192,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,85,27,2,2,0,100,HIGH,có,đúng
+T2-0193,Giá bất thường,MEDIUM,"PRICE_ANOMALY, DUPLICATE",unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0194,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0195,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",majority,MEDIUM,MEDIUM,HIGH,25,27,1,1,0,60,HIGH,có,sai
+T2-0196,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,majority,MEDIUM,MEDIUM,HIGH,0,0,1,1,15,30,MEDIUM,có,đúng
+T2-0197,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,2,2,15,100,HIGH,có,đúng
+T2-0198,"Liên hệ ngoài nền tảng, nêu tên kênh",HIGH,OFF_PLATFORM_CONTACT,unanimous,HIGH,HIGH,HIGH,0,0,1,1,15,30,MEDIUM,có,sai
+T2-0199,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, DUPLICATE",majority,MEDIUM,MEDIUM,HIGH,0,0,0,0,0,0,LOW,có,sai
+T2-0200,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0201,Hàng cấm nói thẳng,HIGH,"PROHIBITED_GOODS, DUPLICATE",majority,MEDIUM,HIGH,HIGH,40,15,1,1,0,60,HIGH,có,đúng
+T2-0202,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,25,15,1,1,0,60,HIGH,có,sai
+T2-0203,Ranh giới,MEDIUM,DUPLICATE,majority,MEDIUM,MEDIUM,LOW,0,0,1,0,0,0,LOW,có,sai
+T2-0204,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0205,"Giá, thiếu mẫu so sánh",MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,0,0,0,30,MEDIUM,không,đúng
+T2-0206,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0207,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0208,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT",unanimous,HIGH,HIGH,HIGH,60,15,2,2,15,90,HIGH,có,đúng
+T2-0209,Lịch bất thường,MEDIUM,SCHEDULE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0210,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0211,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0212,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,0,1,1,0,60,HIGH,có,đúng
+T2-0213,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,85,27,2,2,0,100,HIGH,có,đúng
+T2-0214,Lừa đảo,HIGH,"SCAM, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0215,Rủi ro ban tổ chức,LOW,-,unanimous,LOW,LOW,LOW,0,15,0,0,0,15,LOW,có,đúng
+T2-0216,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0217,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,2,2,15,100,HIGH,có,đúng
+T2-0218,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0219,Lừa đảo,HIGH,"SCAM, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0220,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,0,0,0,70,HIGH,có,đúng
+T2-0221,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,0,1,0,0,60,HIGH,có,đúng
+T2-0222,Điều khoản cấm dài (hợp lệ),LOW,-,majority,MEDIUM,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0223,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,majority,MEDIUM,HIGH,HIGH,40,0,1,1,0,60,HIGH,có,đúng
+T2-0224,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,15,100,HIGH,có,đúng
+T2-0225,"Liên hệ ngoài nền tảng, không nêu tên kênh",HIGH,OFF_PLATFORM_CONTACT,majority,HIGH,HIGH,MEDIUM,0,0,1,1,15,30,MEDIUM,có,sai
+T2-0226,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0227,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0228,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,0,0,0,87,HIGH,có,đúng
+T2-0229,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0230,Ranh giới,LOW,-,unanimous,LOW,LOW,LOW,60,0,0,0,0,70,HIGH,có,sai
+T2-0231,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,100,0,0,0,0,100,HIGH,có,đúng
+T2-0232,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0233,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,0,1,1,0,60,HIGH,có,đúng
+T2-0234,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0235,Rủi ro ban tổ chức,MEDIUM,ORGANIZER_RISK,unanimous,MEDIUM,MEDIUM,MEDIUM,0,15,0,0,0,30,MEDIUM,có,đúng
+T2-0236,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0237,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0238,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0239,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,2,1,0,70,HIGH,có,đúng
+T2-0240,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0241,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,1,1,15,30,MEDIUM,có,đúng
+T2-0242,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0243,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, DUPLICATE",unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0244,Liên hệ được phép,MEDIUM,DUPLICATE,majority,MEDIUM,MEDIUM,LOW,0,0,0,0,0,0,LOW,có,sai
+T2-0245,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0246,Ranh giới,LOW,-,unanimous,LOW,LOW,LOW,60,0,0,0,0,70,HIGH,có,sai
+T2-0247,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0248,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, DUPLICATE",unanimous,HIGH,HIGH,HIGH,60,25,0,0,0,85,HIGH,có,đúng
+T2-0249,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,85,27,2,1,0,100,HIGH,có,đúng
+T2-0250,"Liên hệ ngoài nền tảng, không nêu tên kênh",HIGH,"OFF_PLATFORM_CONTACT, DUPLICATE",majority,HIGH,HIGH,MEDIUM,0,25,1,1,15,40,MEDIUM,có,sai
+T2-0251,Ranh giới,MEDIUM,DUPLICATE,majority,MEDIUM,MEDIUM,LOW,60,0,0,0,0,70,HIGH,có,sai
+T2-0252,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0253,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0254,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0255,Hàng cấm nói vòng bằng ngữ nghĩa,HIGH,"PROHIBITED_GOODS, DUPLICATE",majority,MEDIUM,HIGH,HIGH,0,0,0,0,0,0,LOW,có,sai
+T2-0256,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0257,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,0,1,1,0,60,HIGH,có,đúng
+T2-0258,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0259,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0260,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0261,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,25,27,1,1,0,60,HIGH,có,sai
+T2-0262,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0263,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0264,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0265,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,0,0,0,30,MEDIUM,có,đúng
+T2-0266,Hàng cấm nói thẳng,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",majority,MEDIUM,HIGH,HIGH,40,27,1,1,0,67,HIGH,có,đúng
+T2-0267,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0268,Ranh giới,LOW,-,majority,MEDIUM,LOW,LOW,60,0,0,0,0,70,HIGH,có,sai
+T2-0269,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,25,0,1,1,0,30,MEDIUM,có,đúng
+T2-0270,"Giá, thiếu mẫu so sánh",LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,không,đúng
+T2-0271,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,0,0,0,30,MEDIUM,có,đúng
+T2-0272,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,15,1,1,0,60,HIGH,có,đúng
+T2-0273,Gần trùng sự kiện đã có,MEDIUM,"ORGANIZER_RISK, DUPLICATE",unanimous,MEDIUM,MEDIUM,MEDIUM,0,52,0,0,0,52,MEDIUM,có,đúng
+T2-0274,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,25,15,1,1,0,60,HIGH,có,sai
+T2-0275,"Liên hệ ngoài nền tảng, không nêu tên kênh",HIGH,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,0,27,1,1,15,60,HIGH,có,đúng
+T2-0276,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0277,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0278,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,100,27,1,0,0,100,HIGH,có,đúng
+T2-0279,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0280,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0281,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0282,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,0,0,0,70,HIGH,có,đúng
+T2-0283,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,25,15,1,1,0,60,HIGH,có,sai
+T2-0284,Điều khoản cấm dài (hợp lệ),LOW,-,majority,MEDIUM,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0285,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0286,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,majority,MEDIUM,MEDIUM,LOW,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0287,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,0,1,1,0,60,HIGH,có,đúng
+T2-0288,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0289,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, DUPLICATE",unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0290,Rủi ro ban tổ chức,MEDIUM,"ORGANIZER_RISK, DUPLICATE",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,0,0,0,30,MEDIUM,có,đúng
+T2-0291,"Liên hệ ngoài nền tảng, nêu tên kênh",HIGH,OFF_PLATFORM_CONTACT,unanimous,HIGH,HIGH,HIGH,0,0,1,1,15,30,MEDIUM,có,sai
+T2-0292,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,85,27,2,2,0,100,HIGH,có,đúng
+T2-0293,Ranh giới,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0294,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,0,0,87,HIGH,có,đúng
+T2-0295,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,25,0,0,0,30,MEDIUM,có,sai
+T2-0296,Ranh giới,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0297,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0298,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, DUPLICATE",majority,MEDIUM,MEDIUM,HIGH,0,0,1,1,15,30,MEDIUM,có,đúng
+T2-0299,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0300,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,0,0,87,HIGH,có,đúng
+T2-0301,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0302,Sạch,MEDIUM,DUPLICATE,majority,MEDIUM,LOW,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0303,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0304,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0305,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0306,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",majority,MEDIUM,MEDIUM,HIGH,25,27,1,1,0,60,HIGH,có,sai
+T2-0307,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,25,0,1,1,0,30,MEDIUM,có,đúng
+T2-0308,Lừa đảo,HIGH,"SCAM, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0309,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0310,Sạch,MEDIUM,DUPLICATE,majority,MEDIUM,LOW,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0311,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0312,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0313,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,0,1,1,0,60,HIGH,có,đúng
+T2-0314,Chèn lệnh vào mô tả,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0315,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0316,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0317,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,0,0,0,30,MEDIUM,có,đúng
+T2-0318,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0319,Lịch bất thường,MEDIUM,SCHEDULE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0320,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,0,0,0,30,MEDIUM,có,đúng
+T2-0321,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0322,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,0,1,0,0,60,HIGH,có,đúng
+T2-0323,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0324,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,0,0,0,87,HIGH,có,đúng
+T2-0325,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,15,1,1,0,60,HIGH,có,đúng
+T2-0326,Chèn lệnh vào mô tả,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0327,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0328,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0329,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,25,0,1,1,0,30,MEDIUM,có,đúng
+T2-0330,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,15,1,1,0,60,HIGH,có,đúng
+T2-0331,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",majority,MEDIUM,MEDIUM,HIGH,0,27,1,1,15,60,HIGH,có,sai
+T2-0332,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0333,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,25,27,1,1,0,60,HIGH,có,sai
+T2-0334,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0335,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0336,Ranh giới,HIGH,"PROHIBITED_GOODS, DUPLICATE",unanimous,HIGH,HIGH,HIGH,40,0,1,0,0,60,HIGH,có,đúng
+T2-0337,"Giá, thiếu mẫu so sánh",LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,không,đúng
+T2-0338,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, DUPLICATE",unanimous,MEDIUM,MEDIUM,MEDIUM,25,40,1,1,0,65,HIGH,có,sai
+T2-0339,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0340,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0341,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0342,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0343,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0344,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0345,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,0,0,0,30,MEDIUM,có,đúng
+T2-0346,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0347,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,0,0,0,87,HIGH,có,đúng
+T2-0348,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0349,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0350,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0351,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",majority,MEDIUM,MEDIUM,HIGH,25,27,1,1,0,60,HIGH,có,sai
+T2-0352,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0353,Chèn lệnh vào mô tả,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",majority,MEDIUM,HIGH,HIGH,40,27,1,1,0,67,HIGH,có,đúng
+T2-0354,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,25,15,1,1,0,60,HIGH,có,sai
+T2-0355,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0356,Rủi ro ban tổ chức,MEDIUM,ORGANIZER_RISK,unanimous,MEDIUM,MEDIUM,MEDIUM,0,40,0,0,0,40,MEDIUM,có,đúng
+T2-0357,Rủi ro ban tổ chức,LOW,-,unanimous,LOW,LOW,LOW,0,15,0,0,0,15,LOW,có,đúng
+T2-0358,Sạch,MEDIUM,DUPLICATE,majority,MEDIUM,MEDIUM,LOW,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0359,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,1,1,15,60,HIGH,có,sai
+T2-0360,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0361,Rủi ro ban tổ chức,MEDIUM,DUPLICATE,majority,MEDIUM,MEDIUM,LOW,0,15,0,0,0,15,LOW,có,sai
+T2-0362,Rủi ro ban tổ chức,LOW,-,unanimous,LOW,LOW,LOW,0,6,0,0,0,6,LOW,có,đúng
+T2-0363,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0364,Rủi ro ban tổ chức,LOW,-,unanimous,LOW,LOW,LOW,0,15,0,0,0,15,LOW,có,đúng
+T2-0365,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,0,0,70,HIGH,có,đúng
+T2-0366,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0367,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0368,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0369,Rủi ro ban tổ chức,LOW,-,unanimous,LOW,LOW,LOW,0,6,0,0,0,6,LOW,có,đúng
+T2-0370,Lừa đảo,HIGH,"SCAM, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0371,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0372,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,15,1,1,0,60,HIGH,có,đúng
+T2-0373,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,1,1,15,60,HIGH,có,sai
+T2-0374,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, DUPLICATE",unanimous,MEDIUM,MEDIUM,MEDIUM,25,0,1,1,0,30,MEDIUM,có,đúng
+T2-0375,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0376,Giá bất thường,MEDIUM,"PRICE_ANOMALY, DUPLICATE",unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0377,Lừa đảo,HIGH,"SCAM, ORGANIZER_RISK, DUPLICATE",unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0378,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,1,1,0,30,MEDIUM,có,đúng
+T2-0379,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0380,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,0,0,0,30,MEDIUM,có,đúng
+T2-0381,Rủi ro ban tổ chức,MEDIUM,ORGANIZER_RISK,unanimous,MEDIUM,MEDIUM,MEDIUM,0,15,0,0,0,30,MEDIUM,có,đúng
+T2-0382,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,15,1,1,0,60,HIGH,có,đúng
+T2-0383,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,PROHIBITED_GOODS,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0384,Hàng cấm nói thẳng,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,40,27,1,1,0,67,HIGH,có,đúng
+T2-0385,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0386,Lịch bất thường,MEDIUM,SCHEDULE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0387,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0388,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, ORGANIZER_RISK",majority,MEDIUM,MEDIUM,HIGH,0,27,1,1,25,60,HIGH,có,sai
+T2-0389,Lịch bất thường,MEDIUM,SCHEDULE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0390,"Liên hệ ngoài nền tảng, nêu tên kênh",HIGH,OFF_PLATFORM_CONTACT,unanimous,HIGH,HIGH,HIGH,0,15,1,1,15,60,HIGH,có,đúng
+T2-0391,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,PROHIBITED_GOODS,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,1,0,0,0,LOW,có,sai
+T2-0392,Chèn lệnh vào mô tả,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,40,27,0,0,0,67,HIGH,có,đúng
+T2-0393,Hàng cấm nói thẳng,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,40,27,1,1,0,67,HIGH,có,đúng
+T2-0394,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0395,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,0,0,0,70,HIGH,có,đúng
+T2-0396,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,25,27,1,1,0,60,HIGH,có,sai
+T2-0397,Lừa đảo,HIGH,"SCAM, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0398,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,25,27,1,1,0,60,HIGH,có,sai
+T2-0399,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,1,1,15,60,HIGH,có,sai
+T2-0400,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0401,"Giá, thiếu mẫu so sánh",LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,không,đúng
+T2-0402,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,PROHIBITED_GOODS,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0403,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0404,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,1,1,0,30,MEDIUM,có,đúng
+T2-0405,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0406,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0407,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0408,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,1,1,15,60,HIGH,có,sai
+T2-0409,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0410,Gần trùng sự kiện đã có,MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0411,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,1,1,0,30,MEDIUM,có,đúng
+T2-0412,Giá bất thường,MEDIUM,"PRICE_ANOMALY, DUPLICATE",unanimous,MEDIUM,MEDIUM,MEDIUM,0,35,0,0,0,35,MEDIUM,có,đúng
+T2-0413,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,PROHIBITED_GOODS,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0414,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,PROHIBITED_GOODS,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,1,1,25,60,HIGH,có,sai
+T2-0415,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0416,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,1,1,15,30,MEDIUM,có,đúng
+T2-0417,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0418,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,25,27,1,1,0,60,HIGH,có,sai
+T2-0419,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, DUPLICATE",unanimous,HIGH,HIGH,HIGH,40,25,1,1,0,65,HIGH,có,đúng
+T2-0420,Ranh giới,LOW,-,unanimous,LOW,LOW,LOW,0,0,1,0,0,0,LOW,có,đúng
+T2-0421,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0422,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0423,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0424,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0425,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,10,0,0,0,0,30,MEDIUM,có,đúng
+T2-0426,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0427,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,"PROHIBITED_GOODS, DUPLICATE",majority,MEDIUM,MEDIUM,HIGH,0,0,1,1,25,60,HIGH,có,sai
+T2-0428,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0429,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0430,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0431,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0432,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0433,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0434,Chèn lệnh vào mô tả,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0435,Hàng cấm nói vòng bằng ngữ nghĩa,HIGH,PROHIBITED_GOODS,majority,MEDIUM,HIGH,HIGH,0,0,0,0,0,0,LOW,có,sai
+T2-0436,Sạch,MEDIUM,DUPLICATE,majority,MEDIUM,MEDIUM,LOW,0,0,0,0,0,0,LOW,có,sai
+T2-0437,Chèn lệnh vào mô tả,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0438,Sạch,MEDIUM,DUPLICATE,majority,MEDIUM,MEDIUM,LOW,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0439,Rủi ro ban tổ chức,MEDIUM,ORGANIZER_RISK,unanimous,MEDIUM,MEDIUM,MEDIUM,0,15,0,0,0,30,MEDIUM,có,đúng
+T2-0440,Ranh giới,MEDIUM,DUPLICATE,majority,MEDIUM,LOW,MEDIUM,60,0,0,0,0,70,HIGH,có,sai
+T2-0441,Điều khoản cấm dài (hợp lệ),LOW,-,majority,MEDIUM,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0442,Ranh giới,LOW,-,unanimous,LOW,LOW,LOW,0,0,1,0,0,0,LOW,có,đúng
+T2-0443,Sạch,MEDIUM,DUPLICATE,majority,MEDIUM,MEDIUM,LOW,0,25,0,0,0,30,MEDIUM,có,đúng
+T2-0444,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0445,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0446,Ranh giới,LOW,-,unanimous,LOW,LOW,LOW,0,0,1,1,25,60,HIGH,có,sai
+T2-0447,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0448,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0449,Rủi ro ban tổ chức,MEDIUM,ORGANIZER_RISK,unanimous,MEDIUM,MEDIUM,MEDIUM,0,15,0,0,0,30,MEDIUM,có,đúng
+T2-0450,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0451,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,40,27,0,0,0,67,HIGH,có,đúng
+T2-0452,Rủi ro ban tổ chức,MEDIUM,ORGANIZER_RISK,unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,0,0,0,30,MEDIUM,có,đúng
+T2-0453,Giá bất thường,MEDIUM,PRICE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0454,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,100,27,1,1,0,100,HIGH,có,đúng
+T2-0455,Lừa đảo,HIGH,"SCAM, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0456,Sạch,MEDIUM,DUPLICATE,majority,MEDIUM,MEDIUM,LOW,0,0,0,0,0,0,LOW,có,sai
+T2-0457,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0458,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,85,27,1,1,0,100,HIGH,có,đúng
+T2-0459,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0460,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT",unanimous,HIGH,HIGH,HIGH,85,15,2,1,0,100,HIGH,có,đúng
+T2-0461,Rủi ro ban tổ chức,MEDIUM,ORGANIZER_RISK,unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,0,0,0,30,MEDIUM,có,đúng
+T2-0462,"Liên hệ ngoài nền tảng, không nêu tên kênh",HIGH,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,0,27,1,1,15,60,HIGH,có,đúng
+T2-0463,Hàng cấm nói vòng bằng ngữ nghĩa,MEDIUM,PROHIBITED_GOODS,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0464,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0465,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,60,27,1,1,15,100,HIGH,có,đúng
+T2-0466,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,40,27,1,1,0,67,HIGH,có,đúng
+T2-0467,Hứa quá mức,MEDIUM,OVERPROMISE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,1,0,0,0,LOW,có,sai
+T2-0468,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,majority,MEDIUM,HIGH,HIGH,60,0,0,0,0,70,HIGH,có,đúng
+T2-0469,Gần trùng sự kiện đã có,MEDIUM,"ORGANIZER_RISK, DUPLICATE",majority,MEDIUM,MEDIUM,HIGH,0,52,0,0,0,52,MEDIUM,có,đúng
+T2-0470,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0471,Hàng cấm nói thẳng,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK, DUPLICATE",unanimous,HIGH,HIGH,HIGH,60,27,1,1,0,87,HIGH,có,đúng
+T2-0472,Rủi ro ban tổ chức,LOW,-,unanimous,LOW,LOW,LOW,0,6,0,0,0,6,LOW,có,đúng
+T2-0473,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0474,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0475,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0476,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,1,1,0,70,HIGH,có,đúng
+T2-0477,Liên hệ được phép,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0478,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0479,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0480,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,OFF_PLATFORM_CONTACT,unanimous,MEDIUM,MEDIUM,MEDIUM,25,0,1,1,0,30,MEDIUM,có,đúng
+T2-0481,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0482,Điều khoản cấm dài (hợp lệ),LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0483,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0484,Rủi ro ban tổ chức,MEDIUM,ORGANIZER_RISK,unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,0,0,0,30,MEDIUM,có,đúng
+T2-0485,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,25,27,1,1,0,60,HIGH,có,sai
+T2-0486,Nhiều vi phạm,HIGH,"PROHIBITED_GOODS, OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,HIGH,HIGH,HIGH,85,27,2,2,0,100,HIGH,có,đúng
+T2-0487,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,60,0,0,0,0,70,HIGH,có,đúng
+T2-0488,"Liên hệ ngoài nền tảng, không nêu tên kênh",HIGH,OFF_PLATFORM_CONTACT,majority,HIGH,HIGH,MEDIUM,0,0,1,1,15,30,MEDIUM,có,sai
+T2-0489,Hàng cấm nói thẳng,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,40,15,1,1,0,60,HIGH,có,đúng
+T2-0490,Chèn lệnh vào mô tả,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0491,Hàng cấm viết che ký tự,HIGH,PROHIBITED_GOODS,unanimous,HIGH,HIGH,HIGH,100,0,1,1,0,100,HIGH,có,đúng
+T2-0492,Sạch,MEDIUM,DUPLICATE,unanimous,MEDIUM,MEDIUM,MEDIUM,0,0,0,0,0,0,LOW,có,sai
+T2-0493,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,25,27,1,1,0,60,HIGH,có,sai
+T2-0494,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,1,1,15,60,HIGH,có,sai
+T2-0495,"Liên hệ ngoài nền tảng, nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,25,27,1,1,0,60,HIGH,có,sai
+T2-0496,Sạch,LOW,-,unanimous,LOW,LOW,LOW,0,0,0,0,0,0,LOW,có,đúng
+T2-0497,Lịch bất thường,MEDIUM,SCHEDULE_ANOMALY,unanimous,MEDIUM,MEDIUM,MEDIUM,0,10,0,0,0,30,MEDIUM,có,đúng
+T2-0498,Hàng cấm viết che ký tự,HIGH,"PROHIBITED_GOODS, ORGANIZER_RISK, DUPLICATE",unanimous,HIGH,HIGH,HIGH,100,27,1,1,0,100,HIGH,có,đúng
+T2-0499,Lừa đảo,HIGH,SCAM,unanimous,HIGH,HIGH,HIGH,60,15,1,1,0,75,HIGH,có,đúng
+T2-0500,"Liên hệ ngoài nền tảng, không nêu tên kênh",MEDIUM,"OFF_PLATFORM_CONTACT, ORGANIZER_RISK",unanimous,MEDIUM,MEDIUM,MEDIUM,0,27,1,1,15,60,HIGH,có,sai
