@@ -1,5 +1,5 @@
-"""Layer C: the language model looks only for what keywords cannot (coded contact details, veiled prohibited goods,
-exaggerated promises, scam patterns). It returns FLAGS, never a score; flags are validated in engine.validate_ai_flags.
+"""Lớp C: mô hình ngôn ngữ chỉ tìm những gì từ khóa không bắt được (thông tin liên hệ che chữ, hàng cấm nói vòng,
+lời hứa phóng đại, mẫu lừa đảo). Nó trả về CỜ, không bao giờ trả điểm; cờ được kiểm tra trong engine.validate_ai_flags.
 """
 import json
 import logging
@@ -11,7 +11,7 @@ from app.services.risk.engine import AI_FLAG_POINTS
 log = logging.getLogger("ai.risk.semantic")
 
 MAX_TEXT = 4000
-# stored with every assessment so a score can be tied to the prompt that produced it
+# được lưu cùng mỗi bản đánh giá để gắn điểm số với prompt đã tạo ra nó
 PROMPT_VERSION = "risk-c-v3"
 FLAG_DEFINITIONS = {
     "VEILED_PROHIBITED": "chào bán hoặc quảng bá hàng hóa, dịch vụ bị cấm bằng cách nói vòng",
@@ -21,7 +21,7 @@ FLAG_DEFINITIONS = {
 }
 
 
-# v3: tells the model what the rule layer cannot (kept generic on purpose: no list of example phrases)
+# v3: nói cho mô hình biết điều mà lớp luật không làm được (cố ý viết chung chung: không liệt kê cụm từ ví dụ)
 FLAG_GUIDANCE = (
     "\nLưu ý thêm khi đọc:\n"
     "- Cam kết lợi nhuận, lãi suất, đầu tư sinh lời, kiếm tiền dễ dàng là SCAM_PATTERN, KHÔNG phải OVERPROMISE. OVERPROMISE chỉ dành "
@@ -33,10 +33,12 @@ FLAG_GUIDANCE = (
 
 
 def build_prompt(title: str, description: str, organizer_name: str, delimiter: str) -> str:
+    """Dựng prompt hoàn chỉnh cho lần đọc đầu: phần thân (quy định, khối dữ liệu, định dạng JSON) cộng lưu ý bổ sung FLAG_GUIDANCE."""
     return (_prompt_body(title, description, organizer_name, delimiter) + FLAG_GUIDANCE)
 
 
 def _prompt_body(title: str, description: str, organizer_name: str, delimiter: str) -> str:
+    """Phần thân của prompt: quy định cấm, các trường hợp không phải vi phạm, nội dung sự kiện trong khối dữ liệu cắt ngắn và yêu cầu trả JSON {"flags": [...]}."""
     return (
         "Bạn kiểm duyệt nội dung sự kiện cho HaloTicket. Chỉ tìm các dấu hiệu mà bộ lọc từ khóa bỏ sót.\n"
         "Quy định: cấm CHÀO BÁN hoặc quảng bá vũ khí, ma túy, cá độ, đánh bạc, văn hóa phẩm đồi trụy; cấm quảng cáo thuốc lá, "
@@ -60,7 +62,7 @@ def _prompt_body(title: str, description: str, organizer_name: str, delimiter: s
 
 
 def parse_flags(content: str) -> list:
-    """Strict: anything that is not {"flags": [...]} is a failure (ValueError), never an empty list."""
+    """Chặt chẽ: bất cứ thứ gì không phải {"flags": [...]} đều là lỗi (ValueError), không bao giờ trả về danh sách rỗng."""
     text = content.replace("```json", "").replace("```", "").strip()
     data = json.loads(text)
     if not isinstance(data, dict) or not isinstance(data.get("flags"), list):
@@ -69,6 +71,7 @@ def parse_flags(content: str) -> list:
 
 
 def _model_name(response) -> Optional[str]:
+    """Tên mô hình do nhà cung cấp báo trong response_metadata (cắt 80 ký tự); None nếu không có."""
     meta = getattr(response, "response_metadata", None)
     if isinstance(meta, dict):
         name = meta.get("model_name") or meta.get("model")
@@ -78,7 +81,7 @@ def _model_name(response) -> Optional[str]:
 
 
 def run_with_meta(invoke: Callable, texts: dict, organizer_name: str, actor: Optional[str]) -> tuple:
-    """(flags, meta). meta names the prompt version and, when the provider reports it, the model. Raises on any failure."""
+    """Trả (flags, meta). meta ghi phiên bản prompt và, khi nhà cung cấp báo, cả tên mô hình. Ném ngoại lệ khi có bất kỳ lỗi nào."""
     prompt = build_prompt(texts.get("title", ""), texts.get("description", ""), organizer_name, new_delimiter())
     response = invoke("risk_scoring", [("human", prompt)], actor=actor)
     meta = {"prompt_version": PROMPT_VERSION}
@@ -89,11 +92,12 @@ def run_with_meta(invoke: Callable, texts: dict, organizer_name: str, actor: Opt
 
 
 def run(invoke: Callable, texts: dict, organizer_name: str, actor: Optional[str]) -> list:
-    """Raises on any failure (AiError, bad JSON); the caller turns that into ai='failed'."""
+    """Ném ngoại lệ khi có bất kỳ lỗi nào (AiError, JSON sai); nơi gọi đổi thành ai='failed'."""
     return run_with_meta(invoke, texts, organizer_name, actor)[0]
 
 
 def build_verify_prompt(title: str, description: str, flags: list, delimiter: str) -> str:
+    """Dựng prompt cho lần đọc thứ hai: liệt kê các cờ (mã, ý nghĩa, đoạn trích) và yêu cầu mô hình xác nhận cờ nào ĐÚNG."""
     listed = "\n".join(f'- {f["code"]} ({FLAG_DEFINITIONS.get(f["code"], "")}): "{f["evidence"]["text"]}"' for f in flags)
     return (
         "Bạn kiểm tra lại các cờ kiểm duyệt do một bộ lọc khác đề xuất cho một sự kiện của HaloTicket. "
@@ -111,7 +115,7 @@ def build_verify_prompt(title: str, description: str, flags: list, delimiter: st
 
 
 def parse_confirmed(content: str) -> list:
-    """Strict: anything that is not {"confirmed": [codes]} is a failure (ValueError), never "nothing confirmed"."""
+    """Chặt chẽ: bất cứ thứ gì không phải {"confirmed": [mã]} đều là lỗi (ValueError), không bao giờ coi là "không cờ nào được xác nhận"."""
     text = content.replace("```json", "").replace("```", "").strip()
     data = json.loads(text)
     if not isinstance(data, dict) or not isinstance(data.get("confirmed"), list) or not all(isinstance(c, str) for c in data["confirmed"]):
@@ -120,8 +124,8 @@ def parse_confirmed(content: str) -> list:
 
 
 def verify(invoke: Callable, texts: dict, flags: list, actor: Optional[str]) -> set:
-    """Codes of the flags a second reading confirms. The quote check only proves the words exist; this asks whether the words
-    are really that kind of violation. Can only remove flags, never add. Raises on any failure (the caller keeps the flags)."""
+    """Mã của các cờ mà lần đọc thứ hai xác nhận. Bước kiểm tra trích dẫn chỉ chứng minh các từ có tồn tại; bước này hỏi liệu các từ đó
+    có thật là loại vi phạm ấy không. Chỉ có thể loại bớt cờ, không bao giờ thêm. Ném ngoại lệ khi lỗi (nơi gọi giữ nguyên các cờ)."""
     prompt = build_verify_prompt(texts.get("title", ""), texts.get("description", ""), flags, new_delimiter())
     response = invoke("risk_scoring", [("human", prompt)], actor=actor)
     asked = {f["code"] for f in flags}

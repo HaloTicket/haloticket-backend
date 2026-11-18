@@ -13,6 +13,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Định kỳ phát các bản ghi outbox đang chờ lên Kafka (mẫu transactional outbox).
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -20,6 +23,10 @@ public class OutboxPublisher {
     private final OutboxEventRepository repository;
     private final KafkaTemplate<String, String> kafkaTemplate;
 
+    /**
+     * Gửi tối đa 50 bản ghi {@code PENDING} cũ nhất lên Kafka. Gửi thành công thì đánh dấu {@code PROCESSED};
+     * lỗi thì tăng số lần thử và chuyển sang {@code FAILED} khi đạt 10 lần.
+     */
     @Scheduled(fixedDelayString = "${marketplace.outbox.poll-delay-ms:1000}")
     @Transactional
     public void publishPendingEvents() {

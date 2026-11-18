@@ -8,6 +8,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** Thanh toán của một đơn đặt chỗ (bảng {@code payments}): số tiền, phương thức, nhà cung cấp, trạng thái cùng các giao dịch cổng và hoàn tiền liên quan. */
 @Entity
 @Table(name = "payments")
 @Getter
@@ -49,6 +50,7 @@ public class Payment {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Trước khi lưu: gán thời điểm tạo, cập nhật và trạng thái {@code PENDING} nếu chưa có. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -56,6 +58,7 @@ public class Payment {
         if (this.status == null) this.status = PaymentStatus.PENDING;
     }
 
+    /** Trước khi cập nhật: làm mới thời điểm cập nhật. */
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

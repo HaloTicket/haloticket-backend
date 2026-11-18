@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/** Thông tin một voucher của sự kiện trả về cho client; {@code code} có thể bị che ({@code null}) với người không quản lý voucher. */
 @Data
 @Builder
 @NoArgsConstructor

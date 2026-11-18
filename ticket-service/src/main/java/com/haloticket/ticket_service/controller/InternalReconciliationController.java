@@ -18,8 +18,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Read-only reconciliation for booking-service. Service-to-service only: the gateway can still route here, so every call
- * must carry the shared token; an unset token rejects everything.
+ * Đối soát chỉ đọc (và một thao tác sửa tồn kho) cho booking-service. Chỉ dùng giữa các dịch vụ: gateway vẫn có thể định tuyến tới đây
+ * nên mọi lời gọi phải mang token dùng chung; chưa cấu hình token thì từ chối tất cả.
  */
 @RestController
 @RequestMapping("/api/internal/tickets")
@@ -34,6 +34,7 @@ public class InternalReconciliationController {
     private final TicketTypeRepository ticketTypes;
     private final String serviceToken;
 
+    /** Khởi tạo với các repository vé, loại vé và token dịch vụ ({@code ticket.stock-reservation.internal-token}). */
     public InternalReconciliationController(TicketRepository tickets, TicketTypeRepository ticketTypes,
             @Value("${ticket.stock-reservation.internal-token:}") String serviceToken) {
         this.tickets = tickets;
@@ -41,9 +42,10 @@ public class InternalReconciliationController {
         this.serviceToken = serviceToken;
     }
 
+    /** Yêu cầu đếm vé đã phát hành theo danh sách mã booking. */
     public record IssuedCountsRequest(List<String> bookingIds) {}
 
-    /** Every requested id appears in the answer; a booking without tickets counts 0. */
+    /** Mỗi mã được yêu cầu đều có trong kết quả; booking không có vé thì đếm 0. Tối đa 500 mã mỗi lần. */
     @PostMapping("/issued-counts")
     @Transactional(readOnly = true)
     public Map<String, Object> issuedCounts(@RequestBody IssuedCountsRequest request,
@@ -67,7 +69,7 @@ public class InternalReconciliationController {
         return Map.of("counts", counts);
     }
 
-    /** Only ticket types with a discrepancy or a note, worst-first is not needed: ordered by event and name. */
+    /** Chỉ liệt kê loại vé có chênh lệch hoặc ghi chú, sắp theo sự kiện rồi tên; {@code limit} mặc định 200, tối đa 500. */
     @GetMapping("/stock-reconciliation")
     @Transactional(readOnly = true)
     public List<Map<String, Object>> stockReconciliation(@RequestParam(value = "limit", required = false) Integer limit,
@@ -107,8 +109,8 @@ public class InternalReconciliationController {
     }
 
     /**
-     * Repairs one ticket type: remaining := initial - issued (a row without an initial number gets initial := remaining + issued).
-     * Refused, without changing anything, when that would be negative or below what unpaid bookings hold.
+     * Sửa một loại vé: số còn lại := số ban đầu - số đã phát hành (dòng chưa có số ban đầu thì số ban đầu := số còn lại + đã phát hành).
+     * Từ chối, không đổi gì, khi kết quả âm hoặc thấp hơn số đang được các booking chưa thanh toán giữ chỗ.
      */
     @PostMapping("/stock-reconciliation/{ticketTypeId}/fix")
     @Transactional
@@ -148,10 +150,12 @@ public class InternalReconciliationController {
         return row;
     }
 
+    /** Đổi giá trị số từ truy vấn native sang {@code Integer}, giữ {@code null}. */
     private static Integer intOrNull(Object value) {
         return value == null ? null : ((Number) value).intValue();
     }
 
+    /** Kiểm tra token dịch vụ bằng so sánh thời gian không đổi; sai, thiếu hoặc chưa cấu hình thì ném 403. */
     private void requireToken(String token) {
         if (serviceToken.isBlank() || token == null || !MessageDigest.isEqual(
                 serviceToken.getBytes(StandardCharsets.UTF_8), token.getBytes(StandardCharsets.UTF_8))) {

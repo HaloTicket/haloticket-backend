@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/** Thông tin tài khoản ngân hàng nhận tiền và thông tin thuế của nhà tổ chức, gửi sang payment-service. */
 @Data
 @Builder
 @NoArgsConstructor

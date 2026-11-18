@@ -1,7 +1,7 @@
-"""Combines layers A (rules), B (signals) and C (model flags) into one assessment. Pure: no I/O, no model.
+"""Kết hợp lớp A (luật), B (tín hiệu) và C (cờ của mô hình) thành một bản đánh giá. Thuần túy: không I/O, không gọi mô hình.
 
-The score is computed here, never by the model: the model only supplies flags {code, quote, confidence}, each flag is
-validated against the event text, and its points come from a fixed table. Layer C can only ADD points.
+Điểm số được tính ở đây, không bao giờ do mô hình tính: mô hình chỉ đưa ra các cờ {code, quote, confidence}, mỗi cờ được
+đối chiếu với văn bản sự kiện, và điểm của nó lấy từ một bảng cố định. Lớp C chỉ có thể CỘNG thêm điểm.
 """
 import hashlib
 import json
@@ -17,25 +17,26 @@ AI_FLAG_MESSAGES = {
     "SCAM_PATTERN": "Nội dung có dấu hiệu lừa đảo (thu tiền trước ngoài hệ thống, hứa hẹn bất thường).",
 }
 CONFIDENCE_FACTOR = {"HIGH": 1.0, "MEDIUM": 0.7, "LOW": 0.4}
-# the organiser signals move together (a new account is usually also unverified), so they share one capped budget
+# các tín hiệu về ban tổ chức thường đi cùng nhau (tài khoản mới thường cũng chưa xác minh), nên dùng chung một ngân sách điểm có trần
 ORGANIZER_SIGNAL_CODES = ("organizer_account_new", "organizer_account_young", "organizer_ekyc_not_approved", "organizer_history_rejected")
-# a model flag that points at the same words as the rule that already scored them adds nothing
+# một cờ của mô hình trỏ vào đúng những từ mà luật đã chấm điểm thì không cộng thêm gì
 AI_RULE_EQUIVALENT = {
     "SOCIAL_CONTACT": ("contact_social",),
     "VEILED_PROHIBITED": ("prohibited_goods", "prohibited_ads"),
     "SCAM_PATTERN": ("profit_guarantee",),
-    "OVERPROMISE": ("overpromise", "profit_guarantee"),  # a guaranteed profit is a scam pattern by definition, not an exaggeration
+    "OVERPROMISE": ("overpromise", "profit_guarantee"),  # lợi nhuận được đảm bảo là dấu hiệu lừa đảo theo định nghĩa, không phải sự phóng đại
 }
 LEVEL_ORDER = {"LOW": 0, "MEDIUM": 1, "HIGH": 2}
 
 
 def content_hash(parts: dict) -> str:
-    """SHA-256 of the canonical JSON of the fields that decide the assessment."""
+    """SHA-256 của JSON chuẩn tắc của các trường quyết định kết quả đánh giá."""
     canonical = json.dumps(parts, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def level_for(score: int) -> str:
+    """Đổi điểm số sang mức rủi ro: HIGH, MEDIUM hoặc LOW theo ngưỡng cấu hình."""
     if score >= settings.risk_high_threshold:
         return "HIGH"
     if score >= settings.risk_medium_threshold:
@@ -44,7 +45,7 @@ def level_for(score: int) -> str:
 
 
 def validate_ai_flags(raw_flags, texts: dict) -> list:
-    """Keeps only well-formed flags whose quote is a verbatim substring of one of the event texts."""
+    """Chỉ giữ các cờ đúng định dạng và có trích dẫn là chuỗi con nguyên văn của một trong các văn bản sự kiện (tối đa 10 cờ, mỗi mã một cờ)."""
     kept, seen = [], set()
     if not isinstance(raw_flags, list):
         return kept
@@ -61,7 +62,7 @@ def validate_ai_flags(raw_flags, texts: dict) -> list:
             continue
         field = next((name for name, text in texts.items() if text and quote in text), None)
         if field is None:
-            continue  # the model quoted something the event does not say
+            continue  # mô hình trích dẫn thứ mà sự kiện không hề viết
         start = texts[field].index(quote)
         seen.add(code)
         kept.append({"code": code, "confidence": confidence, "evidence": {"field": field, "start": start, "end": start + len(quote), "text": quote}})
@@ -69,6 +70,7 @@ def validate_ai_flags(raw_flags, texts: dict) -> list:
 
 
 def _overlaps(a: dict, b: dict) -> bool:
+    """Hai bằng chứng có chồng lấn không: cùng trường và hai khoảng ký tự giao nhau."""
     if a.get("field") != b.get("field"):
         return False
     try:
@@ -78,8 +80,8 @@ def _overlaps(a: dict, b: dict) -> bool:
 
 
 def drop_flags_already_scored(valid_flags: list, rule_findings: list) -> tuple:
-    """(kept, dropped_count). A flag is dropped when its quote overlaps the evidence of the rule that covers the same kind of
-    violation: the rule already scored those words, counting them again would inflate the score."""
+    """Trả (kept, dropped_count). Một cờ bị bỏ khi trích dẫn của nó chồng lên bằng chứng của luật phủ cùng loại vi phạm:
+    luật đã chấm điểm những từ đó, tính lại sẽ làm điểm bị thổi phồng."""
     kept, dropped = [], 0
     for flag in valid_flags:
         covered = AI_RULE_EQUIVALENT.get(flag["code"], ())
@@ -93,8 +95,8 @@ def drop_flags_already_scored(valid_flags: list, rule_findings: list) -> tuple:
 
 
 def cap_organizer_signals(findings: list) -> list:
-    """The organiser signals share settings.risk_organizer_signal_cap points; the largest are kept whole, the one that crosses
-    the cap is cut, the rest score 0. They stay in the reasons (capped=True) so the reviewer still sees them."""
+    """Các tín hiệu về ban tổ chức dùng chung settings.risk_organizer_signal_cap điểm; tín hiệu lớn nhất được giữ nguyên, tín hiệu làm vượt
+    trần bị cắt bớt, phần còn lại tính 0 điểm. Chúng vẫn nằm trong lý do (capped=True) để người duyệt vẫn thấy."""
     cap = settings.risk_organizer_signal_cap
     group = sorted((f for f in findings if f.get("code") in ORGANIZER_SIGNAL_CODES), key=lambda f: -f["weight"])
     if sum(f["weight"] for f in group) <= cap:
@@ -109,10 +111,10 @@ def cap_organizer_signals(findings: list) -> list:
 
 
 def policy_floor(findings: list) -> tuple:
-    """(level, codes): the lowest level the findings force, from the policy in LABELING_GUIDE.md. A finding that names a violation
-    carries its own minimum (min_level); two profile signals that are weak alone force MEDIUM together (a new account that is
-    also not verified; an account under 30 days that is not verified); a content violation together with any profile signal is HIGH. The additive score still orders the queue and adds
-    up weak evidence; the floor only keeps a clear violation from being filed as LOW because its weight was small."""
+    """Trả (level, codes): mức thấp nhất mà các phát hiện buộc phải có, theo chính sách trong LABELING_GUIDE.md. Phát hiện nêu một vi phạm
+    mang mức tối thiểu riêng (min_level); hai tín hiệu hồ sơ vốn yếu khi đứng riêng thì cùng nhau buộc MEDIUM (tài khoản mới mà
+    chưa xác minh; tài khoản dưới 30 ngày mà chưa xác minh); vi phạm nội dung cùng với bất kỳ tín hiệu hồ sơ nào là HIGH. Điểm cộng dồn vẫn dùng để
+    xếp hàng đợi và cộng các bằng chứng yếu; mức sàn chỉ ngăn một vi phạm rõ ràng bị xếp LOW chỉ vì trọng số nhỏ."""
     level, because = "LOW", []
     for f in findings:
         floor = f.get("min_level", "LOW")
@@ -124,8 +126,8 @@ def policy_floor(findings: list) -> tuple:
     if "organizer_ekyc_not_approved" in codes and codes & {"organizer_account_new", "organizer_account_young"}:
         because.append("organizer_account+ekyc")
         level = level if LEVEL_ORDER[level] >= 1 else "MEDIUM"
-    # independent indicators together: a content violation (rule, or a checked model flag) and a weak profile signal on the
-    # same event is HIGH ("many suspicious signs at once", guide section 3), though each alone is MEDIUM at most
+    # các chỉ báo độc lập đi cùng nhau: vi phạm nội dung (luật, hoặc cờ mô hình đã kiểm tra) và một tín hiệu hồ sơ yếu trên cùng
+    # sự kiện là HIGH ("nhiều dấu hiệu đáng ngờ cùng lúc", mục 3 của hướng dẫn), dù mỗi cái đứng riêng chỉ tối đa MEDIUM
     content = any(f.get("layer") in ("RULE", "AI") and f.get("weight", 0) > 0 for f in findings)
     if content and codes & set(ORGANIZER_SIGNAL_CODES):
         because.append("content+organizer")
@@ -134,6 +136,7 @@ def policy_floor(findings: list) -> tuple:
 
 
 def ai_findings(valid_flags: list) -> list:
+    """Đổi các cờ hợp lệ của mô hình thành phát hiện có điểm = điểm gốc x hệ số tin cậy, trong ngân sách settings.risk_ai_max_points."""
     findings = []
     budget = settings.risk_ai_max_points
     for flag in valid_flags:
@@ -144,8 +147,8 @@ def ai_findings(valid_flags: list) -> list:
         findings.append({
             "layer": "AI", "code": flag["code"], "severity": "HIGH" if points >= 15 else "MEDIUM", "weight": points,
             "message": AI_FLAG_MESSAGES[flag["code"]], "evidence": [flag["evidence"]], "confidence": flag["confidence"],
-            # a checked flag is a violation signal: at least MEDIUM. HIGH only for an explicit one (high confidence, veiled prohibited
-            # goods) that also passed the second reading; any other flag alone stays at MEDIUM, like the 30-point cap
+            # cờ đã kiểm tra là tín hiệu vi phạm: tối thiểu MEDIUM. HIGH chỉ cho cờ tường minh (độ tin cậy cao, hàng cấm nói vòng)
+            # đã qua lần đọc thứ hai; mọi cờ khác đứng riêng vẫn ở MEDIUM, như trần 30 điểm
             "min_level": "HIGH" if flag.get("verified") and flag["confidence"] == "HIGH" and flag["code"] == "VEILED_PROHIBITED" else "MEDIUM",
         })
     return findings
@@ -153,7 +156,8 @@ def ai_findings(valid_flags: list) -> list:
 
 def combine(rule_findings: Optional[list], signal_results: list, ai_state: str, ai_flags: list,
             ruleset_version: Optional[str], ai_meta: Optional[dict] = None) -> dict:
-    """rule_findings None = layer A unavailable. signal_results: [{name, status, finding?}]. ai_state: ran|failed|skipped."""
+    """Tổng hợp điểm và lý do. rule_findings None = lớp A không khả dụng. signal_results: [{name, status, finding?}]. ai_state: ran|failed|skipped.
+    Điểm = tổng trọng số (có trần cho tín hiệu ban tổ chức, bỏ cờ AI trùng luật), nâng lên sàn của chính sách rồi kẹp trong 0..100."""
     findings = list(rule_findings or [])
     missing = []
     assessed = 0

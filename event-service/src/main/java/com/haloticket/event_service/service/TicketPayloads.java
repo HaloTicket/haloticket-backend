@@ -9,19 +9,20 @@ import java.util.List;
 import java.util.function.Function;
 
 /**
- * Builds what is sent to ticket-service. Deterministic: the same event and request always give the same payloads, so saving
- * twice (or resyncing) sends the same thing. The number issued is carried as initialQuantity; when the request has only
- * totalQuantity that value is used (both fields are set to it, the legacy field kept for compatibility).
+ * Dựng dữ liệu gửi sang ticket-service. Kết quả có tính xác định: cùng sự kiện và request luôn cho cùng payload, nên lưu hai
+ * lần (hoặc đồng bộ lại) gửi đúng cùng một nội dung. Số vé phát hành được mang trong {@code initialQuantity}; khi request chỉ
+ * có {@code totalQuantity} thì dùng giá trị đó (cả hai trường đều được gán, trường cũ giữ lại để tương thích).
  */
 public final class TicketPayloads {
+    /** Lớp tiện ích, không cho tạo đối tượng. */
     private TicketPayloads() {}
 
-    /** The number issued: initialQuantity, else the legacy totalQuantity. */
+    /** Số vé phát hành: {@code initialQuantity}, nếu không có thì lấy {@code totalQuantity} (trường cũ). */
     public static Integer issued(TicketCreateRequest t) {
         return t.getInitialQuantity() != null ? t.getInitialQuantity() : t.getTotalQuantity();
     }
 
-    /** Full copy (id and showtimeId kept) with the quantities normalised. */
+    /** Bản sao đầy đủ (giữ nguyên {@code id} và {@code showtimeId}) với số lượng đã chuẩn hóa. */
     public static TicketCreateRequest copy(TicketCreateRequest t) {
         TicketCreateRequest c = new TicketCreateRequest();
         c.setId(t.getId());
@@ -30,7 +31,7 @@ public final class TicketPayloads {
         return c;
     }
 
-    /** Copy for one showtime: the id is carried over only when the ticket already belongs to that showtime. */
+    /** Bản sao cho một suất diễn: chỉ giữ {@code id} khi vé vốn đã thuộc đúng suất đó, ngược lại để ticket-service tạo vé mới. */
     public static TicketCreateRequest cloneFor(TicketCreateRequest t, String showtimeId) {
         TicketCreateRequest c = new TicketCreateRequest();
         if (showtimeId != null && showtimeId.equals(t.getShowtimeId())) c.setId(t.getId());
@@ -39,6 +40,7 @@ public final class TicketPayloads {
         return c;
     }
 
+    /** Chép các trường nghiệp vụ của vé nguồn sang vé đích và chuẩn hóa hai trường số lượng về cùng một giá trị. */
     private static void fill(TicketCreateRequest c, TicketCreateRequest t) {
         Integer issued = issued(t);
         c.setName(t.getName());
@@ -52,8 +54,14 @@ public final class TicketPayloads {
     }
 
     /**
-     * An event with showtimes is synced per showtime only (never at event level): a showtime's own tickets when it has any,
-     * else the event-level tickets cloned for it. An event without showtimes is synced once with showtimeId = null.
+     * Chia vé thành các lô đồng bộ. Sự kiện có suất diễn chỉ được đồng bộ theo từng suất (không bao giờ ở cấp sự kiện): dùng
+     * vé riêng của suất nếu có, không thì nhân bản vé cấp sự kiện cho suất đó. Sự kiện không có suất diễn đồng bộ một lô với
+     * {@code showtimeId = null}.
+     *
+     * @param showtimes các suất diễn của sự kiện
+     * @param eventLevel vé khai báo ở cấp sự kiện
+     * @param ownTickets hàm trả về vé riêng của một suất diễn
+     * @return danh sách lô, mỗi lô tương ứng một lần gọi ticket-service
      */
     public static List<Batch> batches(List<EventShowtime> showtimes, List<TicketCreateRequest> eventLevel,
                                       Function<EventShowtime, List<TicketCreateRequest>> ownTickets) {

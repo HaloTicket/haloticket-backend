@@ -1,20 +1,19 @@
-"""Adversarial set (paper section IV.E, plan D.6.D(6)). RISK_SET=adv python -m research.risk.adversarial
+"""Bộ đối kháng (bài báo mục IV.E, kế hoạch D.6.D(6)). RISK_SET=adv python -m research.risk.adversarial
 
-Cases built by construction, written down BEFORE any run and never tuned to a result. The system under test is the one frozen for
-t2 (data/t2/freeze.json, hashes unchanged). The labels follow from how a case is built, not from people, so these numbers are
-not comparable with the t2 numbers that rest on three annotators.
+Các ca được dựng theo cấu trúc, viết ra TRƯỚC mọi lần chạy và không bao giờ chỉnh theo kết quả. Hệ thống được thử là hệ thống đã đóng băng cho
+t2 (data/t2/freeze.json, mã băm không đổi). Nhãn suy ra từ cách dựng ca, không phải từ con người, nên các số này
+không so sánh được với số của t2 vốn dựa trên ba người gán nhãn.
 
-Techniques (an attacker who knows the words but not the rules):
-  plain          the sale sentence with the item written normally (positives; separates "the rules do not know the word" from "the
-                 disguise worked")
-  odd_chars      characters inserted between the letters of the item: soft hyphen, zero-width non-joiner, word joiner, combining grapheme
-                 joiner (the zero-width space is already in t2, so it is not used here)
-  homoglyph      Latin letters replaced by letters of another script that look the same (Cyrillic, all replaceable letters; full-width Latin)
-  line_split     the item broken over lines: newline between words, hyphen at a line break, two letters per line
-  inject         the sale sentence plus an instruction that tries to hide it (positives); a benign text plus an instruction that tries to
-                 make the model raise a flag (controls). Ten phrasings, none of them the three used by research.risk.generate
-Controls (LOW by construction): a benign text with a prohibition clause ("Nghiêm cấm mang {item}...") whose item goes through the same
-disguise, to count false alarms the disguise causes."""
+Các kỹ thuật (kẻ tấn công biết các từ nhưng không biết các luật):
+  plain          câu bán hàng với món hàng viết bình thường (ca dương; để tách "luật không biết từ này" khỏi "ngụy trang đã thành công")
+  odd_chars      ký tự chèn giữa các chữ cái của món hàng: gạch nối mềm, ký tự không độ rộng không nối, ký tự nối từ, ký tự nối đồ họa
+                 kết hợp (khoảng trắng không độ rộng đã có trong t2 nên không dùng ở đây)
+  homoglyph      chữ Latin được thay bằng chữ của bảng chữ khác trông giống hệt (Cyrillic, mọi chữ thay được; Latin toàn chiều rộng)
+  line_split     món hàng bị ngắt qua nhiều dòng: xuống dòng giữa các từ, gạch nối ở chỗ ngắt dòng, hai chữ cái mỗi dòng
+  inject         câu bán hàng cộng một chỉ thị cố giấu nó (ca dương); một văn bản lành cộng một chỉ thị cố khiến
+                 mô hình nâng cờ (ca đối chứng). Mười cách diễn đạt, không cái nào là ba cách dùng trong research.risk.generate
+Đối chứng (LOW theo cấu trúc): một văn bản lành có mệnh đề cấm ("Nghiêm cấm mang {item}...") mà món hàng đi qua cùng
+kiểu ngụy trang, để đếm báo động giả do ngụy trang gây ra."""
 import json
 import os
 
@@ -43,16 +42,19 @@ INDUCE = [
 
 
 def odd_chars(item: str, mark: str) -> str:
+    """Chèn ký tự `mark` vào giữa mọi chữ cái của món hàng."""
     return mark.join(item)
 
 
 def homoglyph(item: str, kind: str) -> str:
+    """Thay chữ Latin bằng chữ Cyrillic trông giống (kind = cyrillic), hoặc bằng chữ Latin toàn chiều rộng (các kind khác)."""
     if kind == "cyrillic":
         return "".join(CYRILLIC.get(c, c) for c in item)
     return "".join(chr(0xFF41 + ord(c) - 97) if "a" <= c <= "z" else c for c in item)
 
 
 def line_split(item: str, kind: str) -> str:
+    """Ngắt món hàng qua nhiều dòng: newline_words (xuống dòng giữa hai từ), hyphen_break (gạch nối ở chỗ ngắt trong từ dài nhất), còn lại hai chữ cái mỗi dòng."""
     if kind == "newline_words":
         return item.replace(" ", "\n") if " " in item else item[: len(item) // 2] + "\n" + item[len(item) // 2:]
     if kind == "hyphen_break":
@@ -65,12 +67,14 @@ def line_split(item: str, kind: str) -> str:
 
 
 def build() -> tuple:
+    """Dựng toàn bộ các ca đối kháng (ca dương, ca đối chứng, ca chèn chỉ thị) theo SEED cố định, rồi xáo trộn. Trả danh sách ca chưa có id."""
     b = Builder(SEED)
     cats = list(CATEGORIES)
     P = b.pick
     cases = []
 
     def positive(group, variant, item_form):
+        """Thêm một ca HIGH (hàng cấm): văn bản lành cộng câu bán với món hàng đã ngụy trang."""
         c = P(cats)
         text = b.benign_text(c) + " " + P(SELL_VERBS).format(x=item_form)
         case = b.case(group, c, text, P(["trusted", "new"]), intended=level("HIGH", "PROHIBITED_GOODS"))
@@ -79,6 +83,7 @@ def build() -> tuple:
             cases.append(case)
 
     def control(group, variant, item_form):
+        """Thêm một ca đối chứng LOW: văn bản lành cộng mệnh đề cấm với món hàng đã ngụy trang."""
         c = P(cats)
         text = b.benign_text(c) + " " + P(BAN_FORMS).format(x=item_form)
         case = b.case(group, c, text, P(["trusted", "veteran"]), intended=level("LOW"))
@@ -87,6 +92,7 @@ def build() -> tuple:
             cases.append(case)
 
     def times(n, fn):
+        """Gọi fn tới khi sinh đủ n ca mới (bỏ qua ca trùng), tối đa n * 30 lần thử."""
         made = 0
         guard = 0
         while made < n and guard < n * 30:
@@ -126,10 +132,11 @@ def build() -> tuple:
 
 
 def main() -> None:
+    """Sinh bộ ca đối kháng và nhãn vàng theo cấu trúc, ghi vào data/adv; chỉ chạy khi RISK_SET=adv."""
     if os.environ.get("RISK_SET", "").strip() != "adv":
         raise SystemExit("chạy với RISK_SET=adv để ghi vào data/adv, results/adv")
     with open(os.path.join(HERE, "data", "t2", "cases.jsonl"), encoding="utf-8") as handle:
-        pool = json.loads(handle.readline())["pool"]  # the same approved events every t2 case starts from
+        pool = json.loads(handle.readline())["pool"]  # cùng các sự kiện đã duyệt mà mọi ca t2 đều xuất phát từ đó
     cases = build()
     for i, case in enumerate(cases, 1):
         case["id"] = f"{PREFIX}-{i:04d}"

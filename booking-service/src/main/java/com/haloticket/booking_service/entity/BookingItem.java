@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
+/** Một dòng vé của đơn (bảng {@code booking_items}): loại vé, số lượng, đơn giá và thành tiền. */
 @Entity
 @Table(name = "booking_items")
 @Getter

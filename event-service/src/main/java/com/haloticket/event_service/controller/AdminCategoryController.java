@@ -18,7 +18,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Category administration. Reads are public (EventController); every write here is for the platform admin. */
+/** Quản trị danh mục sự kiện. Thao tác đọc là công khai (xem {@code EventController}); mọi thao tác ghi ở đây dành cho quản trị viên nền tảng. */
 @RestController
 @RequestMapping("/api/events/categories")
 @RequiredArgsConstructor
@@ -26,11 +26,20 @@ public class AdminCategoryController {
 
     private final EventCategoryRepository categoryRepository;
 
+    /**
+     * Lấy toàn bộ danh mục (kể cả danh mục đã tắt), xếp theo thứ tự hiển thị rồi theo tên.
+     * @return danh sách danh mục
+     */
     @GetMapping("/admin")
     public ResponseEntity<List<EventCategory>> getAllCategoriesAdmin() {
         return ResponseEntity.ok(categoryRepository.findAllByOrderBySortOrderAscNameAsc());
     }
 
+    /**
+     * Tạo danh mục mới: tên phải khác rỗng và không trùng tên hoặc slug với danh mục khác; thứ tự hiển thị được đặt xuống cuối danh sách.
+     * @param request dữ liệu danh mục; trạng thái mặc định {@code ACTIVE}, cờ {@code active} mặc định là bật
+     * @return danh mục vừa tạo
+     */
     @PostMapping
     @Transactional
     public ResponseEntity<EventCategory> createCategory(@RequestBody CategoryRequest request) {
@@ -48,6 +57,12 @@ public class AdminCategoryController {
         return ResponseEntity.ok(categoryRepository.save(category));
     }
 
+    /**
+     * Cập nhật danh mục: chỉ ghi đè những trường có trong yêu cầu; tên hoặc slug mới phải còn duy nhất.
+     * @param id mã danh mục cần sửa
+     * @param request các trường cần đổi
+     * @return danh mục sau khi sửa, hoặc 404 nếu không tìm thấy
+     */
     @PutMapping("/{id}")
     @Transactional
     public ResponseEntity<EventCategory> updateCategory(@PathVariable String id, @RequestBody CategoryRequest request) {
@@ -73,8 +88,10 @@ public class AdminCategoryController {
     }
 
     /**
-     * Saves the order of the categories in one call: the ids in the order they should be listed. Ids that are not listed keep
-     * their relative order after the listed ones; an unknown id answers 400 and nothing changes.
+     * Lưu thứ tự các danh mục trong một lần gọi: danh sách mã theo đúng thứ tự muốn hiển thị. Danh mục không có trong danh sách giữ nguyên
+     * thứ tự tương đối và xếp sau các danh mục đã liệt kê; mã không tồn tại trả 400 và không có gì thay đổi.
+     * @param orderedIds danh sách mã danh mục theo thứ tự mới; không được rỗng
+     * @return danh sách danh mục theo thứ tự đã lưu
      */
     @PutMapping("/order")
     @Transactional
@@ -104,9 +121,13 @@ public class AdminCategoryController {
         return ResponseEntity.ok(categoryRepository.findAllByOrderBySortOrderAscNameAsc());
     }
 
+    /**
+     * Vô hiệu hóa danh mục (chuyển trạng thái sang {@code INACTIVE}) thay vì xóa; không có danh mục thì vẫn trả thành công.
+     * @param id mã danh mục
+     */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCategory(@PathVariable String id) {
-        // a category is switched off, not removed: the events keep pointing at it
+        // danh mục chỉ bị tắt chứ không bị xóa: các sự kiện vẫn trỏ tới nó
         categoryRepository.findById(id).ifPresent(category -> {
             category.setStatus(CategoryStatus.INACTIVE);
             categoryRepository.save(category);
@@ -114,6 +135,12 @@ public class AdminCategoryController {
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * Chuẩn hóa tên danh mục bằng cách cắt khoảng trắng hai đầu.
+     * @param raw tên người dùng gửi lên
+     * @return tên đã chuẩn hóa
+     * @throws ResponseStatusException 400 {@code CATEGORY_NAME_REQUIRED} khi tên rỗng
+     */
     private static String cleanName(String raw) {
         String name = raw == null ? "" : raw.trim();
         if (name.isEmpty()) {
@@ -122,11 +149,22 @@ public class AdminCategoryController {
         return name;
     }
 
+    /**
+     * Đổi chuỗi rỗng hoặc toàn khoảng trắng thành {@code null}, ngược lại cắt khoảng trắng hai đầu.
+     * @param value chuỗi đầu vào
+     * @return chuỗi đã chuẩn hóa hoặc {@code null}
+     */
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    /** 409 when another category already has this name or slug (case does not matter); excludeId is the category being edited */
+    /**
+     * Báo lỗi 409 khi danh mục khác đã dùng tên hoặc slug này (không phân biệt hoa thường).
+     * @param name tên cần kiểm tra, {@code null} thì bỏ qua
+     * @param slug slug cần kiểm tra, rỗng hoặc {@code null} thì bỏ qua
+     * @param excludeId mã danh mục đang được sửa, loại khỏi phép so sánh
+     * @throws ResponseStatusException 409 {@code CATEGORY_NAME_EXISTS} hoặc {@code CATEGORY_SLUG_EXISTS}
+     */
     private void ensureUnique(String name, String slug, String excludeId) {
         if (name != null) {
             categoryRepository.findByNameIgnoreCase(name).filter(c -> !c.getId().equals(excludeId)).ifPresent(c -> {
@@ -140,6 +178,10 @@ public class AdminCategoryController {
         }
     }
 
+    /**
+     * Tính thứ tự hiển thị cho danh mục mới: lớn hơn thứ tự hiện có cao nhất một đơn vị, hoặc 0 khi chưa có danh mục nào.
+     * @return thứ tự hiển thị kế tiếp
+     */
     private int nextSortOrder() {
         return categoryRepository.findAll().stream()
                 .map(EventCategory::getSortOrder).filter(java.util.Objects::nonNull)

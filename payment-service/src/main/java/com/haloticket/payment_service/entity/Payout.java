@@ -5,6 +5,10 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/**
+ * Yêu cầu chi trả cho ban tổ chức (bảng {@code payouts}): số tiền, trạng thái, ảnh chụp tài khoản nhận và chính sách tại thời điểm yêu cầu,
+ * thông tin chuyển khoản.
+ */
 @Entity
 @Table(name = "payouts")
 @Getter
@@ -89,6 +93,7 @@ public class Payout {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Trước khi lưu: gán thời điểm tạo, cập nhật và trạng thái {@code PENDING} nếu chưa có. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -96,6 +101,7 @@ public class Payout {
         if (this.status == null) this.status = PayoutStatus.PENDING;
     }
 
+    /** Trước khi cập nhật: làm mới thời điểm cập nhật. */
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

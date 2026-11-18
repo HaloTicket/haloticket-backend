@@ -22,6 +22,11 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.*;
 
+/**
+ * Nghiệp vụ chính của chợ vé: kiểm tra điều kiện bán lại, đăng tin bán lại và tặng vé theo mô hình saga
+ * (khóa vé, tạo tin hoặc lời mời, chuyển quyền sở hữu, nhả vé khi bù trừ), giữ chỗ khi mua và kiểm duyệt tin.
+ * Các thông điệp gửi sang service khác đi qua bảng outbox.
+ */
 @Service
 @RequiredArgsConstructor
 public class TicketListingService {
@@ -36,6 +41,16 @@ public class TicketListingService {
     private final ObjectMapper objectMapper;
     private final EventTransferPolicyService policyGate;
 
+    /**
+     * Kiểm tra vé có thể bán lại không và tính khoảng giá cho phép theo chính sách của sự kiện
+     * (giá tối thiểu làm tròn lên, tối đa làm tròn xuống, theo phần trăm giá gốc).
+     * Trả kết quả không đủ điều kiện với mã lý do khi chưa cấu hình chính sách ({@code RESALE_POLICY_NOT_CONFIGURED}),
+     * chính sách tắt, chưa mở, loại vé không thuộc phạm vi hoặc đã quá hạn ({@code RESALE_DEADLINE_PASSED}).
+     *
+     * @param authorization header {@code Authorization} của người dùng
+     * @param ticketId mã vé
+     * @return kết quả kiểm tra điều kiện, hoặc {@code null} nếu {@code ticket-service} không trả gì
+     */
     public TicketServiceClient.ResaleEligibilityResponse eligibility(String authorization, String ticketId) {
         TicketServiceClient.ResaleEligibilityResponse ticket = ticketServiceClient.getResaleEligibility(authorization, ticketId);
         if (ticket == null || !ticket.eligible()) return ticket;
@@ -78,6 +93,19 @@ public class TicketListingService {
                 ticket.giftTransferCount(), policy.serviceFeePercent() == null ? new BigDecimal("5") : policy.serviceFeePercent());
     }
 
+    /**
+     * Bắt đầu saga đăng bán lại một hoặc nhiều vé. Yêu cầu khóa idempotency; cùng khóa với nội dung giống thì trả lại saga cũ.
+     * Kiểm tra giá nguyên không âm, eKYC của người bán, từng vé đủ điều kiện và cùng suất diễn, chính sách còn mở,
+     * giá nằm trong khoảng cho phép và phiên bản chính sách không đổi; sau đó lưu saga ở bước chờ khóa vé và đưa lệnh khóa vào outbox.
+     *
+     * @param actorId mã người bán
+     * @param authorization header {@code Authorization} của người bán
+     * @param idempotencyKey khóa idempotency bắt buộc
+     * @param request thông tin tin bán
+     * @return trạng thái saga vừa tạo hoặc đã có
+     * @throws ResponseStatusException khi thiếu khóa (400), giá hoặc danh sách vé không hợp lệ (422), khóa dùng lại với nội dung khác,
+     *         thiếu eKYC, vé không đủ điều kiện hoặc chính sách thay đổi (409), dịch vụ phụ thuộc không khả dụng (503)
+     */
     @Transactional
     public SagaResponse startResale(String actorId, String authorization, String idempotencyKey, CreateListingRequest request) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency-Key is required");
@@ -149,6 +177,14 @@ public class TicketListingService {
         } catch (JsonProcessingException exception) { throw new IllegalStateException("Could not create resale saga", exception); }
     }
 
+    /**
+     * Xem trạng thái một saga của chính người khởi tạo.
+     *
+     * @param actorId mã người gọi
+     * @param sagaId mã saga
+     * @return trạng thái saga
+     * @throws ResponseStatusException HTTP 404 nếu không có saga, HTTP 403 nếu saga không thuộc người gọi
+     */
     @Transactional(readOnly = true)
     public SagaResponse getSaga(String actorId, String sagaId) {
         MarketplaceSaga saga = sagaRepository.findById(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -156,38 +192,85 @@ public class TicketListingService {
         return toResponse(saga);
     }
 
+    /**
+     * Liệt kê tin bán lại công khai khi không biết người dùng hiện tại.
+     *
+     * @param pageable thông tin phân trang
+     * @return trang tin đang mở
+     */
     @Transactional(readOnly = true)
     public Page<ListingResponse> publicListings(Pageable pageable) {
         return publicListings(null, pageable);
     }
 
+    /**
+     * Liệt kê tin bán lại đang mở (đã công bố, chưa hết hạn), đánh dấu tin do người dùng hiện tại sở hữu.
+     *
+     * @param currentUserId mã người dùng hiện tại, có thể {@code null}
+     * @param pageable thông tin phân trang
+     * @return trang tin đang mở
+     */
     @Transactional(readOnly = true)
     public Page<ListingResponse> publicListings(String currentUserId, Pageable pageable) {
         return listingRepository.findPublicActive(ListingStatus.ACTIVE, Instant.now(), pageable)
                 .map(listing -> ListingResponse.from(listing, currentUserId));
     }
 
+    /**
+     * Liệt kê tin bán lại công khai của một sự kiện khi không biết người dùng hiện tại.
+     *
+     * @param eventId mã sự kiện
+     * @param pageable thông tin phân trang
+     * @return trang tin đang mở
+     */
     @Transactional(readOnly = true)
     public Page<ListingResponse> publicListingsByEvent(String eventId, Pageable pageable) {
         return publicListingsByEvent(eventId, null, pageable);
     }
 
+    /**
+     * Liệt kê tin bán lại đang mở của một sự kiện, đánh dấu tin do người dùng hiện tại sở hữu.
+     *
+     * @param eventId mã sự kiện
+     * @param currentUserId mã người dùng hiện tại, có thể {@code null}
+     * @param pageable thông tin phân trang
+     * @return trang tin đang mở
+     */
     @Transactional(readOnly = true)
     public Page<ListingResponse> publicListingsByEvent(String eventId, String currentUserId, Pageable pageable) {
         return listingRepository.findPublicActiveByEventId(eventId, ListingStatus.ACTIVE, Instant.now(), pageable)
                 .map(listing -> ListingResponse.from(listing, currentUserId));
     }
 
+    /**
+     * Tổng hợp các sự kiện có tin bán lại đang mở, kèm số tin và giá thấp nhất.
+     *
+     * @return danh sách tóm tắt sự kiện
+     */
     @Transactional(readOnly = true)
     public List<ResaleEventSummary> publicEvents() {
         return listingRepository.summarizePublicEvents(ListingStatus.ACTIVE, Instant.now());
     }
 
+    /**
+     * Xem công khai một tin bán lại khi không biết người dùng hiện tại.
+     *
+     * @param listingId mã tin
+     * @return chi tiết tin
+     */
     @Transactional(readOnly = true)
     public ListingResponse publicListing(String listingId) {
         return publicListing(listingId, null);
     }
 
+    /**
+     * Xem công khai một tin bán lại đang mở.
+     *
+     * @param listingId mã tin
+     * @param currentUserId mã người dùng hiện tại, có thể {@code null}
+     * @return chi tiết tin
+     * @throws ResponseStatusException HTTP 404 {@code LISTING_NOT_AVAILABLE} khi tin không tồn tại, chưa mở, đã hết hạn hoặc không còn ở trạng thái {@code ACTIVE}
+     */
     @Transactional(readOnly = true)
     public ListingResponse publicListing(String listingId, String currentUserId) {
         TicketListing listing = listingRepository.findById(listingId)
@@ -197,11 +280,32 @@ public class TicketListingService {
         return ListingResponse.from(listing, currentUserId);
     }
 
+    /**
+     * Giữ chỗ toàn bộ vé còn lại của một tin bán lại.
+     *
+     * @param buyerId mã người mua
+     * @param idempotencyKey khóa idempotency
+     * @param listingId mã tin
+     * @return thông tin giữ chỗ
+     */
     @Transactional
     public ReservationResponse reserveListing(String buyerId, String idempotencyKey, String listingId) {
         return reserveListing(buyerId, idempotencyKey, listingId, null);
     }
 
+    /**
+     * Giữ chỗ vé của một tin bán lại trong 10 phút và tạo giao dịch chờ thanh toán. Khóa idempotency cũng là mã tham chiếu thanh toán,
+     * nên gọi lặp với cùng khóa và cùng lựa chọn sẽ trả lại giao dịch cũ. Người mua đang giữ chỗ hợp lệ cũng nhận lại giao dịch hiện có.
+     * Chỉ cho chọn một phần vé khi tin cho phép bán lẻ.
+     *
+     * @param buyerId mã người mua
+     * @param idempotencyKey khóa idempotency bắt buộc
+     * @param listingId mã tin
+     * @param requestedIds các vé muốn mua, hoặc {@code null} để mua tất cả vé còn lại
+     * @return thông tin giữ chỗ
+     * @throws ResponseStatusException HTTP 400 khi thiếu khóa, HTTP 404 khi không có tin, HTTP 409 khi khóa dùng lại với nội dung khác,
+     *         tin không còn bán, người mua là người bán hoặc lựa chọn vé không hợp lệ
+     */
     @Transactional
     public ReservationResponse reserveListing(String buyerId, String idempotencyKey, String listingId, List<String> requestedIds) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
@@ -264,6 +368,14 @@ public class TicketListingService {
         return reservationResponse(transactionRepository.save(transaction));
     }
 
+    /**
+     * Xác định trạng thái tin sau khi gỡ giữ chỗ: {@code EXPIRED} nếu đã hết hạn, {@code PAUSED_BY_EVENT} nếu ban tổ chức đã tắt bán lại
+     * (đồng thời đặt lý do tạm dừng), ngược lại {@code ACTIVE}.
+     *
+     * @param listing tin bán lại
+     * @param now mốc thời gian hiện tại
+     * @return trạng thái mới của tin
+     */
     private ListingStatus resolveStatusAfterReservation(TicketListing listing, Instant now) {
         if (listing.getExpiresAt() != null && !listing.getExpiresAt().isAfter(now)) {
             return ListingStatus.EXPIRED;
@@ -280,6 +392,9 @@ public class TicketListingService {
         return ListingStatus.ACTIVE;
     }
 
+    /**
+     * Giải phóng các giữ chỗ quá hạn: đánh dấu giao dịch chờ thanh toán là {@code EXPIRED} và đưa tin về trạng thái bán phù hợp.
+     */
     @Transactional
     public void expireReservations() {
         Instant now = Instant.now();
@@ -299,6 +414,13 @@ public class TicketListingService {
         }
     }
 
+    /**
+     * Hủy giữ chỗ của người mua: đánh dấu giao dịch chờ thanh toán là {@code CANCELLED} và mở lại tin. Bỏ qua nếu tin không ở trạng thái
+     * giữ chỗ hoặc người gọi không phải người đang giữ.
+     *
+     * @param buyerId mã người mua, hoặc {@code null} để bỏ qua kiểm tra người giữ
+     * @param listingId mã tin
+     */
     @Transactional
     public void cancelReservation(String buyerId, String listingId) {
         TicketListing listing = listingRepository.findByIdForUpdate(listingId)
@@ -321,13 +443,35 @@ public class TicketListingService {
         }
     }
 
+    /**
+     * Liệt kê các tin bán lại của người bán.
+     *
+     * @param actorId mã người bán
+     * @param pageable thông tin phân trang
+     * @return trang tin của người bán
+     */
     @Transactional(readOnly = true)
     public Page<ListingResponse> myListings(String actorId, Pageable pageable) { return listingRepository.findBySellerId(actorId, pageable).map(ListingResponse::from); }
 
+    /**
+     * Cho phép bán lẻ khi tin chỉ có một vé, hoặc khi người bán không tắt bán lẻ một cách tường minh.
+     *
+     * @param quantity số vé trong tin
+     * @param requested lựa chọn của người bán, có thể {@code null}
+     * @return {@code true} nếu cho phép bán lẻ
+     */
     static boolean retailAllowed(int quantity, Boolean requested) {
         return quantity <= 1 || !Boolean.FALSE.equals(requested);
     }
 
+    /**
+     * Người bán hủy tin của mình.
+     *
+     * @param actorId mã người gọi
+     * @param listingId mã tin
+     * @return trạng thái saga bù trừ
+     * @throws ResponseStatusException HTTP 404 nếu không có tin, HTTP 403 {@code LISTING_NOT_OWNED} nếu không phải chủ tin
+     */
     @Transactional
     public SagaResponse cancelListing(String actorId, String listingId) {
         TicketListing listing = listingRepository.findByIdForUpdate(listingId)
@@ -336,12 +480,33 @@ public class TicketListingService {
         return cancelListingLocked(actorId, listing, "SELLER_CANCELLED");
     }
 
+    /**
+     * Ban tổ chức hủy tin của sự kiện; lý do mặc định là {@code ORGANIZER_CANCELLED}.
+     *
+     * @param actorId mã người thực hiện
+     * @param eventId mã sự kiện
+     * @param listingId mã tin
+     * @param reason lý do hủy, có thể bỏ trống
+     * @return trạng thái saga bù trừ
+     */
     @Transactional
     public SagaResponse cancelListingAsOrganizer(String actorId, String eventId, String listingId, String reason) {
         TicketListing listing = organizerListing(eventId, listingId);
         return cancelListingLocked(actorId, listing, reason == null || reason.isBlank() ? "ORGANIZER_CANCELLED" : boundedReason(reason));
     }
 
+    /**
+     * Ban tổ chức duyệt hoặc từ chối tin đang chờ duyệt. Duyệt thì mở bán và phát sự kiện kích hoạt; từ chối thì bắt buộc có lý do và hủy tin.
+     * Gọi lặp với kết quả đã đạt được thì trả lại saga hiện tại.
+     *
+     * @param actorId mã người thực hiện
+     * @param eventId mã sự kiện
+     * @param listingId mã tin
+     * @param approved {@code true} để duyệt, {@code false} để từ chối
+     * @param reason lý do (bắt buộc khi từ chối)
+     * @return trạng thái saga
+     * @throws ResponseStatusException HTTP 409 khi tin không chờ duyệt hoặc đã hết hạn, HTTP 422 khi thiếu lý do từ chối
+     */
     @Transactional
     public SagaResponse moderateListingAsOrganizer(String actorId, String eventId, String listingId, boolean approved, String reason) {
         TicketListing listing = organizerListing(eventId, listingId);
@@ -367,6 +532,14 @@ public class TicketListingService {
         return toResponse(saga);
     }
 
+    /**
+     * Lấy tin kèm khóa ghi và bảo đảm nó thuộc đúng sự kiện.
+     *
+     * @param eventId mã sự kiện
+     * @param listingId mã tin
+     * @return tin bán lại
+     * @throws ResponseStatusException HTTP 404 nếu không có tin, HTTP 403 {@code EVENT_MISMATCH} nếu tin thuộc sự kiện khác
+     */
     private TicketListing organizerListing(String eventId, String listingId) {
         TicketListing listing = listingRepository.findByIdForUpdate(listingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LISTING_NOT_FOUND"));
@@ -374,16 +547,40 @@ public class TicketListingService {
         return listing;
     }
 
+    /**
+     * Lấy saga đã tạo ra tin bán lại.
+     *
+     * @param listing tin bán lại
+     * @return saga của tin
+     * @throws ResponseStatusException HTTP 409 {@code LISTING_SAGA_NOT_FOUND} nếu không tìm thấy saga
+     */
     private MarketplaceSaga listingSaga(TicketListing listing) {
         return sagaRepository.findById(listing.getSagaId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "LISTING_SAGA_NOT_FOUND"));
     }
 
+    /**
+     * Cắt khoảng trắng đầu cuối của lý do và kiểm tra độ dài tối đa 1000 ký tự.
+     *
+     * @param reason lý do
+     * @return lý do đã cắt khoảng trắng
+     * @throws ResponseStatusException HTTP 422 {@code REASON_TOO_LONG} khi quá dài
+     */
     private static String boundedReason(String reason) {
         if (reason.trim().length() > 1000) throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "REASON_TOO_LONG");
         return reason.trim();
     }
 
+    /**
+     * Hủy tin đã được khóa: đặt trạng thái {@code CANCELLED}, chuyển saga sang bù trừ và đưa lệnh nhả vé vào outbox.
+     * Trả lại saga hiện tại nếu tin đã hủy.
+     *
+     * @param actorId mã người thực hiện
+     * @param listing tin cần hủy
+     * @param reason lý do hủy
+     * @return trạng thái saga
+     * @throws ResponseStatusException HTTP 409 {@code LISTING_NOT_CANCELLABLE} khi tin không ở trạng thái hủy được
+     */
     private SagaResponse cancelListingLocked(String actorId, TicketListing listing, String reason) {
         MarketplaceSaga saga = listingSaga(listing);
         if (listing.getStatus() == ListingStatus.CANCELLED) return toResponse(saga);
@@ -418,11 +615,25 @@ public class TicketListingService {
         return toResponse(saga);
     }
 
+    /**
+     * Kích hoạt tin sau khi vé đã được khóa thành công (tương đương kết quả khóa thành công).
+     *
+     * @param sagaId mã saga
+     */
     @Transactional
     public void activateFromTicketLock(String sagaId) {
         handleTicketLockResult(sagaId, true);
     }
 
+    /**
+     * Xử lý kết quả khóa vé của saga đang chờ khóa. Khóa thất bại thì saga {@code FAILED} và hủy lượt tặng (nếu có). Khóa thành công với
+     * lượt tặng thì tạo lời mời có hạn và phát sự kiện mời; với bán lại thì tạo tin ở trạng thái {@code ACTIVE}, {@code PENDING_APPROVAL}
+     * hoặc {@code PAUSED_BY_EVENT} tùy chính sách, hoàn tất saga và phát sự kiện tương ứng.
+     *
+     * @param sagaId mã saga
+     * @param locked {@code true} nếu {@code ticket-service} đã khóa vé
+     * @throws IllegalStateException khi không tạo được tin hoặc lời mời
+     */
     @Transactional
     public void handleTicketLockResult(String sagaId, boolean locked) {
         MarketplaceSaga saga = sagaRepository.findById(sagaId).orElse(null);
@@ -510,6 +721,19 @@ public class TicketListingService {
         } catch (Exception exception) { throw new IllegalStateException("Could not activate resale listing", exception); }
     }
 
+    /**
+     * Bắt đầu saga tặng vé cho người nhận theo email. Kiểm tra khóa idempotency, điều khoản, người nhận tồn tại và khác người tặng,
+     * từng vé đủ điều kiện và cùng suất diễn, chính sách tặng vé còn mở, loại vé và giới hạn số lần tặng; sau đó lưu saga,
+     * lượt chuyển nhượng ở trạng thái chờ và đưa lệnh khóa vé vào outbox.
+     *
+     * @param actorId mã người tặng
+     * @param authorization header {@code Authorization} của người tặng
+     * @param idempotencyKey khóa idempotency bắt buộc
+     * @param request thông tin người nhận và vé
+     * @return trạng thái saga vừa tạo hoặc đã có
+     * @throws ResponseStatusException khi thiếu khóa (400), thiếu người nhận, điều khoản hoặc tặng cho chính mình (422),
+     *         vé không đủ điều kiện hoặc chính sách tắt, chạm giới hạn (409), dịch vụ phụ thuộc không khả dụng (503)
+     */
     @Transactional
     public SagaResponse startGift(String actorId, String authorization, String idempotencyKey, CreateGiftRequest request) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Idempotency-Key is required");
@@ -592,6 +816,18 @@ public class TicketListingService {
         } catch (JsonProcessingException exception) { throw new IllegalStateException("Could not create gift saga", exception); }
     }
 
+    /**
+     * Người nhận chấp nhận quà tặng: kiểm tra token lời mời, hạn lời mời, đúng người nhận, chính sách còn mở, email khớp tài khoản
+     * và eKYC (nếu yêu cầu), rồi chuyển saga sang chờ chuyển vé và đưa lệnh chuyển quyền sở hữu vào outbox.
+     *
+     * @param actorId mã người nhận
+     * @param authorization header {@code Authorization} của người nhận
+     * @param sagaId mã saga của lượt tặng
+     * @param token token trong lời mời
+     * @return trạng thái saga
+     * @throws ResponseStatusException HTTP 409 {@code GIFT_INVITATION_INVALID} khi lời mời không hợp lệ, hết hạn hoặc sai người nhận,
+     *         {@code EKYC_REQUIRED} khi chưa xác thực eKYC, HTTP 503 khi dịch vụ eKYC không khả dụng
+     */
     @Transactional
     public SagaResponse acceptGift(String actorId, String authorization, String sagaId, String token) {
         MarketplaceSaga saga = sagaRepository.findByIdForUpdate(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -625,6 +861,14 @@ public class TicketListingService {
         return toResponse(saga);
     }
 
+    /**
+     * Người tặng hủy lượt tặng khi người nhận chưa phản hồi; yêu cầu nhả vé.
+     *
+     * @param actorId mã người tặng
+     * @param sagaId mã saga của lượt tặng
+     * @return trạng thái saga
+     * @throws ResponseStatusException HTTP 404, 403 nếu không phải người tặng, HTTP 409 {@code GIFT_NOT_CANCELLABLE} nếu không còn ở trạng thái chờ người nhận
+     */
     @Transactional
     public SagaResponse cancelGift(String actorId, String sagaId) {
         MarketplaceSaga saga = sagaRepository.findByIdForUpdate(sagaId)
@@ -644,6 +888,14 @@ public class TicketListingService {
         return toResponse(saga);
     }
 
+    /**
+     * Người nhận từ chối quà tặng; yêu cầu nhả vé.
+     *
+     * @param actorId mã người nhận
+     * @param sagaId mã saga của lượt tặng
+     * @return trạng thái saga
+     * @throws ResponseStatusException HTTP 404, 403 nếu không phải người nhận, HTTP 409 {@code GIFT_NOT_CANCELLABLE} nếu không còn ở trạng thái chờ người nhận
+     */
     @Transactional
     public SagaResponse declineGift(String actorId, String sagaId) {
         MarketplaceSaga saga = sagaRepository.findByIdForUpdate(sagaId)
@@ -663,6 +915,14 @@ public class TicketListingService {
         return toResponse(saga);
     }
 
+    /**
+     * Lấy lượt tặng đang chờ của một vé do chính người tặng gửi.
+     *
+     * @param actorId mã người tặng
+     * @param ticketId mã vé
+     * @return thông tin lượt tặng (saga, vé, trạng thái, email người nhận, hạn lời mời)
+     * @throws ResponseStatusException HTTP 404 {@code GIFT_NOT_FOUND} nếu không có, HTTP 403 nếu không phải người tặng
+     */
     @Transactional(readOnly = true)
     public Map<String, Object> getActiveGiftByTicket(String actorId, String ticketId) {
         TicketTransfer transfer = transferRepository.findFirstByTicketIdAndStatus(ticketId, TransferStatus.PENDING)
@@ -679,6 +939,17 @@ public class TicketListingService {
         return result;
     }
 
+    /**
+     * Ban tổ chức hủy lượt tặng đang chờ người nhận: đánh dấu lượt chuyển {@code CANCELLED}, chuyển saga sang bù trừ
+     * và đưa lệnh nhả vé vào outbox. Trả lại saga hiện tại nếu lượt tặng đã hủy.
+     *
+     * @param actorId mã người thực hiện
+     * @param eventId mã sự kiện
+     * @param sagaId mã saga của lượt tặng
+     * @param reason lý do hủy, có thể bỏ trống
+     * @return trạng thái saga
+     * @throws ResponseStatusException HTTP 403 {@code EVENT_MISMATCH} khi lượt tặng không thuộc sự kiện, HTTP 409 {@code GIFT_NOT_CANCELLABLE}
+     */
     @Transactional
     public SagaResponse cancelGiftAsOrganizer(String actorId, String eventId, String sagaId, String reason) {
         MarketplaceSaga saga = sagaRepository.findByIdForUpdate(sagaId)
@@ -706,6 +977,15 @@ public class TicketListingService {
         return toResponse(saga);
     }
 
+    /**
+     * Xem nội dung lời mời tặng vé; chỉ người nhận cùng token hợp lệ mới xem được. Kèm tên người tặng nếu lấy được.
+     *
+     * @param actorId mã người nhận
+     * @param sagaId mã saga của lượt tặng
+     * @param token token trong lời mời
+     * @return thông tin lời mời dưới dạng map
+     * @throws ResponseStatusException HTTP 404, HTTP 403 {@code GIFT_INVITATION_INVALID} khi sai người nhận hoặc token
+     */
     @Transactional(readOnly = true)
     public Map<String, Object> giftInvitation(String actorId, String sagaId, String token) {
         TicketTransfer transfer = transferRepository.findBySagaId(sagaId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
@@ -740,6 +1020,12 @@ public class TicketListingService {
         } catch (JsonProcessingException exception) { throw new IllegalStateException(exception); }
     }
 
+    /**
+     * Liệt kê các lời mời tặng vé còn hiệu lực gửi tới người dùng, mới nhất trước.
+     *
+     * @param actorId mã người nhận
+     * @return danh sách lời mời
+     */
     @Transactional(readOnly = true)
     public java.util.List<Map<String, Object>> myGiftInvitations(String actorId) {
         java.util.List<Map<String, Object>> result = new java.util.ArrayList<>();
@@ -770,6 +1056,12 @@ public class TicketListingService {
         return result;
     }
 
+    /**
+     * Xử lý khi vé tặng đã chuyển quyền sở hữu: hoàn tất lượt chuyển nhượng và saga rồi phát sự kiện hoàn tất.
+     * Bỏ qua nếu saga không ở trạng thái chờ chuyển vé.
+     *
+     * @param sagaId mã saga của lượt tặng
+     */
     @Transactional
     public void handleOwnershipTransferred(String sagaId) {
         MarketplaceSaga saga = sagaRepository.findById(sagaId).orElse(null); if (saga == null || saga.getState() != SagaState.WAITING_TRANSFER) return;
@@ -779,6 +1071,13 @@ public class TicketListingService {
         outboxRepository.save(OutboxEvent.builder().aggregateType("TICKET_TRANSFER").aggregateId(transfer.getId()).eventType("GIFT_COMPLETED").topic("haloticket.marketplace.gift.completed.v1").payload(saga.getPayload()).status(OutboxStatus.PENDING).retryCount(0).build());
     }
 
+    /**
+     * Yêu cầu nhả vé cho saga: chuyển sang bù trừ, hẹn thử lại sau 10 giây và đưa lệnh nhả vào outbox.
+     * Bỏ qua saga mua vé bán lại hoặc saga đã kết thúc.
+     *
+     * @param sagaId mã saga
+     * @param reason lý do nhả vé, được lưu vào saga
+     */
     @Transactional
     public void requestRelease(String sagaId, String reason) {
         MarketplaceSaga saga = sagaRepository.findById(sagaId).orElse(null);
@@ -791,6 +1090,12 @@ public class TicketListingService {
         } catch (JsonProcessingException exception) { throw new IllegalStateException("Could not create release command", exception); }
     }
 
+    /**
+     * Xử lý khi vé đã được nhả: hủy tin bán lại hoặc lượt tặng còn mở, đánh dấu saga {@code COMPENSATED} và phát sự kiện
+     * hủy hoặc thất bại tương ứng (người bán hoặc ban tổ chức hủy thì là sự kiện hủy).
+     *
+     * @param sagaId mã saga
+     */
     @Transactional
     public void handleTicketReleased(String sagaId) {
         MarketplaceSaga saga = sagaRepository.findById(sagaId).orElse(null);
@@ -812,9 +1117,35 @@ public class TicketListingService {
         outboxRepository.save(OutboxEvent.builder().aggregateType("MARKETPLACE_SAGA").aggregateId(sagaId).eventType(eventType).topic(topic).payload(saga.getPayload()).status(OutboxStatus.PENDING).retryCount(0).build());
     }
 
+    /**
+     * Đọc trường chuỗi từ JSON.
+     *
+     * @param node nút JSON
+     * @param field tên trường
+     * @return giá trị chuỗi, hoặc {@code null} nếu trường vắng hoặc null
+     */
     private static String text(com.fasterxml.jackson.databind.JsonNode node, String field) { return node.hasNonNull(field) ? node.get(field).asText() : null; }
+    /**
+     * Đọc trường số thập phân từ JSON.
+     *
+     * @param node nút JSON
+     * @param field tên trường
+     * @return giá trị {@code BigDecimal}, hoặc {@code null} nếu trường vắng hoặc null
+     */
     private static BigDecimal decimal(com.fasterxml.jackson.databind.JsonNode node, String field) { return node.hasNonNull(field) ? new BigDecimal(node.get(field).asText()) : null; }
+    /**
+     * Chuyển saga thành phản hồi trả cho client.
+     *
+     * @param saga saga nguồn
+     * @return mã saga, trạng thái, mã nghiệp vụ liên quan và lỗi gần nhất
+     */
     private SagaResponse toResponse(MarketplaceSaga saga) { return new SagaResponse(saga.getId(), saga.getState(), saga.getBusinessId(), saga.getLastError()); }
+    /**
+     * Dựng phản hồi giữ chỗ từ giao dịch; không có danh sách vé riêng thì dùng vé gốc của tin.
+     *
+     * @param transaction giao dịch mua
+     * @return phản hồi giữ chỗ
+     */
     private ReservationResponse reservationResponse(MarketplaceTransaction transaction) {
         List<String> ids = transaction.getTicketIds() == null || transaction.getTicketIds().isEmpty()
                 ? List.of(transaction.getTicketListing().getTicketId()) : List.copyOf(transaction.getTicketIds());
@@ -822,6 +1153,12 @@ public class TicketListingService {
                 transaction.getAmount(), transaction.getCurrency(), transaction.getReservationExpiresAt(), ids.size(), ids);
     }
 
+    /**
+     * Xử lý thanh toán thất bại: hủy giao dịch đang chờ hoặc đang xử lý thanh toán và mở lại tin đang bị người mua đó giữ chỗ.
+     * Bỏ qua nếu giao dịch hoặc tin không còn ở trạng thái phù hợp.
+     *
+     * @param transactionId mã giao dịch mua
+     */
     @Transactional
     public void paymentFailed(String transactionId) {
         MarketplaceTransaction transaction = transactionRepository.findById(transactionId).orElse(null);
@@ -837,6 +1174,15 @@ public class TicketListingService {
         listing.setReservedBy(null); listing.setReservedUntil(null);
         listingRepository.save(listing);
     }
+    /**
+     * Chuẩn hóa danh sách vé được chọn, gộp mã vé cũ ({@code legacyId}) nếu chỉ có mã đơn.
+     *
+     * @param legacyId mã vé đơn, có thể {@code null}
+     * @param ids danh sách mã vé, có thể {@code null}
+     * @return danh sách bất biến các mã vé
+     * @throws ResponseStatusException HTTP 422 {@code TICKET_IDS_INVALID} khi rỗng, quá 50 vé, có mã trống hoặc trùng,
+     *         hoặc mã đơn không nằm trong danh sách
+     */
     private static List<String> selectedIds(String legacyId, List<String> ids) {
         List<String> selected = ids == null ? (legacyId == null ? List.of() : List.of(legacyId)) : ids;
         if (selected.isEmpty() || selected.size() > 50 || selected.stream().anyMatch(id -> id == null || id.isBlank())
@@ -845,10 +1191,22 @@ public class TicketListingService {
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "TICKET_IDS_INVALID");
         return List.copyOf(selected);
     }
+    /**
+     * Chụp thông tin vé từ kết quả kiểm tra điều kiện, với cờ chưa bán.
+     *
+     * @param item kết quả kiểm tra điều kiện của vé
+     * @return bản chụp thông tin vé
+     */
     private static TicketMemberSnapshot snapshot(TicketServiceClient.ResaleEligibilityResponse item) {
         return new TicketMemberSnapshot(item.ticketId(), item.ticketTypeId(), item.showtimeId(),
                 item.ticketTypeName(), item.section(), item.row(), item.seat(), item.originalPrice(), false);
     }
+    /**
+     * Dựng danh sách bản chụp vé từ payload của saga; thiếu mảng {@code tickets} thì dựng một vé từ các trường đơn.
+     *
+     * @param node payload JSON của saga
+     * @return danh sách bản chụp vé
+     */
     private List<TicketMemberSnapshot> members(com.fasterxml.jackson.databind.JsonNode node) {
         var tickets = node.path("tickets");
         if (!tickets.isArray()) return List.of(new TicketMemberSnapshot(text(node,"ticketId"), null, null,
@@ -859,10 +1217,23 @@ public class TicketListingService {
                 text(ticket,"seat"), decimal(ticket,"originalPrice"), false));
         return result;
     }
+    /**
+     * Lấy mã các vé của lượt chuyển nhượng; không có danh sách thành viên thì dùng mã vé gốc.
+     *
+     * @param transfer lượt chuyển nhượng
+     * @return danh sách mã vé
+     */
     private static List<String> memberIds(TicketTransfer transfer) {
         return transfer.getMembers() == null || transfer.getMembers().isEmpty() ? List.of(transfer.getTicketId())
                 : transfer.getMembers().stream().map(TicketMemberSnapshot::getTicketId).toList();
     }
+    /**
+     * Đọc danh sách mã vé từ payload của saga; thiếu mảng {@code ticketIds} thì dùng mã vé gốc của saga.
+     *
+     * @param saga saga nguồn
+     * @return danh sách mã vé
+     * @throws IllegalStateException khi payload không phải JSON hợp lệ
+     */
     private List<String> sagaTicketIds(MarketplaceSaga saga) {
         try {
             var ids = objectMapper.readTree(saga.getPayload()).path("ticketIds");
@@ -872,15 +1243,33 @@ public class TicketListingService {
             return result;
         } catch (JsonProcessingException exception) { throw new IllegalStateException(exception); }
     }
+    /**
+     * Băm SHA-256 nội dung yêu cầu đăng bán để so khớp khi dùng lại khóa idempotency.
+     *
+     * @param request yêu cầu đăng bán
+     * @return chuỗi hex của giá trị băm
+     */
     private String hash(CreateListingRequest request) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(request.toString().getBytes(StandardCharsets.UTF_8))); } catch (Exception exception) { throw new IllegalStateException(exception); } }
+    /**
+     * Băm SHA-256 nội dung yêu cầu tặng vé để so khớp khi dùng lại khóa idempotency.
+     *
+     * @param request yêu cầu tặng vé
+     * @return chuỗi hex của giá trị băm
+     */
     private String hash(CreateGiftRequest request) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(request.toString().getBytes(StandardCharsets.UTF_8))); } catch (Exception exception) { throw new IllegalStateException(exception); } }
     
-    /** Hash missing, token missing/blank or token mismatch are all rejected the same way. */
+    /** Thiếu hash, thiếu token (hoặc token trống) và token sai đều bị từ chối như nhau để không lộ thông tin. */
     private boolean isInvitationTokenValid(TicketTransfer transfer, String token) {
         String expectedHash = transfer.getInvitationTokenHash();
         if (expectedHash == null || token == null || token.isBlank()) return false;
         return MessageDigest.isEqual(hashToken(token).getBytes(StandardCharsets.UTF_8), expectedHash.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * Băm SHA-256 token lời mời để lưu và so khớp mà không lưu token gốc.
+     *
+     * @param token token gốc
+     * @return chuỗi hex của giá trị băm
+     */
     private String hashToken(String token) { try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8))); } catch (Exception exception) { throw new IllegalStateException(exception); } }
 }

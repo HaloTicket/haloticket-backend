@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import java.time.LocalDateTime;
 
+/** Một thành viên nhân sự của sự kiện: thông tin người dùng, vai trò, trạng thái và hạn của lời mời (nếu còn chờ). */
 @Data
 @Builder
 public class EventMemberResponse {

@@ -8,6 +8,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Lượt chuyển nhượng vé (tặng hoặc bán lại) giữa hai người dùng: vé, người gửi, người nhận, trạng thái,
+ * token mời đã băm và các ràng buộc như yêu cầu eKYC, số lượt tặng tối đa.
+ */
 @Entity @Table(name = "ticket_transfers")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class TicketTransfer {
@@ -35,5 +39,6 @@ public class TicketTransfer {
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "ticket_transfer_members", joinColumns = @JoinColumn(name = "transfer_id"))
     @Builder.Default private List<TicketMemberSnapshot> members = new ArrayList<>();
+    /** Đặt thời điểm tạo và trạng thái mặc định {@code PENDING} nếu chưa có, trước khi lưu mới. */
     @PrePersist void onCreate() { createdAt = Instant.now(); if (status == null) status = TransferStatus.PENDING; }
 }

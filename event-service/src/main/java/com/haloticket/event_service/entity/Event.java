@@ -8,6 +8,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** Thực thể sự kiện (bảng {@code events}): nội dung, địa điểm, thời gian diễn và mở bán, trạng thái duyệt, nhà tổ chức, nhân sự, suất diễn và bản chụp vé đã đồng bộ. */
 @Entity
 @Table(name = "events")
 @Getter
@@ -137,6 +138,7 @@ public class Event {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Trước khi lưu lần đầu: đặt thời điểm tạo và cập nhật; trạng thái sự kiện và trạng thái duyệt mặc định là {@code PENDING}. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -145,6 +147,7 @@ public class Event {
         if (this.eventApprovalStatus == null) this.eventApprovalStatus = EventApprovalStatus.PENDING;
     }
 
+    /** Trước mỗi lần cập nhật: làm mới thời điểm cập nhật. */
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

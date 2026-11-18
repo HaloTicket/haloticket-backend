@@ -14,6 +14,7 @@ import org.springframework.kafka.core.*;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Cấu hình Kafka cho payment-service: producer và consumer dùng chuỗi, nhóm consumer {@code payment-service}. */
 @Configuration
 @EnableKafka
 public class KafkaConfig {
@@ -21,6 +22,11 @@ public class KafkaConfig {
     @Value("${spring.kafka.bootstrap-servers:${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}}")
     private String bootstrapServers;
 
+    /**
+     * Tạo producer factory với key và value dạng chuỗi.
+     *
+     * @return producer factory
+     */
     @Bean
     public ProducerFactory<String, String> producerFactory() {
         Map<String, Object> props = new HashMap<>();
@@ -30,11 +36,21 @@ public class KafkaConfig {
         return new DefaultKafkaProducerFactory<>(props);
     }
 
+    /**
+     * Tạo {@code KafkaTemplate} để gửi sự kiện dạng chuỗi.
+     *
+     * @return Kafka template
+     */
     @Bean
     public KafkaTemplate<String, String> kafkaTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
 
+    /**
+     * Tạo consumer factory (nhóm {@code payment-service}, đọc từ {@code earliest} khi chưa có offset).
+     *
+     * @return consumer factory
+     */
     @Bean
     public ConsumerFactory<String, String> consumerFactory() {
         Map<String, Object> props = new HashMap<>();
@@ -46,6 +62,11 @@ public class KafkaConfig {
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
+    /**
+     * Tạo container factory cho các {@code @KafkaListener}.
+     *
+     * @return container factory
+     */
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory() {
         ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();

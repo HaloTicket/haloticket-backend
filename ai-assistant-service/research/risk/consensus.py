@@ -1,10 +1,11 @@
-"""Agreement and gold labels for three (or two) independent annotators:
+"""Độ đồng thuận và nhãn vàng cho ba (hoặc hai) người gán nhãn độc lập:
 RISK_SET=t2 python -m research.risk.consensus --annotators H1,H2,L [--write-gold]
 
-Prints Fleiss' kappa for the level, Cohen's kappa for every pair, and per-code pairwise kappa. With --write-gold it writes
-gold.jsonl: the level chosen by at least two annotators, and each code marked by at least two. A case where all annotators
-gave different levels (or, with two annotators, any disagreement) has no majority and goes to data/<set>/undecided.json for a
-separate reader. The annotators' own files are read, never changed."""
+In kappa Fleiss của mức rủi ro, kappa Cohen cho từng cặp và kappa từng mã. Với --write-gold thì ghi gold.jsonl:
+mức do ít nhất hai người chọn, và mỗi mã có ít nhất hai người đánh dấu. Ca mà mọi người chọn mức khác nhau (hoặc, với hai
+người, bất kỳ bất đồng nào) không có đa số và được ghi vào data/<set>/undecided.json cho một người đọc riêng. Tệp của từng
+người gán chỉ được đọc, không bị sửa.
+"""
 import argparse
 import itertools
 import json
@@ -16,7 +17,14 @@ from research.risk.stats import cohen_kappa, fleiss_kappa, kappa_band
 
 
 def decide(votes: list) -> dict:
-    """votes: [{"level", "codes"}] -> {"level", "codes", "method"} or None when no level has a majority."""
+    """Quyết định nhãn vàng của một ca theo đa số phiếu.
+
+    Args:
+        votes: danh sách phiếu, mỗi phiếu có "level" và "codes".
+
+    Returns:
+        {"level", "codes", "method"} (method là unanimous hoặc majority), hoặc None khi không mức nào đạt đa số.
+    """
     need = len(votes) // 2 + 1
     levels = [v["level"] for v in votes]
     top = max(set(levels), key=levels.count)
@@ -24,13 +32,20 @@ def decide(votes: list) -> dict:
         return None
     marked = [c for c in CODES if sum(1 for v in votes if c in v["codes"]) >= need]
     codes = [] if top == "LOW" else marked
-    if top != "LOW" and not codes:  # a level above LOW needs a code: take the codes the annotators of that level agree on
+    if top != "LOW" and not codes:  # mức trên LOW cần có mã: lấy các mã mà những người chọn mức đó đồng ý
         pool = [v["codes"] for v in votes if v["level"] == top]
         codes = [c for c in CODES if sum(1 for p in pool if c in p) >= max(1, len(pool) // 2 + len(pool) % 2)] or sorted(pool[0])[:1]
     return {"level": top, "codes": codes, "method": "unanimous" if len(set(levels)) == 1 else "majority"}
 
 
 def report(annotators: list, labels: dict, ids: list) -> str:
+    """Dựng báo cáo đồng thuận dạng văn bản: kappa Fleiss (khi hơn hai người), kappa Cohen từng cặp theo mức (thường và tuyến tính) và kappa từng mã.
+
+    Args:
+        annotators: tên những người gán nhãn.
+        labels: nhãn của từng người, dạng {người: {mã ca: nhãn}}.
+        ids: mã các ca mà mọi người đều đã gán.
+    """
     lines = [f"{len(ids)} ca có đủ nhãn của {', '.join(annotators)}"]
     items = [[labels[a][i]["level"] for a in annotators] for i in ids]
     if len(annotators) > 2:
@@ -51,6 +66,7 @@ def report(annotators: list, labels: dict, ids: list) -> str:
 
 
 def main() -> None:
+    """Đọc nhãn, in báo cáo đồng thuận và, với --write-gold, ghi gold.jsonl cùng danh sách ca chưa có đa số."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--annotators", default="H1,H2,L")
     parser.add_argument("--write-gold", action="store_true")

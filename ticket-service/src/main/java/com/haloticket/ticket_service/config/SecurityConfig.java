@@ -9,24 +9,30 @@ import org.springframework.security.web.SecurityFilterChain;
 
 import org.springframework.http.HttpMethod;
 
+/** Cấu hình bảo mật của ticket-service: xác thực JWT từ Keycloak và danh sách đường dẫn không cần đăng nhập. */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri:http://localhost:9080/realms/haloticket-realm}") private String issuerUri;
     @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}") private String jwkSetUri;
+    /** Tạo bộ giải mã JWT: dùng JWK set URI nếu có cấu hình, ngược lại tự tìm theo issuer; luôn kiểm tra issuer. */
     @Bean JwtDecoder jwtDecoder() {
         NimbusJwtDecoder decoder = jwkSetUri == null || jwkSetUri.isBlank() ? NimbusJwtDecoder.withIssuerLocation(issuerUri).build() : NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
         decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuerUri));
         return decoder;
     }
+    /**
+     * Dựng chuỗi lọc bảo mật: tắt CSRF, cho phép tự do actuator, các API nội bộ giữa dịch vụ (tự kiểm tra token trong controller)
+     * và API công khai về loại vé, sơ đồ ghế; mọi yêu cầu còn lại phải đăng nhập bằng JWT.
+     */
     @Bean SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http.csrf(csrf -> csrf.disable()).authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/**", "/health").permitAll()
-                // This one endpoint validates its service credential before any DB access.
+                // Endpoint này tự kiểm tra thông tin xác thực dịch vụ trước khi truy cập DB.
                 .requestMatchers(HttpMethod.GET, "/api/internal/tickets/*/transfer-snapshot").permitAll()
-                // Service token is validated inside the controller before any DB access.
+                // Token dịch vụ được kiểm tra ngay trong controller trước khi truy cập DB.
                 .requestMatchers(HttpMethod.POST, "/api/internal/tickets/stock-reservations", "/api/internal/tickets/stock-reservations/*/release").permitAll()
-                // Same for the reopen of a hold (late payment) and the reconciliation reads (admin page through booking-service).
+                // Tương tự cho việc mở lại giữ chỗ (thanh toán muộn) và các lần đọc đối soát (trang admin qua booking-service).
                 .requestMatchers(HttpMethod.POST, "/api/internal/tickets/stock-reservations/*/reopen", "/api/internal/tickets/issued-counts").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/internal/tickets/stock-reconciliation").permitAll()
                 .requestMatchers("/api/tickets/types/**", "/api/tickets/seat-layouts/**", "/api/tickets/seat-status").permitAll()

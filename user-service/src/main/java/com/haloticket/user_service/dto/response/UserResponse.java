@@ -9,6 +9,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+/** Thông tin người dùng trả về cho client. */
 @Data
 @Builder
 public class UserResponse {

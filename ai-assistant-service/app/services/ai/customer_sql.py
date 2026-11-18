@@ -1,19 +1,19 @@
-"""SQL fragments and small helpers shared by the customer chatbot paths (chat-search, smart-booking-chat, tools).
+"""Đoạn SQL và hàm phụ dùng chung cho các luồng chatbot khách hàng (chat-search, smart-booking-chat, tools).
 
-All of it runs on the read-only chatbot engines (app.db.engines.get_chatbot_engine); nothing here touches the shared
-account. Columns used on event_db: events(id,title,description,banner_url,thumbnail_url,location_name,city,ward,address,
+Tất cả chạy trên engine chatbot chỉ đọc (app.db.engines.get_chatbot_engine); không đụng tới tài khoản dùng chung.
+Các cột dùng trên event_db: events(id,title,description,banner_url,thumbnail_url,location_name,city,ward,address,
 dates_summary,min_price,event_status,end_time,is_private,created_at).
 """
 from types import SimpleNamespace
 
-# One definition of "still valid" for every customer path (alias `e` = events). Applied inside SQL, before any top-k cut.
+# Một định nghĩa duy nhất cho "sự kiện còn hiệu lực" ở mọi luồng khách hàng (bí danh `e` = events). Áp dụng ngay trong SQL, trước khi cắt top-k.
 VALID_EVENT_FILTER = (
     "e.event_status IN ('LIVE', 'APPROVED') "
     "AND e.is_private IS NOT TRUE "
     "AND (e.end_time IS NULL OR e.end_time > now())"
 )
 
-# Cosine similarity below this is not a match (chat-search); applied in SQL.
+# Độ tương đồng cosine thấp hơn ngưỡng này thì không tính là khớp (chat-search); áp dụng trong SQL.
 SEARCH_MIN_SCORE = 0.35
 
 EVENT_SELECT = """
@@ -25,11 +25,12 @@ EVENT_SELECT = """
 
 
 def escape_like(term: str) -> str:
-    """Make %, _ and \\ in user text literal inside an ILIKE pattern (use with ESCAPE '\\')."""
+    """Thoát %, _ và \\ trong chữ người dùng để chúng thành ký tự thường trong mẫu ILIKE (dùng kèm ESCAPE '\\')."""
     return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def event_dict(row) -> dict:
+    """Chuyển một dòng kết quả SQL của bảng events thành dict camelCase cho giao diện; trường rỗng thành chuỗi rỗng, ảnh bìa và ảnh nhỏ dự phòng cho nhau."""
     return {
         "id": row.id,
         "title": row.title,
@@ -46,5 +47,5 @@ def event_dict(row) -> dict:
 
 
 def vector_hit(event_id, content, score) -> SimpleNamespace:
-    """Same shape the callers always used: r.EventVector.event_id / .content and r.distance (cosine distance)."""
+    """Dựng đối tượng có cùng hình dạng mà các nơi gọi vẫn dùng: r.EventVector.event_id / .content và r.distance (khoảng cách cosine)."""
     return SimpleNamespace(EventVector=SimpleNamespace(event_id=event_id, content=content), distance=1.0 - float(score))

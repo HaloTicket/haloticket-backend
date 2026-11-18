@@ -16,6 +16,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
+/**
+ * Cấu hình {@code S3Client} cho {@code media-service}. Khi lớp được nạp, thông tin cấu hình trong tệp {@code .env}
+ * (nếu có) được đưa vào system property với điều kiện chưa có biến cùng tên.
+ */
 @Configuration
 @Slf4j
 public class S3Config {
@@ -24,6 +28,10 @@ public class S3Config {
         loadEnvFile();
     }
 
+    /**
+     * Tìm tệp {@code .env} ở vài vị trí thường gặp, đọc các dòng {@code KEY=VALUE} (bỏ dòng trống và dòng bắt đầu bằng {@code #})
+     * rồi đặt vào system property nếu chưa có system property hoặc biến môi trường cùng tên. Chỉ dùng tệp đầu tiên tìm được; lỗi đọc chỉ được ghi log.
+     */
     private static void loadEnvFile() {
         String[] possiblePaths = {
                 ".env",
@@ -67,6 +75,13 @@ public class S3Config {
     @Value("${aws.s3.endpoint:}")
     private String endpoint;
 
+    /**
+     * Tạo {@code S3Client} với khóa truy cập và vùng lấy từ system property ({@code AWS_ACCESS_KEY_ID}, {@code AWS_SECRET_ACCESS_KEY},
+     * {@code AWS_REGION}) nếu có, ngược lại dùng cấu hình {@code aws.s3.*}. Có {@code aws.s3.endpoint} thì ghi đè địa chỉ (ví dụ S3 tương thích như MinIO).
+     * Log chỉ in 4 ký tự đầu của khóa truy cập.
+     *
+     * @return client S3 dùng chung
+     */
     @Bean
     public S3Client s3Client() {
         String keyId = System.getProperty("AWS_ACCESS_KEY_ID", accessKeyId);

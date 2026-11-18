@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/** Sơ đồ ghế của sự kiện trả về cho client: dữ liệu SVG, ảnh nền, trạng thái và các khu vực. */
 @Data
 @Builder
 @NoArgsConstructor
@@ -20,6 +21,7 @@ public class SeatLayoutResponse {
     private String status;
     private List<ZoneResponseDto> zones;
 
+    /** Một khu vực trên sơ đồ ghế: hình dạng, vị trí, màu sắc, sức chứa và loại vé gắn với khu vực. */
     @Data
     @Builder
     @NoArgsConstructor

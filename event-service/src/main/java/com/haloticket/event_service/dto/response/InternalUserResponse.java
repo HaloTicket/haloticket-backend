@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+/** Thông tin cơ bản của người dùng do API nội bộ của user-service trả về. */
 @Data
 @Builder
 @NoArgsConstructor

@@ -17,6 +17,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
+/** Tích hợp SePay: sinh thông tin chuyển khoản VietQR và chủ động tra giao dịch ngân hàng để xác nhận thanh toán. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -24,6 +25,15 @@ public class SePayService {
 
     private final SePayConfig sePayConfig;
 
+    /**
+     * Tạo mã VietQR và thông tin chuyển khoản. Nội dung chuyển khoản có dạng {@code HALO <mã đặt chỗ>}
+     * (dùng {@code bookingId} nếu chưa có mã đặt chỗ) để webhook đối chiếu về sau.
+     *
+     * @param amount số tiền cần chuyển (VND)
+     * @param bookingCode mã đặt chỗ, có thể rỗng
+     * @param bookingId mã booking
+     * @return map gồm {@code qrUrl}, {@code bankName}, {@code accountNo}, {@code accountName}, {@code amount}, {@code transferContent}, {@code bookingId}
+     */
     public Map<String, Object> createVietQrPayload(long amount, String bookingCode, String bookingId) {
         String bankCode = sePayConfig.getBankName();
         String accountNumber = sePayConfig.getAccountNo();
@@ -49,6 +59,15 @@ public class SePayService {
         return res;
     }
 
+    /**
+     * Chủ động hỏi SePay 50 giao dịch gần nhất để tìm khoản tiền vào có nội dung chứa {@code HALO} cùng mã booking
+     * hoặc mã đặt chỗ, và so khớp đúng số tiền. Không có user token hoặc gặp lỗi thì coi như chưa thanh toán.
+     *
+     * @param bookingId mã booking
+     * @param bookingCode mã đặt chỗ, có thể {@code null}
+     * @param amount số tiền cần nhận
+     * @return {@code true} nếu tìm thấy giao dịch khớp cả nội dung lẫn số tiền
+     */
     public boolean checkPaymentActively(String bookingId, String bookingCode, double amount) {
         String userToken = sePayConfig.getUserToken();
         if (userToken == null || userToken.isBlank()) {

@@ -20,6 +20,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/** Báo cáo doanh thu theo sự kiện cho admin nền tảng. Ghép thanh toán thành công từ payment-service với dữ liệu đơn hàng từ booking-service và danh sách sự kiện, rồi tổng hợp theo sự kiện và theo ngày cho kỳ báo cáo và kỳ liền trước cùng độ dài. */
 @Service
 @RequiredArgsConstructor
 public class AdminEventReportService {
@@ -31,6 +32,23 @@ public class AdminEventReportService {
     private final PaymentReportClient payments;
     private final BookingInternalServiceClient bookings;
 
+    /**
+     * Dựng báo cáo: tổng hợp, mốc so sánh kỳ trước, đường thời gian theo ngày, bảng sự kiện (có lọc, sắp xếp, phân trang hoặc xuất toàn bộ) và các lựa chọn lọc. Chỉ tính đơn đã thanh toán (hoặc đã hoàn tiền), mỗi đơn một lần, theo ngày xác nhận thanh toán. Dữ liệu bất thường (trùng, không khớp, doanh thu âm) được bỏ qua và nêu trong {@code warnings}, khi đó trạng thái là {@code PARTIAL}.
+     * @param authorization header Authorization chuyển tiếp sang các dịch vụ nguồn
+     * @param from ngày bắt đầu kỳ báo cáo
+     * @param to ngày kết thúc kỳ báo cáo (tính cả ngày này)
+     * @param q từ khóa tìm theo tên sự kiện, id hoặc tên nhà tổ chức
+     * @param categoryId lọc theo danh mục, có thể null
+     * @param organizerId lọc theo nhà tổ chức, có thể null
+     * @param status lọc theo trạng thái sự kiện, có thể null
+     * @param sort {@code revenue}, {@code orders}, {@code tickets} hoặc {@code title}
+     * @param page số trang, từ 1
+     * @param size kích thước trang: 10, 20 hoặc 50
+     * @param eventId giới hạn vào một sự kiện, có thể null
+     * @param export true để lấy toàn bộ không phân trang
+     * @return báo cáo đã tổng hợp
+     * @throws ResponseStatusException 400 khi tham số sai, 404 khi {@code eventId} không có trong báo cáo, 422 khi xuất quá 10.000 sự kiện hoặc quá nhiều đơn trong kỳ, 503 khi một nguồn dữ liệu không khả dụng
+     */
     public AdminEventReportResponse report(String authorization, LocalDate from, LocalDate to, String q,
             String categoryId, String organizerId, String status, String sort, int page, int size, String eventId,
             boolean export) {
@@ -150,6 +168,10 @@ public class AdminEventReportService {
                 effectivePage, effectiveSize, allRows.size(), totalPages, options);
     }
 
+    /**
+     * Kiểm tra tham số: khoảng ngày hợp lệ và không quá 366 ngày, trang từ 1, kích thước trang 10/20/50 và kiểu sắp xếp được hỗ trợ.
+     * @throws ResponseStatusException 400 khi có tham số sai
+     */
     private static void validate(LocalDate from, LocalDate to, int page, int size, String sort) {
         if (from == null || to == null || to.isBefore(from)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Khoảng ngày báo cáo không hợp lệ.");
         if (ChronoUnit.DAYS.between(from, to) + 1 > 366) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Khoảng báo cáo tối đa là 366 ngày.");
@@ -157,6 +179,7 @@ public class AdminEventReportService {
         if (!Set.of("revenue", "orders", "tickets", "title").contains(sort)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Kiểu sắp xếp báo cáo không hợp lệ.");
     }
 
+    /** Kiểm tra sự kiện có thỏa các bộ lọc không; {@code q} khớp một phần (không phân biệt hoa thường) với tên, id sự kiện hoặc tên nhà tổ chức. */
     private static boolean matches(Event e, String q, String categoryId, String organizerId, String status, String eventId) {
         if (eventId != null && !eventId.isBlank() && !eventId.equals(e.getId())) return false;
         if (categoryId != null && !categoryId.isBlank() && (e.getCategory() == null || !categoryId.equals(e.getCategory().getId()))) return false;
@@ -170,18 +193,22 @@ public class AdminEventReportService {
         return true;
     }
 
+    /** So khớp một phần không phân biệt hoa thường; giá trị null coi như không khớp. */
     private static boolean contains(String value, String query) { return value != null && value.toLowerCase(Locale.ROOT).contains(query); }
 
+    /** Đơn được tính doanh thu khi ở trạng thái {@code PAID} hoặc {@code REFUNDED}. */
     private static boolean isPaidBooking(String status) {
         return "PAID".equalsIgnoreCase(status) || "REFUNDED".equalsIgnoreCase(status);
     }
 
+    /** Chỉ sự kiện đã duyệt, đang diễn ra hoặc đã kết thúc mới xuất hiện trong báo cáo. */
     private static boolean isReportable(Event event) {
         return event.getEventStatus() == EventStatus.APPROVED
                 || event.getEventStatus() == EventStatus.LIVE
                 || event.getEventStatus() == EventStatus.COMPLETED;
     }
 
+    /** Dựng một dòng báo cáo cho sự kiện; sự kiện không có số liệu thì doanh thu, đơn, vé đều bằng 0. */
     private static AdminEventReportResponse.EventRow row(Event event, Metrics metrics) {
         String organizer = organizers(event).stream().map(EventOrganizer::getName).filter(Objects::nonNull).sorted(String.CASE_INSENSITIVE_ORDER).collect(Collectors.joining(", "));
         EventCategory category = event.getCategory();
@@ -190,6 +217,7 @@ public class AdminEventReportService {
                 metrics == null ? ZERO : metrics.revenue, metrics == null ? 0 : metrics.orders, metrics == null ? 0 : metrics.tickets);
     }
 
+    /** Tạo bộ so sánh theo kiểu sắp xếp (doanh thu, đơn và vé giảm dần; tên tăng dần), khi bằng nhau thì xếp theo id sự kiện để thứ tự ổn định. */
     private static Comparator<AdminEventReportResponse.EventRow> comparator(String sort) {
         Comparator<AdminEventReportResponse.EventRow> secondary = Comparator.comparing(AdminEventReportResponse.EventRow::eventId);
         return switch (sort) {
@@ -200,6 +228,7 @@ public class AdminEventReportService {
         };
     }
 
+    /** Cộng dồn doanh thu, số đơn, số vé và số sự kiện có bán được vé trên các sự kiện đang xét. */
     private static AdminEventReportResponse.Summary summary(List<Event> events, Map<String, Metrics> metrics) {
         BigDecimal revenue = ZERO; long orders = 0, tickets = 0, eventsWithSales = 0;
         for (Event event : events) {
@@ -209,6 +238,7 @@ public class AdminEventReportService {
         return new AdminEventReportResponse.Summary(revenue, orders, tickets, eventsWithSales);
     }
 
+    /** Dựng danh sách lựa chọn cho bộ lọc (danh mục, nhà tổ chức, trạng thái) từ các sự kiện có thể báo cáo. */
     private static AdminEventReportResponse.Options options(List<Event> events) {
         Map<String, String> categories = new TreeMap<>(String.CASE_INSENSITIVE_ORDER), organizers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         Set<String> statuses = new TreeSet<>();
@@ -221,11 +251,14 @@ public class AdminEventReportService {
                 organizers.entrySet().stream().map(e -> new AdminEventReportResponse.Option(e.getKey(), e.getValue())).toList(), List.copyOf(statuses));
     }
 
+    /** Bộ cộng dồn số liệu: doanh thu, số đơn và số vé. */
     private static final class Metrics {
         BigDecimal revenue = ZERO; long orders; long tickets;
+        /** Cộng thêm một đơn: cộng doanh thu, tăng số đơn lên 1 và cộng số vé. */
         void add(BigDecimal amount, long ticketCount) { revenue = revenue.add(amount); orders++; tickets += ticketCount; }
     }
 
+    /** Danh sách nhà tổ chức của sự kiện, rỗng khi chưa có. */
     private static List<EventOrganizer> organizers(Event event) {
         return event.getOrganizers() == null ? List.of() : event.getOrganizers();
     }

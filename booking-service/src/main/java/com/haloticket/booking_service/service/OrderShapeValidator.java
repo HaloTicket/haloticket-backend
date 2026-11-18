@@ -12,14 +12,19 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Early shape check of an order, before anything touches Redis, the database or ticket-service: an order that would
- * fail at ticket issuance after payment is refused here with 422 instead. Pure; needs no other service.
- * Codes: INVALID_ORDER_ITEMS, DUPLICATE_SEAT_IDS, SEAT_COUNT_EXCEEDS_QUANTITY, SEAT_COUNT_MISMATCH.
+ * Kiểm tra sớm hình dạng của đơn, trước khi đụng tới Redis, cơ sở dữ liệu hay ticket-service: đơn sẽ lỗi khi phát hành vé
+ * sau thanh toán thì bị từ chối ngay ở đây với HTTP 422. Thuần túy, không cần service khác.
+ * Mã lỗi: INVALID_ORDER_ITEMS, DUPLICATE_SEAT_IDS, SEAT_COUNT_EXCEEDS_QUANTITY, SEAT_COUNT_MISMATCH.
  */
 @Slf4j
 @Component
 public class OrderShapeValidator {
 
+    /**
+     * Kiểm tra dòng vé hợp lệ (có loại vé, số lượng từ 1), ghế không rỗng và không trùng, và số ghế khớp với số vé.
+     * @param request yêu cầu tạo đơn, null thì bỏ qua
+     * @throws ResponseStatusException HTTP 422 với một trong các mã lỗi ở trên
+     */
     public void validate(BookingCreateRequest request) {
         if (request == null) return;
         List<String> seatIds = request.getSeatIds() == null ? List.of() : request.getSeatIds();
@@ -51,14 +56,15 @@ public class OrderShapeValidator {
             if (seatIds.size() > totalQuantity) {
                 throw refuse("SEAT_COUNT_EXCEEDS_QUANTITY", "seats=" + seatIds.size() + " quantity=" + totalQuantity);
             }
-            // a seat-only order has one ticket per seat; a mixed order cannot be checked more tightly because a seat id
-            // does not say which ticket type it belongs to
+            // đơn chỉ có ghế thì mỗi ghế một vé; đơn hỗn hợp không kiểm tra chặt hơn được vì mã ghế
+            // không cho biết nó thuộc loại vé nào
             if (!anyGeneralAdmission && seatIds.size() != totalQuantity) {
                 throw refuse("SEAT_COUNT_MISMATCH", "seats=" + seatIds.size() + " quantity=" + totalQuantity);
             }
         }
     }
 
+    /** Ghi log và tạo ngoại lệ HTTP 422 với mã lỗi đã cho. */
     private static ResponseStatusException refuse(String code, String detail) {
         log.warn("[ORDER_SHAPE] refused {}: {}", code, detail);
         return new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, code);

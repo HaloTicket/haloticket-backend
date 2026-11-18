@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** Chi tiết đơn trả cho người mua khi tra cứu theo mã đơn. */
 @Data
 @Builder
 @NoArgsConstructor
@@ -23,6 +24,7 @@ public class BookingDetailResponse {
     private LocalDateTime createdAt;
     private List<BookingItemDetailResponse> items;
 
+    /** Một dòng vé trong chi tiết đơn: loại vé, số lượng và đơn giá. */
     @Data
     @Builder
     @NoArgsConstructor

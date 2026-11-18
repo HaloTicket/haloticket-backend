@@ -15,6 +15,7 @@ import java.util.Map;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/** API phân tích sự kiện: số liệu cho nhà tổ chức và ghi nhận lượt xem trang sự kiện. */
 @RestController
 @RequiredArgsConstructor
 public class EventAnalyticsController {
@@ -23,6 +24,15 @@ public class EventAnalyticsController {
     private final EventViewLogRepository viewLogRepository;
     private final EventAccessService access;
 
+    /**
+     * Lấy số liệu phân tích của sự kiện; người gọi phải có quyền {@code ANALYTICS_VIEW} trên sự kiện.
+     * @param eventId mã sự kiện
+     * @param timeRange khoảng thời gian định sẵn, mặc định {@code 30d}
+     * @param from ngày bắt đầu tùy chọn
+     * @param to ngày kết thúc tùy chọn
+     * @param compare {@code true} để so sánh với kỳ trước
+     * @return số liệu phân tích
+     */
     @GetMapping("/api/events/{eventId}/analytics")
     public ResponseEntity<EventAnalyticsResponse> getEventAnalytics(
             @PathVariable String eventId,
@@ -35,6 +45,13 @@ public class EventAnalyticsController {
         return ResponseEntity.ok(analyticsService.getEventAnalytics(eventId, timeRange, from, to, compare));
     }
 
+    /**
+     * Ghi nhận một lượt xem sự kiện (không cần đăng nhập). Thiếu {@code sessionId} thì dùng id phiên HTTP; địa chỉ IP lấy từ {@code X-Forwarded-For}, nếu không có thì lấy địa chỉ máy gọi.
+     * @param eventId mã sự kiện được xem
+     * @param body có thể chứa {@code userId} và {@code sessionId}
+     * @param request yêu cầu HTTP, dùng để lấy phiên và địa chỉ IP
+     * @return 200 không có thân
+     */
     @PostMapping("/api/events/{eventId}/view")
     public ResponseEntity<Void> logEventView(
             @PathVariable String eventId,

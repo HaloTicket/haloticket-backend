@@ -4,19 +4,19 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-/** booking.reconcile.*: admin reconciliation of orders. */
+/** Cấu hình {@code booking.reconcile}: admin đối soát đơn hàng. */
 @Data
 @Component
 @ConfigurationProperties(prefix = "booking.reconcile")
 public class ReconciliationProperties {
-    /** A PAID order younger than this is not flagged yet: issuing tickets takes a moment. */
+    /** Đơn PAID mới hơn số phút này chưa bị đánh dấu lệch vì việc phát hành vé cần một khoảng thời gian. */
     private int paidGraceMinutes = 10;
-    /** Bookings checked per ticket-service call (ticket-service accepts up to 500). */
+    /** Số đơn kiểm tra mỗi lần gọi ticket-service (ticket-service nhận tối đa 500). */
     private int batchSize = 200;
-    /** Batches checked per request, so one request cannot become a table scan. */
+    /** Số lô kiểm tra mỗi request, để một request không biến thành quét toàn bảng. */
     private int maxBatches = 5;
-    /** Only orders paid within this many days are checked. */
+    /** Chỉ kiểm tra các đơn đã thanh toán trong số ngày này. */
     private int lookbackDays = 14;
-    /** Rows read from ticket-service stock reconciliation. */
+    /** Số dòng đọc từ đối soát tồn kho của ticket-service. */
     private int stockLimit = 200;
 }

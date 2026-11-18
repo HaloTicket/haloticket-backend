@@ -9,15 +9,19 @@ import com.haloticket.ticket_service.authz.EventAccessView;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** Feign client gọi event-service để lấy chi tiết sự kiện và quyền của người dùng trên sự kiện. */
 @FeignClient(name = "event-service", url = "${EVENT_SERVICE_URL:}")
 public interface EventServiceClient {
 
+    /** Lấy chi tiết sự kiện, gồm thời gian và các suất diễn. */
     @GetMapping("/api/events/{id}")
     EventDetailsResponse getEventById(@PathVariable("id") String id);
 
+    /** Lấy vai trò và quyền của người gọi (theo header {@code Authorization}) trên sự kiện. */
     @GetMapping("/api/events/{id}/members/my-access")
     EventAccessView getMyAccess(@PathVariable("id") String id, @RequestHeader("Authorization") String authorization);
 
+    /** Chi tiết sự kiện: mã, thời gian bắt đầu, kết thúc và các suất diễn. */
     record EventDetailsResponse(
             String id,
             LocalDateTime startTime,
@@ -25,6 +29,7 @@ public interface EventServiceClient {
             List<ShowtimeDetailsDto> showtimes
     ) {}
 
+    /** Thông tin một suất diễn: mã, thời gian bắt đầu và kết thúc. */
     record ShowtimeDetailsDto(
             String id,
             LocalDateTime startTime,

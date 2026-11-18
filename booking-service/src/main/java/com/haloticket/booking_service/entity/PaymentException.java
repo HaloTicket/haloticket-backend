@@ -21,9 +21,9 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 /**
- * A payment that was taken but the order could not be completed (or tickets could not be issued). A person decides:
- * refund on the gateway by hand and mark it. One row per (payment, kind); ISSUANCE_FAILED has no payment id and is
- * unique per (booking, kind) through a partial index (see migration 20261031_payment_exceptions.sql).
+ * Một khoản thanh toán đã thu tiền nhưng đơn không thể hoàn tất (hoặc không phát hành được vé). Một người sẽ quyết định:
+ * hoàn tiền thủ công trên cổng thanh toán rồi đánh dấu. Mỗi cặp (thanh toán, loại) có một dòng; {@code ISSUANCE_FAILED} không có mã thanh toán và
+ * là duy nhất theo (đơn, loại) nhờ chỉ mục một phần (xem migration 20261031_payment_exceptions.sql).
  */
 @Entity
 @Table(name = "payment_exceptions", uniqueConstraints = {
@@ -73,6 +73,7 @@ public class PaymentException {
     @Column(name = "resolution_note", length = 500)
     private String resolutionNote;
 
+    /** Trước khi lưu lần đầu: gán thời gian tạo nếu chưa có và đặt trạng thái mặc định {@code OPEN}. */
     @PrePersist
     protected void onCreate() {
         if (this.createdAt == null) this.createdAt = LocalDateTime.now();

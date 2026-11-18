@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** Thông tin sự kiện trả về cho client: nội dung, thời gian, địa điểm, trạng thái duyệt, nhà tổ chức, nhân sự và tình trạng đồng bộ vé. */
 @Data
 @Builder
 @NoArgsConstructor

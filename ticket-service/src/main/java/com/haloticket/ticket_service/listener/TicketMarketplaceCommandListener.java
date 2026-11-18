@@ -22,6 +22,10 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
+/**
+ * Nhận các lệnh của saga chợ vé (khóa, mở khóa, chuyển quyền sở hữu) từ Kafka, cập nhật vé và ghi {@code TicketOperation}.
+ * Kết quả được ghi vào bảng outbox để dịch vụ chợ vé nhận lại. Các lệnh idempotent theo {@code operationId}.
+ */
 @Component
 @RequiredArgsConstructor
 public class TicketMarketplaceCommandListener {
@@ -30,6 +34,12 @@ public class TicketMarketplaceCommandListener {
     private final TicketOperationRepository operationRepository;
     private final OutboxEventRepository outboxRepository;
 
+    /**
+     * Xử lý lệnh khóa vé để bán lại hoặc tặng. Vé hợp lệ phải thuộc người bán, đang {@code VALID}, chưa bị khóa và (với quà tặng)
+     * chưa vượt giới hạn số lần tặng. Chỉ cần một vé không đạt thì cả nhóm bị từ chối. Gửi lại cùng lệnh sẽ trả lại kết quả cũ.
+     *
+     * @param message nội dung JSON của lệnh khóa vé
+     */
     @KafkaListener(topics = "haloticket.ticket.lock.requested.v1", groupId = "ticket-service-marketplace")
     @Transactional
     public void lock(String message) {
@@ -62,6 +72,11 @@ public class TicketMarketplaceCommandListener {
         } catch (Exception exception) { throw new IllegalStateException("Failed to process ticket lock command", exception); }
     }
 
+    /**
+     * Xử lý lệnh mở khóa vé: đưa vé đang khóa bởi đúng thao tác khóa về {@code VALID} và đánh dấu thao tác là {@code RELEASED}.
+     *
+     * @param message nội dung JSON của lệnh mở khóa
+     */
     @KafkaListener(topics = "haloticket.ticket.release.requested.v1", groupId = "ticket-service-marketplace")
     @Transactional
     public void release(String message) {
@@ -88,6 +103,13 @@ public class TicketMarketplaceCommandListener {
         } catch (Exception exception) { throw new IllegalStateException("Failed to process ticket release command", exception); }
     }
 
+    /**
+     * Xử lý lệnh chuyển quyền sở hữu vé (tặng hoặc bán lại). Chỉ chuyển khi mọi vé còn thuộc người gửi, đang khóa đúng mục đích
+     * bởi đúng thao tác khóa. Khi thành công vé đổi chủ, tăng phiên bản QR, đổi mã QR; quà tặng tăng số lần tặng,
+     * bán lại ghi giá mua mới.
+     *
+     * @param message nội dung JSON của lệnh chuyển quyền sở hữu
+     */
     @KafkaListener(topics = "haloticket.ticket.ownership.transfer.requested.v1", groupId = "ticket-service-marketplace")
     @Transactional
     public void transfer(String message) {
@@ -131,6 +153,12 @@ public class TicketMarketplaceCommandListener {
         } catch (Exception exception) { throw new IllegalStateException("Failed to process ticket ownership transfer command", exception); }
     }
 
+    /**
+     * Ghi một dòng outbox báo kết quả của thao tác để dịch vụ chợ vé nhận, chọn topic theo loại sự kiện.
+     *
+     * @param operation thao tác đại diện cho cả nhóm vé
+     * @param eventType loại kết quả, ví dụ {@code TICKET_LOCKED} hoặc {@code TICKET_TRANSFER_REJECTED}
+     */
     private void emitResult(TicketOperation operation, String eventType) {
         try {
             Map<String, Object> payload = new LinkedHashMap<>();
@@ -150,6 +178,13 @@ public class TicketMarketplaceCommandListener {
         } catch (Exception exception) { throw new IllegalStateException("Could not write ticket command result", exception); }
     }
 
+    /**
+     * Đọc danh sách mã vé của lệnh ({@code ticketIds} hoặc {@code ticketId}).
+     *
+     * @param root nội dung JSON của lệnh
+     * @return danh sách mã vé
+     * @throws IllegalArgumentException khi rỗng, quá 50 vé, có mã trống hoặc trùng
+     */
     private List<String> ids(JsonNode root) {
         List<String> result = new ArrayList<>();
         if (root.path("ticketIds").isArray()) root.path("ticketIds").forEach(node -> result.add(node.asText()));
@@ -159,35 +194,81 @@ public class TicketMarketplaceCommandListener {
         return result;
     }
 
+    /**
+     * Đọc danh sách mã vé của thao tác khóa trước đó ({@code lockTicketIds}).
+     *
+     * @param root nội dung JSON của lệnh
+     * @return danh sách mã vé đã khóa
+     */
     private List<String> lockIds(JsonNode root) {
         List<String> result = new ArrayList<>();
         root.path("lockTicketIds").forEach(node -> result.add(node.asText()));
         return result;
     }
 
+    /**
+     * Nạp các vé bằng khóa ghi trong DB theo thứ tự id tăng dần để tránh deadlock; vé không tồn tại bị bỏ qua.
+     *
+     * @param ids mã các vé cần nạp
+     * @return các vé tìm thấy
+     */
     private List<Ticket> lockedTickets(List<String> ids) {
         List<Ticket> tickets = new ArrayList<>();
         ids.stream().sorted().forEach(id -> ticketRepository.findWithLockById(id).ifPresent(tickets::add));
         return tickets;
     }
 
+    /**
+     * Tìm các thao tác đã ghi của một lệnh, dùng để nhận ra lệnh gửi lại.
+     *
+     * @param base mã thao tác gốc
+     * @param ids mã các vé trong lệnh
+     * @return các thao tác đã tồn tại
+     */
     private List<TicketOperation> operations(String base, List<String> ids) {
         List<TicketOperation> found = new ArrayList<>();
         for (String id : ids) operationRepository.findByOperationId(memberOperationId(base, id, ids)).ifPresent(found::add);
         return found;
     }
 
+    /**
+     * Tạo mã thao tác cho từng vé: giữ nguyên mã gốc khi lệnh chỉ có một vé, ngược lại ghép thêm mã vé.
+     *
+     * @param base mã thao tác gốc
+     * @param id mã vé
+     * @param ids mã các vé trong lệnh
+     * @return mã thao tác của vé đó
+     */
     private static String memberOperationId(String base, String id, List<String> ids) {
         return ids.size() == 1 ? base : base + ":" + id;
     }
 
+    /**
+     * Dựng một bản ghi thao tác (chưa lưu) cho một vé.
+     *
+     * @param root nội dung JSON của lệnh, lấy {@code sagaId}
+     * @param id mã thao tác
+     * @param ticketId mã vé
+     * @param actor người thực hiện, cũng là chủ vé mong đợi
+     * @param purpose mục đích ({@code RESALE}, {@code GIFT}, {@code RELEASE})
+     * @param state trạng thái thao tác
+     * @return bản ghi thao tác mới
+     */
     private static TicketOperation operation(JsonNode root, String id, String ticketId, String actor, String purpose, TicketOperationState state) {
         return TicketOperation.builder().operationId(id).sagaId(root.path("sagaId").asText(id)).ticketId(ticketId)
                 .actorId(actor).expectedOwnerId(actor).purpose(purpose).state(state).build();
     }
 
+    /** Đọc trường văn bản của nút JSON, trả null nếu thiếu hoặc null. */
     private static String text(JsonNode node, String field) { return node.hasNonNull(field) ? node.get(field).asText() : null; }
 
+    /**
+     * Đọc giới hạn số lần tặng vé; mặc định 3 khi lệnh không nêu.
+     *
+     * @param root nội dung JSON của lệnh
+     * @return số lần tặng tối đa
+     * @throws IllegalArgumentException khi giá trị không phải số nguyên không âm
+     */
     private static int maxGiftCount(JsonNode root) {
         JsonNode limit = root.get("maxGiftCount");
         if (limit == null || limit.isNull()) return 3;

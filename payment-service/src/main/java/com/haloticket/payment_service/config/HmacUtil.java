@@ -4,8 +4,16 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 
+/** Tiện ích băm HMAC dùng khi ký và kiểm tra chữ ký của cổng thanh toán. */
 public class HmacUtil {
 
+    /**
+     * Tính HMAC-SHA256 và trả về chuỗi hex chữ thường.
+     *
+     * @param key khóa bí mật
+     * @param data dữ liệu cần ký
+     * @return chuỗi hex, hoặc chuỗi rỗng khi khóa/dữ liệu null hoặc có lỗi
+     */
     public static String hmacSHA256(String key, String data) {
         try {
             if (key == null || data == null) {

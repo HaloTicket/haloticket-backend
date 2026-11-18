@@ -11,26 +11,57 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 
+/**
+ * Repository cho bảng {@code outbox_events} của payment-service, đồng thời chứa các truy vấn native
+ * tổng hợp doanh thu, hoàn tiền và dòng tiền theo thời điểm thanh toán được xác nhận.
+ */
 @Repository
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, String> {
+    /**
+     * Lấy tối đa 50 sự kiện outbox theo trạng thái, cũ nhất trước, để publisher gửi lên Kafka.
+     *
+     * @param status trạng thái cần lọc
+     * @return danh sách sự kiện, tối đa 50 phần tử
+     */
     List<OutboxEvent> findTop50ByStatusOrderByCreatedAtAsc(OutboxStatus status);
 
+    /** Dữ liệu một thanh toán thành công (một dòng cho mỗi booking) dùng cho đối soát doanh thu. */
     interface SuccessfulPaymentFact {
+        /** @return mã booking */
         String getBookingId();
+        /** @return mã thanh toán được chọn cho booking */
         String getPaymentId();
+        /** @return thời điểm xác nhận thanh toán, lấy từ sự kiện {@code PAYMENT_COMPLETED} đầu tiên */
         LocalDateTime getConfirmedAt();
+        /** @return số tiền thanh toán (doanh thu) */
         Double getRevenue();
+        /** @return tổng tiền hoàn đã hoàn tất; chỉ có ở truy vấn theo danh sách booking */
         Double getRefunds();
+        /** @return tổng tiền hoàn đang chờ hoặc đang xử lý; chỉ có ở truy vấn theo danh sách booking */
         Double getPendingRefunds();
     }
 
+    /** Dòng tiền gộp theo ngày: tiền thu và tiền hoàn của các booking được chọn. */
     interface DailyCashFlowFact {
+        /** @return ngày phát sinh; {@code null} cho nhóm hoàn tiền chưa có ngày cập nhật */
         LocalDate getDate();
+        /** @return tổng tiền thu trong ngày, làm tròn theo đồng */
         Long getGrossAmount();
+        /** @return tổng tiền hoàn đã hoàn tất trong ngày */
         Long getRefundAmount();
+        /** @return số lần hoàn tiền đã hoàn tất nhưng thiếu thời điểm cập nhật */
         Long getUndatedCompletedRefundCount();
     }
 
+    /**
+     * Tính dòng tiền theo ngày cho các booking đã chọn, mỗi booking chỉ lấy một thanh toán thành công
+     * có thời điểm xác nhận sớm nhất. Tiền thu tính theo ngày xác nhận, tiền hoàn theo ngày cập nhật hoàn tiền.
+     *
+     * @param bookingIds danh sách mã booking
+     * @param from mốc bắt đầu (bao gồm)
+     * @param to mốc kết thúc (không bao gồm)
+     * @return các dòng theo ngày, dòng không có ngày xếp cuối
+     */
     @Query(value = "WITH confirmations AS (SELECT aggregate_id, MIN(created_at) AS confirmed_at FROM outbox_events " +
             "WHERE aggregate_type='PAYMENT' AND event_type='PAYMENT_COMPLETED' GROUP BY aggregate_id), " +
             "selected AS (SELECT DISTINCT ON (p.booking_id) p.booking_id,p.id AS payment_id,p.amount,confirmations.confirmed_at " +
@@ -52,6 +83,15 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, String
     List<DailyCashFlowFact> findDailyCashFlowFactsByBookingIds(@Param("bookingIds") List<String> bookingIds,
             @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
+    /**
+     * Liệt kê các thanh toán thành công trong khoảng thời gian xác nhận, mỗi booking một dòng
+     * (thanh toán xác nhận sớm nhất), sắp theo thời điểm xác nhận.
+     *
+     * @param from mốc bắt đầu (bao gồm)
+     * @param to mốc kết thúc (không bao gồm)
+     * @param limit số dòng tối đa
+     * @return danh sách thanh toán, chưa kèm số liệu hoàn tiền
+     */
     @Query(value = "WITH confirmations AS (SELECT aggregate_id, MIN(created_at) AS confirmed_at FROM outbox_events " +
             "WHERE aggregate_type = 'PAYMENT' AND event_type = 'PAYMENT_COMPLETED' GROUP BY aggregate_id), " +
             "earliest_by_booking AS (SELECT DISTINCT ON (p.booking_id) p.booking_id, p.id AS payment_id, " +
@@ -64,6 +104,15 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, String
                                                                    @Param("to") LocalDateTime to,
                                                                    @Param("limit") int limit);
 
+    /**
+     * Lấy thanh toán thành công của các booking đã chọn trong khoảng thời gian xác nhận, kèm tổng tiền
+     * hoàn đã hoàn tất và tổng tiền hoàn đang chờ xử lý.
+     *
+     * @param bookingIds danh sách mã booking
+     * @param from mốc bắt đầu (bao gồm)
+     * @param to mốc kết thúc (không bao gồm)
+     * @return danh sách thanh toán kèm số liệu hoàn tiền
+     */
     @Query(value = "WITH confirmations AS (SELECT aggregate_id, MIN(created_at) AS confirmed_at FROM outbox_events " +
             "WHERE aggregate_type='PAYMENT' AND event_type='PAYMENT_COMPLETED' GROUP BY aggregate_id), " +
             "selected AS (SELECT DISTINCT ON (p.booking_id) p.booking_id,p.id AS payment_id,p.amount,confirmations.confirmed_at " +
@@ -79,6 +128,12 @@ public interface OutboxEventRepository extends JpaRepository<OutboxEvent, String
     List<SuccessfulPaymentFact> findSuccessfulPaymentFactsByBookingIds(@Param("bookingIds") List<String> bookingIds,
             @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
+    /**
+     * Đếm số booking đã thanh toán thành công (hoặc đã hoàn tiền) nhưng không tìm thấy sự kiện
+     * {@code PAYMENT_COMPLETED} để suy ra thời điểm xác nhận. Dùng để phát hiện dữ liệu thiếu.
+     *
+     * @return số booking thiếu mốc xác nhận
+     */
     @Query(value = "WITH confirmations AS (SELECT aggregate_id, MIN(created_at) AS confirmed_at FROM outbox_events " +
             "WHERE aggregate_type = 'PAYMENT' AND event_type = 'PAYMENT_COMPLETED' GROUP BY aggregate_id), " +
             "earliest_by_booking AS (SELECT DISTINCT ON (p.booking_id) p.booking_id, confirmations.confirmed_at " +

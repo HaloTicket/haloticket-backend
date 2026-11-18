@@ -22,6 +22,7 @@ import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.util.backoff.FixedBackOff;
 
+/** Cấu hình Kafka của ticket-service: producer, consumer và cơ chế thử lại rồi chuyển sang topic DLT khi xử lý lỗi. */
 @Configuration
 @EnableKafka
 public class KafkaConfig {
@@ -29,6 +30,7 @@ public class KafkaConfig {
     @Value("${spring.kafka.bootstrap-servers:${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}}")
     private String bootstrapServers;
 
+    /** Khai báo topic dead-letter {@code haloticket.booking.confirmed.v1.DLT} cho sự kiện booking đã xác nhận. */
     @Bean
     public NewTopic bookingConfirmedDltTopic() {
         return TopicBuilder.name("haloticket.booking.confirmed.v1.DLT")
@@ -37,6 +39,7 @@ public class KafkaConfig {
                 .build();
     }
 
+    /** Tạo producer factory với key và value dạng chuỗi. */
     @Bean
     public ProducerFactory<String, String> producerFactory() {
         Map<String, Object> props = new HashMap<>();
@@ -46,11 +49,13 @@ public class KafkaConfig {
         return new DefaultKafkaProducerFactory<>(props);
     }
 
+    /** Tạo {@code KafkaTemplate} dùng để gửi sự kiện outbox và dead-letter. */
     @Bean
     public KafkaTemplate<String, String> kafkaTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
 
+    /** Tạo consumer factory thuộc group {@code ticket-service}, đọc từ offset sớm nhất khi chưa có offset. */
     @Bean
     public ConsumerFactory<String, String> consumerFactory() {
         Map<String, Object> props = new HashMap<>();
@@ -62,14 +67,16 @@ public class KafkaConfig {
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
+    /** Tạo bộ xử lý lỗi consumer: thử lại tối đa 10 lần cách nhau 1 giây rồi chuyển bản ghi sang topic {@code <topic>.DLT}. */
     @Bean
     public CommonErrorHandler kafkaErrorHandler(KafkaOperations<String, String> kafkaOperations) {
         DeadLetterPublishingRecoverer recoverer = new DeadLetterPublishingRecoverer(kafkaOperations,
                 (record, ex) -> new TopicPartition(record.topic() + ".DLT", record.partition()));
-        // Keep 10 retries with 1000ms fixed backoff as in current behavior before sending to DLT
+        // Giữ 10 lần thử lại, cách nhau 1000ms như hành vi hiện tại, trước khi gửi sang DLT
         return new DefaultErrorHandler(recoverer, new FixedBackOff(1000L, 10L));
     }
 
+    /** Tạo container factory cho {@code @KafkaListener}, gắn consumer factory và bộ xử lý lỗi. */
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
             ConsumerFactory<String, String> consumerFactory,

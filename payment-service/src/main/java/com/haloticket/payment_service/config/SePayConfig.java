@@ -4,6 +4,7 @@ import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
+/** Cấu hình SePay: khóa API, tài khoản ngân hàng nhận tiền, bí mật webhook và token người dùng. */
 @Configuration
 @Getter
 public class SePayConfig {

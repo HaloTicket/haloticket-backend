@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+/** Thực thể danh mục sự kiện (bảng {@code event_categories}). Danh mục chỉ bị tắt chứ không bị xóa để các sự kiện cũ vẫn trỏ tới được. */
 @Entity
 @Table(name = "event_categories")
 @Getter
@@ -29,10 +30,10 @@ public class EventCategory {
     
     private String imageUrl;
 
-    /** name of an icon the apps know how to draw; empty means the default one */
+    /** Tên biểu tượng mà ứng dụng biết cách vẽ; để trống thì dùng biểu tượng mặc định. */
     private String icon;
 
-    /** position in the category lists, smallest first; null counts as the end */
+    /** Vị trí trong danh sách danh mục, số nhỏ xếp trước; {@code null} được tính là cuối danh sách. */
     @Column(name = "sort_order")
     private Integer sortOrder;
 
@@ -52,6 +53,7 @@ public class EventCategory {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Trước khi lưu lần đầu: đặt thời điểm tạo và cập nhật; trạng thái mặc định là {@code ACTIVE}. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -59,6 +61,7 @@ public class EventCategory {
         if (this.status == null) this.status = CategoryStatus.ACTIVE;
     }
 
+    /** Trước mỗi lần cập nhật: làm mới thời điểm cập nhật. */
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/** Thống kê hiệu quả của một sự kiện cho nhà tổ chức. Ghép lượt xem (cơ sở dữ liệu của event-service), số liệu đặt vé (booking-service) và số vé phát hành (ticket-service); nguồn nào lỗi thì đánh dấu kết quả là một phần thay vì làm hỏng toàn bộ. */
 @Service
 @Slf4j
 public class EventAnalyticsService {
@@ -31,12 +32,14 @@ public class EventAnalyticsService {
     private final TicketServiceClient ticketClient;
     private final Clock clock;
 
+    /** Constructor dùng khi chạy thật, lấy đồng hồ hệ thống theo múi giờ của nền tảng. */
     @Autowired
     public EventAnalyticsService(EventRepository eventRepository, EventViewLogRepository viewLogRepository,
                                  BookingInternalServiceClient bookingClient, TicketServiceClient ticketClient) {
         this(eventRepository, viewLogRepository, bookingClient, ticketClient, Clock.system(AnalyticsPeriod.ZONE));
     }
 
+    /** Constructor cho phép tiêm đồng hồ, dùng để cố định thời điểm hiện tại khi kiểm thử. */
     EventAnalyticsService(EventRepository eventRepository, EventViewLogRepository viewLogRepository,
                           BookingInternalServiceClient bookingClient, TicketServiceClient ticketClient, Clock clock) {
         this.eventRepository = eventRepository;
@@ -46,14 +49,25 @@ public class EventAnalyticsService {
         this.clock = clock;
     }
 
+    /** Thống kê của sự kiện theo cửa sổ trượt {@code timeRange}, không so sánh kỳ trước. */
     public EventAnalyticsResponse getEventAnalytics(String eventId, String timeRange) {
         return getEventAnalytics(eventId, timeRange, null, null, false);
     }
 
     /**
-     * from and to (whole days, to included) take the place of timeRange. compare adds the period of the same length that ends
-     * where this one starts. A source that cannot be read sets partial and is named in unavailableSources; its figures are then
-     * 0 and must not be shown as real zeros.
+     * Thống kê của sự kiện trong một khoảng thời gian: lượt xem, người xem riêng biệt, người mua, tỷ lệ chuyển đổi, doanh thu, vé bán, so với mục tiêu và theo từng ngày.
+     * {@code from} và {@code to} (ngày trọn vẹn, gồm cả ngày {@code to}) thay cho {@code timeRange}. {@code compare} thêm số liệu của
+     * khoảng cùng độ dài liền trước. Nguồn không đọc được sẽ đặt {@code partial} và được nêu trong {@code unavailableSources};
+     * số liệu của nguồn đó khi ấy là 0 và không được hiển thị như số 0 thật.
+     *
+     * @param eventId id sự kiện
+     * @param timeRange cửa sổ trượt {@code 24h}, {@code 7d} hoặc {@code 30d}
+     * @param from ngày bắt đầu, phải đi cùng {@code to}
+     * @param to ngày kết thúc
+     * @param compare true để kèm số liệu kỳ trước
+     * @return số liệu thống kê
+     * @throws ResponseStatusException 404 khi không có sự kiện
+     * @throws AnalyticsPeriod.InvalidPeriodException khi khoảng thời gian không hợp lệ
      */
     public EventAnalyticsResponse getEventAnalytics(String eventId, String timeRange, LocalDate from, LocalDate to, boolean compare) {
         eventRepository.findById(eventId)
@@ -98,8 +112,10 @@ public class EventAnalyticsService {
                 .build();
     }
 
+    /** Số lượt xem trong một khoảng: tổng lượt và số phiên khác nhau. */
     private record Views(long total, long unique) {}
 
+    /** Đếm lượt xem và số phiên khác nhau trong khoảng; lỗi truy vấn thì trả 0 và ghi nhận nguồn {@code views} không khả dụng. */
     private Views views(String eventId, AnalyticsPeriod period, List<String> unavailable) {
         try {
             return new Views(viewLogRepository.countViewsBetween(eventId, period.start(), period.end()),
@@ -111,7 +127,7 @@ public class EventAnalyticsService {
         }
     }
 
-    /** period null means the whole life of the event. Null result: booking-service could not answer. */
+    /** {@code period} null nghĩa là toàn bộ vòng đời của sự kiện. Kết quả null nghĩa là booking-service không trả lời được. */
     private BookingStatsResponse bookingStats(String eventId, AnalyticsPeriod period, List<String> unavailable) {
         try {
             BookingStatsResponse stats = period == null
@@ -126,6 +142,7 @@ public class EventAnalyticsService {
         }
     }
 
+    /** Tính số liệu của khoảng liền trước và phần trăm thay đổi so với hiện tại. Thay đổi về đơn hàng chỉ có khi cả hai kỳ đều đọc được booking-service. */
     private EventAnalyticsResponse.PreviousPeriod previous(String eventId, AnalyticsPeriod period, Views now,
                                                           BookingStatsResponse nowBooking, List<String> unavailable) {
         AnalyticsPeriod before = period.previous();
@@ -145,13 +162,13 @@ public class EventAnalyticsService {
                 .build();
     }
 
-    /** Percentage change against the previous value, one decimal; null when the previous value is 0 (no base to compare with). */
+    /** Phần trăm thay đổi so với giá trị trước, làm tròn một chữ số thập phân; null khi giá trị trước bằng 0 (không có gốc để so sánh). */
     static Double change(long current, long previous) {
         if (previous == 0) return null;
         return Math.round((current - previous) * 1000.0 / previous) / 10.0;
     }
 
-    /** Every day of the period, with the days that had no sales as zero. */
+    /** Đủ mọi ngày trong khoảng, những ngày không bán được vé được điền bằng 0. */
     private static List<EventAnalyticsResponse.DailyStat> fillDays(AnalyticsPeriod period, BookingStatsResponse stats) {
         Map<String, BookingStatsResponse.DailyStat> byDate = new HashMap<>();
         if (stats.getDailyStats() != null) {
@@ -167,8 +184,8 @@ public class EventAnalyticsService {
     }
 
     /**
-     * {tickets, revenue} the ticket types could sell in all. Ticket types of an event with showtimes are already one row per
-     * showtime, so each row is counted once (no multiplying by the number of showtimes).
+     * Trả về {@code {số vé, doanh thu}} mà các loại vé có thể bán tối đa. Loại vé của sự kiện có suất diễn đã là một dòng cho mỗi
+     * suất nên mỗi dòng chỉ tính một lần (không nhân với số suất). Không đọc được ticket-service thì trả {@code {0, 0}} và ghi nhận nguồn {@code tickets} không khả dụng.
      */
     private long[] targets(String eventId, List<String> unavailable) {
         long tickets = 0;
@@ -192,14 +209,17 @@ public class EventAnalyticsService {
         return new long[]{tickets, Math.round(revenue)};
     }
 
+    /** Làm tròn một giá trị số bất kỳ thành {@code long}; không phải số thì là 0. */
     private static long number(Object value) {
         return value instanceof Number n ? Math.round(n.doubleValue()) : 0;
     }
 
+    /** Định dạng thời điểm theo ISO, cắt tới mili giây, để gửi cho booking-service. */
     private static String iso(LocalDateTime time) {
         return time.truncatedTo(ChronoUnit.MILLIS).toString();
     }
 
+    /** Thêm tên nguồn dữ liệu vào danh sách không khả dụng nếu chưa có. */
     private static void addOnce(List<String> list, String name) {
         if (!list.contains(name)) list.add(name);
     }

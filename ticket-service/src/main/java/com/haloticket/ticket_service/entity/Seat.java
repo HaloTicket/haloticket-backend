@@ -5,6 +5,7 @@ import com.haloticket.ticket_service.enums.SeatType;
 import jakarta.persistence.*;
 import lombok.*;
 
+/** Một ghế trong hàng ghế (bảng {@code seats}): số ghế, tọa độ trên sơ đồ, loại ghế và trạng thái; có {@code version} để chống ghi đồng thời. */
 @Entity
 @Table(name = "seats")
 @Getter
@@ -44,6 +45,7 @@ public class Seat {
     @Version
     private Long version;
 
+    /** Khi lưu: mặc định ghế {@code AVAILABLE} và loại {@code REGULAR}. */
     @PrePersist
     protected void onCreate() {
         if (this.seatStatus == null) this.seatStatus = SeatStatus.AVAILABLE;

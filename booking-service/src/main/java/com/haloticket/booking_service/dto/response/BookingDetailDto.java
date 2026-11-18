@@ -7,6 +7,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** Chi tiết đơn dành cho ban tổ chức: thông tin khách, tổng tiền, trạng thái, phương thức thanh toán và các dòng vé. */
 @Data
 @Builder
 public class BookingDetailDto {

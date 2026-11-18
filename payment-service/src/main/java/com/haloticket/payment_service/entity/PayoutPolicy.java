@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Chính sách ứng trước chi trả mặc định (bảng {@code payout_policies}): tỷ lệ ứng, bật tắt, thời gian xử lý; có khóa phiên bản lạc quan. */
 @Entity @Table(name="payout_policies") @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class PayoutPolicy {
     @Id private String id;
@@ -15,5 +16,6 @@ public class PayoutPolicy {
     private String updatedBy;
     private String reason;
     private LocalDateTime updatedAt;
+    /** Trước khi lưu hoặc cập nhật: làm mới thời điểm cập nhật. */
     @PrePersist @PreUpdate void updateTimestamp() { updatedAt = LocalDateTime.now(); }
 }

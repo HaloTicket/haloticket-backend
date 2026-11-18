@@ -1,23 +1,23 @@
-"""Manual job: (re)build the event_vectors table used by the customer chat-search (RAG).
+"""Tác vụ chạy tay: (xây lại) bảng event_vectors dùng cho tìm kiếm của chat khách hàng (RAG).
 
-This is the ONLY way event_vectors is filled now (the Kafka consumer that used to do it was removed).
-Without a run, vector search has no data and chat-search relies on its keyword fallback.
+Đây là cách DUY NHẤT để điền event_vectors hiện nay (consumer Kafka từng làm việc này đã bị gỡ).
+Nếu không chạy, tìm kiếm vector không có dữ liệu và chat-search dùng cách dự phòng theo từ khóa.
 
-What it does: reads APPROVED events whose sale has not ended (event_db) with their showtimes (event_db) and ticket
-types (ticket_db), builds one JSON document per event, embeds it with the configured embedding model (needs
-GEMINI_API_KEY; this makes one embedding call per event) and upserts it into event_vectors (merge by id).
-Safe to re-run: existing rows are overwritten, nothing is deleted (rows of ended events stay until removed by hand).
+Việc nó làm: đọc các sự kiện APPROVED chưa hết bán vé (event_db) cùng suất diễn (event_db) và loại vé (ticket_db), dựng một
+tài liệu JSON cho mỗi sự kiện, nhúng bằng mô hình embedding đã cấu hình (cần GEMINI_API_KEY; mỗi sự kiện một lần gọi embedding)
+rồi upsert vào event_vectors (merge theo id). Chạy lại an toàn: dòng đã có bị ghi đè, không xóa gì (dòng của sự kiện đã kết thúc
+còn nguyên cho tới khi xóa tay).
 
-Required environment (no defaults on purpose; the script exits with a clear message when one is missing):
-  EVENT_DB_URL   SQLAlchemy URL of event_db,  e.g. postgresql+psycopg2://<user>:<password>@postgres:5432/event_db
-  TICKET_DB_URL  SQLAlchemy URL of ticket_db, e.g. postgresql+psycopg2://<user>:<password>@postgres:5432/ticket_db
-  GEMINI_API_KEY (read by the app settings) for the embedding model.
-The account needs write access to event_vectors in event_db and read access to the tables above. The ai-assistant
-container already has EVENT_DB_URL, TICKET_DB_URL and GEMINI_API_KEY from docker-compose.
+Biến môi trường bắt buộc (cố ý không có mặc định; script thoát kèm thông báo rõ khi thiếu):
+  EVENT_DB_URL   URL SQLAlchemy của event_db,  ví dụ postgresql+psycopg2://<user>:<password>@postgres:5432/event_db
+  TICKET_DB_URL  URL SQLAlchemy của ticket_db, ví dụ postgresql+psycopg2://<user>:<password>@postgres:5432/ticket_db
+  GEMINI_API_KEY (do cấu hình ứng dụng đọc) cho mô hình embedding.
+Tài khoản cần quyền ghi event_vectors trong event_db và quyền đọc các bảng trên. Container ai-assistant đã có sẵn
+EVENT_DB_URL, TICKET_DB_URL và GEMINI_API_KEY từ docker-compose.
 
-Run inside the container (from /app):
+Chạy trong container (từ /app):
   docker exec -it haloticket-ai-assistant python sync_to_vectordb.py
-Run locally (from ai-assistant-service/, with the venv active and the variables exported):
+Chạy trên máy (từ ai-assistant-service/, đã bật venv và export các biến):
   python sync_to_vectordb.py
 """
 import os
@@ -28,6 +28,11 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 def _require_env(name):
+    """Đọc một biến môi trường bắt buộc.
+
+    Raises:
+        SystemExit: khi biến chưa đặt hoặc rỗng, kèm hướng dẫn đặt EVENT_DB_URL và TICKET_DB_URL.
+    """
     value = os.getenv(name, "").strip()
     if not value:
         sys.exit(
@@ -38,7 +43,7 @@ def _require_env(name):
     return value
 
 
-if __name__ == "__main__":  # fail fast, before the app imports
+if __name__ == "__main__":  # thoát sớm khi thiếu cấu hình, trước khi nạp các module của ứng dụng
     _require_env("EVENT_DB_URL")
     _require_env("TICKET_DB_URL")
 
@@ -48,6 +53,9 @@ from app.services.ai.rag_engine import rag_engine
 
 
 def sync_events_to_vectordb():
+    """Đồng bộ sự kiện sang bảng vector: đọc các sự kiện APPROVED chưa hết bán vé cùng suất diễn và loại vé, nhúng JSON mô tả thành vector rồi merge vào event_vectors.
+    Lỗi được in ra và giao dịch bị rollback (không ném tiếp).
+    """
     EVENT_DB_URL = _require_env("EVENT_DB_URL")
     TICKET_DB_URL = _require_env("TICKET_DB_URL")
     print("Connecting to Event DB and Ticket DB...")
@@ -60,7 +68,7 @@ def sync_events_to_vectordb():
     ticket_session = TicketSession()
 
     try:
-        # fetch events that are approved and not ended (or sale_end_time is null or in the future)
+        # lấy các sự kiện đã duyệt và chưa hết bán vé (sale_end_time rỗng hoặc ở tương lai)
         events_query = text("""
             SELECT id, title, description, location_name, city, dates_summary, min_price, banner_url, start_time, end_time, sale_start_time, sale_end_time
             FROM events
@@ -74,15 +82,15 @@ def sync_events_to_vectordb():
             event_id = event.id
             title = event.title
             
-            # Fetch showtimes
+            # lấy các suất diễn
             showtimes_query = text("SELECT id, name, start_time, end_time FROM event_showtimes WHERE event_id = :event_id")
             showtimes = event_session.execute(showtimes_query, {"event_id": event_id}).fetchall()
             
-            # fetch ticket types
+            # lấy các loại vé
             tickets_query = text("SELECT name, price, ticket_type_status, total_quantity FROM ticket_types WHERE event_id = :event_id")
             tickets = ticket_session.execute(tickets_query, {"event_id": event_id}).fetchall()
 
-            # build detailed rich text
+            # dựng nội dung chi tiết cho sự kiện
             content_dict = {
                 "event_id": event_id,
                 "title": title,
@@ -101,7 +109,7 @@ def sync_events_to_vectordb():
             
             vector = rag_engine.embeddings.embed_query(content_json)
             
-            # store JSON string as content!
+            # lưu chuỗi JSON làm nội dung
             db_event = EventVector(id=event_id, event_id=event_id, content=content_json, embedding=vector)
             event_session.merge(db_event)
             

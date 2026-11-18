@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Set;
 
+/** API quản trị người dùng ({@code /api/users/admin}), chỉ vai trò ADMIN được gọi: danh sách, thống kê, nhật ký, chi tiết, tạo tài khoản, đổi trạng thái và vai trò. */
 @RestController
 @RequestMapping("/api/users/admin")
 @PreAuthorize("hasRole('ADMIN')")
@@ -31,6 +32,19 @@ public class AdminUserController {
     private final UserService userService;
     private final AdminUserManagementService management;
 
+    /**
+     * Danh sách người dùng có lọc và phân trang. Trang đánh số từ 1; sắp xếp mặc định theo ngày tạo mới nhất,
+     * {@code oldest} theo ngày tạo cũ nhất, {@code name} theo họ tên.
+     *
+     * @param query từ khóa tìm kiếm
+     * @param status lọc theo trạng thái ({@code ALL} là tất cả)
+     * @param ekycStatus lọc theo trạng thái eKYC
+     * @param role lọc theo vai trò
+     * @param sort kiểu sắp xếp
+     * @param page số trang, bắt đầu từ 1
+     * @param size số dòng mỗi trang
+     * @return trang người dùng
+     */
     @GetMapping
     public ResponseEntity<Page<AdminUserListItem>> getUsers(
             @RequestParam(defaultValue = "") String query,
@@ -52,13 +66,13 @@ public class AdminUserController {
         return ResponseEntity.ok(userService.getAdminUsers(query, status, ekycStatus, role, pageRequest));
     }
 
-    /** Head counts by role and status, so the page needs one request instead of one list request per role. */
+    /** Số lượng người dùng theo vai trò và trạng thái, để trang chỉ cần một yêu cầu thay vì một yêu cầu danh sách cho mỗi vai trò. */
     @GetMapping("/stats")
     public ResponseEntity<AdminUserStatsResponse> stats() {
         return ResponseEntity.ok(management.stats());
     }
 
-    /** Who changed which account and how, newest first. */
+    /** Nhật ký quản trị: ai đã đổi tài khoản nào và đổi gì, mới nhất trước; kích thước trang giữ trong khoảng 1 đến 100. */
     @GetMapping("/audit")
     public ResponseEntity<Page<AdminAuditItem>> audit(@RequestParam(defaultValue = "1") int page,
                                                       @RequestParam(defaultValue = "20") int size) {
@@ -67,18 +81,33 @@ public class AdminUserController {
         return ResponseEntity.ok(management.auditLog(pageRequest));
     }
 
+    /** Chi tiết một người dùng theo mã. */
     @GetMapping("/{id}")
     public ResponseEntity<AdminUserDetailResponse> getUserDetail(@PathVariable String id) {
         return ResponseEntity.ok(userService.getAdminUserDetail(id));
     }
 
-    /** Opens an account for somebody else; the person sets a password through the password-reset flow. */
+    /**
+     * Mở tài khoản cho người khác; người đó tự đặt mật khẩu qua luồng quên mật khẩu.
+     *
+     * @param admin JWT của quản trị viên thực hiện
+     * @param request thông tin tài khoản mới
+     * @return tài khoản vừa tạo với mã 201
+     */
     @PostMapping
     public ResponseEntity<AdminUserListItem> createUser(@AuthenticationPrincipal Jwt admin,
                                                         @RequestBody AdminUserCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(management.createUser(admin, request));
     }
 
+    /**
+     * Đổi trạng thái tài khoản.
+     *
+     * @param admin JWT của quản trị viên thực hiện
+     * @param id mã người dùng
+     * @param status trạng thái mới
+     * @param reason lý do (không bắt buộc)
+     */
     @PutMapping("/{id}/status")
     public ResponseEntity<Void> updateUserStatus(@AuthenticationPrincipal Jwt admin, @PathVariable String id,
                                                  @RequestParam UserStatus status,
@@ -87,6 +116,13 @@ public class AdminUserController {
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * Thay tập vai trò của người dùng.
+     *
+     * @param admin JWT của quản trị viên thực hiện
+     * @param id mã người dùng
+     * @param roles tập vai trò mới
+     */
     @PutMapping("/{id}/roles")
     public ResponseEntity<Void> updateUserRoles(@AuthenticationPrincipal Jwt admin, @PathVariable String id,
                                                 @RequestBody Set<Role> roles) {

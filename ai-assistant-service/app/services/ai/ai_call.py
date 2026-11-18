@@ -1,10 +1,10 @@
-"""Bounded, metered model calls for the routes in scope (agent-chat keeps using llm_factory untouched).
+"""Lệnh gọi mô hình có giới hạn và có đo lường cho các route thuộc phạm vi (agent-chat vẫn dùng llm_factory, không bị đụng tới).
 
-- at most 2 providers per call, tried one after the other (Groq, then OpenAI, then Gemini; first two configured)
-- a hard total deadline per call (bounded thread pool + future.result(timeout)); a thread that outlives its deadline
-  cannot be killed, so each client also gets its own timeout slightly below the deadline
-- max_tokens from the profile; models are built lazily and cached (nothing happens at import)
-- every attempt is metered through usage.record (never raises) and kept in an in-memory ring for provider_status()
+- tối đa 2 nhà cung cấp cho mỗi lệnh gọi, thử lần lượt (Groq, rồi OpenAI, rồi Gemini; lấy hai nhà đầu tiên đã cấu hình)
+- hạn chót tổng cứng cho mỗi lệnh gọi (thread pool có giới hạn + `future.result(timeout)`); luồng chạy quá hạn
+  không thể bị hủy, nên mỗi client cũng có timeout riêng thấp hơn hạn chót một chút
+- `max_tokens` lấy từ profile; mô hình được tạo lười và lưu đệm (không làm gì lúc import)
+- mọi lần thử đều được đo qua `usage.record` (không bao giờ ném lỗi) và giữ trong vòng đệm bộ nhớ cho `provider_status()`
 """
 import logging
 import threading
@@ -26,24 +26,26 @@ from app.services.ai import usage
 
 log = logging.getLogger("ai.call")
 
-_PLACEHOLDER_KEY = "your-default-key-if-missing"  # default of settings.gemini_api_key, not a real key
+_PLACEHOLDER_KEY = "your-default-key-if-missing"  # giá trị mặc định của settings.gemini_api_key, không phải khóa thật
 PROVIDERS = ("groq", "openai", "gemini")
 MAX_PROVIDERS_PER_CALL = 2
 _RING_WINDOW_SECONDS = 24 * 3600
 
-# profiles that count against the global daily budget (customer-facing chat)
+# các profile bị tính vào ngân sách ngày chung (chat hướng tới khách hàng)
 BUDGETED_PROFILES = frozenset({"customer_chat"})
 
 
 @dataclass(frozen=True)
 class AiProfile:
+    """Hồ sơ một loại lệnh gọi mô hình: tên, tầng mô hình (`fast` hoặc `smart`), số token tối đa và hạn chót tính bằng giây."""
     name: str
-    tier: str  # 'fast' | 'smart'
+    tier: str  # một trong 'fast' | 'smart' (tầng mô hình)
     max_tokens: int
     deadline_s: int
 
 
 def _build_profiles() -> dict:
+    """Dựng các profile gọi mô hình từ cấu hình giới hạn token và hạn chót."""
     d = settings.ai_llm_deadline_seconds
     return {
         "customer_chat": AiProfile("customer_chat", "fast", settings.ai_max_tokens_customer_chat, d),
@@ -59,16 +61,17 @@ def _build_profiles() -> dict:
 
 PROFILES: dict = _build_profiles()
 
-# plumbing
+# Phần hạ tầng nội bộ
 _executor = None
 _executor_lock = threading.Lock()
 _models: dict = {}
 _models_lock = threading.Lock()
-_ring: dict = {name: deque(maxlen=500) for name in PROVIDERS}  # (ts, ok, error_code)
+_ring: dict = {name: deque(maxlen=500) for name in PROVIDERS}  # mỗi phần tử là (thời điểm, thành công, mã lỗi)
 _ring_lock = threading.Lock()
 
 
 def _get_executor() -> ThreadPoolExecutor:
+    """Thread pool dùng chung (tối đa 8 luồng), tạo lười ở lần dùng đầu."""
     global _executor
     with _executor_lock:
         if _executor is None:
@@ -77,11 +80,12 @@ def _get_executor() -> ThreadPoolExecutor:
 
 
 def _split_keys(value: str) -> list:
+    """Tách chuỗi nhiều khóa API ngăn cách bằng dấu phẩy thành danh sách, bỏ khoảng trắng và mục rỗng."""
     return [k.strip() for k in (value or "").split(",") if k.strip()]
 
 
 def _candidates(tier: str) -> list:
-    """Ordered (provider, model, temperature, key) for the tier; the first MAX_PROVIDERS_PER_CALL are used."""
+    """Danh sách có thứ tự `(nhà cung cấp, mô hình, nhiệt độ, khóa)` cho tầng; chỉ dùng `MAX_PROVIDERS_PER_CALL` mục đầu."""
     smart = tier == "smart"
     temp = 0.0 if smart else 0.2
     out = []
@@ -100,19 +104,21 @@ RECENT_FAILURE_SECONDS = 120
 
 
 def _healthy_first(candidates: list) -> list:
-    """A provider whose last two outcomes were both failures within the last two minutes (quota exhausted, rate limited, down) goes
-    to the end, so the next one is tried instead of calling it again. Order is otherwise unchanged; nothing is ever dropped."""
+    """Nhà cung cấp có hai kết quả gần nhất đều thất bại trong hai phút qua (hết quota, bị giới hạn, ngừng hoạt động) bị đẩy xuống cuối,
+    để thử nhà kế tiếp thay vì gọi lại. Thứ tự còn lại giữ nguyên; không có nhà nào bị loại bỏ."""
     now = time.time()
 
     def failing(provider: str) -> bool:
+        """Cho biết nhà cung cấp có hai lần thử gần nhất cùng thất bại trong `RECENT_FAILURE_SECONDS` giây hay không."""
         with _ring_lock:
             last = list(_ring[provider])[-2:]
         return len(last) == 2 and all(not ok and now - ts < RECENT_FAILURE_SECONDS for ts, ok, _code in last)
 
-    return sorted(candidates, key=lambda c: failing(c[0]))  # sorted is stable: False (healthy) first
+    return sorted(candidates, key=lambda c: failing(c[0]))  # sorted ổn định: False (khỏe) xếp trước
 
 
 def _model_for(provider: str, model: str, temp: float, key: str, max_tokens: int, timeout: float):
+    """Mô hình chat của nhà cung cấp, tạo lười và lưu đệm theo bộ tham số."""
     cache_key = (provider, model, temp, hash(key), max_tokens, timeout)
     with _models_lock:
         cached = _models.get(cache_key)
@@ -120,7 +126,7 @@ def _model_for(provider: str, model: str, temp: float, key: str, max_tokens: int
             return cached
         if provider == "groq":
             extra = {"reasoning_effort": "low"} if "gpt-oss" in model else {}
-            # a reasoning model spends max_tokens on its thinking first: at the default effort a short answer can come back empty
+            # mô hình suy luận tiêu token vào phần suy nghĩ trước: ở mức mặc định, câu trả lời ngắn có thể bị rỗng
             built = ChatGroq(api_key=key, model=model, temperature=temp, timeout=timeout, max_retries=1, max_tokens=max_tokens, **extra)
         elif provider == "openai":
             built = ChatOpenAI(api_key=key, model=model, temperature=temp, timeout=timeout, max_retries=1, max_tokens=max_tokens)
@@ -132,6 +138,7 @@ def _model_for(provider: str, model: str, temp: float, key: str, max_tokens: int
 
 
 def _content_text(message) -> str:
+    """Văn bản của một phản hồi, ghép các phần nếu nội dung là danh sách; chuỗi rỗng nếu không có."""
     content = getattr(message, "content", message)
     if isinstance(content, str):
         return content
@@ -147,12 +154,14 @@ def _content_text(message) -> str:
 
 
 def _is_empty(message) -> bool:
+    """Phản hồi được coi là rỗng khi không có lệnh gọi công cụ và văn bản chỉ gồm khoảng trắng."""
     if getattr(message, "tool_calls", None):
         return False
     return not _content_text(message).strip()
 
 
 def _chars_of(messages) -> int:
+    """Tổng số ký tự của các tin nhắn đầu vào, dùng để ước lượng token khi nhà cung cấp không báo."""
     if isinstance(messages, str):
         return len(messages)
     total = 0
@@ -165,6 +174,7 @@ def _chars_of(messages) -> int:
 
 
 def _tokens(response, messages):
+    """Trả `(token vào, token ra, ước lượng)`; dùng số liệu của nhà cung cấp nếu có, nếu không ước lượng bằng số ký tự chia 4."""
     meta = getattr(response, "usage_metadata", None)
     if isinstance(meta, dict) and (meta.get("input_tokens") is not None or meta.get("output_tokens") is not None):
         return meta.get("input_tokens"), meta.get("output_tokens"), False
@@ -172,21 +182,24 @@ def _tokens(response, messages):
 
 
 def _note(provider: str, ok: bool, error_code: Optional[str]) -> None:
+    """Ghi kết quả một lần thử vào vòng đệm của nhà cung cấp."""
     with _ring_lock:
         _ring[provider].append((time.time(), ok, error_code))
 
 
 def _code_of(failure: BaseException) -> str:
+    """Mã lỗi ngắn của một lần thử thất bại: `TIMEOUT` hoặc tên kiểu ngoại lệ (không lộ nội dung lỗi)."""
     if isinstance(failure, FutureTimeout):
         return "TIMEOUT"
     return type(failure).__name__[:60]
 
 
-# public API
+# API công khai
 def ai_invoke(profile: str, messages, *, actor: Optional[str] = None, tools: Optional[list] = None,
               tier: Optional[str] = None):
-    """One bounded model call. Returns the LangChain AIMessage; raises AiError (AI_UNAVAILABLE / AI_GENERATION_FAILED /
-    AI_BUDGET_EXHAUSTED). `messages` is whatever the chat models accept (list of messages or a string)."""
+    """Một lệnh gọi mô hình có giới hạn. Trả về AIMessage của LangChain; ném AiError (AI_UNAVAILABLE / AI_GENERATION_FAILED /
+    AI_BUDGET_EXHAUSTED). `messages` là bất cứ thứ gì mô hình chat nhận (danh sách tin nhắn hoặc chuỗi).
+    Thử lần lượt các nhà cung cấp trong hạn chót của profile; mỗi lần thử đều được ghi nhận."""
     prof = PROFILES.get(profile)
     if prof is None:
         raise ValueError(f"unknown AI profile: {profile}")
@@ -208,7 +221,7 @@ def ai_invoke(profile: str, messages, *, actor: Optional[str] = None, tools: Opt
         if remaining <= 0:
             break
         attempts += 1
-        share = remaining / (len(candidates) - index)  # the second provider keeps its share of the budget
+        share = remaining / (len(candidates) - index)  # nhà cung cấp thứ hai vẫn giữ phần thời gian của mình
         t0 = time.monotonic()
         error_code = None
         response = None
@@ -220,7 +233,7 @@ def ai_invoke(profile: str, messages, *, actor: Optional[str] = None, tools: Opt
             response = future.result(timeout=share)
             if _is_empty(response):
                 error_code = "EMPTY_RESPONSE"
-        except BaseException as failure:  # includes the future timeout; never leaks to the caller as-is
+        except BaseException as failure:  # gồm cả timeout của future; không bao giờ lộ nguyên trạng ra cho nơi gọi
             if isinstance(failure, (KeyboardInterrupt, SystemExit)):
                 raise
             error_code = _code_of(failure)
@@ -242,21 +255,24 @@ def ai_invoke(profile: str, messages, *, actor: Optional[str] = None, tools: Opt
 
 
 class _MeteredLlm:
+    """Bao ngoài `ai_invoke` thành đối tượng có `.invoke(...)` để tiêm vào SQLEngine."""
     def __init__(self, profile: str, actor: Optional[str]):
+        """Gắn profile và định danh người gọi cho các lệnh gọi sau này."""
         self.profile = profile
         self.actor = actor
 
     def invoke(self, messages, **kwargs):
+        """Gọi mô hình qua `ai_invoke`; chỉ chuyển tiếp tham số `tools` nếu có."""
         return ai_invoke(self.profile, messages, actor=self.actor, tools=kwargs.get("tools"))
 
 
 def metered_llm(profile: str, actor: Optional[str] = None) -> _MeteredLlm:
-    """Object with .invoke(messages, **kwargs) that goes through ai_invoke (for injection into SQLEngine)."""
+    """Đối tượng có `.invoke(messages, **kwargs)` đi qua `ai_invoke` (để tiêm vào SQLEngine)."""
     return _MeteredLlm(profile, actor)
 
 
 def provider_status() -> list:
-    """Passive status per provider from in-memory outcomes of the last 24 h. No network, no keys in the result."""
+    """Trạng thái thụ động của từng nhà cung cấp, suy từ kết quả trong bộ nhớ của 24 giờ qua. Không gọi mạng, kết quả không chứa khóa."""
     configured = {
         "groq": bool(_split_keys(settings.groq_api_key)),
         "openai": bool(settings.openai_api_key),
@@ -287,6 +303,7 @@ def provider_status() -> list:
 
 
 def reset_for_tests() -> None:
+    """Xóa mô hình đã lưu đệm, vòng đệm kết quả và đóng thread pool; chỉ dùng trong kiểm thử."""
     global _executor
     with _models_lock:
         _models.clear()

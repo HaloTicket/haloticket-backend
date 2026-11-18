@@ -1,7 +1,8 @@
-"""RQ4: what each step of layer A contributes. RISK_SET=t2 python -m research.risk.rq4
+"""RQ4: từng bước của lớp A đóng góp gì. RISK_SET=t2 python -m research.risk.rq4
 
-C0 (rules only) and C1 (rules and signals) on the 500 cases of t2 in the four layer-A modes (run_configs --layer-a): full, without the
-prohibition-context test, without the decoding of veiled text, without both. One run per mode; no interval is computed."""
+C0 (chỉ luật) và C1 (luật và tín hiệu) trên 500 ca của t2 ở bốn chế độ lớp A (run_configs --layer-a): đầy đủ, bỏ phép kiểm tra
+ngữ cảnh cấm, bỏ phép giải mã chữ che, bỏ cả hai. Mỗi chế độ chạy một lần; không tính khoảng tin cậy.
+"""
 import glob
 import json
 
@@ -12,6 +13,11 @@ MODES = (("full", "Đầy đủ"), ("no_context", "Tắt ngữ cảnh cấm"), (
 
 
 def run_rows(config: str, mode: str) -> dict:
+    """Lấy các dòng kết quả mới nhất của một cấu hình ở một chế độ lớp A (một lần lặp, toàn bộ tập, chỉ trạng thái ok).
+
+    Raises:
+        SystemExit: khi không có kết quả phù hợp.
+    """
     pattern = "*_full.jsonl" if mode == "full" else f"*_{mode}.jsonl"
     for path in sorted(glob.glob(f"{RESULTS}/{config}/{pattern}"), reverse=True):
         with open(path, encoding="utf-8") as handle:
@@ -22,10 +28,12 @@ def run_rows(config: str, mode: str) -> dict:
 
 
 def pct(value: float) -> str:
+    """Định dạng một tỷ lệ (0 đến 1) thành phần trăm một chữ số thập phân, dùng dấu phẩy."""
     return f"{value * 100:.1f}%".replace(".", ",")
 
 
 def table() -> str:
+    """Dựng bảng Markdown: với mỗi chế độ, độ chính xác, macro F1, tỷ lệ HIGH thành LOW và báo sai HIGH của C0 và C1."""
     gold = {r["id"]: r["level"] for r in read_jsonl(GOLD_PATH)}
     lines = ["| Chế độ | C0 chính xác | C0 macro F1 | C0 HIGH thành LOW | C0 báo sai HIGH | C1 chính xác | C1 macro F1 | C1 HIGH thành LOW | C1 báo sai HIGH |",
              "|:--|:--|:--|:--|:--|:--|:--|:--|:--|"]

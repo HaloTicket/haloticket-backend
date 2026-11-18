@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.ToString;
 import java.time.LocalDateTime;
 
+/** Thông tin một lượt check-in của vé: vé, loại vé, vị trí ghế, trạng thái và thời điểm vào cửa. */
 @Data
 @Builder
 public class TicketCheckinDTO {
@@ -14,13 +15,13 @@ public class TicketCheckinDTO {
     private String qrCodeHash;
     private String seatName;
     private String ticketTypeName;
-    private String status; // checkin status
+    private String status; // trạng thái check-in
     private String code;
     private LocalDateTime checkedInAt;
     private String showtimeId;
     private String ownerId;
-    // the seat as separate fields (seatName above stays the Vietnamese sentence the app already shows)
-    private String ticketKind; // SEATED, STANDING or GENERAL (no seat)
+    // vị trí ghế tách thành các trường riêng (`seatName` ở trên vẫn là câu tiếng Việt mà ứng dụng đang hiển thị)
+    private String ticketKind; // SEATED, STANDING hoặc GENERAL (không có ghế)
     private String zone;
     private String row;
     private String seat;

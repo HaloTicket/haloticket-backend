@@ -4,6 +4,10 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/**
+ * Báo giá chi trả đã phát hành (bảng {@code payout_quotes}): số tiền yêu cầu, ảnh chụp chính sách và đối soát, hạn hiệu lực
+ * và cờ đã dùng để mỗi báo giá chỉ được dùng một lần.
+ */
 @Entity @Table(name = "payout_quotes") @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class PayoutQuote {
     @Id private String id;

@@ -16,6 +16,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Tích hợp ZaloPay: tạo đơn hàng lấy {@code order_url} và kiểm tra mac của callback. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -25,6 +26,15 @@ public class ZaloPayService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * Gọi API ZaloPay tạo đơn thanh toán, ký mac bằng key1. Mã giao dịch có dạng {@code yyMMdd_<bookingId>}.
+     *
+     * @param amount số tiền (VND)
+     * @param orderInfo mô tả đơn hàng; {@code null} thì dùng nội dung mặc định
+     * @param bookingId mã booking
+     * @return map gồm {@code paymentUrl} và {@code appTransId}
+     * @throws IllegalStateException khi ZaloPay lỗi hoặc không trả về {@code order_url}
+     */
     public Map<String, String> createPaymentUrl(long amount, String orderInfo, String bookingId) {
         String appTime = String.valueOf(System.currentTimeMillis());
         SimpleDateFormat sdf = new SimpleDateFormat("yyMMdd");
@@ -88,6 +98,13 @@ public class ZaloPayService {
         throw new IllegalStateException("ZaloPay did not create a payment URL");
     }
 
+    /**
+     * Kiểm tra mac của callback ZaloPay bằng key2 và so sánh không phân biệt hoa thường.
+     *
+     * @param data chuỗi dữ liệu callback
+     * @param requestMac mac do ZaloPay gửi
+     * @return {@code true} nếu hợp lệ; {@code false} nếu thiếu dữ liệu hoặc mac sai
+     */
     public boolean verifyCallback(String data, String requestMac) {
         if (data == null || requestMac == null) return false;
         String mac = HmacUtil.hmacSHA256(zaloPayConfig.getKey2(), data);

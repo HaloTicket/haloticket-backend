@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/** Yêu cầu lưu hoặc xuất bản sơ đồ ghế của sự kiện, gồm dữ liệu SVG, ảnh nền và các khu vực. */
 @Data
 @Builder
 @NoArgsConstructor
@@ -16,9 +17,10 @@ public class SeatLayoutRequest {
     private String draftJson;
     private String svgData;
     private String imageUrl;
-    private String status; // DRAFT or PUBLISHED
+    private String status; // DRAFT hoặc PUBLISHED
     private List<ZoneDto> zones;
 
+    /** Một khu vực trên sơ đồ ghế: hình dạng, vị trí, màu sắc, sức chứa và loại vé gắn với khu vực. */
     @Data
     @Builder
     @NoArgsConstructor
@@ -27,7 +29,7 @@ public class SeatLayoutRequest {
         private String id;
         private String name;
         private String ticketTypeId;
-        private String shapeType; // RECTANGLE, CIRCLE, POLYGON, PATH_CURVED
+        private String shapeType; // hình dạng: RECTANGLE, CIRCLE, POLYGON, PATH_CURVED
         private String colorCode;
         private String fillColor;
         private String strokeColor;

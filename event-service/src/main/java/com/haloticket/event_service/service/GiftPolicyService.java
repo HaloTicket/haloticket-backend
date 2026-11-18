@@ -11,18 +11,33 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.util.Set;
 
+/** Quản lý chính sách tặng vé của sự kiện: đọc, tạo hoặc cập nhật, kèm kiểm tra hợp lệ, khóa phiên bản lạc quan và ghi nhật ký kiểm toán. */
 @Service @RequiredArgsConstructor
 public class GiftPolicyService {
     private final GiftPolicyRepository repository;
     private final EventAccessService access;
     private final TransferPolicySupport support;
 
+    /**
+     * Lấy chính sách tặng vé của sự kiện.
+     * @param eventId id sự kiện
+     * @return chính sách hiện hành
+     * @throws ResponseStatusException 404 {@code POLICY_NOT_CONFIGURED} khi sự kiện chưa cấu hình chính sách
+     */
     @Transactional(readOnly = true)
     public GiftPolicyResponse get(String eventId) {
         return repository.findByEventId(eventId).map(GiftPolicyResponse::from)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POLICY_NOT_CONFIGURED"));
     }
 
+    /**
+     * Tạo mới hoặc cập nhật chính sách tặng vé. Yêu cầu quyền ghi, kiểm tra {@code maxGiftCount} trong 0..100 và thời hạn lời mời 1..168 giờ (mặc định 24), đối chiếu {@code expectedVersion} với phiên bản hiện có, rồi ghi nhật ký kiểm toán và outbox.
+     * @param eventId id sự kiện
+     * @param request nội dung chính sách mới
+     * @param authorization header Authorization của request
+     * @return chính sách sau khi lưu
+     * @throws ResponseStatusException 422 {@code INVALID_POLICY} khi dữ liệu sai, 409 {@code POLICY_CHANGED} khi phiên bản đã đổi
+     */
     @Transactional
     public GiftPolicyResponse upsert(String eventId, GiftPolicyRequest request, String authorization) {
         String actor = access.requireWrite(eventId, authorization);

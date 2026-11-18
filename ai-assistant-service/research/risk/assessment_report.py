@@ -1,9 +1,9 @@
-"""Metrics of the study, from the result files of run_configs and the gold labels:
+"""Các chỉ số của nghiên cứu, tính từ tệp kết quả của run_configs và nhãn vàng:
 python -m research.risk.assessment_report --split dev [--configs C0,C1,C4,C5] [--reference C5] [--out report.md]
 
-Reads the latest result file of each configuration (for the chosen --layer-a), joins it with gold.jsonl, keeps the cases of the
-split, and prints Markdown tables. A case whose run failed is counted as failed and left out of every metric. Results made
-with --llm fake are refused unless --allow-fake (they are not a measurement)."""
+Đọc tệp kết quả mới nhất của mỗi cấu hình (theo --layer-a đã chọn), ghép với gold.jsonl, giữ các ca thuộc
+phần chia (split) và in các bảng Markdown. Ca mà lần chạy thất bại được tính là thất bại và bị loại khỏi mọi chỉ số. Kết quả tạo
+bằng --llm fake bị từ chối trừ khi có --allow-fake (đó không phải phép đo)."""
 import argparse
 import json
 import os
@@ -15,15 +15,18 @@ ALL_CONFIGS = ("C0", "C1", "C2", "C3", "C4", "C5")
 
 
 def pct(value: float) -> str:
+    """Định dạng một tỷ lệ 0..1 thành phần trăm với một chữ số thập phân."""
     return f"{100 * value:.1f}%"
 
 
 def with_ci(successes: int, n: int) -> str:
+    """Định dạng tỷ lệ successes/n kèm khoảng tin cậy Wilson; hiện dấu - khi n = 0."""
     low, high = wilson(successes, n)
     return f"{pct(successes / n) if n else '-'} [{pct(low)}, {pct(high)}]"
 
 
 def latest_run(config: str, layer_a: str, allow_fake: bool):
+    """Tệp kết quả mới nhất của một cấu hình theo chế độ lớp A: trả (header, các dòng) hoặc None. Bỏ qua bản fake (trừ khi allow_fake) và bản chạy thử có limit."""
     folder = os.path.join(RESULTS, config)
     if not os.path.isdir(folder):
         return None
@@ -37,12 +40,13 @@ def latest_run(config: str, layer_a: str, allow_fake: bool):
         if header.get("llm") == "fake" and not allow_fake:
             continue
         if header.get("limit"):
-            continue  # a smoke run is not a result
+            continue  # bản chạy thử không phải là kết quả
         return header, rows[1:]
     return None
 
 
 def level_metrics(gold: list, pred: list) -> dict:
+    """Chỉ số theo mức rủi ro: tp/fp/fn/precision-recall-F1 từng mức, macro F1, ma trận nhầm lẫn, số HIGH bị bỏ sót (và bị xuống LOW) và số báo sai HIGH."""
     n = len(gold)
     per_level = {}
     for level in LEVELS:
@@ -62,6 +66,7 @@ def level_metrics(gold: list, pred: list) -> dict:
 
 
 def code_metrics(gold_codes: list, pred_codes: list) -> dict:
+    """Với mỗi mã vi phạm, trả (số ca thật, precision, recall, F1) so giữa mã của nhãn vàng và mã dự đoán."""
     out = {}
     for code in CODES:
         tp = sum(1 for g, p in zip(gold_codes, pred_codes) if code in g and code in p)
@@ -72,7 +77,7 @@ def code_metrics(gold_codes: list, pred_codes: list) -> dict:
 
 
 def stability(rows: list) -> dict:
-    """Across repeats of the same case: mean SD of the score, and the share of cases whose level is not the same every time."""
+    """Trên các lần chạy lặp của cùng một ca: độ lệch chuẩn trung bình của điểm, và số ca mà mức không giống nhau ở mọi lần."""
     by_case = {}
     for row in rows:
         by_case.setdefault(row["id"], []).append(row)
@@ -87,6 +92,7 @@ def stability(rows: list) -> dict:
 
 
 def select_ids(split: str, gold_ids: set) -> set:
+    """Tập id ca thuộc phần chia đã chọn (dev, test hoặc all); thoát với lỗi nếu chưa dựng split.json."""
     if split == "all":
         return gold_ids
     if not os.path.exists(SPLIT_PATH):
@@ -96,6 +102,7 @@ def select_ids(split: str, gold_ids: set) -> set:
 
 
 def build_report(split: str, configs: list, layer_a: str, reference: str, allow_fake: bool) -> str:
+    """Dựng báo cáo Markdown: mức rủi ro, precision/recall/F1, ma trận nhầm lẫn, theo mã vi phạm, lớp mô hình, độ ổn định và so sánh cặp McNemar với cấu hình tham chiếu."""
     gold = {row["id"]: row for row in read_jsonl(GOLD_PATH)}
     if not gold:
         raise SystemExit(f"{GOLD_PATH} is empty or missing: label the cases and build the gold first")
@@ -184,6 +191,7 @@ def build_report(split: str, configs: list, layer_a: str, reference: str, allow_
 
 
 def main() -> None:
+    """Điểm vào dòng lệnh: dựng báo cáo, ghi ra tệp --out (nếu có) và in ra màn hình."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--split", choices=("dev", "test", "all"), default="dev")
     parser.add_argument("--configs", default=",".join(ALL_CONFIGS))

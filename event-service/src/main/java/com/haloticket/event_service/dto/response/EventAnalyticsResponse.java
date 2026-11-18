@@ -5,9 +5,9 @@ import lombok.Data;
 import java.util.List;
 
 /**
- * Figures of one event. Money is whole VND. pageViews, uniqueUsers, buyers, periodRevenue, periodTicketsSold and
- * conversionRate cover the requested period; currentTicketsSold and currentRevenue are for the whole life of the event
- * (they are what the sales targets are compared with).
+ * Số liệu phân tích của một sự kiện. Tiền tính bằng đồng (VND), số nguyên. {@code pageViews}, {@code uniqueUsers}, {@code buyers}, {@code periodRevenue},
+ * {@code periodTicketsSold} và {@code conversionRate} tính theo kỳ được yêu cầu; {@code currentTicketsSold} và {@code currentRevenue} tính cho cả vòng đời sự kiện
+ * (đó là số dùng để so với các mục tiêu bán hàng).
  */
 @Data
 @Builder
@@ -21,25 +21,26 @@ public class EventAnalyticsResponse {
     private long totalRevenueTarget;
     private double conversionRate;
 
-    /** The period the period figures cover: dates in the platform zone, periodTo is the last included day. */
+    /** Kỳ mà các số liệu theo kỳ bao phủ: ngày theo múi giờ của nền tảng, {@code periodTo} là ngày cuối cùng được tính. */
     private String periodFrom;
     private String periodTo;
     private long periodRevenue;
     private long periodTicketsSold;
 
-    /** The period of the same length that ended where this one starts; null when the comparison was not asked for. */
+    /** Kỳ có cùng độ dài, kết thúc ngay tại điểm kỳ hiện tại bắt đầu; {@code null} khi không yêu cầu so sánh. */
     private PreviousPeriod previous;
 
-    /** Revenue and tickets per day over the period, every day present (zero when nothing was sold). */
+    /** Doanh thu và số vé theo từng ngày trong kỳ, ngày nào cũng có mặt (bằng 0 khi không bán được gì). */
     private List<DailyStat> dailyStats;
 
-    /** True when a source could not be read; unavailableSources names them (booking, tickets, views). */
+    /** {@code true} khi có nguồn dữ liệu không đọc được; {@code unavailableSources} liệt kê tên các nguồn đó (booking, tickets, views). */
     private boolean partial;
     private List<String> unavailableSources;
 
-    /** Kept for older clients: the same days as dailyStats, revenue and tickets as plain numbers (not percentages). */
+    /** Giữ lại cho client cũ: cùng các ngày như {@code dailyStats}, nhưng doanh thu và số vé là số thuần (không phải phần trăm). */
     private List<DailyMetric> growthMetrics;
 
+    /** Một điểm của chuỗi {@code growthMetrics} dành cho client cũ: nhãn ngày, doanh thu và số vé. */
     @Data
     @Builder
     public static class DailyMetric {
@@ -48,6 +49,7 @@ public class EventAnalyticsResponse {
         private double ticketsPercent;
     }
 
+    /** Doanh thu và số vé bán được trong một ngày. */
     @Data
     @Builder
     public static class DailyStat {
@@ -56,7 +58,7 @@ public class EventAnalyticsResponse {
         private long ticketsSold;
     }
 
-    /** change* are percentages against the previous period, null when the previous value is 0. */
+    /** Các trường {@code change*} là phần trăm thay đổi so với kỳ trước, {@code null} khi giá trị kỳ trước bằng 0. Lớp này chứa số liệu của kỳ trước. */
     @Data
     @Builder
     public static class PreviousPeriod {

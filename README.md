@@ -1,166 +1,164 @@
-# HaloTicket Backend Microservices
+# HaloTicket Backend
 
-Backend microservices and Docker infrastructure for the **HaloTicket** event ticketing platform.
+Hệ thống backend microservice và hạ tầng Docker cho nền tảng bán vé sự kiện **HaloTicket**.
 
----
+## Kiến trúc và cấu trúc thư mục
 
-## 🏛️ Architecture & Directory Structure
-
-```bash
+```text
 haloticket-backend/
-├── api-gateway/               # Central API Entrypoint & Security Filter (Port 8888)
-├── discovery-server/          # Netflix Eureka Service Registry (Port 8761)
-├── user-service/              # Authentication, Profiles, OTP, Keycloak Broker (Port 8081)
-├── event-service/             # Events, Categories, Search Analytics (Port 8082)
-├── ticket-service/            # Ticket Inventory & Pricing Rules (Port 8083)
-├── booking-service/           # Order Checkout & Ticket Reservation (Port 8084)
-├── payment-service/           # Payment Processing & Gateway Integration (Port 8085)
-├── notification-service/      # Email Delivery & Kafka OTP Consumer (Port 8086)
-├── media-service/             # Image Upload & Asset Storage (Port 8087)
-├── ai-assistant-service/      # AI chatbot & assistants, FastAPI (Port 8089)
-├── haloticket-infrastructure/ # PostgreSQL Init Scripts, Keycloak Realm & Themes
-├── docker-compose.yml         # Single unified Compose specification for all 13 containers
-├── Dockerfile                 # Multi-stage build using Eclipse Temurin 21 JRE Alpine
-├── .env                       # Local environment secrets (ignored by Git)
-├── .env.example               # Template environment configuration
-└── README.md                  # Project documentation
+├── api-gateway/               # Cổng API trung tâm, lọc bảo mật (cổng 8888)
+├── discovery-server/          # Eureka Service Registry (cổng 8761)
+├── user-service/              # Xác thực, hồ sơ, OTP, đồng bộ Keycloak (cổng 8081)
+├── event-service/             # Sự kiện, danh mục, địa điểm, phân tích tìm kiếm (cổng 8082)
+├── ticket-service/            # Kho vé, hạng vé, quy tắc giá, check-in (cổng 8083)
+├── booking-service/           # Đặt vé, giữ chỗ, voucher (cổng 8084)
+├── payment-service/           # Thanh toán và tích hợp cổng thanh toán (cổng 8085)
+├── notification-service/      # Gửi email, nhận OTP từ Kafka (cổng 8086)
+├── media-service/             # Tải ảnh lên và lưu trữ S3 (cổng 8087)
+├── marketplace-service/       # Chợ bán lại vé
+├── ai-assistant-service/      # Chatbot và trợ lý AI, FastAPI (cổng 8089)
+├── haloticket-infrastructure/ # Script khởi tạo PostgreSQL, realm và theme Keycloak
+├── docker-compose.yml         # Khai báo Compose cho toàn bộ container
+├── Dockerfile                 # Build nhiều tầng trên Eclipse Temurin 21 JRE Alpine
+├── .env.example               # Mẫu biến môi trường
+└── DEPLOYMENT.md              # Hướng dẫn triển khai lên máy chủ
 ```
 
-### Components & Services
+## Công nghệ
 
-- **API Gateway** (Port `8888`) — Central reverse proxy and security filter routing all `/api/**` requests.
-- **Discovery Server** (Port `8761`) — Netflix Eureka service registry for internal service discovery.
-- **User Service** (Port `8081`) — User accounts, authentication, OTP challenge, and Keycloak synchronization.
-- **Event Service** (Port `8082`) — Events, categories, organizers, and search analytics.
-- **Ticket Service** (Port `8083`) — Ticket inventory, seating tiers, and pricing rules.
-- **Booking Service** (Port `8084`) — Order checkout, ticket hold, and reservation workflows.
-- **Payment Service** (Port `8085`) — Payment processing and transaction verification.
-- **Notification Service** (Port `8086`) — Transactional emails and Kafka OTP consumer.
-- **Media Service** (Port `8087`) — Image upload, asset storage, and S3 integration.
-- **AI Assistant Service** (Port `8089`) — FastAPI service for the customer chatbot and AI search, organizer and admin assistants (Groq, OpenAI, Gemini). Rate limited per IP/account via Redis; usage metered in the `ai_ops` database.
-- **Keycloak IAM** (Port `9080`) — Identity provider, OAuth2/OIDC, Google login, and role management.
-- **PostgreSQL 16** (Port `5433`) — Primary relational database.
-- **Redis 7** (Port `6379`) — In-memory caching, distributed locking and AI rate-limit counters.
-- **Apache Kafka** (Port `9092`) — KRaft event streaming and message broker.
+- Java 21, Spring Boot 4.1, Spring Cloud 2025.1 (Gateway, Eureka)
+- Python, FastAPI, LangChain (ai-assistant-service)
+- Keycloak 24 (OAuth2/OIDC, đăng nhập Google)
+- PostgreSQL 16 (có pgvector), Redis 7, Apache Kafka 3.7 (KRaft)
+- Docker và Docker Compose
 
----
+## Bảng dịch vụ và cổng
 
-## 🚀 Quick Start (All-in-One Docker)
+| Dịch vụ | Cổng host | Cổng container | Vai trò |
+|---|---:|---:|---|
+| API Gateway | 8888 | 8888 | Định tuyến `/api/**`, lọc bảo mật |
+| Discovery Server | 8761 | 8761 | Eureka Service Registry |
+| User Service | 8081 | 8081 | Tài khoản, xác thực mật khẩu, OTP |
+| Event Service | 8082 | 8082 | Sự kiện, ban tổ chức, danh mục |
+| Ticket Service | 8083 | 8083 | Kho vé, giá theo hạng, check-in |
+| Booking Service | 8084 | 8084 | Đơn hàng, giữ chỗ vé |
+| Payment Service | 8085 | 8085 | Thanh toán, webhook |
+| Notification Service | 8086 | 8086 | Email, consumer Kafka |
+| Media Service | 8087 | 8087 | Tải ảnh lên, lưu trữ S3 |
+| AI Assistant Service | 8089 | 8089 | Chatbot, tìm kiếm AI, trợ lý cho ban tổ chức và admin |
+| Keycloak | 9080 | 8080 | OAuth2/OIDC, phân quyền |
+| PostgreSQL | 5433 | 5432 | Cơ sở dữ liệu quan hệ (nhiều database) |
+| Redis | 6379 | 6379 | Cache, khóa phân tán, giới hạn tốc độ AI |
+| Kafka | 9092 | 9092 | Message broker |
 
-Start the entire backend stack (all 13 containers) with a single command:
+## Yêu cầu
+
+- Docker và Docker Compose
+- JDK 21 (khi chạy service trực tiếp bằng Maven)
+- Python 3.11 trở lên (khi chạy ai-assistant-service ngoài Docker)
+
+## Cấu hình
+
+Sao chép file mẫu rồi điền giá trị thật:
+
+```bash
+cp .env.example .env
+```
+
+Trên Windows PowerShell: `Copy-Item .env.example .env`
+
+Các biến quan trọng trong `.env`:
+
+- `POSTGRES_USER`, `POSTGRES_PASSWORD`: tài khoản cơ sở dữ liệu.
+- `REDIS_PASSWORD`: mật khẩu Redis.
+- `KEYCLOAK_ADMIN`, `KEYCLOAK_ADMIN_PASSWORD`: tài khoản quản trị Keycloak.
+- `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`: đăng nhập Google.
+- `SMTP_USERNAME`, `SMTP_PASSWORD`: gửi email OTP và email giao dịch.
+- `AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN`, `TICKET_RESERVATION_INTERNAL_TOKEN`: bí mật dùng chung cho các lời gọi nội bộ giữa service. Bắt buộc, không để trống.
+- `GEMINI_API_KEY`, `GROQ_API_KEY`, `OPENAI_API_KEY`: cần ít nhất một khóa để dùng tính năng AI.
+- Thông tin cổng thanh toán (VNPAY, SePay, ZaloPay, ShopeePay, MoMo) và S3 cho media-service.
+
+Không commit file `.env`. Chi tiết từng biến có chú thích trong `.env.example`.
+
+## Chạy toàn bộ hệ thống bằng Docker
 
 ```bash
 docker compose up -d
 docker compose ps
 ```
 
-Once all containers report `healthy`:
-- **API Gateway**: `http://localhost:8888`
-- **Eureka Dashboard**: `http://localhost:8761`
-- **Keycloak IAM**: `http://localhost:9080`
-- **Frontend App**: `http://localhost:5173` (run from `haloticket-web`)
+Khi các container ở trạng thái `healthy`:
 
-To stop all containers:
+- API Gateway: `http://localhost:8888`
+- Eureka: `http://localhost:8761`
+- Keycloak: `http://localhost:9080`
+- Frontend: `http://localhost:5173` (chạy từ `haloticket-web-app`)
+
+Dừng hệ thống:
+
 ```bash
 docker compose down
 ```
 
----
+## Chạy từng service trong IDE hoặc terminal
 
-## 💻 Terminal Development Mode
+Giữ hạ tầng trong Docker, chạy service cần debug ở máy.
 
-To run or debug microservices locally in your terminal or IDE while keeping database and messaging services in Docker:
+1. Khởi động hạ tầng:
 
-### 1. Start Infrastructure Only
-```bash
-docker compose up -d postgres redis kafka keycloak
-```
+   ```bash
+   docker compose up -d postgres redis kafka keycloak
+   ```
 
-### 2. Stop Dockerized Microservices
-If the full Docker stack is already running and you want to free up ports for terminal running:
-```bash
-docker compose stop discovery-server api-gateway user-service event-service ticket-service booking-service payment-service notification-service media-service
-```
+2. Nếu toàn bộ stack đang chạy, dừng các service Java trong Docker để nhường cổng:
 
-### 3. Run a Specific Service Locally
-For example, to run `user-service` locally:
-```bash
-# Stop the Docker container for this service if running:
-docker compose stop user-service
+   ```bash
+   docker compose stop discovery-server api-gateway user-service event-service ticket-service booking-service payment-service notification-service media-service
+   ```
 
-# Run with Maven wrapper:
-cd user-service
-./mvnw spring-boot:run
-```
-*(On Windows PowerShell, run `.\mvnw.cmd spring-boot:run`)*.
+3. Chạy service cần dùng, ví dụ `user-service`:
 
----
+   ```bash
+   cd user-service
+   ./mvnw spring-boot:run
+   ```
 
-## 📋 Services & Ports Matrix
-
-| Service | Host Port | Container Port | Protocol | Description |
-|---|---:|---:|---|---|
-| **API Gateway** | `8888` | `8888` | HTTP | Central gateway routing `/api/**` |
-| **Discovery Server** | `8761` | `8761` | HTTP | Netflix Eureka Service Registry |
-| **User Service** | `8081` | `8081` | HTTP | User profiles, password auth & OTP |
-| **Event Service** | `8082` | `8082` | HTTP | Events, organizers & categories |
-| **Ticket Service** | `8083` | `8083` | HTTP | Ticket inventory & tier pricing |
-| **Booking Service** | `8084` | `8084` | HTTP | Order workflows & ticket reservation |
-| **Payment Service** | `8085` | `8085` | HTTP | Payment status & webhooks |
-| **Notification Service** | `8086` | `8086` | HTTP | Email notifications & Kafka consumers |
-| **Media Service** | `8087` | `8087` | HTTP | Media upload & S3 storage handler |
-| **AI Assistant Service** | `8089` | `8089` | HTTP | Chatbot, AI search & assistants (FastAPI) |
-| **Keycloak IAM** | `9080` | `8080` | HTTP | OAuth2/OIDC, Google login & RBAC |
-| **PostgreSQL 16** | `5433` | `5432` | TCP | Relational database (multi-DB) |
-| **Redis 7** | `6379` | `6379` | TCP | Distributed caching, locking & AI rate limits |
-| **Apache Kafka** | `9092` | `9092` | TCP | KRaft event broker & message queue |
-
----
+   Trên Windows PowerShell: `.\mvnw.cmd spring-boot:run`
 
 ## AI Assistant
 
-`ai-assistant-service` (Python, FastAPI, port `8089`) serves the customer chatbot and AI search (`/api/customer/**`), organizer tools (`/api/organizer/**`) and admin tools (`/api/admin/**`) through the gateway. Model calls go to Groq first, then OpenAI or Gemini, with a hard deadline, a per-route token cap and a daily call budget. Rate limits live in the service (Redis database 1, in-process fallback). Optional usage metering writes to a separate `ai_ops` database. The chatbot reads Postgres through a column-limited read-only role. The container is image-only (no source bind mount). Required keys and tunables are documented in `.env.example`; database roles are created by hand with the scripts in `haloticket-infrastructure/postgres/ai-ops/` and `ai-chatbot/`. See `DEPLOYMENT.md` for the rollout order.
+`ai-assistant-service` (Python, FastAPI, cổng 8089) phục vụ:
 
----
+- chatbot và tìm kiếm AI cho khách hàng (`/api/customer/**`),
+- công cụ cho ban tổ chức (`/api/organizer/**`),
+- trợ lý, chấm điểm rủi ro và báo cáo cho admin (`/api/admin/**`).
 
-## ⚙️ Configuration & Environment
+Dịch vụ thử Groq trước, sau đó OpenAI hoặc Gemini. Truy cập dữ liệu bằng các role PostgreSQL chỉ đọc, script tạo role nằm trong `haloticket-infrastructure/postgres/`. Các biến cấu hình và giới hạn tốc độ nằm cuối `.env.example`.
 
-Copy the template environment file:
+Nghiên cứu về chấm điểm rủi ro nằm trong `ai-assistant-service/research/risk/`.
 
-```bash
-cp .env.example .env
-```
-*(On Windows PowerShell, use `Copy-Item .env.example .env`)*.
+## Triển khai chi phí thấp
 
-Key environment variables in `.env`:
-- `POSTGRES_USER` & `POSTGRES_PASSWORD`: Database credentials.
-- `KEYCLOAK_ADMIN` & `KEYCLOAK_ADMIN_PASSWORD`: Keycloak administrator account.
-- `GOOGLE_OAUTH_CLIENT_ID` & `GOOGLE_OAUTH_CLIENT_SECRET`: Credentials for Google OAuth2 login.
-- `SMTP_USERNAME` & `SMTP_PASSWORD`: Mail credentials for OTP and transactional emails.
+`docker-compose.yml` đã được tối ưu bộ nhớ và dung lượng đĩa:
 
----
+- JVM dùng SerialGC và stack luồng 256k, giảm khoảng 450MB bộ nhớ.
+- Tổng giới hạn bộ nhớ các container khoảng 3,55 GB, chạy ổn trên VPS 4GB (hoặc 2GB có swap).
+- Log Docker xoay vòng, tối đa 3MB x 2 file mỗi container.
 
-## 🌐 Low-Cost Server Deployment
+Các bước triển khai thật, reverse proxy và swap xem trong [DEPLOYMENT.md](DEPLOYMENT.md).
 
-The unified `docker-compose.yml` has been pre-configured with memory and disk optimizations:
-- **JVM SerialGC (`-XX:+UseSerialGC`) & 256k thread stacks**: Reduces memory overhead by ~450MB.
-- Total memory limit across all 13 containers is capped at **~3.55 GB**, allowing stable execution on a **4GB VPS** (or 2GB VPS with Swap).
-- **Docker log rotation**: Capped at `3MB x 2 files` per container (max 78MB total).
+## Kiểm thử
 
-For step-by-step production setup, reverse proxy configuration, and swap setup, refer to [DEPLOYMENT.md](DEPLOYMENT.md).
-
----
-
-## 🧪 Testing
-
-Run tests using the Maven wrapper:
+Dùng Maven wrapper trong từng service:
 
 ```bash
-# Run tests for a specific microservice:
 cd user-service
 ./mvnw test
+```
 
-# Run tests for API gateway:
-cd ../api-gateway
-./mvnw test
+Với ai-assistant-service:
+
+```bash
+cd ai-assistant-service
+pytest
 ```

@@ -1,9 +1,9 @@
-"""Event description and terms for the organizer (POST /api/organizer/generate-event-content).
+"""Mô tả và điều khoản sự kiện cho ban tổ chức (POST /api/organizer/generate-event-content).
 
-The prompt text and the JSON format {description, terms_and_conditions} are the ones of OrganizerAgent.generate_event_content
-(organizer_agent.py is not touched). Differences: the user text sits in per-request random-delimiter data blocks, sizes are
-limited, the call goes through ai_invoke('event_content'), and any failure is an AiError: an error text is never returned
-as if it were the description.
+Nội dung prompt và định dạng JSON {description, terms_and_conditions} giống OrganizerAgent.generate_event_content
+(organizer_agent.py không bị sửa). Khác biệt: chữ người dùng nằm trong khối dữ liệu có dấu phân cách ngẫu nhiên theo từng
+yêu cầu, có giới hạn kích thước, lời gọi đi qua ai_invoke('event_content'), và mọi lỗi đều thành AiError: văn bản báo lỗi
+không bao giờ bị trả về như thể là phần mô tả.
 """
 import json
 import logging
@@ -21,16 +21,18 @@ MAX_POINTS_CHARS = 2000
 
 
 def data_block(text: str, delimiter: str) -> str:
-    """User text between two delimiter lines; any occurrence of the delimiter inside the text is removed first."""
+    """Bọc chữ người dùng giữa hai dòng phân cách; mọi chỗ trùng với dấu phân cách trong chữ đều bị xóa trước."""
     cleaned = (text or "").replace(delimiter, "")
     return f"<<{delimiter}\n{cleaned}\n{delimiter}>>"
 
 
 def new_delimiter() -> str:
+    """Sinh dấu phân cách ngẫu nhiên cho mỗi yêu cầu để người dùng không đoán trước và đóng khối dữ liệu sớm."""
     return "DATA_" + secrets.token_hex(8)
 
 
 def message_text(response) -> str:
+    """Lấy phần chữ từ phản hồi của LLM, kể cả khi content là danh sách các phần (dict có khóa text hoặc chuỗi)."""
     content = getattr(response, "content", response)
     if isinstance(content, list):
         return "".join(part.get("text", "") if isinstance(part, dict) else str(part) for part in content)
@@ -38,15 +40,17 @@ def message_text(response) -> str:
 
 
 def clean_markdown(text: str) -> str:
+    """Bỏ cú pháp markdown (tiêu đề, in đậm, in nghiêng) khỏi văn bản do LLM sinh ra."""
     if not text:
         return ""
-    text = re.sub(r'#{1,6}\s*', '', text)  # markdown headers
-    text = re.sub(r'\*{1,3}([^*]+)\*{1,3}', r'\1', text)  # bold / italic
+    text = re.sub(r'#{1,6}\s*', '', text)  # tiêu đề markdown
+    text = re.sub(r'\*{1,3}([^*]+)\*{1,3}', r'\1', text)  # in đậm / in nghiêng
     text = re.sub(r'_{1,3}([^_]+)_{1,3}', r'\1', text)
     return text.strip()
 
 
 def build_prompt(title: str, points: str, delimiter: str) -> str:
+    """Dựng prompt tiếng Việt gồm tên sự kiện và ý chính (đều nằm trong khối dữ liệu) cùng yêu cầu trả về JSON."""
     return (
         "Bạn là một chuyên gia Content Marketing & Pháp chế cho sự kiện của hệ thống HaloTicket.\n"
         "Người dùng (Ban tổ chức) đang tạo một sự kiện mới có tên nằm trong khối dữ liệu TÊN SỰ KIỆN bên dưới.\n"
@@ -68,21 +72,21 @@ def build_prompt(title: str, points: str, delimiter: str) -> str:
 
 
 def generate_event_content(title: str, points: str, actor: Optional[str] = None) -> dict:
-    """Returns {description, terms_and_conditions}. Raises AiError (AI_INPUT_INVALID, AI_UNAVAILABLE, AI_GENERATION_FAILED)."""
+    """Sinh mô tả và điều khoản cho sự kiện. Trả về {description, terms_and_conditions}. Ném AiError (AI_INPUT_INVALID, AI_UNAVAILABLE, AI_GENERATION_FAILED)."""
     title = title if isinstance(title, str) else ""
     points = points if isinstance(points, str) else ""
     if not title.strip() or len(title) > MAX_TITLE_CHARS or len(points) > MAX_POINTS_CHARS:
         raise ai_error(AI_INPUT_INVALID)
 
     prompt = build_prompt(title, points, new_delimiter())
-    response = ai_invoke("event_content", [("human", prompt)], actor=actor)  # AiError passes through
+    response = ai_invoke("event_content", [("human", prompt)], actor=actor)  # AiError được để lọt ra ngoài
 
     try:
         content = message_text(response).strip().removeprefix("```json").removesuffix("```").strip()
         data = json.loads(content)
         description = clean_markdown(data["description"])
         terms = clean_markdown(data["terms_and_conditions"])
-    except Exception as failure:  # not JSON, not an object, a key missing or not a string
+    except Exception as failure:  # không phải JSON, không phải object, thiếu khóa hoặc giá trị không phải chuỗi
         log.warning("Event content could not be parsed: %s", type(failure).__name__)
         raise ai_error(AI_GENERATION_FAILED)
     if not description or not terms:

@@ -1,6 +1,6 @@
-"""Dashboard KPIs and the "needs attention" feed. Deterministic: no model is called here.
+"""KPI của bảng điều khiển và danh sách "cần chú ý". Mang tính xác định: ở đây không gọi mô hình nào.
 
-A KPI whose source cannot be read is None and the source is named in `sources` as "unavailable"; it is never shown as 0.
+KPI mà nguồn dữ liệu không đọc được sẽ là `None` và nguồn đó được ghi trong `sources` là "unavailable"; không bao giờ hiển thị thành 0.
 """
 import hashlib
 import json
@@ -20,10 +20,12 @@ LINKS = {"reconciliation": "/admin/reconciliation", "resale": "/admin/market/res
 
 
 def event_link(event_id: str) -> str:
+    """Đường dẫn tương đối tới trang duyệt của một sự kiện (mã sự kiện được mã hóa URL)."""
     return f"{LINKS['approval']}/{quote(str(event_id), safe='')}"
 
 
 def _parse(value) -> Optional[datetime]:
+    """Đọc thời điểm ISO-8601 (chấp nhận hậu tố `Z`); không có múi giờ thì coi là UTC; sai định dạng trả `None`."""
     if not value:
         return None
     try:
@@ -34,22 +36,25 @@ def _parse(value) -> Optional[datetime]:
 
 
 def _hours_since(value, now: datetime) -> Optional[float]:
+    """Số giờ từ `value` đến `now` (không âm); `None` nếu không đọc được thời điểm."""
     moment = _parse(value)
     return None if moment is None else max(0.0, (now - moment).total_seconds() / 3600)
 
 
 def _safe(sources: dict, name: str, function: Callable):
+    """Gọi `function` để lấy dữ liệu một nguồn; ghi `ok` hoặc `unavailable` vào `sources[name]` và trả `None` khi lỗi."""
     try:
         value = function()
         sources[name] = "ok"
         return value
     except Exception as failure:
-        log.warning("KPI source %s unavailable: %s %s", name, type(failure).__name__, str(failure)[:100])  # our own messages: path and status
+        log.warning("KPI source %s unavailable: %s %s", name, type(failure).__name__, str(failure)[:100])  # thông điệp do chính mình tạo: đường dẫn và trạng thái
         sources[name] = "unavailable"
         return None
 
 
 def _health_summary(health: Optional[list]) -> Optional[dict]:
+    """Tóm tắt sức khỏe dịch vụ: số dịch vụ UP, tổng số và tên các dịch vụ DOWN; `None` nếu không có dữ liệu."""
     if not health:
         return None
     up = [h for h in health if h.get("status") == "UP"]
@@ -58,11 +63,16 @@ def _health_summary(health: Optional[list]) -> Optional[dict]:
 
 
 def kpi_hash(kpis: dict) -> str:
+    """Mã băm ổn định của nội dung KPI (bỏ `generated_at` và `sources`), dùng để biết bản tóm tắt đã lưu còn khớp dữ liệu hay không."""
     body = {k: v for k, v in kpis.items() if k not in ("generated_at", "sources")}
     return hashlib.sha256(json.dumps(body, sort_keys=True, default=str, ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
 
 
 def build_kpis(authorization: str, actor: str, health: Optional[list], now: Optional[datetime] = None) -> dict:
+    """Dựng các KPI: sự kiện chờ duyệt (theo mức rủi ro), sự kiện đang mở bán, tin bán lại chờ duyệt, giao dịch 7 ngày, đối soát và dịch vụ.
+
+    Nguồn nào lỗi thì KPI tương ứng là `None` và `sources` ghi `unavailable`.
+    """
     now = now or datetime.now(timezone.utc)
     sources: dict = {}
     events = _safe(sources, "events", lambda: upstream.approvals(authorization))
@@ -86,6 +96,7 @@ def build_kpis(authorization: str, actor: str, health: Optional[list], now: Opti
         resale = {"count": int(resale.get("pendingCount", 0)), "oldest_hours": _hours_since(resale.get("oldestPendingAt"), now)}
 
     def timeline():
+        """Gộp số đơn và doanh thu theo ngày trong 7 ngày gần nhất."""
         start = (now - timedelta(days=6)).date().isoformat()
         data = upstream.sales_timeline(authorization, start, now.date().isoformat())
         days = [{"date": d.get("date"), "orders": int(d.get("orders") or 0), "revenue": float(d.get("revenue") or 0)}
@@ -98,6 +109,7 @@ def build_kpis(authorization: str, actor: str, health: Optional[list], now: Opti
     sources["services"] = "ok" if services else "unavailable"
 
     def count(name):
+        """Số liệu đối soát theo tên trường, hoặc `None` nếu thiếu."""
         if recon is None or recon.get(name) is None:
             return None
         return int(recon[name])
@@ -113,6 +125,7 @@ def build_kpis(authorization: str, actor: str, health: Optional[list], now: Opti
 
 
 def _item(kind: str, priority: str, title: str, evidence: dict, link: str, since: Optional[str] = None, ref: str = "") -> dict:
+    """Dựng một mục cần chú ý; `id` ghép loại và mã tham chiếu để ổn định giữa các lần gọi."""
     return {"id": f"{kind}:{ref}" if ref else kind, "type": kind, "priority": priority, "title": title, "evidence": evidence,
             "link": link, "since": since}
 
@@ -121,6 +134,10 @@ PRIORITY_ORDER = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2}
 
 
 def build_attention(authorization: str, actor: str, health: Optional[list], now: Optional[datetime] = None) -> dict:
+    """Dựng danh sách việc cần chú ý theo luật: sự kiện rủi ro cao chờ lâu, thanh toán muộn, đơn đã trả tiền thiếu vé, tin bán lại tồn đọng, dịch vụ ngừng.
+
+    Sắp theo mức ưu tiên rồi theo thời điểm cũ nhất; mỗi mục kèm bằng chứng và liên kết tới trang xử lý.
+    """
     now = now or datetime.now(timezone.utc)
     sources: dict = {}
     items: list = []

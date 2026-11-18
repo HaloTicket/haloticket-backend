@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+/** Gửi các bản ghi outbox chờ xử lý lên Kafka (mẫu transactional outbox), thử lại tối đa 5 lần rồi đánh dấu {@code FAILED}. */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -24,6 +25,10 @@ public class OutboxPublisher {
     private final OutboxEventRepository outboxEventRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
 
+    /**
+     * Chạy mỗi giây: lấy tối đa 50 bản ghi {@code PENDING} cũ nhất, gửi lên Kafka và chờ broker xác nhận.
+     * Thành công thì đánh dấu {@code PROCESSED}; lỗi thì tăng số lần thử và đánh dấu {@code FAILED} khi đạt 5 lần.
+     */
     @Scheduled(fixedDelay = 1000)
     @Transactional
     public void publishPendingEvents() {
@@ -34,7 +39,7 @@ public class OutboxPublisher {
 
         for (OutboxEvent event : pendingEvents) {
             try {
-                // wait for the broker's ack: marking PROCESSED before it would lose the event if the send fails
+                // chờ broker xác nhận: nếu đánh dấu PROCESSED trước thì sẽ mất sự kiện khi gửi lỗi
                 kafkaTemplate.send(event.getTopic(), event.getAggregateId(), event.getPayload()).get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
                 event.setStatus(OutboxStatus.PROCESSED);
                 event.setProcessedAt(LocalDateTime.now());

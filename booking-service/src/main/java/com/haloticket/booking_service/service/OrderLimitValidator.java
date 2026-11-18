@@ -18,6 +18,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Kiểm tra số vé mỗi đơn theo giới hạn tối thiểu và tối đa của từng loại vé (lấy từ ticket-service, có cache 30 giây).
+ * Nếu không đọc được giới hạn thì bỏ qua kiểm tra thay vì chặn đơn.
+ */
 @Slf4j
 @Component
 public class OrderLimitValidator {
@@ -26,6 +30,7 @@ public class OrderLimitValidator {
     static final long LOOKUP_TIMEOUT_MILLIS = 3_000L;
     private static final int MAX_ENTRIES = 2000;
 
+    /** Giới hạn số vé mỗi đơn của một loại vé, kèm thời điểm lưu vào cache. */
     private record Limits(Integer min, Integer max, long storedAt) {}
 
     private final TicketOrderLimitClient ticketClient;
@@ -37,21 +42,35 @@ public class OrderLimitValidator {
         return thread;
     });
 
+    /**
+     * Constructor dùng trong ứng dụng, với thời gian chờ tra cứu mặc định {@code LOOKUP_TIMEOUT_MILLIS}.
+     * @param ticketClient client gọi ticket-service lấy giới hạn của loại vé
+     */
     @Autowired
     public OrderLimitValidator(TicketOrderLimitClient ticketClient) {
         this(ticketClient, LOOKUP_TIMEOUT_MILLIS);
     }
 
+    /**
+     * Constructor cho phép đặt thời gian chờ tra cứu (dùng khi kiểm thử).
+     * @param ticketClient client gọi ticket-service lấy giới hạn của loại vé
+     * @param lookupTimeoutMillis thời gian chờ tối đa của mỗi lần tra cứu, tính bằng mili giây
+     */
     OrderLimitValidator(TicketOrderLimitClient ticketClient, long lookupTimeoutMillis) {
         this.ticketClient = ticketClient;
         this.lookupTimeoutMillis = lookupTimeoutMillis;
     }
 
+    /**
+     * Kiểm tra tổng số vé của từng loại trong đơn nằm trong giới hạn của loại đó.
+     * @param request yêu cầu tạo đơn
+     * @throws ResponseStatusException HTTP 422 {@code QUANTITY_OUT_OF_RANGE} khi số vé ít hơn mức tối thiểu hoặc nhiều hơn mức tối đa
+     */
     public void validate(BookingCreateRequest request) {
         if (request == null || request.getItems() == null || request.getItems().isEmpty()) return;
 
-        // one limit applies to everything ordered of a ticket type, so add up repeated items; a non-positive
-        // quantity is not a count of tickets and is left to the checks further on
+        // một giới hạn áp dụng cho mọi vé cùng loại trong đơn nên cộng dồn các dòng lặp; số lượng không dương
+        // không phải số vé và được để cho các bước kiểm tra phía sau xử lý
         Map<String, Integer> byType = new LinkedHashMap<>();
         for (BookingItemRequest item : request.getItems()) {
             if (item.getTicketTypeId() == null || item.getTicketTypeId().isBlank()) continue;
@@ -72,7 +91,7 @@ public class OrderLimitValidator {
         }
     }
 
-    /** Limits of a ticket type, or null when they cannot be read (the caller then skips the check). */
+    /** Giới hạn của một loại vé, hoặc null khi không đọc được (bên gọi sẽ bỏ qua kiểm tra). Có cache và giới hạn thời gian chờ. */
     private Limits limitsOf(String ticketTypeId) {
         long now = System.currentTimeMillis();
         Limits cached = cache.get(ticketTypeId);

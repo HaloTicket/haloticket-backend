@@ -6,14 +6,15 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 
+/** Dữ liệu tạo hoặc cập nhật sự kiện do nhà tổ chức gửi: thông tin chung, nhà tổ chức, lịch diễn, vé, cài đặt và thông tin thanh toán, thuế. */
 @Data
 public class EventCreateRequest {
-    private String eventId; // id of existing draft event to update
+    private String eventId; // mã của sự kiện nháp đã có cần cập nhật
     private String status; // "DRAFT" | "PENDING"
     private String title;
     private String categoryName;
     private String categoryId;
-    private String locationType; // "offline" | "online"
+    private String locationType; // hình thức tổ chức: "offline" | "online"
     private String locationName;
     private String city;
     private String ward;
@@ -21,15 +22,15 @@ public class EventCreateRequest {
     private String thumbnailUrl; // poster 3:4
     private String bannerUrl; // banner 16:9
     private String description;
-    private List<String> galleryImages; // event image gallery URLs
+    private List<String> galleryImages; // danh sách URL ảnh trong thư viện của sự kiện
 
-    // organizer info
+    // thông tin nhà tổ chức
     private String userId;
     private String organizerName;
     private String organizerInfo;
     private String organizerLogo;
 
-    // time schedule
+    // lịch diễn
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm[:ss]")
     private LocalDateTime startTime;
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm[:ss]")
@@ -38,7 +39,7 @@ public class EventCreateRequest {
     // showtimes
     private List<EventShowtimeRequest> showtimes;
 
-    // (legacy) tickets list
+    // danh sách vé (cách cũ)
     private List<TicketCreateRequest> tickets;
 
     // settings
@@ -48,7 +49,7 @@ public class EventCreateRequest {
     private String questionScope;
     private List<CustomQuestionRequest> customQuestions;
 
-    // payment & tax
+    // thanh toán và thuế
     private String accountHolder;
     private String accountNumber;
     private String bankName;
@@ -58,6 +59,7 @@ public class EventCreateRequest {
     private String taxCode;
     private String taxAddress;
 
+    /** Một suất diễn trong yêu cầu tạo sự kiện, kèm thời gian mở bán và các loại vé của suất đó. */
     @Data
     public static class EventShowtimeRequest {
         private String id;
@@ -73,6 +75,7 @@ public class EventCreateRequest {
         private List<TicketCreateRequest> tickets;
     }
 
+    /** Một loại vé trong yêu cầu tạo sự kiện; các trường lạ trong JSON bị bỏ qua. */
     @Data
     @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
     public static class TicketCreateRequest {
@@ -88,6 +91,7 @@ public class EventCreateRequest {
         private String description;
     }
 
+    /** Một câu hỏi tùy chỉnh mà người mua phải hoặc có thể trả lời khi đặt vé. */
     @Data
     public static class CustomQuestionRequest {
         private String id;

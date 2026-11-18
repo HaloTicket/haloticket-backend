@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+/** Tích hợp cổng VNPay: dựng URL thanh toán có ký HMAC SHA-512 và kiểm tra chữ ký IPN. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -19,6 +20,16 @@ public class VNPayService {
 
     private final VNPayConfig vnPayConfig;
 
+    /**
+     * Dựng URL thanh toán VNPay có chữ ký. Tham số được sắp xếp theo tên, mã hóa rồi ký bằng hash secret;
+     * giao dịch hết hạn sau 15 phút (múi giờ GMT+7).
+     *
+     * @param request yêu cầu HTTP, dùng để lấy địa chỉ IP người thanh toán
+     * @param amount số tiền (VND), được nhân 100 theo quy định của VNPay
+     * @param orderInfo nội dung đơn hàng; {@code null} thì dùng nội dung mặc định
+     * @param bookingId mã booking dùng làm {@code vnp_TxnRef}; {@code null} thì sinh số ngẫu nhiên
+     * @return URL chuyển hướng người dùng sang VNPay
+     */
     public String createPaymentUrl(HttpServletRequest request, long amount, String orderInfo, String bookingId) {
         String vnp_Version = "2.1.0";
         String vnp_Command = "pay";
@@ -30,7 +41,7 @@ public class VNPayService {
         vnp_Params.put("vnp_Version", vnp_Version);
         vnp_Params.put("vnp_Command", vnp_Command);
         vnp_Params.put("vnp_TmnCode", vnp_TmnCode);
-        vnp_Params.put("vnp_Amount", String.valueOf(amount * 100)); // VNPay amount in VND * 100
+        vnp_Params.put("vnp_Amount", String.valueOf(amount * 100)); // số tiền VNPay tính theo VND nhân 100
         vnp_Params.put("vnp_CurrCode", "VND");
         vnp_Params.put("vnp_TxnRef", vnp_TxnRef);
         vnp_Params.put("vnp_OrderInfo", orderInfo != null ? orderInfo : "Thanh toan don hang HaloTicket " + vnp_TxnRef);
@@ -78,6 +89,13 @@ public class VNPayService {
         return paymentUrl;
     }
 
+    /**
+     * Kiểm tra chữ ký IPN của VNPay. Hàm bỏ {@code vnp_SecureHash} và {@code vnp_SecureHashType} khỏi map đầu vào,
+     * ký lại phần còn lại rồi so sánh không phân biệt hoa thường.
+     *
+     * @param fields các tham số VNPay gửi về (bị sửa trực tiếp: loại hai trường chữ ký)
+     * @return {@code true} nếu chữ ký hợp lệ
+     */
     public boolean verifyIpn(Map<String, String> fields) {
         String vnp_SecureHash = fields.get("vnp_SecureHash");
         if (fields.containsKey("vnp_SecureHashType")) {

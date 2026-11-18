@@ -1,23 +1,26 @@
+"""Dựng các mô hình LLM và embedding (Groq, OpenAI, Gemini) kèm cơ chế dự phòng theo thứ tự ưu tiên."""
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
 from app.core.config import settings
 
 def _get_gemini_keys():
+    """Tách chuỗi GEMINI_API_KEY (phân cách bằng dấu phẩy) thành danh sách khóa; rỗng nếu chưa cấu hình."""
     if not settings.gemini_api_key: return []
     keys = settings.gemini_api_key.split(",")
     return [k.strip() for k in keys if k.strip()]
 
 def _get_groq_keys():
+    """Tách chuỗi GROQ_API_KEY (phân cách bằng dấu phẩy) thành danh sách khóa; rỗng nếu chưa cấu hình."""
     if not settings.groq_api_key: return []
     keys = settings.groq_api_key.split(",")
     return [k.strip() for k in keys if k.strip()]
 
 def get_fast_llm(tools=None):
-    """Dùng cho Khách hàng: Chatbot, Tìm kiếm, Chọn ghế (Tốc độ cao)"""
+    """Dùng cho Khách hàng: Chatbot, Tìm kiếm, Chọn ghế (Tốc độ cao). Trả về LLM đầu tiên khả dụng, các LLM còn lại làm dự phòng (with_fallbacks); gắn tools nếu có."""
     models = []
     
-    # 1. Groq (Llama 3.1 70B - Fastest, Native tool calling)
+    # 1. Groq (nhanh nhất, hỗ trợ gọi tool gốc)
     groq_keys = _get_groq_keys()
     for key in groq_keys:
         model = ChatGroq(
@@ -30,7 +33,7 @@ def get_fast_llm(tools=None):
         if tools: model = model.bind_tools(tools)
         models.append(model)
         
-    # 2. OpenAI (GPT-4o-mini - Stable)
+    # 2. OpenAI (GPT-4o-mini - ổn định)
     if settings.openai_api_key:
         model = ChatOpenAI(
             api_key=settings.openai_api_key,
@@ -42,7 +45,7 @@ def get_fast_llm(tools=None):
         if tools: model = model.bind_tools(tools)
         models.append(model)
         
-    # 3. Gemini Flash
+    # 3. Gemini Flash (dự phòng cuối)
     gemini_keys = _get_gemini_keys()
     for key in gemini_keys:
         model = ChatGoogleGenerativeAI(
@@ -64,10 +67,10 @@ def get_fast_llm(tools=None):
     return primary_llm
 
 def get_smart_llm(tools=None):
-    """Used for Admin/Organizer: Text-to-SQL, Risk Scoring (Tư duy sâu)"""
+    """Dùng cho Admin/Organizer: Text-to-SQL, chấm điểm rủi ro (tư duy sâu, temperature 0). Cùng cơ chế dự phòng như get_fast_llm."""
     models = []
     
-    # 1. Groq (Llama 3.1 70B)
+    # 1. Groq (mô hình lớn hơn)
     groq_keys = _get_groq_keys()
     for key in groq_keys:
         model = ChatGroq(
@@ -92,7 +95,7 @@ def get_smart_llm(tools=None):
         if tools: model = model.bind_tools(tools)
         models.append(model)
         
-    # 3. Gemini Pro
+    # 3. Gemini Pro (dự phòng cuối)
     gemini_keys = _get_gemini_keys()
     for key in gemini_keys:
         model = ChatGoogleGenerativeAI(

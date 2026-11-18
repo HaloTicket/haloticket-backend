@@ -1,8 +1,8 @@
-"""Best-effort metering of every model attempt into ai_ops.ai_usage (one INSERT per attempt).
+"""Ghi nhận theo kiểu cố gắng hết sức mỗi lần gọi mô hình vào ai_ops.ai_usage (một INSERT cho mỗi lần thử).
 
-The insert is synchronous (a single small INSERT with a 2 s connect timeout); the circuit breaker skips the database for
-60 s after a failure, so a down database costs at most one slow call per minute. record() NEVER raises. Prompt text and
-raw user ids are never stored: `actor` is already a short hash. Empty AI_OPS_DATABASE_URL = no-op (logged once).
+INSERT chạy đồng bộ (một INSERT nhỏ với connect timeout 2 giây); cầu dao bỏ qua cơ sở dữ liệu trong 60 giây sau một lỗi,
+nên cơ sở dữ liệu hỏng chỉ tốn tối đa một lần gọi chậm mỗi phút. record() KHÔNG BAO GIỜ ném ngoại lệ. Nội dung prompt và
+id người dùng gốc không bao giờ được lưu: `actor` vốn đã là một mã băm ngắn. AI_OPS_DATABASE_URL rỗng = không làm gì (chỉ ghi log một lần).
 """
 import logging
 import threading
@@ -34,6 +34,7 @@ _INSERT = text(
 
 
 def _get_engine(url: str):
+    """Trả engine kết nối tới cơ sở dữ liệu ai_ops, tạo lại khi URL đổi (có khóa luồng, connect timeout 2 giây)."""
     global _engine, _engine_url
     with _lock:
         if _engine is None or _engine_url != url:
@@ -43,6 +44,7 @@ def _get_engine(url: str):
 
 
 def _warn(msg: str):
+    """Ghi log cảnh báo nhưng tối đa một lần mỗi 60 giây để không tràn log."""
     global _last_warn
     now = time.time()
     if now - _last_warn >= WARN_EVERY_SECONDS:
@@ -53,6 +55,7 @@ def _warn(msg: str):
 def record(*, route: str, tier: str, provider: str, model: str, ok: bool, error_code: Optional[str],
            latency_ms: int, input_tokens: Optional[int], output_tokens: Optional[int], estimated: bool,
            actor: Optional[str], attempts: int) -> None:
+    """Ghi một lần gọi mô hình vào ai_usage. Bỏ qua khi chưa cấu hình URL hoặc cầu dao đang mở; mọi lỗi đều bị nuốt."""
     global _breaker_until, _noop_logged
     try:
         url = settings.ai_ops_database_url
@@ -74,11 +77,12 @@ def record(*, route: str, tier: str, provider: str, model: str, ok: bool, error_
         except Exception as failure:
             _breaker_until = time.time() + BREAKER_SECONDS
             _warn(f"ai_usage insert failed ({type(failure).__name__}); skipping for {BREAKER_SECONDS}s")
-    except Exception:  # absolutely never propagate
+    except Exception:  # tuyệt đối không để lan ra ngoài
         pass
 
 
 def reset_for_tests() -> None:
+    """Đặt lại engine, cầu dao và cờ log (chỉ dùng trong kiểm thử)."""
     global _engine, _engine_url, _breaker_until, _last_warn, _noop_logged
     with _lock:
         if _engine is not None:

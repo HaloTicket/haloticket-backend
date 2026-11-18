@@ -20,6 +20,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Cấu hình bảo mật của notification-service: dịch vụ là resource server xác thực JWT, không giữ session.
+ * Mọi yêu cầu được cho qua ở tầng Spring Security; việc phân quyền theo từng endpoint do interceptor
+ * {@code NotificationScopeGuard} đảm nhiệm.
+ */
 @Configuration
 public class SecurityConfig {
 
@@ -29,6 +34,12 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
     private String jwkSetUri;
 
+    /**
+     * Tạo bộ giải mã JWT. Dùng {@code jwk-set-uri} nếu được cấu hình, ngược lại tự dò khóa từ issuer;
+     * luôn kiểm tra claim issuer khớp {@code issuer-uri}.
+     *
+     * @return bộ giải mã JWT dùng cho resource server
+     */
     @Bean
     JwtDecoder jwtDecoder() {
         NimbusJwtDecoder decoder = StringUtils.hasText(jwkSetUri)
@@ -38,6 +49,15 @@ public class SecurityConfig {
         return decoder;
     }
 
+    /**
+     * Dựng chuỗi lọc bảo mật: tắt CSRF, chế độ STATELESS, cho qua mọi request và xác thực JWT khi có.
+     * Quyền (authority) lấy từ claim {@code roles} và {@code realm_access.roles}, chuẩn hóa thành
+     * dạng {@code ROLE_VIẾT_HOA}.
+     *
+     * @param http đối tượng cấu hình HTTP security
+     * @return chuỗi lọc đã dựng
+     * @throws Exception khi cấu hình không hợp lệ
+     */
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http

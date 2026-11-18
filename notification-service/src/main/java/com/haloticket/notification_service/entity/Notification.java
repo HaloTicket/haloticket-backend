@@ -22,6 +22,10 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 
+/**
+ * Thông báo gửi tới người dùng (bảng {@code notifications}). {@code eventId} là khóa chống xử lý trùng sự kiện Kafka;
+ * {@code template} có thể rỗng với thông báo phát trực tiếp.
+ */
 @Entity
 @Table(name = "notifications")
 @Getter
@@ -76,6 +80,7 @@ public class Notification {
     @Column(name = "sent_at")
     private LocalDateTime sentAt;
 
+    /** Trước khi lưu: gán thời điểm tạo và đặt trạng thái {@code PENDING} nếu chưa có. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

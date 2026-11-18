@@ -14,6 +14,9 @@ import org.springframework.kafka.core.*;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Cấu hình Kafka của booking-service: producer và consumer dùng chuỗi ký tự, consumer thuộc nhóm {@code booking-service}.
+ */
 @Configuration
 @EnableKafka
 public class KafkaConfig {
@@ -21,6 +24,9 @@ public class KafkaConfig {
     @Value("${spring.kafka.bootstrap-servers:${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}}")
     private String bootstrapServers;
 
+    /**
+     * @return factory tạo producer Kafka với khóa và giá trị dạng chuỗi
+     */
     @Bean
     public ProducerFactory<String, String> producerFactory() {
         Map<String, Object> props = new HashMap<>();
@@ -30,11 +36,19 @@ public class KafkaConfig {
         return new DefaultKafkaProducerFactory<>(props);
     }
 
+    /**
+     * @return {@code KafkaTemplate} dùng producer factory ở trên
+     */
     @Bean
     public KafkaTemplate<String, String> kafkaTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
 
+    /**
+     * Tạo consumer factory: nhóm {@code booking-service}, khóa và giá trị dạng chuỗi, đọc từ offset sớm nhất khi chưa có offset đã lưu.
+     *
+     * @return factory tạo consumer Kafka
+     */
     @Bean
     public ConsumerFactory<String, String> consumerFactory() {
         Map<String, Object> props = new HashMap<>();
@@ -46,6 +60,9 @@ public class KafkaConfig {
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
+    /**
+     * @return factory cho các {@code @KafkaListener}, dùng consumer factory ở trên
+     */
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory() {
         ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();

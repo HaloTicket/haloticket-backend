@@ -9,6 +9,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.util.StringUtils;
 
+/**
+ * Cấu hình Redisson kết nối một node Redis, dùng cho khóa phân tán.
+ */
 @Configuration
 public class RedissonConfig {
 
@@ -21,6 +24,11 @@ public class RedissonConfig {
     @Value("${spring.data.redis.password:}")
     private String redisPassword;
 
+    /**
+     * Tạo {@code RedissonClient} từ host, port và mật khẩu (nếu có) trong cấu hình Redis.
+     *
+     * @return client Redisson
+     */
     @Bean
     public RedissonClient redissonClient() {
         Config config = new Config();

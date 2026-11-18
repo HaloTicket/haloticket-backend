@@ -4,6 +4,7 @@ import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
+/** Cấu hình cổng thanh toán MoMo: mã đối tác, khóa, endpoint và các URL chuyển hướng và IPN (có giá trị mặc định cho môi trường thử). */
 @Configuration
 @Getter
 public class MoMoConfig {

@@ -6,6 +6,7 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+/** Sự kiện chờ gửi lên Kafka theo mẫu transactional outbox (bảng {@code outbox_events}), ghi cùng giao dịch với dữ liệu nghiệp vụ. */
 @Entity
 @Table(name = "outbox_events")
 @Getter
@@ -46,6 +47,7 @@ public class OutboxEvent {
     @Column(name = "processed_at")
     private LocalDateTime processedAt;
 
+    /** Trước khi lưu lần đầu: gán thời gian tạo, trạng thái {@code PENDING} và số lần thử lại bằng 0 nếu chưa có. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

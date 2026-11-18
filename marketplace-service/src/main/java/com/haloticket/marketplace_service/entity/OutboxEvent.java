@@ -5,6 +5,10 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
 
+/**
+ * Bản ghi outbox: sự kiện cần phát lên Kafka, được lưu cùng giao dịch cơ sở dữ liệu rồi
+ * {@code OutboxPublisher} gửi đi để bảo đảm không mất sự kiện.
+ */
 @Entity @Table(name = "outbox_events", indexes = @Index(name = "idx_market_outbox_status_created", columnList = "status,created_at"))
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class OutboxEvent {
@@ -18,5 +22,6 @@ public class OutboxEvent {
     @Column(name = "retry_count", nullable = false) private Integer retryCount;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "processed_at") private Instant processedAt;
+    /** Đặt thời điểm tạo, trạng thái mặc định {@code PENDING} và số lần thử lại bằng 0 trước khi lưu mới. */
     @PrePersist void onCreate() { createdAt = Instant.now(); if (status == null) status = OutboxStatus.PENDING; if (retryCount == null) retryCount = 0; }
 }

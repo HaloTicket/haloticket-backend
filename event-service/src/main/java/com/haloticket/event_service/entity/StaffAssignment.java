@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Thực thể phân công nhân sự cho sự kiện (bảng {@code staff_assignments}): người dùng, vai trò, trạng thái và thông tin lời mời (băm token, hạn dùng, số lần gửi lại). */
 @Entity
 @Table(name = "staff_assignments")
 @Getter
@@ -23,7 +24,7 @@ public class StaffAssignment {
     private Event event;
 
     @Column(name = "user_id", nullable = false)
-    private String userId; // Link sang User Service
+    private String userId; // liên kết sang user-service
 
     private String email;
 
@@ -41,14 +42,14 @@ public class StaffAssignment {
     @Column(name = "revoked_at")
     private LocalDateTime revokedAt;
 
-    /** SHA-256 (hex) of the one-time invitation token; the token itself is never stored. Cleared once it is used. */
+    /** Mã băm SHA-256 (hex) của token lời mời dùng một lần; bản thân token không bao giờ được lưu. Được xóa sau khi token đã dùng. */
     @Column(name = "invitation_token_hash")
     private String invitationTokenHash;
 
     @Column(name = "invitation_expires_at")
     private LocalDateTime invitationExpiresAt;
 
-    /** user-service id of the person who sent the invitation. */
+    /** Mã người dùng (trong user-service) của người đã gửi lời mời. */
     @Column(name = "invited_by")
     private String invitedBy;
 
@@ -58,6 +59,10 @@ public class StaffAssignment {
     @Column(name = "invitation_resend_count")
     private Integer invitationResendCount;
 
+    /**
+     * Nhãn trạng thái để hiển thị: lời mời {@code PENDING} đã quá hạn thì trả {@code EXPIRED}, ngược lại trả tên trạng thái.
+     * @return nhãn trạng thái, hoặc {@code null} nếu chưa có trạng thái
+     */
     public String statusLabel() {
         if (status == StaffAssignmentStatus.PENDING && invitationExpiresAt != null && invitationExpiresAt.isBefore(LocalDateTime.now())) {
             return "EXPIRED";
@@ -65,6 +70,7 @@ public class StaffAssignment {
         return status == null ? null : status.name();
     }
 
+    /** Trước khi lưu lần đầu: thời điểm phân công mặc định là hiện tại, trạng thái mặc định là {@code ACTIVE}. */
     @PrePersist
     protected void onCreate() {
         if (this.assignedAt == null) this.assignedAt = LocalDateTime.now();

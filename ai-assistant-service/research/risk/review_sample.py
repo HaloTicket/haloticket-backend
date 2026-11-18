@@ -1,9 +1,10 @@
-"""A human check of the adjudicated labels: python -m research.risk.review_sample [--n 20] [--seed 7] [--annotator H]
+"""Kiểm tra bằng người các nhãn do mô hình phân xử: python -m research.risk.review_sample [--n 20] [--seed 7] [--annotator H]
 
-Draws a seeded sample of the cases the model adjudicators decided, shows each one WITHOUT any label, asks for your own label
-(same syntax as label.py), and only then reveals the gold label and the adjudicator's reason. Answers go to
-data/review_adjudication.jsonl; the summary at the end tells how often a person reading the case alone reaches the gold level.
-Run it again to continue; the sample is the same for the same seed."""
+Lấy một mẫu theo hạt giống trong các ca mà mô hình phân xử đã quyết định, hiện từng ca KHÔNG kèm nhãn nào, hỏi nhãn của chính
+bạn (cùng cú pháp với label.py), rồi mới cho xem nhãn chuẩn và lý do của người phân xử. Câu trả lời ghi vào
+data/review_adjudication.jsonl; phần tóm tắt cuối cho biết một người đọc ca một mình đạt đúng mức chuẩn với tần suất nào.
+Chạy lại để tiếp tục; cùng hạt giống thì mẫu giống nhau.
+"""
 import argparse
 import os
 import random
@@ -17,12 +18,14 @@ OUT = os.path.join(DATA, "review_adjudication.jsonl")
 
 
 def sample(seed: int, n: int) -> list:
+    """Lấy mẫu `n` mã ca theo hạt giống trong các ca có nhãn chuẩn do người phân xử quyết định (method là adjudicated)."""
     adjudicated = sorted(r["id"] for r in read_jsonl(GOLD) if r["method"] == "adjudicated")
     random.Random(seed).shuffle(adjudicated)
     return adjudicated[:n]
 
 
 def summary(rows: list) -> str:
+    """Tóm tắt các câu trả lời của người xem lại: số ca, số ca trùng mức nhãn chuẩn, số ca trùng cả mức lẫn mã."""
     rows = list(latest(rows).values())
     if not rows:
         return "chưa có câu trả lời nào"
@@ -32,6 +35,15 @@ def summary(rows: list) -> str:
 
 
 def run(n: int, seed: int, annotator: str, input_fn=input, output=print) -> None:
+    """Vòng kiểm tra tương tác: hiện từng ca trong mẫu chưa xem lại, đọc nhãn của người xem, hiện nhãn chuẩn kèm lý do phân xử và lưu câu trả lời.
+
+    Args:
+        n: cỡ mẫu.
+        seed: hạt giống chọn mẫu.
+        annotator: mã người xem lại.
+        input_fn: hàm đọc dòng nhập (thay được khi kiểm thử).
+        output: hàm in (thay được khi kiểm thử).
+    """
     gold = {r["id"]: r for r in read_jsonl(GOLD)}
     _, cases = load_cases()
     by_id = {c["id"]: c for c in cases}
@@ -52,6 +64,7 @@ def run(n: int, seed: int, annotator: str, input_fn=input, output=print) -> None
 
 
 def main() -> None:
+    """Điểm vào dòng lệnh: đọc --n, --seed, --annotator rồi chạy vòng kiểm tra."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--n", type=int, default=20)
     parser.add_argument("--seed", type=int, default=7)

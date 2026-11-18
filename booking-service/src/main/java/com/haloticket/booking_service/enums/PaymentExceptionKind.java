@@ -1,6 +1,6 @@
 package com.haloticket.booking_service.enums;
 
-/** Why a payment needs a person to look at it. Values are stored as text (payment_exceptions.kind, CHECK constraint). */
+/** Lý do một khoản thanh toán cần người xem xét. Giá trị lưu dạng chữ (cột payment_exceptions.kind, có ràng buộc CHECK). */
 public enum PaymentExceptionKind {
     LATE_PAYMENT_NO_STOCK,
     LATE_PAYMENT_SEATS_UNAVAILABLE,

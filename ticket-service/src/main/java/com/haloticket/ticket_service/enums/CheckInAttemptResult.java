@@ -1,8 +1,8 @@
 package com.haloticket.ticket_service.enums;
 
 /**
- * Outcome of one scan, stored in checkin_attempts.result (a varchar with a CHECK constraint that Hibernate never updates:
- * adding a value needs a new SQL migration, see haloticket-infrastructure/postgres/migrations).
+ * Kết quả của một lần quét vé, lưu ở cột {@code checkin_attempts.result} (varchar có ràng buộc CHECK mà Hibernate không bao giờ cập nhật:
+ * thêm giá trị mới cần một migration SQL mới, xem {@code haloticket-infrastructure/postgres/migrations}).
  */
 public enum CheckInAttemptResult {
     SUCCESS,

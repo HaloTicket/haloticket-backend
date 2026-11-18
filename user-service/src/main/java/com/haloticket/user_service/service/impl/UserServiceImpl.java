@@ -39,6 +39,10 @@ import com.haloticket.user_service.dto.response.AdminUserDetailResponse;
 import com.haloticket.user_service.entity.EkycProfile;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Cài đặt nghiệp vụ người dùng: tạo, đồng bộ từ JWT Keycloak, cập nhật hồ sơ, đổi mật khẩu,
+ * mời người dùng và các truy vấn quản trị (danh sách, chi tiết, gán vai trò).
+ */
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
@@ -47,6 +51,13 @@ public class UserServiceImpl implements UserService {
     private final JwtRoleConverter jwtRoleConverter;
     private final KeycloakAuthPort keycloakAuthPort;
 
+    /**
+     * Tạo người dùng mới với trạng thái {@code ACTIVE}.
+     *
+     * @param request thông tin người dùng, bắt buộc có Keycloak ID và email
+     * @return người dùng vừa lưu
+     * @throws ResponseStatusException HTTP 400 khi thiếu Keycloak ID hoặc email, HTTP 409 khi danh tính đã tồn tại
+     */
     @Override
     public UserResponse createUser(UserCreateRequest request) {
         if (request == null || isBlank(request.getKeycloakId()) || isBlank(request.getEmail())) {
@@ -68,6 +79,13 @@ public class UserServiceImpl implements UserService {
         return toResponse(userRepository.save(user));
     }
 
+    /**
+     * Tra người dùng theo Keycloak ID.
+     *
+     * @param keycloakId mã chủ thể (sub) trên Keycloak
+     * @return thông tin người dùng
+     * @throws ResponseStatusException HTTP 404 khi không tìm thấy
+     */
     @Override
     public UserResponse getUserByKeycloakId(String keycloakId) {
         return userRepository.findByKeycloakId(keycloakId)
@@ -75,6 +93,16 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
 
+    /**
+     * Đồng bộ người dùng hiện tại từ JWT vào cơ sở dữ liệu mỗi lần đăng nhập.
+     * Tìm theo Keycloak ID rồi theo email; tạo mới nếu chưa có, gắn lại Keycloak ID cho tài khoản
+     * cũ chưa liên kết (ID rỗng hoặc bắt đầu bằng {@code kc-}). Bổ sung avatar, tên và gộp thêm vai trò từ token,
+     * đồng thời cập nhật thời điểm đăng nhập cuối. Thiếu email thì dùng {@code <sub>@haloticket.local}.
+     *
+     * @param jwt token đã xác thực của người dùng
+     * @return người dùng sau khi đồng bộ
+     * @throws ResponseStatusException HTTP 400 khi token không có sub, HTTP 409 khi email thuộc danh tính khác
+     */
     @Override
     public UserResponse syncCurrentUser(Jwt jwt) {
         String keycloakId = jwt == null ? null : jwt.getSubject();
@@ -97,7 +125,7 @@ public class UserServiceImpl implements UserService {
 
         final String targetEmail = email;
 
-        // 1. try to find user by Keycloak ID
+        // 1. Thử tìm người dùng theo Keycloak ID (và theo email để phát hiện xung đột)
         Optional<User> userByKeycloak = userRepository.findByKeycloakId(keycloakId);
         Optional<User> userByEmail = userRepository.findByEmail(targetEmail);
         User user;
@@ -157,6 +185,14 @@ public class UserServiceImpl implements UserService {
         return toResponse(userRepository.save(user));
     }
 
+    /**
+     * Cập nhật hồ sơ (họ tên, số điện thoại, giới tính, avatar) của người dùng đang đăng nhập.
+     *
+     * @param jwt token đã xác thực
+     * @param request dữ liệu hồ sơ mới; avatar nếu có phải là URL ảnh HTTPS công khai
+     * @return hồ sơ sau khi cập nhật
+     * @throws ResponseStatusException HTTP 400 khi token thiếu sub, request rỗng hoặc avatar không hợp lệ; HTTP 404 khi không có người dùng
+     */
     @Override
     public UserResponse updateCurrentUser(Jwt jwt, UserProfileUpdateRequest request) {
         String keycloakId = jwt == null ? null : jwt.getSubject();
@@ -178,6 +214,14 @@ public class UserServiceImpl implements UserService {
         return toResponse(userRepository.save(user));
     }
 
+    /**
+     * Đổi mật khẩu của người dùng hiện tại sau khi xác minh mật khẩu cũ bằng cách thử đăng nhập Keycloak.
+     *
+     * @param jwt token đã xác thực
+     * @param currentPassword mật khẩu hiện tại
+     * @param newPassword mật khẩu mới
+     * @throws ResponseStatusException HTTP 400 khi token thiếu sub hoặc mật khẩu hiện tại sai, HTTP 404 khi không có người dùng
+     */
     @Override
     public void changePassword(Jwt jwt, String currentPassword, String newPassword) {
         String keycloakId = jwt == null ? null : jwt.getSubject();
@@ -188,16 +232,17 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         
         try {
-            // verify current password by attempting to login
+            // Xác minh mật khẩu hiện tại bằng cách thử đăng nhập
             keycloakAuthPort.login(user.getEmail(), currentPassword);
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mật khẩu hiện tại không đúng");
         }
         
-        // update to new password
+        // Đặt mật khẩu mới trên Keycloak
         keycloakAuthPort.changePassword(keycloakId, newPassword);
     }
 
+    /** Chuyển thực thể {@code User} sang {@code UserResponse}; dùng riêng cho {@code getUserById}. */
     private UserResponse mapToUserResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())
@@ -213,6 +258,13 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    /**
+     * Tra người dùng theo ID nội bộ.
+     *
+     * @param id ID người dùng trong cơ sở dữ liệu
+     * @return thông tin người dùng
+     * @throws ResponseStatusException HTTP 404 khi không tìm thấy
+     */
     @Override
     public UserResponse getUserById(String id) {
         return userRepository.findById(id)
@@ -220,6 +272,14 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
 
+    /**
+     * Mời người dùng theo email. Nếu email đã có tài khoản thì trả về thông tin hiện có;
+     * nếu chưa, tạo tài khoản "ngủ" trên Keycloak rồi đọc lại bản ghi vừa được tạo.
+     *
+     * @param request yêu cầu chứa email (được chuẩn hóa về chữ thường)
+     * @return thông tin người được mời, kèm cờ {@code isNewUser}
+     * @throws ResponseStatusException HTTP 400 khi email không hợp lệ, HTTP 500 khi tạo tài khoản thất bại
+     */
     @Override
     public UserInviteResponse inviteUser(UserInviteRequest request) {
         String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
@@ -238,19 +298,19 @@ public class UserServiceImpl implements UserService {
                     .build();
         }
 
-        // an account nobody can sign in to yet: the invited person sets a password through the password reset flow,
-        // which sends a code to this very mailbox (no password is chosen, returned, logged or e-mailed here)
+        // Tài khoản chưa ai đăng nhập được: người được mời tự đặt mật khẩu qua luồng quên mật khẩu,
+        // luồng này gửi mã đến chính hộp thư đó (ở đây không chọn, trả về, ghi log hay gửi email mật khẩu nào)
         try {
             keycloakAuthPort.registerDormant(email);
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to create user in Keycloak");
         }
 
-        // fetch the newly created user
+        // Đọc lại người dùng vừa tạo
         User newUser = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User creation failed"));
         
-        // return response
+        // Trả về kết quả
         return UserInviteResponse.builder()
                 .userId(newUser.getId())
                 .email(newUser.getEmail())
@@ -260,6 +320,18 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    /**
+     * Danh sách người dùng cho trang quản trị, có phân trang và lọc động.
+     * Giá trị {@code ALL} hoặc {@code null} nghĩa là không lọc; trạng thái hoặc vai trò không hợp lệ bị bỏ qua.
+     * Trạng thái eKYC {@code UNVERIFIED} khớp những người chưa có hồ sơ eKYC.
+     *
+     * @param query từ khóa tìm trong email, họ tên, số điện thoại
+     * @param status trạng thái tài khoản
+     * @param ekycStatus trạng thái eKYC
+     * @param role vai trò
+     * @param pageable thông tin phân trang và sắp xếp
+     * @return một trang phần tử danh sách quản trị
+     */
     @Override
     @Transactional(readOnly = true)
     public Page<AdminUserListItem> getAdminUsers(String query, String status, String ekycStatus, String role, Pageable pageable) {
@@ -314,6 +386,13 @@ public class UserServiceImpl implements UserService {
         });
     }
 
+    /**
+     * Chi tiết người dùng cho quản trị viên, gồm cả thông tin eKYC, ngân hàng và thuế.
+     *
+     * @param id ID nội bộ hoặc Keycloak ID của người dùng
+     * @return chi tiết người dùng; trường eKYC là {@code null} nếu chưa có hồ sơ, trạng thái mặc định {@code UNVERIFIED}
+     * @throws ResponseStatusException HTTP 404 khi không tìm thấy
+     */
     @Override
     @Transactional(readOnly = true)
     public AdminUserDetailResponse getAdminUserDetail(String id) {
@@ -355,6 +434,13 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    /**
+     * Gán thêm một vai trò cho người dùng; không làm gì nếu người dùng đã có vai trò đó.
+     *
+     * @param id ID nội bộ của người dùng
+     * @param role vai trò cần thêm
+     * @throws ResponseStatusException HTTP 404 khi không tìm thấy người dùng
+     */
     @Override
     @Transactional
     public void addRoleToUser(String id, Role role) {
@@ -369,6 +455,7 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    /** Chuyển thực thể {@code User} sang {@code UserResponse} cho các thao tác tạo, tra cứu và đồng bộ. */
     private UserResponse toResponse(User user) {
         return UserResponse.builder()
                 .id(user.getId())
@@ -384,6 +471,7 @@ public class UserServiceImpl implements UserService {
                 .build();
     }
 
+    /** Suy ra tên hiển thị từ claim {@code name}, rồi {@code given_name} + {@code family_name}, cuối cùng {@code preferred_username}. */
     private String resolveName(Jwt jwt) {
         String name = jwt.getClaimAsString("name");
         if (!isBlank(name)) {
@@ -395,10 +483,12 @@ public class UserServiceImpl implements UserService {
         return !combined.isBlank() ? combined : jwt.getClaimAsString("preferred_username");
     }
 
+    /** Trả về {@code true} khi chuỗi là {@code null} hoặc chỉ gồm khoảng trắng. */
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
     }
 
+    /** Kiểm tra URL ảnh hợp lệ: dùng HTTPS, có host và không chứa thông tin đăng nhập (userinfo). */
     private boolean isPublicImageUrl(String value) {
         if (isBlank(value)) return false;
         try {

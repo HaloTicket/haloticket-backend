@@ -1,11 +1,12 @@
-"""Dev-split comparison of ways to make the model layer find more of what the rules miss, without touching production code:
-python -m research.risk.experiments.model_variants [base|prompt|big|prompt_big]   (dev only; the test split is never used here)
+"""So sánh trên tập dev các cách giúp lớp mô hình tìm thêm những gì luật bỏ sót, mà không sửa mã production:
+python -m research.risk.experiments.model_variants [base|prompt|big|prompt_big]   (chỉ dev; không bao giờ dùng tập test ở đây)
 
-base        the shipped prompt (risk-c-v2) on the "fast" tier (Groq gpt-oss-20b); answers come from the existing cache
-prompt      the same model with extra, generic guidance in the prompt (no list of example phrases: they would leak the generator)
-big         the shipped prompt on the "smart" tier (Groq gpt-oss-120b, temperature 0)
-prompt_big  both
-Each variant has its own response cache (cache/variant-<name>.jsonl)."""
+base        prompt đang dùng (risk-c-v2) trên tầng "fast" (Groq gpt-oss-20b); câu trả lời lấy từ cache có sẵn
+prompt      cùng mô hình với hướng dẫn chung bổ sung trong prompt (không có danh sách cụm từ ví dụ vì sẽ làm lộ bộ sinh ca)
+big         prompt đang dùng trên tầng "smart" (Groq gpt-oss-120b, temperature 0)
+prompt_big  cả hai
+Mỗi biến thể có cache phản hồi riêng (cache/variant-<tên>.jsonl).
+"""
 import dataclasses
 import json
 import sys
@@ -26,6 +27,7 @@ EXTRA = (
 
 
 def install(variant: str):
+    """Cài biến thể vào mã đang chạy mà không sửa mã production: thêm hướng dẫn phụ vào prompt (biến thể có 'prompt') và/hoặc nâng tầng mô hình lên smart (biến thể có 'big')."""
     if "prompt" in variant:
         original = semantic.build_prompt
         semantic.build_prompt = lambda *args, **kwargs: original(*args, **kwargs) + EXTRA
@@ -35,6 +37,7 @@ def install(variant: str):
 
 
 def main(variant: str) -> None:
+    """Chạy C4 và C5 trên tập dev với biến thể đã chọn rồi in F1, độ chính xác, bỏ sót và báo sai HIGH, số cờ giữ lại và độ chính xác, độ phủ từng mã."""
     gold = {r["id"]: r for r in common.read_jsonl(common.GOLD_PATH)}
     dev = set(json.load(open(common.SPLIT_PATH, encoding="utf-8"))["dev"])
     _, cases = common.load_cases()

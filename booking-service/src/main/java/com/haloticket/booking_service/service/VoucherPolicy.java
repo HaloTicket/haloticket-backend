@@ -9,9 +9,9 @@ import java.util.List;
 import java.util.function.LongSupplier;
 
 /**
- * Decides whether a voucher may be used on an order and how much it takes off. Every refusal is an
- * {@link VoucherNotApplicableException} whose message is written for the buyer (the order is answered with 400), so a
- * voucher that does not apply is never silently ignored.
+ * Quyết định voucher có dùng được cho đơn không và giảm bao nhiêu. Mọi từ chối đều là
+ * {@link VoucherNotApplicableException} với thông điệp viết cho người mua (đơn được trả lời bằng HTTP 400), nên voucher
+ * không áp dụng được sẽ không bao giờ bị lặng lẽ bỏ qua.
  */
 public final class VoucherPolicy {
 
@@ -21,15 +21,20 @@ public final class VoucherPolicy {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
     };
 
+    /** Lớp tiện ích không tạo đối tượng. */
     private VoucherPolicy() {}
 
     /**
-     * @param tickets          tickets in the order
-     * @param subtotal         price of the order before the discount
-     * @param showtimeId       showtime the order is for (a voucher limited to showtimes needs it in its list)
-     * @param priorOrdersOfBuyer how many paid orders this buyer already made with the voucher; only asked when the
-     *                         voucher limits orders per buyer
-     * @return the discount, never above the subtotal
+     * Tính số tiền giảm của voucher cho đơn: kiểm tra trạng thái, thời gian hiệu lực, giới hạn lượt dùng, số vé mỗi đơn,
+     * số đơn mỗi người mua và phạm vi suất chiếu; sau đó tính theo phần trăm hoặc số tiền cố định.
+     * @param voucher voucher cần áp dụng, null nghĩa là không tồn tại
+     * @param tickets số vé trong đơn
+     * @param subtotal giá đơn trước khi giảm
+     * @param showtimeId suất chiếu của đơn (voucher giới hạn theo suất chiếu cần có suất này trong danh sách)
+     * @param now thời điểm hiện tại để kiểm tra hiệu lực
+     * @param priorOrdersOfBuyer số đơn đã thanh toán của người mua với voucher này; chỉ được hỏi khi voucher giới hạn số đơn mỗi người mua
+     * @return số tiền giảm, không bao giờ vượt quá giá đơn
+     * @throws VoucherNotApplicableException khi voucher không dùng được cho đơn
      */
     public static double discountFor(VoucherResponse voucher, int tickets, double subtotal, String showtimeId,
                                      LocalDateTime now, LongSupplier priorOrdersOfBuyer) {
@@ -85,14 +90,14 @@ public final class VoucherPolicy {
         return Math.max(0.0, Math.min(discount, subtotal));
     }
 
-    /** A blank or unreadable date means no limit on that side. */
+    /** Đọc thời gian theo các định dạng được hỗ trợ; chuỗi trống hoặc không đọc được nghĩa là không giới hạn phía đó. */
     static LocalDateTime parse(String text) {
         if (text == null || text.isBlank()) return null;
         for (DateTimeFormatter format : DATE_FORMATS) {
             try {
                 return LocalDateTime.parse(text.trim(), format);
             } catch (RuntimeException ignored) {
-                // try the next format
+                // thử định dạng tiếp theo
             }
         }
         return null;

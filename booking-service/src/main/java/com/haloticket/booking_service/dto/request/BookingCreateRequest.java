@@ -3,6 +3,7 @@ package com.haloticket.booking_service.dto.request;
 import lombok.Data;
 import java.util.List;
 
+/** Yêu cầu tạo đơn đặt vé: người mua, sự kiện, suất chiếu, voucher, ghế đã chọn và các dòng vé. */
 @Data
 public class BookingCreateRequest {
     private String customerId;

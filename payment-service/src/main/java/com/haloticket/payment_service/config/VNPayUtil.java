@@ -6,8 +6,16 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
 
+/** Tiện ích cho tích hợp VNPay: ký HMAC-SHA512, lấy IP người gọi, sinh chuỗi số ngẫu nhiên. */
 public class VNPayUtil {
 
+    /**
+     * Tính HMAC-SHA512 và trả về chuỗi hex chữ thường.
+     *
+     * @param key khóa bí mật
+     * @param data dữ liệu cần ký
+     * @return chuỗi hex; null khi khóa hoặc dữ liệu null; chuỗi rỗng khi có lỗi
+     */
     public static String hmacSHA512(final String key, final String data) {
         try {
             if (key == null || data == null) {
@@ -29,6 +37,12 @@ public class VNPayUtil {
         }
     }
 
+    /**
+     * Lấy địa chỉ IP của client: ưu tiên header {@code X-FORWARDED-FOR}, không có thì dùng địa chỉ kết nối; lỗi thì trả {@code 127.0.0.1}.
+     *
+     * @param request yêu cầu HTTP
+     * @return địa chỉ IP
+     */
     public static String getIpAddress(HttpServletRequest request) {
         String ipAddress;
         try {
@@ -42,6 +56,12 @@ public class VNPayUtil {
         return ipAddress;
     }
 
+    /**
+     * Sinh chuỗi gồm các chữ số ngẫu nhiên.
+     *
+     * @param len độ dài chuỗi
+     * @return chuỗi số ngẫu nhiên
+     */
     public static String getRandomNumber(int len) {
         Random rnd = new Random();
         String chars = "0123456789";

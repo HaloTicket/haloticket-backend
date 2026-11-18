@@ -19,9 +19,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Who paid, how, and for which event, for the rows of the admin reconciliation page. Every lookup is best effort: a user,
- * event or payment service that does not answer leaves that field null and never fails the page (the order code and amount
- * still identify the row). At most LOOKUP_MAX distinct customers and events are looked up per page.
+ * Bổ sung cho các dòng của trang đối soát admin: ai đã trả, trả bằng cách nào và cho sự kiện nào. Mọi lần tra cứu đều theo kiểu
+ * cố gắng hết sức: user-service, event-service hoặc payment-service không trả lời thì trường đó để null và không làm hỏng trang (mã đơn và số tiền
+ * vẫn đủ nhận diện dòng). Mỗi trang tra cứu tối đa LOOKUP_MAX khách và sự kiện khác nhau.
  */
 @Service
 @RequiredArgsConstructor
@@ -35,31 +35,51 @@ public class ReconciliationDetails {
     private final EventServiceClient events;
     private final PaymentServiceClient payments;
 
+    /** Thông tin liên hệ của khách (tên, email, số điện thoại); {@code NONE} khi không có. */
     record Customer(String name, String email, String phone) {
         static final Customer NONE = new Customer(null, null, null);
     }
 
-    /** Per-call caches so one customer or event is looked up once however many rows mention it. */
+    /** Cache theo từng lần gọi để mỗi khách hoặc sự kiện chỉ được tra một lần dù có nhiều dòng nhắc tới. */
     private final class Lookups {
         private final Map<String, Booking> byBooking;
         private final Map<String, Customer> customers = new HashMap<>();
         private final Map<String, String> titles = new HashMap<>();
         private final Map<String, String> methods;
 
+        /**
+         * Nạp sẵn các đơn và phương thức thanh toán của danh sách mã đơn.
+         * @param bookingIds các mã đơn cần tra cứu, trùng được gộp
+         */
         Lookups(Collection<String> bookingIds) {
             this.byBooking = bookingIds.isEmpty() ? Map.of() : bookings.findAllById(bookingIds.stream().distinct().toList()).stream()
                     .collect(Collectors.toMap(Booking::getId, Function.identity(), (a, b) -> a));
             this.methods = methodsOf(byBooking.keySet());
         }
 
+        /**
+         * Lấy đơn đã nạp theo id.
+         * @param id mã đơn, có thể null
+         * @return đơn, hoặc null nếu không có
+         */
         Booking booking(String id) {
             return id == null ? null : byBooking.get(id);
         }
 
+        /**
+         * Lấy phương thức thanh toán của đơn.
+         * @param bookingId mã đơn, có thể null
+         * @return phương thức thanh toán, hoặc null nếu không biết
+         */
         String method(String bookingId) {
             return bookingId == null ? null : methods.get(bookingId);
         }
 
+        /**
+         * Lấy thông tin khách của đơn: ưu tiên tên và email từ user-service (nếu tra được), kèm số điện thoại; có giới hạn số lần tra.
+         * @param booking đơn, có thể null
+         * @return thông tin khách, {@code Customer.NONE} nếu không có đơn
+         */
         Customer customer(Booking booking) {
             if (booking == null) return Customer.NONE;
             String key = booking.getCustomerId() == null ? "booking:" + booking.getId() : booking.getCustomerId();
@@ -83,6 +103,11 @@ public class ReconciliationDetails {
             });
         }
 
+        /**
+         * Lấy tên sự kiện từ event-service, có cache và giới hạn số lần tra.
+         * @param eventId mã sự kiện
+         * @return tên sự kiện, hoặc null nếu không tra được
+         */
         String eventTitle(String eventId) {
             if (eventId == null || eventId.isBlank()) return null;
             if (titles.containsKey(eventId)) return titles.get(eventId);
@@ -100,6 +125,11 @@ public class ReconciliationDetails {
         }
     }
 
+    /**
+     * Hỏi payment-service phương thức thanh toán của các đơn; lỗi thì trả bản đồ rỗng.
+     * @param bookingIds mã các đơn
+     * @return bản đồ mã đơn sang phương thức thanh toán
+     */
     private Map<String, String> methodsOf(Collection<String> bookingIds) {
         if (bookingIds.isEmpty()) return Map.of();
         try {
@@ -111,6 +141,11 @@ public class ReconciliationDetails {
         }
     }
 
+    /**
+     * Bổ sung khách, phương thức thanh toán và sự kiện vào các dòng ngoại lệ thanh toán.
+     * @param items các dòng ngoại lệ
+     * @return các dòng đã bổ sung thông tin
+     */
     public List<ReconciliationService.ExceptionItem> exceptionItems(List<ReconciliationService.ExceptionItem> items) {
         Lookups lookups = new Lookups(items.stream().map(ReconciliationService.ExceptionItem::bookingId).filter(java.util.Objects::nonNull).toList());
         List<ReconciliationService.ExceptionItem> out = new ArrayList<>();
@@ -124,6 +159,11 @@ public class ReconciliationDetails {
         return out;
     }
 
+    /**
+     * Bổ sung khách, phương thức thanh toán, số tiền và sự kiện vào các dòng đơn đã thanh toán nhưng thiếu vé.
+     * @param items các dòng đơn đã thanh toán thiếu vé
+     * @return các dòng đã bổ sung thông tin
+     */
     public List<ReconciliationService.PaidWithoutTicketsItem> paidItems(List<ReconciliationService.PaidWithoutTicketsItem> items) {
         Lookups lookups = new Lookups(items.stream().map(ReconciliationService.PaidWithoutTicketsItem::bookingId).filter(java.util.Objects::nonNull).toList());
         List<ReconciliationService.PaidWithoutTicketsItem> out = new ArrayList<>();
@@ -137,7 +177,7 @@ public class ReconciliationDetails {
         return out;
     }
 
-    /** The ticket types with a stock discrepancy come from ticket-service with an event id only: add the event's name. */
+    /** Các loại vé lệch tồn kho đến từ ticket-service chỉ có mã sự kiện: bổ sung thêm tên sự kiện. */
     public List<Map<String, Object>> stockRows(List<Map<String, Object>> rows) {
         Lookups lookups = new Lookups(List.of());
         List<Map<String, Object>> out = new ArrayList<>();
@@ -150,10 +190,12 @@ public class ReconciliationDetails {
         return out;
     }
 
+    /** Chuỗi null hoặc trống thì thành null, ngược lại cắt khoảng trắng hai đầu. */
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
+    /** Trả giá trị không trống đầu tiên trong hai chuỗi, hoặc null nếu cả hai đều trống. */
     private static String firstNonBlank(String first, String second) {
         String a = blankToNull(first);
         return a != null ? a : blankToNull(second);

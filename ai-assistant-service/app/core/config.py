@@ -1,22 +1,24 @@
+"""Cấu hình của dịch vụ AI, đọc từ biến môi trường hoặc tệp `.env`."""
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
+    """Toàn bộ thông số cấu hình: kết nối, khóa API, giới hạn tần suất, ngưỡng rủi ro và các mốc cảnh báo của trang quản trị."""
     app_name: str = "ai-assistant-service"
     port: int = 8089
     eureka_server: str = "http://localhost:8761/eureka"
-    database_url: str = ""  # DATABASE_URL; no default credentials. Empty = DB-backed routes answer 503 AI_DB_NOT_CONFIGURED
+    database_url: str = ""  # DATABASE_URL; không có thông tin đăng nhập mặc định. Để trống = các route dùng DB trả 503 AI_DB_NOT_CONFIGURED
     gemini_api_key: str = "your-default-key-if-missing"
     groq_api_key: str = ""
     openai_api_key: str = ""
-    llm_timeout_seconds: int = 45  # per call to a chat model; LLM_TIMEOUT_SECONDS overrides
+    llm_timeout_seconds: int = 45  # cho mỗi lần gọi mô hình chat; biến LLM_TIMEOUT_SECONDS sẽ ghi đè
 
-    # verification of the Keycloak access token on the admin / analysis routes
+    # xác thực access token của Keycloak trên các route quản trị / phân tích
     keycloak_issuer_uri: str = ""
     keycloak_jwk_set_uri: str = ""
-    auth_audience: str = ""  # optional; empty = audience not checked, as at the gateway
+    auth_audience: str = ""  # tùy chọn; để trống = không kiểm tra audience, giống ở gateway
 
-    # data analysis (text-to-SQL). the account is a read-only role that sees only the analysis views.
-    # Both are required: without them the analysis routes answer 503 AI_DB_NOT_CONFIGURED (the service itself still starts).
+    # phân tích dữ liệu (text-to-SQL). Tài khoản là role chỉ đọc, chỉ thấy các view phân tích.
+    # Cả hai đều bắt buộc: thiếu thì các route phân tích trả 503 AI_DB_NOT_CONFIGURED (bản thân dịch vụ vẫn khởi động).
     ai_db_user: str = ""
     ai_db_password: str = ""
     ai_analysis_schema: str = "ai_analytics"
@@ -28,24 +30,24 @@ class Settings(BaseSettings):
     ai_sql_timeout_ms: int = 5000
     ai_sql_max_result_chars: int = 200000
 
-    # data analysis for organizers: limited to the events they may manage
+    # phân tích dữ liệu cho organizer: chỉ trong phạm vi các sự kiện họ được quản lý
     ai_scope_columns: str = (
         "v_events:event_id,v_event_showtimes:event_id,v_ticket_types:event_id,v_ticket_sales_daily:event_id,"
         "v_booking_summary_daily:event_id,v_event_views_daily:event_id,v_vouchers:event_id"
-    )  # relation:column that holds the event id
-    ai_scope_public_relations: str = "v_venues,v_event_categories"  # no event id, public information
+    )  # dạng relation:column, cột chứa mã sự kiện
+    ai_scope_public_relations: str = "v_venues,v_event_categories"  # không có mã sự kiện, là thông tin công khai
     ai_scope_max_events: int = 500
-    user_service_url: str = "http://user-service:8081"  # to turn the token into the user-service user id
-    user_service_timeout_seconds: float = 8.0  # the first call after a user-service start can be slow
+    user_service_url: str = "http://user-service:8081"  # để đổi token thành mã người dùng của user-service
+    user_service_timeout_seconds: float = 8.0  # lần gọi đầu tiên sau khi user-service khởi động có thể chậm
 
-    # admin screens
-    ai_system_log_file: str = "/app/event-error.log"  # legacy single file; used only when ai_system_log_dir is empty
-    ai_system_log_dir: str = ""  # AI_SYSTEM_LOG_DIR: folder with one <service>.log per service (compose mounts it read only)
+    # các màn hình quản trị
+    ai_system_log_file: str = "/app/event-error.log"  # tệp đơn kiểu cũ; chỉ dùng khi ai_system_log_dir để trống
+    ai_system_log_dir: str = ""  # AI_SYSTEM_LOG_DIR: thư mục chứa mỗi dịch vụ một tệp <service>.log (compose gắn ở chế độ chỉ đọc)
     ai_system_log_max_lines: int = 100
-    ai_actuator_port: int = 9091  # management port of the Spring services (not published outside the compose network)
-    alert_ssl_domains: str = "haloticket.duckdns.org"  # ALERT_SSL_DOMAINS: the only domains /ssl-status will look at
+    ai_actuator_port: int = 9091  # cổng quản lý của các dịch vụ Spring (không mở ra ngoài mạng compose)
+    alert_ssl_domains: str = "haloticket.duckdns.org"  # ALERT_SSL_DOMAINS: các tên miền duy nhất mà /ssl-status được phép kiểm tra
 
-    # model calls (app/services/ai/ai_call.py): numeric limits only
+    # gọi mô hình (app/services/ai/ai_call.py): chỉ gồm các giới hạn số
     ai_llm_deadline_seconds: int = 20
     ai_max_tokens_customer_chat: int = 600
     ai_max_tokens_admin_assistant: int = 700
@@ -58,16 +60,16 @@ class Settings(BaseSettings):
     ai_search_cache_seconds: int = 300
     ai_trusted_proxy_cidrs: str = "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8,::1"
 
-    # addresses (empty = feature degrades, service still starts)
+    # địa chỉ kết nối (để trống = tính năng suy giảm, dịch vụ vẫn khởi động)
     redis_url: str = ""
     ai_ops_database_url: str = ""
-    ai_admin_database_url: str = ""  # role ai_admin_rw on ai_ops: risk assessments, decisions, pins, dashboard summaries
-    internal_api_base_url: str = "http://api-gateway:8888"  # admin data is read through the gateway with the admin's own token
+    ai_admin_database_url: str = ""  # role ai_admin_rw trên ai_ops: đánh giá rủi ro, quyết định, ghim, tóm tắt bảng điều khiển
+    internal_api_base_url: str = "http://api-gateway:8888"  # dữ liệu quản trị được đọc qua gateway bằng chính token của admin
     internal_api_timeout_seconds: float = 3.0
     chatbot_event_database_url: str = ""
     chatbot_ticket_database_url: str = ""
 
-    # rate limits (fixed windows)
+    # giới hạn tần suất (cửa sổ cố định)
     ai_rl_customer_search_per_minute: int = 20
     ai_rl_customer_chat_ip_per_minute: int = 6
     ai_rl_customer_chat_ip_per_hour: int = 60
@@ -83,22 +85,23 @@ class Settings(BaseSettings):
     ai_rl_risk_scoring_per_hour: int = 60
     ai_rl_dashboard_summary_per_day: int = 10
 
-    # admin intelligence (risk assessment, dashboard KPIs, attention feed). Numbers only; every one has a default.
+    # phần thông minh cho quản trị (đánh giá rủi ro, KPI bảng điều khiển, mục cần chú ý). Chỉ gồm số; mỗi mục đều có mặc định.
     risk_medium_threshold: int = 30
     risk_high_threshold: int = 60
-    risk_block_floor: int = 70  # a BLOCK rule (prohibited goods, guaranteed profit) never scores below this
-    risk_ai_max_points: int = 30  # the language-model layer can add at most this many points
-    risk_organizer_signal_cap: int = 30  # account age, eKYC and rejection history are correlated: together they add at most this much
+    risk_block_floor: int = 70  # luật BLOCK (hàng cấm, cam kết lợi nhuận) không bao giờ có điểm thấp hơn mức này
+    risk_ai_max_points: int = 30  # lớp mô hình ngôn ngữ chỉ được cộng tối đa chừng này điểm
+    risk_organizer_signal_cap: int = 30  # tuổi tài khoản, eKYC và lịch sử bị từ chối có tương quan với nhau: cộng lại tối đa chừng này điểm
     attn_high_risk_pending_hours: int = 12
     attn_critical_pending_hours: int = 24
     attn_late_payment_minutes: int = 30
     attn_paid_without_tickets_minutes: int = 15
     attn_resale_pending_hours: int = 24
     ai_pins_max_per_admin: int = 12
-    admin_cache_seconds: int = 30  # attention feed; the KPI cache is twice this
+    admin_cache_seconds: int = 30  # danh sách cần chú ý; bộ đệm KPI gấp đôi giá trị này
 
     class Config:
+        """Cấu hình pydantic: đọc biến môi trường từ tệp .env và bỏ qua biến không khai báo."""
         env_file = [".env", "../.env"]
-        extra = "ignore" # skip undefined env
+        extra = "ignore" # bỏ qua biến môi trường không khai báo
 
 settings = Settings()

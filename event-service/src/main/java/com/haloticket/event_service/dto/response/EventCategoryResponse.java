@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/** Thông tin một danh mục sự kiện trả về cho client. */
 @Data
 @Builder
 @NoArgsConstructor

@@ -27,22 +27,25 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Stock holds for general-admission (no seatmap) orders. ticket-service owns the numbers; this class decides which
- * part of an order is general admission and calls reserve/release.
+ * Giữ tồn kho cho đơn vé vào cổng tự do (không có sơ đồ ghế). ticket-service giữ số liệu tồn kho; lớp này quyết định
+ * phần nào của đơn là vé vào cổng tự do và gọi reserve/release.
  */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class GaReservationService {
 
+    /** Một dòng vé vào cổng tự do: loại vé và số lượng cần giữ. */
     public record GaItem(String ticketTypeId, int quantity) {}
 
-    // what is held as stock (gaItems) and what still goes through the per-seat flow (seatIds)
+    /** Kế hoạch tách đơn: phần giữ theo tồn kho (gaItems) và phần còn đi qua luồng giữ ghế (seatIds). */
     public record Plan(List<GaItem> gaItems, List<String> seatIds) {
+        /** Đơn có phần vé vào cổng tự do hay không. */
         public boolean hasGa() {
             return gaItems != null && !gaItems.isEmpty();
         }
 
+        /** Đơn có phần ghế cần giữ theo luồng từng ghế hay không. */
         public boolean hasSeats() {
             return seatIds != null && !seatIds.isEmpty();
         }
@@ -52,6 +55,7 @@ public class GaReservationService {
     private final TicketStockClient ticketStockClient;
     private final ObjectMapper objectMapper;
 
+    /** Khi ứng dụng khởi động xong, ghi log lỗi nếu token nội bộ để gọi ticket-service bị trống (khi đó mọi lần giữ vé vào cổng tự do đều bị từ chối). */
     @EventListener(ApplicationReadyEvent.class)
     public void warnWhenInternalTokenIsBlank() {
         if (properties.getInternalToken() == null || properties.getInternalToken().isBlank()) {
@@ -60,8 +64,11 @@ public class GaReservationService {
     }
 
     /**
-     * Splits an order. A GA item is one that is flagged generalAdmission or any item of an order without seat ids;
-     * the remaining seat ids go through the per-seat flow.
+     * Tách đơn thành hai phần. Dòng vé là vé vào cổng tự do khi được đánh dấu {@code generalAdmission} hoặc khi đơn không có ghế;
+     * các ghế còn lại đi theo luồng từng ghế.
+     * @param request yêu cầu tạo đơn
+     * @return kế hoạch gồm các dòng vé tự do và danh sách ghế còn lại
+     * @throws IllegalArgumentException khi số lượng của dòng vé tự do không hợp lệ
      */
     public Plan plan(BookingCreateRequest request) {
         List<String> seatIds = request.getSeatIds();
@@ -85,8 +92,13 @@ public class GaReservationService {
     }
 
     /**
-     * Holds the stock; any failure rolls the booking back. Sold out maps to 409 TICKET_SOLD_OUT, anything else
-     * (ticket-service down, token wrong) to 503 so nothing is sold without a hold.
+     * Giữ tồn kho; mọi lỗi đều làm đơn bị hoàn tác. Hết vé trả 409 TICKET_SOLD_OUT, các lỗi khác
+     * (ticket-service ngừng chạy, sai token) trả 503 để không bán vé mà chưa giữ được hàng. Nếu giao dịch của đơn không commit thì tự nhả lại.
+     * @param bookingId mã đơn
+     * @param request yêu cầu tạo đơn
+     * @param plan kế hoạch tách đơn
+     * @param bookingExpiresAt thời điểm đơn hết hạn; cộng thêm {@code slackSeconds} để ra hạn giữ
+     * @throws ResponseStatusException HTTP 409 khi hết vé hoặc đơn giữ đã đóng, HTTP 503 khi không giữ được tồn kho
      */
     public void reserve(String bookingId, BookingCreateRequest request, Plan plan, LocalDateTime bookingExpiresAt) {
         Instant holdUntil = bookingExpiresAt.atZone(ZoneId.systemDefault()).toInstant()
@@ -124,8 +136,8 @@ public class GaReservationService {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "TICKET_STOCK_UNAVAILABLE");
         }
 
-        // If this booking's transaction does not commit, give the stock back right away; the hold's own expiry
-        // in ticket-service is the fallback when this call fails too.
+        // Nếu giao dịch của đơn này không commit thì trả lại tồn kho ngay; hạn tự hết của lượt giữ
+        // ở ticket-service là phương án dự phòng khi lệnh trả này cũng lỗi.
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -138,13 +150,17 @@ public class GaReservationService {
         }
     }
 
-    /** Gives back a hold made for this booking. */
+    /** Trả lại tồn kho đã giữ cho đơn (chỉ khi đơn có cờ {@code gaReserved}). */
     public void releaseIfReserved(Booking booking) {
         if (booking != null && Boolean.TRUE.equals(booking.getGaReserved())) {
             releaseQuietly(booking.getId());
         }
     }
 
+    /**
+     * Nhả tồn kho đã giữ cho đơn và không ném lỗi: nếu lỗi thì chỉ ghi log vì lượt giữ sẽ tự hết hạn.
+     * @param bookingId mã đơn
+     */
     public void releaseQuietly(String bookingId) {
         String token = properties.getInternalToken();
         if (token == null || token.isBlank()) {
@@ -161,9 +177,13 @@ public class GaReservationService {
     }
 
     /**
-     * Takes back the hold of a booking that was cancelled or expired before its payment arrived. Refusals that
-     * change nothing (sold out, not reopenable) are an answer; anything else (unreachable, token) throws so the
-     * caller can retry.
+     * Lấy lại lượt giữ của đơn đã bị hủy hoặc hết hạn trước khi khoản thanh toán đến. Các từ chối không thay đổi gì
+     * (hết vé, không mở lại được) là một câu trả lời; lỗi khác (không gọi được, sai token) ném ngoại lệ để bên gọi thử lại.
+     * Nếu giao dịch của bên gọi không commit thì tồn kho được trả lại.
+     * @param bookingId mã đơn
+     * @param expiresAt hạn mới của lượt giữ
+     * @return kết quả mở lại
+     * @throws IllegalStateException khi không gọi được ticket-service hoặc chưa cấu hình token
      */
     public ReopenOutcome reopen(String bookingId, Instant expiresAt) {
         String token = properties.getInternalToken();
@@ -182,7 +202,7 @@ public class GaReservationService {
         } catch (RuntimeException e) {
             throw new IllegalStateException("TICKET_STOCK_UNAVAILABLE: reopen failed", e);
         }
-        // the booking goes back to PAID in the caller's transaction; if that does not commit, give the stock back
+        // đơn quay lại PAID trong giao dịch của bên gọi; nếu giao dịch không commit thì trả lại tồn kho
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -197,9 +217,10 @@ public class GaReservationService {
         return new ReopenOutcome(true, null);
     }
 
-    /** reopened=false means ticket-service refused with {@code code} and changed nothing. */
+    /** reopened=false nghĩa là ticket-service từ chối với {@code code} và không thay đổi gì. */
     public record ReopenOutcome(boolean reopened, String code) {}
 
+    /** Đọc trường {@code code} trong nội dung lỗi trả về của Feign; chuỗi rỗng nếu không đọc được. */
     private String codeOf(FeignException exception) {
         try {
             JsonNode node = objectMapper.readTree(exception.contentUTF8());
@@ -209,6 +230,7 @@ public class GaReservationService {
         }
     }
 
+    /** Kiểm tra số lượng là số dương; ném {@code IllegalArgumentException} (thông báo cho người mua) nếu không. */
     private static int requirePositive(Integer quantity) {
         if (quantity == null || quantity <= 0) {
             throw new IllegalArgumentException("Số lượng vé không hợp lệ.");
@@ -216,6 +238,7 @@ public class GaReservationService {
         return quantity;
     }
 
+    /** Rút gọn id còn 8 ký tự đầu để ghi log. */
     private static String shortId(String id) {
         return id == null ? "" : id.substring(0, Math.min(8, id.length()));
     }

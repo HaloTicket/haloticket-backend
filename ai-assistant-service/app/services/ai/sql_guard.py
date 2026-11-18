@@ -1,11 +1,11 @@
-"""Safety layer for SQL written by a language model.
+"""Lớp an toàn cho SQL do mô hình ngôn ngữ viết.
 
-The model's text is never executed as is. It is parsed with sqlglot (PostgreSQL dialect) and refused unless it is exactly
-one read-only query that touches only the allowed views or tables, calls only harmless functions and contains no
-comments. What is executed is the SQL regenerated from the checked syntax tree, with a LIMIT of at most `max_rows`.
+Văn bản của mô hình không bao giờ được chạy nguyên trạng. Nó được phân tích bằng sqlglot (phương ngữ PostgreSQL) và bị từ chối
+trừ khi đúng là một câu truy vấn chỉ đọc, chỉ chạm các view hoặc bảng được phép, chỉ gọi hàm vô hại và không có chú thích.
+Thứ được chạy là SQL sinh lại từ cây cú pháp đã kiểm tra, với LIMIT tối đa `max_rows`.
 
-This is the second line of defence. The first is the database account the analysis connects with (a role that can only
-read the analysis views), so a mistake here still cannot reach data outside them.
+Đây là tuyến phòng thủ thứ hai. Tuyến thứ nhất là tài khoản cơ sở dữ liệu mà phần phân tích kết nối (role chỉ đọc các view
+phân tích), nên một sai sót ở đây vẫn không thể chạm dữ liệu ngoài các view đó.
 """
 import hashlib
 import logging
@@ -22,19 +22,19 @@ log = logging.getLogger("ai.sql_guard")
 _DIALECT = "postgres"
 MAX_SQL_CHARS = 5000
 
-# functions a generated query may call when sqlglot does not know them as built-ins. Everything else that is not a
-# built-in aggregate / scalar function known to sqlglot is refused.
+# các hàm mà truy vấn sinh ra được phép gọi dù sqlglot không biết chúng như hàm dựng sẵn. Mọi hàm khác không phải
+# hàm tổng hợp / hàm vô hướng dựng sẵn mà sqlglot biết đều bị từ chối.
 SAFE_UNKNOWN_FUNCTIONS = frozenset({
     "now", "date_part", "to_char", "to_date", "age", "initcap", "btrim", "ltrim", "rtrim", "split_part",
     "regexp_replace", "date_bin", "make_date", "isfinite", "justify_days",
 })
 
-# refused even if sqlglot knows them: they read files, call other servers, change settings or burn CPU.
+# bị từ chối dù sqlglot biết chúng: chúng đọc tệp, gọi máy chủ khác, đổi cấu hình hoặc ngốn CPU.
 FORBIDDEN_FUNCTIONS = frozenset({
     "set_config", "current_setting", "dblink", "dblink_exec", "query_to_xml", "xpath", "version",
     "generate_series", "exploding_generate_series", "unnest", "pg_sleep", "txid_current", "lo_import", "lo_export",
     "copy", "nextval", "setval", "currval", "lastval",
-    # sqlglot knows these under its own names; they reveal the server or expand into many rows
+    # sqlglot biết các hàm này dưới tên riêng; chúng làm lộ thông tin máy chủ hoặc nở ra nhiều dòng
     "current_version", "current_database", "current_catalog", "current_schema", "current_schemas", "current_user",
     "session_user", "explode", "inet_server_addr", "inet_client_addr",
 })
@@ -42,9 +42,10 @@ FORBIDDEN_FUNCTION_PREFIXES = ("pg_", "lo_", "dblink", "xpath", "query_to_", "cu
 
 
 class SqlGuardError(Exception):
-    """The query was refused. `code` is a stable machine-readable reason, `message` is safe to show to the user."""
+    """Truy vấn bị từ chối. `code` là lý do ổn định cho máy đọc, `message` an toàn để hiển thị cho người dùng."""
 
     def __init__(self, code: str, message: str):
+        """Lưu mã lý do và thông báo tiếng Việt cho người dùng."""
         super().__init__(message)
         self.code = code
         self.message = message
@@ -52,35 +53,46 @@ class SqlGuardError(Exception):
 
 @dataclass(frozen=True)
 class GuardedSql:
+    """Câu SQL đã được kiểm tra và sinh lại, cùng giá trị LIMIT thực tế được áp dụng."""
     sql: str
     limit: int
 
 
 @dataclass(frozen=True)
 class ScopeSpec:
-    """Limits a query to some events. `columns` maps a relation to the column that holds the event id; every use of such a
-    relation is replaced by a subquery that keeps only the rows of `event_ids` (none at all when the tuple is empty).
-    `public` relations carry no event id and are readable as they are. Anything else is refused."""
+    """Giới hạn truy vấn trong một số sự kiện. `columns` ánh xạ một relation tới cột chứa id sự kiện; mọi chỗ dùng relation
+    đó được thay bằng một truy vấn con chỉ giữ các dòng thuộc `event_ids` (không dòng nào khi tuple rỗng).
+    Relation `public` không có id sự kiện và được đọc nguyên trạng. Thứ gì khác đều bị từ chối."""
     columns: dict
     public: frozenset
     event_ids: tuple
 
 
 def fingerprint(sql: str) -> str:
-    """Short hash for logs: lets a refusal be matched to a query without writing the query (it may hold personal data)."""
+    """Băm ngắn để ghi log: cho phép đối chiếu một lần từ chối với câu truy vấn mà không ghi câu truy vấn (có thể chứa dữ liệu cá nhân)."""
     return hashlib.sha256((sql or "").encode("utf-8")).hexdigest()[:12]
 
 
 def parse_allowed(csv: str) -> frozenset:
+    """Tách chuỗi phân cách bằng dấu phẩy thành tập tên relation viết thường."""
     return frozenset(item.strip().lower() for item in (csv or "").split(",") if item.strip())
 
 
 def validate_sql(raw_sql: str, allowed_relations: Iterable[str], schema: Optional[str] = None, max_rows: int = 500,
                  scope: Optional[ScopeSpec] = None) -> GuardedSql:
+    """Kiểm tra SQL do mô hình sinh và trả GuardedSql đã sinh lại; ném SqlGuardError khi bị từ chối (và ghi log kèm băm của câu truy vấn).
+
+    Args:
+        raw_sql: văn bản SQL của mô hình.
+        allowed_relations: các view/bảng được phép.
+        schema: schema duy nhất được phép ghi kèm tên bảng.
+        max_rows: LIMIT tối đa.
+        scope: giới hạn theo sự kiện của người gọi (None nếu không giới hạn).
+    """
     allowed = frozenset(name.lower() for name in allowed_relations)
     schema = (schema or "").lower() or None
     if scope is not None:
-        # a scoped caller never gets more than the configured allow-list, and only relations the scope knows how to limit
+        # người gọi bị giới hạn phạm vi không bao giờ được nhiều hơn danh sách cho phép đã cấu hình, và chỉ các relation mà phạm vi biết cách giới hạn
         allowed = allowed & (frozenset(scope.columns) | scope.public)
     try:
         return _validate(raw_sql, allowed, schema, max_rows, scope)
@@ -90,6 +102,7 @@ def validate_sql(raw_sql: str, allowed_relations: Iterable[str], schema: Optiona
 
 
 def _validate(raw_sql: str, allowed: frozenset, schema: Optional[str], max_rows: int, scope: Optional[ScopeSpec] = None) -> GuardedSql:
+    """Thực hiện các bước kiểm tra: độ dài, chú thích và dấu chấm phẩy, đúng một câu SELECT, relation, hàm, phạm vi sự kiện rồi ép LIMIT."""
     sql = (raw_sql or "").strip()
     if not sql:
         raise SqlGuardError("EMPTY_SQL", "Không có câu truy vấn SQL để thực thi.")
@@ -98,7 +111,7 @@ def _validate(raw_sql: str, allowed: frozenset, schema: Optional[str], max_rows:
     if not allowed:
         raise SqlGuardError("NO_ALLOWED_RELATIONS", "Chưa cấu hình danh sách bảng/view được phép truy vấn.")
 
-    # comments and semicolons are read from the tokens, so ones inside string literals do not count
+    # chú thích và dấu chấm phẩy được đọc từ các token, nên những cái nằm trong chuỗi ký tự không bị tính
     try:
         tokens = Dialect.get_or_raise(_DIALECT).tokenize(sql)
     except SqlglotError:
@@ -137,6 +150,7 @@ def _validate(raw_sql: str, allowed: frozenset, schema: Optional[str], max_rows:
 
 
 def _check_relations(tree: exp.Expression, allowed: frozenset, schema: Optional[str]) -> None:
+    """Từ chối hàm làm nguồn dữ liệu, bảng có catalog, schema lạ và bảng ngoài danh sách cho phép (tên CTE được bỏ qua)."""
     cte_names = {cte.alias_or_name.lower() for cte in tree.find_all(exp.CTE)}
     for table in tree.find_all(exp.Table):
         if not isinstance(table.this, exp.Identifier):
@@ -154,9 +168,10 @@ def _check_relations(tree: exp.Expression, allowed: frozenset, schema: Optional[
 
 
 def _apply_scope(tree: exp.Expression, scope: ScopeSpec) -> None:
+    """Thay mỗi chỗ dùng relation có phạm vi bằng truy vấn con lọc theo id sự kiện của người gọi; từ chối nếu CTE trùng tên view hoặc còn chỗ chưa được lọc."""
     cte_names = {cte.alias_or_name.lower() for cte in tree.find_all(exp.CTE)}
     if cte_names & set(scope.columns):
-        # inside its own body a CTE name still means the real relation; refusing is simpler than telling the two apart
+        # trong thân của chính nó, tên CTE vẫn có nghĩa là relation thật; từ chối thì đơn giản hơn là phân biệt hai trường hợp
         raise SqlGuardError("RELATION_NOT_ALLOWED", "Không được đặt tên CTE trùng với tên view dữ liệu.")
     targets = [(table, scope.columns[table.name.lower()]) for table in tree.find_all(exp.Table)
                if table.name.lower() in scope.columns]
@@ -169,15 +184,16 @@ def _apply_scope(tree: exp.Expression, scope: ScopeSpec) -> None:
         else:
             condition = exp.Boolean(this=False)
         inner.append(base)
-        # copy=False keeps `base` the very node that ends up in the tree, which the check below relies on
+        # copy=False giữ `base` đúng là nút nằm trong cây, điều mà bước kiểm tra bên dưới dựa vào
         table.replace(exp.select("*").from_(base, copy=False).where(condition, copy=False).subquery(alias, copy=False))
-    # every use of a scoped relation must now be one of the filtered ones built above
+    # mọi chỗ dùng relation có phạm vi giờ phải là một trong các truy vấn con đã lọc ở trên
     for table in tree.find_all(exp.Table):
         if table.name.lower() in scope.columns and not any(table is base for base in inner):
             raise SqlGuardError("RELATION_NOT_ALLOWED", "Không thể giới hạn phạm vi dữ liệu cho câu truy vấn này.")
 
 
 def _check_functions(tree: exp.Expression) -> None:
+    """Từ chối hàm bị cấm (danh sách, tiền tố) và hàm lạ không nằm trong SAFE_UNKNOWN_FUNCTIONS."""
     for func in tree.find_all(exp.Func):
         name = (func.name if isinstance(func, exp.Anonymous) else func.sql_name()).lower()
         if name in FORBIDDEN_FUNCTIONS or name.startswith(FORBIDDEN_FUNCTION_PREFIXES):
@@ -187,6 +203,7 @@ def _check_functions(tree: exp.Expression) -> None:
 
 
 def _enforce_limit(tree: exp.Expression, max_rows: int) -> int:
+    """Giữ LIMIT số nguyên trong khoảng 1..max_rows; nếu thiếu hoặc vượt thì đặt thành max_rows. Trả về LIMIT thực tế."""
     current = tree.args.get("limit")
     value = None
     if current is not None:

@@ -6,6 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** Yêu cầu chi trả trả về client: số tiền, trạng thái, mốc thời gian, ảnh chụp tài khoản và chính sách, dòng thời gian. */
 @Data
 @Builder
 public class PayoutResponse {
@@ -43,11 +44,13 @@ public class PayoutResponse {
     private String paidAmountSnapshot;
     private String reservedAmountSnapshot;
     private List<TimelineEntry> timeline;
+    /** Ảnh chụp tài khoản nhận tiền với số tài khoản đã che. */
     @Data @Builder public static class AccountSnapshot {
         private String bankName;
         private String accountHolder;
         private String accountNumberMasked;
     }
+    /** Một mốc trong dòng thời gian của yêu cầu chi trả: trạng thái, thời điểm, lý do và thông điệp công khai. */
     @Data @Builder public static class TimelineEntry {
         private String status;
         private LocalDateTime at;

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/** Thông tin voucher: mã, loại và mức giảm, giới hạn áp dụng, thời gian hiệu lực và trạng thái. */
 @Data
 @Builder
 @NoArgsConstructor

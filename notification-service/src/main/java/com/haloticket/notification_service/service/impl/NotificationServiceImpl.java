@@ -28,6 +28,7 @@ import java.util.Map;
 
 import org.springframework.transaction.annotation.Transactional;
 
+/** Cài đặt nghiệp vụ thông báo: lưu qua JPA và đẩy thông báo thời gian thực qua STOMP khi có {@code SimpMessagingTemplate}. */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -40,6 +41,12 @@ public class NotificationServiceImpl implements NotificationService {
     @Autowired(required = false)
     private SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * Tạo mẫu mới, trạng thái mặc định {@code ACTIVE} khi request không nêu.
+     *
+     * @param request nội dung mẫu
+     * @return mẫu đã lưu
+     */
     @Override
     public NotificationTemplateResponse createTemplate(NotificationTemplateCreateRequest request) {
         NotificationTemplate template = NotificationTemplate.builder()
@@ -53,6 +60,11 @@ public class NotificationServiceImpl implements NotificationService {
         return toTemplateResponse(notificationTemplateRepository.save(template));
     }
 
+    /**
+     * Lấy toàn bộ mẫu thông báo.
+     *
+     * @return danh sách mẫu
+     */
     @Override
     public List<NotificationTemplateResponse> getTemplates() {
         return notificationTemplateRepository.findAll().stream()
@@ -60,6 +72,13 @@ public class NotificationServiceImpl implements NotificationService {
                 .toList();
     }
 
+    /**
+     * Tạo thông báo {@code PENDING} từ mẫu; kênh lấy từ request, thiếu thì dùng kênh của mẫu.
+     *
+     * @param request mã mẫu, người nhận, biến, kênh
+     * @return thông báo đã lưu
+     * @throws NotificationException {@code TEMPLATE_NOT_FOUND} (404) hoặc {@code TEMPLATE_INACTIVE} (409)
+     */
     @Override
     public NotificationResponse createNotification(NotificationCreateRequest request) {
         NotificationTemplate template = notificationTemplateRepository.findById(request.getTemplateId())
@@ -81,6 +100,12 @@ public class NotificationServiceImpl implements NotificationService {
         return toNotificationResponse(notificationRepository.save(notification));
     }
 
+    /**
+     * Lấy thông báo của người dùng, mới nhất trước.
+     *
+     * @param userId mã người dùng
+     * @return danh sách thông báo
+     */
     @Override
     public List<NotificationResponse> getUserNotifications(String userId) {
         return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
@@ -88,6 +113,12 @@ public class NotificationServiceImpl implements NotificationService {
                 .toList();
     }
 
+    /**
+     * Đặt trạng thái {@code SENT} và ghi thời điểm gửi.
+     *
+     * @param id mã thông báo
+     * @return thông báo sau cập nhật
+     */
     @Override
     public NotificationResponse markAsSent(String id) {
         Notification notification = findNotification(id);
@@ -96,6 +127,12 @@ public class NotificationServiceImpl implements NotificationService {
         return toNotificationResponse(notificationRepository.save(notification));
     }
 
+    /**
+     * Đặt trạng thái {@code FAILED}.
+     *
+     * @param id mã thông báo
+     * @return thông báo sau cập nhật
+     */
     @Override
     public NotificationResponse markAsFailed(String id) {
         Notification notification = findNotification(id);
@@ -103,6 +140,12 @@ public class NotificationServiceImpl implements NotificationService {
         return toNotificationResponse(notificationRepository.save(notification));
     }
 
+    /**
+     * Đặt cờ đã đọc cho một thông báo.
+     *
+     * @param id mã thông báo
+     * @return thông báo sau cập nhật
+     */
     @Override
     public NotificationResponse markAsRead(String id) {
         Notification notification = findNotification(id);
@@ -110,6 +153,12 @@ public class NotificationServiceImpl implements NotificationService {
         return toNotificationResponse(notificationRepository.save(notification));
     }
 
+    /**
+     * Đặt cờ đã đọc cho mọi thông báo của người dùng.
+     *
+     * @param userId mã người dùng
+     * @return danh sách sau cập nhật
+     */
     @Override
     public List<NotificationResponse> markAllAsRead(String userId) {
         List<Notification> notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
@@ -121,12 +170,27 @@ public class NotificationServiceImpl implements NotificationService {
                 .toList();
     }
 
+    /**
+     * Xử lý sự kiện không kèm nội dung hiển thị trong chuông.
+     *
+     * @param event sự kiện thông báo
+     * @return thông báo đã có hoặc vừa tạo
+     */
     @Override
     public NotificationResponse processEvent(NotificationEvent event) {
         return processEvent(event, null, null, null);
     }
 
-    /** Same, but the in-app entry also gets a type, title and message so the bell shows something readable and can link somewhere. */
+    /**
+     * Như bản không kèm nội dung hiển thị, nhưng mục trong ứng dụng có thêm loại, tiêu đề và nội dung để chuông
+     * hiển thị dễ đọc và có thể dẫn tới đúng nơi. Nếu {@code eventId} đã tồn tại thì dùng lại bản ghi cũ.
+     *
+     * @param event sự kiện thông báo
+     * @param type loại hiển thị
+     * @param title tiêu đề
+     * @param message nội dung
+     * @return thông báo đã có hoặc vừa tạo
+     */
     @Override
     public NotificationResponse processEvent(NotificationEvent event, String type, String title, String message) {
         NotificationResponse res = notificationRepository.findByEventId(event.eventId())
@@ -151,6 +215,17 @@ public class NotificationServiceImpl implements NotificationService {
         return res;
     }
 
+    /**
+     * Lưu thông báo đã ở trạng thái {@code SENT}, chưa đọc, kênh {@code EMAIL}, rồi đẩy qua STOMP.
+     * Dữ liệu bổ sung bị bỏ nếu không phải JSON object hoặc quá 4000 ký tự.
+     *
+     * @param userId mã người nhận
+     * @param type loại thông báo
+     * @param title tiêu đề
+     * @param message nội dung
+     * @param variablesJson dữ liệu bổ sung JSON, có thể null
+     * @return thông báo đã lưu
+     */
     @Override
     public NotificationResponse publishDirectNotification(String userId, String type, String title, String message, String variablesJson) {
         Notification notification = Notification.builder()
@@ -169,7 +244,12 @@ public class NotificationServiceImpl implements NotificationService {
         return response;
     }
 
-    /** Extra data for the web (event id, link, flagged fields): kept only when it is a JSON object of reasonable size. */
+    /**
+     * Dữ liệu bổ sung cho web (mã sự kiện, liên kết, trường bị gắn cờ): chỉ giữ khi là JSON object kích thước hợp lý.
+     *
+     * @param raw chuỗi JSON thô
+     * @return chuỗi gốc nếu hợp lệ, ngược lại null
+     */
     private String validVariables(String raw) {
         if (raw == null || raw.isBlank() || raw.length() > 4000) return null;
         try {
@@ -179,6 +259,12 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
 
+    /**
+     * Đẩy thông báo qua STOMP: tới {@code /topic/admin-notifications} nếu gửi cho admin hoặc loại duyệt sự kiện mới,
+     * tới {@code /topic/user-notifications/{userId}} nếu người nhận là người dùng thường. Lỗi đẩy bị bỏ qua.
+     *
+     * @param response thông báo cần đẩy
+     */
     private void broadcastStompNotification(NotificationResponse response) {
         try {
             if (messagingTemplate != null && response != null) {
@@ -190,16 +276,30 @@ public class NotificationServiceImpl implements NotificationService {
                 }
             }
         } catch (Exception e) {
-            // silent catch for WebSocket broadcast
+            // bỏ qua lỗi khi đẩy qua WebSocket
         }
     }
 
+    /**
+     * Tìm thông báo theo mã.
+     *
+     * @param id mã thông báo
+     * @return thông báo
+     * @throws NotificationException {@code NOTIFICATION_NOT_FOUND} (404) khi không có
+     */
     private Notification findNotification(String id) {
         return notificationRepository.findById(id)
                 .orElseThrow(() -> new NotificationException(NotificationErrorCode.NOTIFICATION_NOT_FOUND,
                         "Notification not found", 404));
     }
 
+    /**
+     * Chuyển map biến thành chuỗi JSON; map rỗng hoặc null cho {@code {}}.
+     *
+     * @param variables biến thay thế
+     * @return chuỗi JSON
+     * @throws NotificationException {@code VARIABLES_SERIALIZATION_FAILED} (500) khi không serialize được
+     */
     private String toVariablesJson(Map<String, String> variables) {
         if (variables == null || variables.isEmpty()) {
             return "{}";
@@ -212,6 +312,12 @@ public class NotificationServiceImpl implements NotificationService {
         }
     }
 
+    /**
+     * Chuyển entity mẫu thành DTO phản hồi.
+     *
+     * @param template entity mẫu
+     * @return DTO phản hồi
+     */
     private NotificationTemplateResponse toTemplateResponse(NotificationTemplate template) {
         return NotificationTemplateResponse.builder()
                 .id(template.getId())
@@ -225,6 +331,12 @@ public class NotificationServiceImpl implements NotificationService {
                 .build();
     }
 
+    /**
+     * Chuyển entity thông báo thành DTO phản hồi; {@code templateId} rỗng khi thông báo không có mẫu.
+     *
+     * @param notification entity thông báo
+     * @return DTO phản hồi
+     */
     private NotificationResponse toNotificationResponse(Notification notification) {
         return NotificationResponse.builder()
                 .id(notification.getId())

@@ -1,3 +1,4 @@
+"""Các route quản trị: sức khỏe nhà cung cấp AI, trạng thái SSL, sức khỏe hệ thống và nhật ký hệ thống."""
 import asyncio
 import hashlib
 import json
@@ -27,18 +28,19 @@ from app.services.ai.event_content import data_block, new_delimiter, message_tex
 
 log = logging.getLogger("ai.admin")
 
-# every route in this file is for administrators; the token is verified here, not only at the gateway
+# Mọi route trong tệp này dành cho quản trị viên; token được xác thực tại đây, không chỉ ở gateway
 router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 def _actor(request: Request) -> str:
+    """Định danh người gọi (từ claims của token) dùng cho giới hạn tần suất và nhật ký."""
     return actor_of(request, getattr(request.state, "claims", None))
 
 
-# risk scoring and the assistant live in admin_intel.py (same paths, mounted below)
+# Chấm điểm rủi ro và trợ lý nằm ở admin_intel.py (cùng đường dẫn, được gắn ở cuối tệp)
 
 
-# AI provider health
+# Sức khỏe nhà cung cấp AI
 PROBE_CACHE_SECONDS = 600
 PROBE_FAILURE_CACHE_SECONDS = 60
 _probe_lock = threading.Lock()
@@ -46,25 +48,26 @@ _probe_cache: dict = {"result": None, "until": 0.0}
 
 
 def reset_probe_cache() -> None:
+    """Xóa kết quả thăm dò đã lưu đệm để lần gọi tiếp theo thực hiện thăm dò mới."""
     with _probe_lock:
         _probe_cache.update(result=None, until=0.0)
 
 
 @router.get("/ai/health")
 def get_ai_health(http: Request, probe: int = 0):
-    """Passive status of the model providers; ?probe=1 makes ONE light call (cached 10 minutes, rate limited)."""
+    """Trạng thái thụ động của các nhà cung cấp mô hình; `?probe=1` thực hiện MỘT lệnh gọi nhẹ (lưu đệm 10 phút, có giới hạn tần suất)."""
     result = None
     if probe == 1:
         with _probe_lock:
             if _probe_cache["result"] is not None and time.time() < _probe_cache["until"]:
                 result = _probe_cache["result"]
         if result is None:
-            ratelimit.check("admin_assistant", _actor(http), True)  # a cached answer costs nothing, a real call counts
+            ratelimit.check("admin_assistant", _actor(http), True)  # kết quả lấy từ bộ đệm không tốn lượt, lệnh gọi thật mới bị tính
             checked_at = datetime.now(timezone.utc).isoformat()
             try:
                 ai_invoke("ai_probe", [("human", "ping")], actor=_actor(http))
                 result, ttl = {"status": "ok", "checked_at": checked_at}, PROBE_CACHE_SECONDS
-            except Exception as failure:  # the probe reports, it does not raise
+            except Exception as failure:  # thăm dò chỉ báo kết quả, không ném ngoại lệ
                 code = failure.code if isinstance(failure, AiError) else type(failure).__name__[:60]
                 result, ttl = {"status": "failed", "checked_at": checked_at, "error_code": code}, PROBE_FAILURE_CACHE_SECONDS
             with _probe_lock:
@@ -72,8 +75,9 @@ def get_ai_health(http: Request, probe: int = 0):
     return {"providers": provider_status(), "probe": result}
 
 
-# ssl status
+# Trạng thái SSL
 def _allowed_ssl_domains() -> list:
+    """Danh sách tên miền được phép kiểm tra SSL, đọc từ cấu hình `alert_ssl_domains` (chữ thường, đã bỏ khoảng trắng)."""
     return [d.strip().lower() for d in (settings.alert_ssl_domains or "").split(",") if d.strip()]
 
 
@@ -88,12 +92,12 @@ def get_ssl_status(domain: str = None):
         check_domain = check_domain.split("://", 1)[1]
     check_domain = check_domain.split("/")[0].split(":")[0].strip().lower()
 
-    # the server connects to this name, so an arbitrary one (or an IP) would let a caller probe other hosts
+    # máy chủ sẽ kết nối tới tên này, nên nếu cho tên tùy ý (hoặc IP) thì người gọi có thể dò các máy khác
     if check_domain and check_domain not in allowed:
         raise HTTPException(status_code=422, detail={"code": "DOMAIN_NOT_ALLOWED",
                                                       "message": "Tên miền không nằm trong danh sách được phép kiểm tra."})
 
-    # if checking localhost or IP address
+    # nếu kiểm tra localhost hoặc địa chỉ IP nội bộ
     if not check_domain or check_domain in ["localhost", "127.0.0.1"] or check_domain.startswith("192."):
         return {
             "has_ssl": False,
@@ -112,7 +116,7 @@ def get_ssl_status(domain: str = None):
         with socket.create_connection((check_domain, 443), timeout=2.5) as sock:
             with context.wrap_socket(sock, server_hostname=check_domain) as ssock:
                 cert = ssock.getpeercert()
-                protocol = ssock.version() or "TLS"  # what the handshake really negotiated
+                protocol = ssock.version() or "TLS"  # phiên bản giao thức mà bước bắt tay thực sự thương lượng được
                 try:
                     port = int(ssock.getpeername()[1])
                 except Exception:
@@ -154,8 +158,9 @@ def get_ssl_status(domain: str = None):
     }
 
 
-# system health
+# Sức khỏe hệ thống
 def _as_int(value) -> Optional[int]:
+    """Ép giá trị về số nguyên; trả về `None` nếu không chuyển được."""
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -163,6 +168,7 @@ def _as_int(value) -> Optional[int]:
 
 
 def _eureka_status(raw) -> str:
+    """Chuẩn hóa trạng thái instance của Eureka về `UP`, `DOWN` hoặc `UNKNOWN`."""
     value = str(raw or "").upper()
     if value == "UP":
         return "UP"
@@ -172,8 +178,8 @@ def _eureka_status(raw) -> str:
 
 
 async def _head_latency(client, url: str) -> Optional[int]:
-    """Round-trip milliseconds of a HEAD request. Any HTTP answer below 500 proves the service is reachable (a protected
-    or route-less root answers 401/403/404 and that is still a real measurement); no answer or a 5xx gives None."""
+    """Thời gian khứ hồi (ms) của một yêu cầu HEAD. Mọi phản hồi HTTP dưới 500 đều chứng tỏ dịch vụ còn truy cập được (gốc có bảo vệ
+    hoặc không có route sẽ trả 401/403/404, đó vẫn là một phép đo thật); không phản hồi hoặc lỗi 5xx thì trả về `None`."""
     if not url:
         return None
     started = time.monotonic()
@@ -187,10 +193,12 @@ async def _head_latency(client, url: str) -> Optional[int]:
 
 
 async def _no_metrics() -> dict:
+    """Số liệu rỗng (toàn `None`) cho dịch vụ không có cổng Actuator để đọc."""
     return {"cpuLoad": None, "memoryUsage": None, "uptime": None}
 
 
 async def _bounded(function, fallback: dict) -> dict:
+    """Chạy hàm chặn trong luồng riêng với thời gian chờ tối đa; quá hạn hoặc lỗi thì trả về `fallback`."""
     try:
         return await asyncio.wait_for(asyncio.to_thread(function), system_probe.CHECK_TIMEOUT_SECONDS)
     except Exception:
@@ -198,6 +206,7 @@ async def _bounded(function, fallback: dict) -> dict:
 
 
 def _eureka_entry(status: str, latency: Optional[int] = None) -> dict:
+    """Dựng mục mô tả chính máy chủ Eureka (cổng lấy từ địa chỉ cấu hình) với trạng thái và độ trễ cho trước."""
     try:
         port = urlparse(settings.eureka_server).port
     except Exception:
@@ -208,7 +217,7 @@ def _eureka_entry(status: str, latency: Optional[int] = None) -> dict:
 
 @router.get("/system-health")
 async def get_system_health():
-    """Services from Eureka plus the checks this service can really make. A value that cannot be measured is null."""
+    """Danh sách dịch vụ từ Eureka cùng các phép kiểm tra mà dịch vụ này thực sự làm được. Giá trị không đo được sẽ là null."""
     eureka_url = f"{settings.eureka_server.rstrip('/')}/apps"
     entries = []
     eureka = _eureka_entry("DOWN")
@@ -239,7 +248,7 @@ async def get_system_health():
                               _as_int(port.get("$")) if isinstance(port, dict) else None, inst.get("homePageUrl") or "",
                               _as_int(metadata.get("management.port"))))
             latencies = await asyncio.gather(*[_head_latency(client, f[3]) for f in found])
-            # CPU, memory and uptime come from each service's Actuator port; a service that does not answer keeps nulls
+            # CPU, bộ nhớ và thời gian chạy lấy từ cổng Actuator của từng dịch vụ; dịch vụ không phản hồi thì giữ null
             metrics = await asyncio.gather(*[
                 service_metrics.fetch(client, urlparse(f[3]).hostname or "", f[4]) if not f[0].startswith("ai-assistant")
                 else _no_metrics() for f in found])
@@ -247,7 +256,7 @@ async def get_system_health():
             eureka_metrics = await service_metrics.fetch(client, registry_host)
         for (name, status, port, _home, _mgmt), latency, measured in zip(found, latencies, metrics):
             if name.startswith("ai-assistant"):
-                entry = system_probe.self_entry(port)  # this process: its own uptime and memory
+                entry = system_probe.self_entry(port)  # tiến trình này: tự đo thời gian chạy và bộ nhớ của chính nó
                 entry.update(name=name, status=status, latencyMs=latency)
             else:
                 entry = {"name": name, "port": port, "type": "Spring Boot Service", "status": status, "uptime": measured["uptime"],
@@ -257,10 +266,10 @@ async def get_system_health():
         eureka.update(uptime=eureka_metrics["uptime"], memoryUsage=eureka_metrics["memoryUsage"], cpuLoad=eureka_metrics["cpuLoad"])
     except Exception as failure:
         log.warning("Eureka registry could not be read: %s", type(failure).__name__)
-        entries = []  # nothing derived from Eureka is shown; the failure itself is the eureka entry below
+        entries = []  # không hiển thị gì suy ra từ Eureka; chính lỗi này được thể hiện qua mục eureka bên dưới
 
     if not any(e["name"].startswith("ai-assistant") for e in entries):
-        entries.append(system_probe.self_entry())  # this code is running
+        entries.append(system_probe.self_entry())  # mã này đang chạy nên chắc chắn còn sống
     postgres, redis_entry = await asyncio.gather(
         _bounded(system_probe.check_postgres, system_probe.down_entry("postgres", "PostgreSQL")),
         _bounded(system_probe.check_redis, system_probe.down_entry("redis", "Redis")),
@@ -269,7 +278,7 @@ async def get_system_health():
     return entries
 
 
-# system logs
+# Nhật ký hệ thống
 _TOKEN_PATTERNS = [
     (re.compile(r"eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*"), "[token]"),
     (re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}"), r"\1 [token]"),
@@ -282,13 +291,14 @@ _LOG_TIME = re.compile(r"(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})")
 
 
 def mask_sensitive(line: str) -> str:
-    """Hides token-like strings, credentials in key=value pairs and e-mail addresses before a log line leaves the server."""
+    """Che các chuỗi giống token, thông tin xác thực dạng key=value và địa chỉ e-mail trước khi dòng nhật ký rời khỏi máy chủ."""
     for pattern, replacement in _TOKEN_PATTERNS:
         line = pattern.sub(replacement, line)
     return line
 
 
 def _log_time(line: str) -> Optional[str]:
+    """Lấy mốc thời gian dạng `YYYY-MM-DDTHH:MM:SS` từ dòng nhật ký; `None` nếu không có."""
     match = _LOG_TIME.search(line)
     return f"{match.group(1)}T{match.group(2)}" if match else None
 
@@ -300,15 +310,17 @@ _TAIL_BYTES = 60000
 
 
 def _tail_lines(path: str, count: int) -> list:
+    """Đọc tối đa `count` dòng cuối của tệp, chỉ quét phần đuôi vài chục KB để tránh đọc tệp lớn."""
     size = os.path.getsize(path)
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
         if size > _TAIL_BYTES:
             f.seek(size - _TAIL_BYTES)
-            f.readline()  # discard partial line
+            f.readline()  # bỏ dòng đầu bị cắt dở
         return f.readlines()[-max(1, count):]
 
 
 def _log_entry(line_str: str, service: str, status: str) -> dict:
+    """Dựng một mục nhật ký trả về cho giao diện; `id` là mã băm ổn định theo dịch vụ và nội dung dòng."""
     return {
         "id": hashlib.sha1((service + line_str).encode("utf-8")).hexdigest()[:12],
         "time": _log_time(line_str), "service": service, "event": line_str[:180], "status": status, "details": line_str,
@@ -317,9 +329,8 @@ def _log_entry(line_str: str, service: str, status: str) -> dict:
 
 
 def _logs_from_directory(directory: str) -> dict:
-    """One <service>.log per service (Spring Boot format). The service name is the file name, the level is the level token of
-    the line, so nothing is guessed from the words in the message. Stack-trace lines are left out; the first line of an error
-    is the entry."""
+    """Mỗi dịch vụ một tệp `<service>.log` (định dạng Spring Boot). Tên dịch vụ là tên tệp, mức log lấy từ token mức của dòng
+    nên không đoán từ chữ trong nội dung. Các dòng stack trace bị bỏ; dòng đầu tiên của một lỗi chính là mục nhật ký."""
     try:
         files = sorted(e.path for e in os.scandir(directory) if e.is_file() and e.name.endswith(".log"))
     except Exception as failure:
@@ -343,15 +354,15 @@ def _logs_from_directory(directory: str) -> dict:
             entries.append(_log_entry(line_str, service, "ERROR" if level.group(1) == "ERROR" else "WARN" if level.group(1) == "WARN" else "INFO"))
     entries.sort(key=lambda e: e["time"] or "")
     entries = entries[-MAX_LOG_ENTRIES:]
-    return {"entries": entries[::-1], "source": {"status": "ok" if entries else "empty"}}  # newest first
+    return {"entries": entries[::-1], "source": {"status": "ok" if entries else "empty"}}  # mới nhất trước
 
 
 @router.get("/system-logs")
 def get_system_logs():
-    """Real log lines only: {entries, source:{status: ok|empty|unavailable}}. No placeholder entries."""
+    """Chỉ trả dòng nhật ký thật: `{entries, source:{status: ok|empty|unavailable}}`. Không có mục giả."""
     if settings.ai_system_log_dir:
         return _logs_from_directory(settings.ai_system_log_dir)
-    log_path = settings.ai_system_log_file  # exactly one configured file, never a path from the request
+    log_path = settings.ai_system_log_file  # đúng một tệp đã cấu hình, không bao giờ lấy đường dẫn từ yêu cầu
     try:
         if not log_path or not os.path.isfile(log_path):
             return {"entries": [], "source": {"status": "unavailable"}}
@@ -379,7 +390,7 @@ def get_system_logs():
     return {"entries": entries, "source": {"status": "ok" if entries else "empty"}}
 
 
-# admin intelligence: risk scoring, KPIs, attention feed, summary, pins, assistant (included last: it needs nothing above)
+# Phần thông minh cho quản trị: chấm điểm rủi ro, KPI, mục cần chú ý, tóm tắt, ghim, trợ lý (gắn sau cùng vì không cần gì ở trên)
 from app.api.endpoints import admin_intel  # noqa: E402
 
 router.include_router(admin_intel.router)

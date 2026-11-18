@@ -1,12 +1,13 @@
-"""RQ2: a person judges the flags the model proposed. python -m research.risk.flag_review label --annotator H1
+"""RQ2: một người đánh giá các cờ mà mô hình đề xuất. python -m research.risk.flag_review label --annotator H1
 
-Shows one flag at a time (the case, the flag's code and quote; never whether the system kept or dropped it), in an order
-shuffled per annotator, and saves every decision at once to labels/<set>/flags_<annotator>.jsonl. Run it again to continue.
-`python -m research.risk.flag_review summary --annotator H1` crosses the decisions with what the system did.
+Hiện từng cờ một (ca, mã cờ và trích dẫn; không bao giờ cho biết hệ thống giữ hay bỏ cờ), theo thứ tự xáo trộn riêng cho từng
+người gán, và lưu mọi quyết định ngay vào labels/<set>/flags_<annotator>.jsonl. Chạy lại để tiếp tục.
+`python -m research.risk.flag_review summary --annotator H1` đối chiếu các quyết định với việc hệ thống đã làm.
 
-Decisions: d = đúng (đúng loại vi phạm), n = nhãn sai (có vấn đề nhưng thuộc loại khác), f = không phải vi phạm (báo sai),
-u = chưa chắc (thêm sau chữ cái, vd 'f u'). A quote that is not in the text at all is a fabricated citation; that is decided by
-the program (engine.validate_ai_flags), not by you, and is reported separately."""
+Quyết định: d = đúng (đúng loại vi phạm), n = nhãn sai (có vấn đề nhưng thuộc loại khác), f = không phải vi phạm (báo sai),
+u = chưa chắc (thêm sau chữ cái, vd 'f u'). Trích dẫn không có trong văn bản là trích dẫn bịa; việc này do chương trình
+(engine.validate_ai_flags) quyết định chứ không phải người gán, và được báo cáo riêng.
+"""
 import argparse
 import hashlib
 import json
@@ -24,10 +25,12 @@ DEFAULT_TAG = "t2-groq-oss20b"
 
 
 def cache_path(tag: str) -> str:
+    """Đường dẫn tệp cache phản hồi của mô hình theo thẻ (tag)."""
     return os.path.join(CACHE, f"{tag}.jsonl")
 
 
 def load_cache(tag: str) -> dict:
+    """Đọc cache phản hồi của mô hình thành từ điển {khóa: văn bản trả lời}."""
     out = {}
     for row in read_jsonl(cache_path(tag)):
         out[row["key"]] = row["text"]
@@ -35,8 +38,17 @@ def load_cache(tag: str) -> dict:
 
 
 def build_items(cases: list, cache: dict, repeat: int = 0) -> list:
-    """One item per flag the model proposed in the given repeat. Each carries what the system did with it:
-    quote_ok (survives the verbatim-quote check, C4) and confirmed (survives the second reading too, C5 before overlap)."""
+    """Dựng mỗi cờ mô hình đề xuất trong lần lặp đã cho thành một mục, kèm việc hệ thống đã làm với nó:
+    quote_ok (qua bước kiểm tra trích dẫn nguyên văn, C4) và kept_after_verify (qua cả lần đọc hai, C5 trước khi bỏ trùng).
+
+    Args:
+        cases: danh sách ca.
+        cache: cache phản hồi của mô hình.
+        repeat: số thứ tự lần lặp cần lấy.
+
+    Returns:
+        danh sách mục; ca không có phản hồi hoặc phản hồi lỗi bị bỏ qua, mỗi ca chỉ xét tối đa 10 cờ đầu.
+    """
     items = []
     for case in cases:
         raw_text = cache.get(f"{case['id']}|flags|{repeat}")
@@ -68,6 +80,7 @@ def build_items(cases: list, cache: dict, repeat: int = 0) -> list:
 
 
 def _seed(annotator: str) -> int:
+    """Hạt giống xáo trộn riêng của một người gán nhãn, suy ra từ băm SHA-256 của tên."""
     return int(hashlib.sha256(f"flags:{annotator}".encode("utf-8")).hexdigest()[:12], 16)
 
 
@@ -75,9 +88,10 @@ AGREEMENT_SEED = "flags-agreement-sample"
 
 
 def agreement_sample(items: list, size: int) -> list:
-    """The same `size` items for every annotator (a fixed seed, independent of who asks), so two people can be compared.
-    Half come from VEILED_PROHIBITED (the code the first annotator split most often) and half from the other codes; the split
-    uses the code only, never anyone's label. A kappa on this sample is not the kappa of all flags."""
+    """Chọn cùng `size` mục cho mọi người gán (hạt giống cố định, không phụ thuộc người hỏi) để so sánh được hai người.
+    Một nửa lấy từ VEILED_PROHIBITED (mã mà người gán đầu tiên chia nhiều nhất) và một nửa từ các mã khác; việc chia chỉ dựa
+    vào mã, không bao giờ dựa vào nhãn của ai. Kappa trên mẫu này không phải kappa của mọi cờ.
+    """
     rng = random.Random(int(hashlib.sha256(AGREEMENT_SEED.encode("utf-8")).hexdigest()[:12], 16))
     veiled = sorted(i["item"] for i in items if i["quote_ok"] and i["code"] == "VEILED_PROHIBITED")
     other = sorted(i["item"] for i in items if i["quote_ok"] and i["code"] != "VEILED_PROHIBITED")
@@ -88,18 +102,21 @@ def agreement_sample(items: list, size: int) -> list:
 
 
 def ordered(items: list, annotator: str, sample: int = 0) -> list:
-    """Items that need a human judgement (the quote exists), shuffled per annotator. Fabricated quotes are skipped.
-    sample > 0: only the shared agreement sample of that size."""
+    """Trả về mã các mục cần người đánh giá (trích dẫn có thật), xáo trộn riêng theo người gán. Trích dẫn bịa bị bỏ qua.
+    sample > 0: chỉ lấy mẫu đồng thuận dùng chung có kích thước đó.
+    """
     ids = agreement_sample(items, sample) if sample else [i["item"] for i in items if i["quote_ok"]]
     random.Random(_seed(annotator)).shuffle(ids)
     return ids
 
 
 def path_for(annotator: str) -> str:
+    """Đường dẫn tệp nhãn cờ của một người gán."""
     return os.path.join(LABELS, f"flags_{annotator}.jsonl")
 
 
 def latest(rows: list) -> dict:
+    """Giữ dòng cuối cùng của mỗi mục (gán lại thì dòng mới thay dòng cũ)."""
     out = {}
     for row in rows:
         out[row["item"]] = row
@@ -107,7 +124,7 @@ def latest(rows: list) -> dict:
 
 
 def parse_decision(text: str):
-    """'f' -> ("NOT_A_VIOLATION", False); 'n u' -> ("WRONG_CODE", True). None when the line is not a decision."""
+    """Phân tích một dòng nhập thành quyết định: 'f' cho ("NOT_A_VIOLATION", False); 'n u' cho ("WRONG_CODE", True). Trả về None khi dòng không phải quyết định hợp lệ."""
     tokens = [t for t in re.split(r"[\s,;]+", text.strip().lower()) if t]
     verdict, unsure = None, False
     for token in tokens:
@@ -121,6 +138,7 @@ def parse_decision(text: str):
 
 
 def show(case: dict, item: dict, output) -> None:
+    """In một cờ cho người gán: nội dung ca, mã cờ, độ tin cậy, trích dẫn và định nghĩa của mã (không in việc hệ thống giữ hay bỏ)."""
     output(render(case))
     output("-" * 78)
     output(f"CỜ MÔ HÌNH ĐỀ XUẤT:  mã = {item['code']}   độ tin cậy = {item['confidence']}")
@@ -130,6 +148,18 @@ def show(case: dict, item: dict, output) -> None:
 
 def run_label(annotator: str, tag: str = DEFAULT_TAG, input_fn=input, output=print, cases=None, cache=None, labels_path=None,
               sample: int = 0) -> None:
+    """Vòng gán nhãn tương tác: hiện từng cờ chưa gán, đọc quyết định (d, n, f, thêm u; b quay lại; q thoát) và ghi ngay vào tệp nhãn.
+
+    Args:
+        annotator: mã người gán.
+        tag: thẻ cache phản hồi.
+        input_fn: hàm đọc dòng nhập (thay được khi kiểm thử).
+        output: hàm in (thay được khi kiểm thử).
+        cases: danh sách ca; None thì đọc từ tệp.
+        cache: cache phản hồi; None thì đọc theo tag.
+        labels_path: đường dẫn tệp nhãn; None thì dùng đường dẫn mặc định của người gán.
+        sample: > 0 thì chỉ gán mẫu đồng thuận dùng chung có kích thước đó.
+    """
     cases = cases if cases is not None else load_cases()[1]
     by_case = {c["id"]: c for c in cases}
     items = build_items(cases, cache if cache is not None else load_cache(tag))
@@ -171,6 +201,7 @@ def run_label(annotator: str, tag: str = DEFAULT_TAG, input_fn=input, output=pri
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> tuple:
+    """Khoảng tin cậy Wilson 95% (z tùy chỉnh) cho một tỷ lệ k/n; (0.0, 0.0) khi n bằng 0."""
     if n == 0:
         return (0.0, 0.0)
     p = k / n
@@ -181,8 +212,9 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple:
 
 
 def summarize(items: list, labels: dict) -> dict:
-    """Counts for RQ2. fabricated = quote not in the text (decided by the program). The rest is crossed with the human decision
-    and with whether the second reading kept or removed the flag."""
+    """Đếm số liệu cho RQ2. fabricated = trích dẫn không có trong văn bản (chương trình tự xác định). Phần còn lại được đối chiếu
+    với quyết định của người gán và với việc lần đọc hai giữ hay bỏ cờ.
+    """
     fabricated = [i for i in items if not i["quote_ok"]]
     judged = [i for i in items if i["quote_ok"] and i["item"] in labels]
     pending = [i for i in items if i["quote_ok"] and i["item"] not in labels]
@@ -196,6 +228,7 @@ def summarize(items: list, labels: dict) -> dict:
 
 
 def run_summary(annotator: str, tag: str = DEFAULT_TAG, output=print) -> None:
+    """In tóm tắt RQ2 của một người gán: số cờ đề xuất, trích dẫn bịa, đã gán, chưa gán, và tỷ lệ cờ sai của từng nhóm (được giữ, bị lần đọc hai loại)."""
     cases = load_cases()[1]
     items = build_items(cases, load_cache(tag))
     labels = latest(read_jsonl(path_for(annotator)))
@@ -210,6 +243,7 @@ def run_summary(annotator: str, tag: str = DEFAULT_TAG, output=print) -> None:
 
 
 def pct(k: int, n: int) -> str:
+    """Định dạng k/n thành 'k/n = tỷ lệ [khoảng Wilson]' với dấu phẩy thập phân; '-' khi n bằng 0."""
     if n == 0:
         return "-"
     lo, hi = wilson(k, n)
@@ -217,7 +251,7 @@ def pct(k: int, n: int) -> str:
 
 
 def rq2_report(items: list, labels: dict) -> str:
-    """Markdown with every number RQ2 needs, from the program's quote check and the person's decisions."""
+    """Dựng báo cáo Markdown chứa mọi số RQ2 cần, từ phép kiểm tra trích dẫn của chương trình và các quyết định của người gán."""
     judged = [i for i in items if i["quote_ok"] and i["item"] in labels]
     verdict = lambda i: labels[i["item"]]["verdict"]
     correct = [i for i in judged if verdict(i) == "CORRECT"]
@@ -252,7 +286,7 @@ def rq2_report(items: list, labels: dict) -> str:
 
 
 def kappa_report(first: str, second: str) -> str:
-    """Cohen's kappa between two annotators on the flags both judged (the agreement sample)."""
+    """Kappa Cohen giữa hai người gán trên các cờ cả hai cùng đánh giá (mẫu đồng thuận), cả theo ba loại và theo gộp đúng hoặc sai."""
     from research.risk import stats
     a, b = latest(read_jsonl(path_for(first))), latest(read_jsonl(path_for(second)))
     shared = sorted(set(a) & set(b))
@@ -270,6 +304,7 @@ def kappa_report(first: str, second: str) -> str:
 
 
 def main() -> None:
+    """Điểm vào dòng lệnh: chạy lệnh con label, summary, count, report hoặc agreement."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("command", choices=["label", "summary", "count", "report", "agreement"])
     parser.add_argument("--sample", type=int, default=0, help="label only the shared agreement sample of this size (same items for every annotator)")

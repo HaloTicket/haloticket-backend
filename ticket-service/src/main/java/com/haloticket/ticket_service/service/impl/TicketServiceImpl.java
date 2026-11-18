@@ -35,6 +35,10 @@ import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Cài đặt {@code TicketService}: quản lý loại vé (tạo, đồng bộ từ ban tổ chức, tra cứu), sơ đồ ghế, trạng thái ghế lấy từ Redis
+ * và danh sách vé của người dùng.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -46,6 +50,12 @@ public class TicketServiceImpl implements TicketService {
     private final SeatZoneRepository seatZoneRepository;
     private final StringRedisTemplate stringRedisTemplate;
 
+    /**
+     * Tạo một loại vé mới từ yêu cầu.
+     *
+     * @param request dữ liệu loại vé; null thì không làm gì
+     * @return loại vé đã lưu, hoặc null khi yêu cầu null
+     */
     @Override
     @Transactional
     public TicketTypeResponse createTicketType(TicketTypeCreateRequest request) {
@@ -56,6 +66,16 @@ public class TicketServiceImpl implements TicketService {
         return mapToResponse(saved);
     }
 
+    /**
+     * Đồng bộ các loại vé của sự kiện (hoặc của một suất diễn) theo danh sách ban tổ chức gửi lên: cập nhật dòng khớp theo id hoặc
+     * tên, tạo dòng mới nếu được phép, và xóa các dòng không còn được liệt kê (ẩn đi nếu đã có bán hoặc giữ chỗ).
+     *
+     * @param eventId mã sự kiện
+     * @param showtimeId mã suất diễn; null hoặc rỗng nghĩa là đồng bộ cấp sự kiện
+     * @param requests danh sách loại vé mới
+     * @return các loại vé sau đồng bộ, không trùng tên
+     * @throws ResponseStatusException 409 {@code TICKET_NAME_CONFLICT} khi đổi tên trùng loại vé khác
+     */
     @Override
     @Transactional
     public List<TicketTypeResponse> syncTicketTypesForEvent(String eventId, String showtimeId, List<TicketTypeCreateRequest> requests) {
@@ -66,8 +86,8 @@ public class TicketServiceImpl implements TicketService {
 
         List<TicketType> all = ticketTypeRepository.findByEventId(eventId);
         boolean eventHasShowtimes = all.stream().anyMatch(TicketServiceImpl::hasShowtime);
-        // scope = the rows this call may touch. An event-level sync never touches or creates master rows once the
-        // event has showtime rows; with showtimes it only updates the per-showtime rows that match by id or name.
+        // phạm vi = các dòng lần gọi này được phép đụng tới. Đồng bộ cấp sự kiện không bao giờ sửa hay tạo dòng gốc khi
+        // sự kiện đã có dòng theo suất diễn; khi đồng bộ theo suất diễn thì chỉ cập nhật các dòng của suất khớp theo id hoặc tên.
         List<TicketType> scope = new ArrayList<>();
         for (TicketType tt : all) {
             if (showtimeScoped ? showtimeId.equals(tt.getShowtimeId()) : (eventHasShowtimes == hasShowtime(tt))) {
@@ -92,7 +112,7 @@ public class TicketServiceImpl implements TicketService {
                 String reqName = req.getName() != null ? req.getName().trim() : "";
 
                 List<TicketType> targets = new ArrayList<>();
-                // a rename is only recognised by id; otherwise a name match is the natural key
+                // đổi tên chỉ nhận ra qua id; nếu không thì khớp theo tên là khóa tự nhiên
                 if (requestedId != null && !requestedId.isBlank() && !requestedId.startsWith("tier_") && byId.containsKey(requestedId)) {
                     TicketType direct = byId.get(requestedId);
                     String newKey = normalizeName(reqName);
@@ -122,7 +142,7 @@ public class TicketServiceImpl implements TicketService {
             }
         }
 
-        // rows of the scope that the request no longer lists are removed, or hidden when sales or holds reference them
+        // các dòng trong phạm vi mà yêu cầu không còn liệt kê sẽ bị xóa, hoặc bị ẩn nếu đã có bán hay giữ chỗ tham chiếu tới
         for (TicketType tt : scope) {
             if (processed.containsKey(tt.getId())) continue;
             boolean inUse = (tt.getReservedQuantity() != null && tt.getReservedQuantity() > 0)
@@ -150,7 +170,12 @@ public class TicketServiceImpl implements TicketService {
         return responses;
     }
 
-    /** One atomic UPDATE per existing row; 0 rows means the new issued number is below sold + held. */
+    /**
+     * Cập nhật nguyên tử một dòng loại vé đã có bằng một câu UPDATE; 0 dòng nghĩa là số lượng phát hành mới thấp hơn đã bán cộng đã giữ.
+     *
+     * @throws ResponseStatusException 400 khi số lượng âm, 409 khi loại vé đã bị đổi
+     * @throws QuantityBelowSoldAndHeldException khi số lượng mới thấp hơn đã bán cộng đã giữ
+     */
     private void applyToExisting(TicketType existing, TicketTypeCreateRequest req, String reqName) {
         String name = reqName.isEmpty() ? existing.getName() : reqName;
         Double price = req.getPrice() != null ? req.getPrice() : existing.getPrice();
@@ -169,7 +194,7 @@ public class TicketServiceImpl implements TicketService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "INVALID_QUANTITY");
         }
         if (existing.getInitialQuantity() == null) {
-            ticketTypeRepository.backfillInitialQuantityAtomic(existing.getId()); // so tickets already sold are not forgotten below
+            ticketTypeRepository.backfillInitialQuantityAtomic(existing.getId()); // để các vé đã bán không bị quên ở bước dưới
         }
         int updated = ticketTypeRepository.applyIssuedQuantityAtomic(existing.getId(), newInitial, name, price, isFree, min, max, description, now);
         if (updated == 0) {
@@ -183,20 +208,23 @@ public class TicketServiceImpl implements TicketService {
         }
     }
 
+    /** Loại vé có gắn suất diễn hay không (dòng theo suất, không phải dòng gốc). */
     private static boolean hasShowtime(TicketType tt) {
         return tt.getShowtimeId() != null && !tt.getShowtimeId().isBlank();
     }
 
+    /** Chuẩn hóa tên để so khớp: bỏ khoảng trắng đầu cuối và viết thường; null thành chuỗi rỗng. */
     private static String normalizeName(String name) {
         return name == null ? "" : name.trim().toLowerCase();
     }
 
+    /** Thêm loại vé vào hai chỉ mục tra cứu theo id và theo tên đã chuẩn hóa. */
     private static void indexRow(Map<String, TicketType> byId, Map<String, List<TicketType>> byName, TicketType tt) {
         byId.put(tt.getId(), tt);
         byName.computeIfAbsent(normalizeName(tt.getName()), k -> new ArrayList<>()).add(tt);
     }
 
-    /** With showtimes the list is the per-showtime rows (never a showtime-less master row); without, the master rows. */
+    /** Các dòng hiển thị cho khách: bỏ dòng bị ẩn; nếu sự kiện có suất diễn thì chỉ lấy dòng theo suất (không lấy dòng gốc không gắn suất), ngược lại lấy dòng gốc. */
     private List<TicketType> visibleRows(String eventId) {
         List<TicketType> list = ticketTypeRepository.findByEventId(eventId).stream()
                 .filter(tt -> tt.getTicketTypeStatus() != TicketTypeStatus.HIDDEN)
@@ -207,6 +235,12 @@ public class TicketServiceImpl implements TicketService {
         return list;
     }
 
+    /**
+     * Lấy các loại vé hiển thị của sự kiện.
+     *
+     * @param eventId mã sự kiện
+     * @return danh sách loại vé, rỗng khi mã trống
+     */
     @Override
     public List<TicketTypeResponse> getTicketTypesByEventId(String eventId) {
         if (eventId == null || eventId.trim().isEmpty())
@@ -214,6 +248,12 @@ public class TicketServiceImpl implements TicketService {
         return visibleRows(eventId).stream().map(this::mapToResponse).toList();
     }
 
+    /**
+     * Lấy các loại vé của sự kiện; bản cài đặt hiện tại dùng cùng quy tắc với {@code getTicketTypesByEventId} nên cũng bỏ loại vé đã ẩn.
+     *
+     * @param eventId mã sự kiện
+     * @return danh sách loại vé, rỗng khi mã trống
+     */
     @Override
     public List<TicketTypeResponse> getAllTicketTypesByEventId(String eventId) {
         if (eventId == null || eventId.trim().isEmpty())
@@ -221,6 +261,12 @@ public class TicketServiceImpl implements TicketService {
         return visibleRows(eventId).stream().map(this::mapToResponse).toList();
     }
 
+    /**
+     * Lấy một loại vé theo mã.
+     *
+     * @param id mã loại vé
+     * @return loại vé, hoặc null khi mã trống hay không tồn tại
+     */
     @Override
     public TicketTypeResponse getTicketTypeById(String id) {
         if (id == null || id.trim().isEmpty())
@@ -230,6 +276,12 @@ public class TicketServiceImpl implements TicketService {
                 .orElse(null);
     }
 
+    /**
+     * Lấy các loại vé của một suất diễn, bỏ loại vé đã ẩn và gộp các loại trùng tên (giữ dòng đầu tiên).
+     *
+     * @param showtimeId mã suất diễn
+     * @return danh sách loại vé, rỗng khi mã trống
+     */
     @Override
     public List<TicketTypeResponse> getTicketTypesByShowtimeId(String showtimeId) {
         if (showtimeId == null || showtimeId.trim().isEmpty())
@@ -248,6 +300,12 @@ public class TicketServiceImpl implements TicketService {
                 .toList();
     }
 
+    /**
+     * Đọc thời điểm từ chuỗi, thử lần lượt các định dạng ISO local, thiếu giây, có offset và instant.
+     *
+     * @param str chuỗi thời gian
+     * @return thời điểm theo giờ địa phương, hoặc null khi trống hay không đọc được
+     */
     private LocalDateTime parseDateTime(String str) {
         if (str == null || str.trim().isEmpty())
             return null;
@@ -274,10 +332,14 @@ public class TicketServiceImpl implements TicketService {
         }
     }
 
+    /**
+     * Đổi yêu cầu thành entity loại vé mới: bắt đầu với chưa bán gì (còn lại bằng ban đầu bằng số phát hành, mặc định 100),
+     * id kiểu {@code tier_*} từ giao diện bị bỏ để DB tự sinh.
+     */
     private TicketType mapToEntity(TicketTypeCreateRequest req) {
 
         String existingId = (req.getId() != null && !req.getId().startsWith("tier_") && !req.getId().isBlank()) ? req.getId() : null;
-        // new rows start with nothing sold: total = initial = the issued number (fallback to the legacy field, then 100)
+        // dòng mới bắt đầu với chưa bán gì: còn lại = ban đầu = số phát hành (dự phòng trường cũ, rồi mặc định 100)
         int issued = req.getInitialQuantity() != null ? req.getInitialQuantity()
                 : (req.getTotalQuantity() != null ? req.getTotalQuantity() : 100);
 
@@ -297,6 +359,7 @@ public class TicketServiceImpl implements TicketService {
                 .build();
     }
 
+    /** Đổi entity loại vé thành phản hồi, gồm các số còn lại, đang giữ, còn mua được và đã bán. */
     private TicketTypeResponse mapToResponse(TicketType entity) {
         if (entity == null)
             return null;
@@ -320,18 +383,38 @@ public class TicketServiceImpl implements TicketService {
                 .build();
     }
 
+    /**
+     * Lưu sơ đồ ghế của sự kiện ở trạng thái nháp.
+     *
+     * @param eventId mã sự kiện
+     * @param request nội dung sơ đồ
+     * @return sơ đồ đã lưu
+     */
     @Override
     @Transactional
     public SeatLayoutResponse saveSeatLayoutDraft(String eventId, SeatLayoutRequest request) {
         return processSaveSeatLayout(eventId, request, SeatLayoutStatus.DRAFT);
     }
 
+    /**
+     * Lưu và xuất bản sơ đồ ghế của sự kiện.
+     *
+     * @param eventId mã sự kiện
+     * @param request nội dung sơ đồ
+     * @return sơ đồ đã xuất bản
+     */
     @Override
     @Transactional
     public SeatLayoutResponse publishSeatLayout(String eventId, SeatLayoutRequest request) {
         return processSaveSeatLayout(eventId, request, SeatLayoutStatus.PUBLISHED);
     }
 
+    /**
+     * Lấy sơ đồ ghế cập nhật gần nhất của sự kiện kèm các khu ghế.
+     *
+     * @param eventId mã sự kiện
+     * @return sơ đồ ghế, hoặc null khi mã trống hay chưa có sơ đồ
+     */
     @Override
     @Transactional(readOnly = true)
     public SeatLayoutResponse getSeatLayoutByEventId(String eventId) {
@@ -350,6 +433,12 @@ public class TicketServiceImpl implements TicketService {
         return mapLayoutToResponse(layout, zones);
     }
 
+    /**
+     * Lưu sơ đồ ghế với trạng thái cho trước. Dùng lại sơ đồ gần nhất của sự kiện (xóa các sơ đồ cũ thừa), cập nhật nội dung
+     * và thay toàn bộ khu ghế theo yêu cầu.
+     *
+     * @throws IllegalArgumentException khi không xác định được mã sự kiện
+     */
     private SeatLayoutResponse processSaveSeatLayout(String eventId, SeatLayoutRequest request, SeatLayoutStatus status) {
         String targetEventId = (eventId != null && !eventId.trim().isEmpty()) ? eventId : request.getEventId();
         if (targetEventId == null || targetEventId.trim().isEmpty()) {
@@ -416,6 +505,7 @@ public class TicketServiceImpl implements TicketService {
         return mapLayoutToResponse(savedLayout, savedLayout.getSeatZones());
     }
 
+    /** Đổi sơ đồ ghế và các khu ghế thành phản hồi; không truyền khu ghế thì dùng khu ghế của sơ đồ. */
     private SeatLayoutResponse mapLayoutToResponse(SeatLayout layout, List<SeatZone> zones) {
         if (layout == null) return null;
         List<SeatLayoutResponse.ZoneResponseDto> zoneDtos = new ArrayList<>();
@@ -451,6 +541,14 @@ public class TicketServiceImpl implements TicketService {
                 .build();
     }
 
+    /**
+     * Lấy trạng thái ghế từ Redis: ghế đang giữ là {@code HOLDING}, ghế đã bán là {@code SOLD} (bán ghi đè giữ). Đọc cả tập
+     * ghế lẫn từng khóa lẻ. Redis lỗi thì trả bản đồ đang có, không ném lỗi.
+     *
+     * @param eventId mã sự kiện
+     * @param showtimeId mã suất diễn; null thì dùng khóa cấp sự kiện
+     * @return bản đồ mã ghế sang trạng thái
+     */
     @Override
     public Map<String, String> getSeatStatusMap(String eventId, String showtimeId) {
         Map<String, String> statusMap = new HashMap<>();
@@ -460,7 +558,7 @@ public class TicketServiceImpl implements TicketService {
 
         try {
             String showtimePrefix = showtimeId != null ? "showtime:" + showtimeId : "event:" + eventId;
-            // check Redis Set for held seats
+            // đọc tập ghế đang giữ trong Redis
             Set<String> heldSeats = stringRedisTemplate.opsForSet().members(showtimePrefix + ":held_seats");
             if (heldSeats != null && !heldSeats.isEmpty()) {
                 for (String seatId : heldSeats) {
@@ -468,7 +566,7 @@ public class TicketServiceImpl implements TicketService {
                 }
             }
 
-            // fallback for individual seat:hold keys
+            // dự phòng cho các khóa seat:hold lẻ
             Set<String> holdKeys = stringRedisTemplate.keys("seat:hold:" + showtimePrefix + ":*");
             if (holdKeys != null) {
                 for (String key : holdKeys) {
@@ -477,7 +575,7 @@ public class TicketServiceImpl implements TicketService {
                 }
             }
 
-            // check Redis Set for sold seats
+            // đọc tập ghế đã bán trong Redis
             Set<String> soldSeats = stringRedisTemplate.opsForSet().members(showtimePrefix + ":sold_seats");
             if (soldSeats != null && !soldSeats.isEmpty()) {
                 for (String seatId : soldSeats) {
@@ -485,7 +583,7 @@ public class TicketServiceImpl implements TicketService {
                 }
             }
 
-            // fallback for individual seat:sold keys
+            // dự phòng cho các khóa seat:sold lẻ
             Set<String> soldKeys = stringRedisTemplate.keys("seat:sold:" + showtimePrefix + ":*");
             if (soldKeys != null) {
                 for (String key : soldKeys) {
@@ -494,12 +592,19 @@ public class TicketServiceImpl implements TicketService {
                 }
             }
         } catch (Exception e) {
-            // fallback if Redis fails
+            // Redis lỗi thì bỏ qua, trả những gì đã đọc được
         }
 
         return statusMap;
     }
 
+    /**
+     * Lấy vé của người dùng, mới phát hành trước.
+     *
+     * @param userId mã người dùng
+     * @param pageable thông tin phân trang
+     * @return trang vé, rỗng khi mã người dùng trống
+     */
     @Override
     @Transactional(readOnly = true)
     public Page<OwnedTicketResponse> getMyTickets(String userId, Pageable pageable) {
@@ -508,6 +613,14 @@ public class TicketServiceImpl implements TicketService {
                 .map(OwnedTicketResponse::from);
     }
 
+    /**
+     * Lấy chi tiết một vé của người dùng.
+     *
+     * @param ticketId mã vé
+     * @param userId mã người dùng, phải là chủ vé
+     * @return thông tin vé
+     * @throws RuntimeException khi không có vé hoặc người dùng không phải chủ vé
+     */
     @Override
     @Transactional(readOnly = true)
     public OwnedTicketResponse getMyTicket(String ticketId, String userId) {

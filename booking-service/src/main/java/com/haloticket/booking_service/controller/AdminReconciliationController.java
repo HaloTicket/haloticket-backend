@@ -19,7 +19,10 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.Locale;
 import java.util.Map;
 
-/** Admin order reconciliation (ROLE_ADMIN only). The rows carry the customer name, e-mail and phone so a person can contact them; never log them. */
+/**
+ * API quản trị đối soát đơn hàng (chỉ ROLE_ADMIN). Các dòng dữ liệu chứa tên, email và số điện thoại
+ * khách để nhân viên liên hệ, tuyệt đối không ghi log chúng.
+ */
 @RestController
 @RequestMapping("/api/bookings/admin/reconciliation")
 @PreAuthorize("hasRole('ADMIN')")
@@ -28,15 +31,25 @@ public class AdminReconciliationController {
 
     private static final int MAX_PAGE_SIZE = 100;
 
+    /** Nội dung yêu cầu xử lý một ngoại lệ thanh toán: ghi chú và cờ đã hoàn tiền thủ công. */
     public record ResolveRequest(String note, Boolean refundedManually) {}
 
     private final ReconciliationService reconciliationService;
 
+    /** Trả số liệu tổng hợp của các ngoại lệ thanh toán. */
     @GetMapping("/summary")
     public Map<String, Object> summary() {
         return reconciliationService.summary();
     }
 
+    /**
+     * Liệt kê ngoại lệ thanh toán có phân trang, lọc tùy chọn theo trạng thái.
+     * @param status trạng thái cần lọc (không phân biệt hoa thường), bỏ trống để lấy tất cả
+     * @param page số trang bắt đầu từ 0
+     * @param size số dòng mỗi trang, từ 1 đến 100
+     * @return trang kết quả
+     * @throws ResponseStatusException HTTP 422 khi trạng thái hoặc tham số phân trang không hợp lệ
+     */
     @GetMapping("/exceptions")
     public ReconciliationService.ExceptionPage exceptions(
             @RequestParam(required = false) String status,
@@ -56,6 +69,14 @@ public class AdminReconciliationController {
         return reconciliationService.exceptions(filter, page, size);
     }
 
+    /**
+     * Đánh dấu một ngoại lệ thanh toán đã được xử lý, kèm ghi chú và việc hoàn tiền thủ công.
+     * Quản trị viên được lấy từ subject của JWT, không có thì ghi {@code unknown}.
+     * @param id mã ngoại lệ
+     * @param body ghi chú và cờ {@code refundedManually}
+     * @param jwt token của quản trị viên
+     * @return ngoại lệ sau khi cập nhật
+     */
     @PostMapping("/exceptions/{id}/resolve")
     public ReconciliationService.ExceptionItem resolve(@PathVariable String id, @RequestBody ResolveRequest body,
                                                       @AuthenticationPrincipal Jwt jwt) {
@@ -64,17 +85,19 @@ public class AdminReconciliationController {
                 body != null && Boolean.TRUE.equals(body.refundedManually()), admin);
     }
 
+    /** Liệt kê các đơn đã thanh toán nhưng chưa được phát hành vé. */
     @GetMapping("/paid-without-tickets")
     public ReconciliationService.PaidWithoutTickets paidWithoutTickets() {
         return reconciliationService.paidWithoutTickets();
     }
 
-    /** "Đồng bộ lại kho" for one row: remaining := initial - issued. Refusals (404/409/422) are passed on with nothing changed. */
+    /** Đồng bộ lại kho cho một loại vé: số còn lại = số ban đầu trừ số đã phát hành. Các từ chối (404/409/422) được chuyển tiếp và không thay đổi dữ liệu. */
     @PostMapping("/stock/{ticketTypeId}/fix")
     public Map<String, Object> fixStock(@PathVariable String ticketTypeId) {
         return reconciliationService.fixStock(ticketTypeId);
     }
 
+    /** Liệt kê các loại vé có số tồn kho lệch so với số vé đã phát hành. */
     @GetMapping("/stock-discrepancies")
     public ReconciliationService.StockDiscrepancies stockDiscrepancies() {
         return reconciliationService.stockDiscrepancies();

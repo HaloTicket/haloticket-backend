@@ -12,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.concurrent.ConcurrentHashMap;
 
+/** Đổi header Authorization của người gọi thành id người dùng trong user-service (không phải subject của Keycloak), có cache 60 giây theo subject. */
 @Component
 @RequiredArgsConstructor
 public class CallerIds {
@@ -19,11 +20,18 @@ public class CallerIds {
     private static final long TTL_MILLIS = 60_000;
     private static final int MAX_ENTRIES = 10_000;
 
+    /** Một mục cache: id người dùng và thời điểm hết hạn (mili giây). */
     private record Cached(String userId, long expiresAt) {}
 
     private final UserServiceClient users;
     private final ConcurrentHashMap<String, Cached> cache = new ConcurrentHashMap<>();
 
+    /**
+     * Lấy id người dùng của người gọi: dùng cache nếu còn hạn, nếu không hỏi user-service bằng token của người gọi.
+     * @param authorization giá trị header Authorization
+     * @return id người dùng trong user-service
+     * @throws ResponseStatusException HTTP 401 khi thiếu token hoặc bị từ chối, HTTP 503 khi user-service không trả lời
+     */
     public String userId(String authorization) {
         if (authorization == null || authorization.isBlank()) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED");
         String subject = subject();
@@ -49,10 +57,12 @@ public class CallerIds {
         return userId;
     }
 
+    /** Xóa toàn bộ cache id người dùng. */
     public void clear() {
         cache.clear();
     }
 
+    /** Lấy tên chủ thể đã xác thực trong ngữ cảnh bảo mật; null nếu chưa đăng nhập hoặc là người dùng ẩn danh. */
     private static String subject() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         return authentication != null && authentication.isAuthenticated() && !"anonymousUser".equals(authentication.getPrincipal())

@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Thực thể voucher của sự kiện (bảng {@code vouchers}): mã giảm giá, mức giảm, giới hạn sử dụng, phạm vi áp dụng và thời gian hiệu lực. */
 @Entity
 @Table(name = "vouchers")
 @Getter
@@ -78,6 +79,7 @@ public class Voucher {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Trước khi lưu lần đầu: đặt thời điểm tạo; mặc định đã dùng 0 lần, trạng thái {@code ACTIVE}, phạm vi {@code ALL}. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -87,6 +89,7 @@ public class Voucher {
         if (this.applyScope == null) this.applyScope = ApplyScope.ALL;
     }
 
+    /** Trước mỗi lần cập nhật: làm mới thời điểm cập nhật. */
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

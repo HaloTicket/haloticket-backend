@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Mẫu thông báo (bảng {@code notification_templates}): tiêu đề và nội dung chứa chỗ giữ {@code {{biến}}}, theo loại và kênh. */
 @Entity
 @Table(name = "notification_templates")
 @Getter
@@ -61,6 +62,7 @@ public class NotificationTemplate {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Trước khi lưu: gán thời điểm tạo, cập nhật và đặt trạng thái {@code ACTIVE} nếu chưa có. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -70,6 +72,7 @@ public class NotificationTemplate {
         }
     }
 
+    /** Trước khi cập nhật: làm mới thời điểm cập nhật. */
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

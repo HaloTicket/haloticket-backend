@@ -14,7 +14,7 @@ x-runtime: &runtime
   read_only: true
   tmpfs:
     - /tmp:size=32m,mode=1777
-  # each service writes its own log file here (LOGGING_FILE_NAME below); ai-assistant mounts the same volume read-only
+  # mỗi service ghi file log riêng vào đây (LOGGING_FILE_NAME bên dưới); ai-assistant gắn cùng volume ở chế độ chỉ đọc
   volumes:
     - service-logs:/logs
   security_opt: [no-new-privileges:true]
@@ -43,12 +43,12 @@ x-environment: &environment
   SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-secretpassword}
   KAFKA_BOOTSTRAP_SERVERS: kafka:29092
   SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-  # system monitoring: Actuator on its own port (9091 is NOT published, only reachable inside the compose network) with only
-  # health and metrics; the gateway also refuses /actuator/** from outside. ai-assistant reads CPU, memory and uptime from it.
+  # giám sát hệ thống: Actuator chạy cổng riêng (9091 KHÔNG publish, chỉ truy cập được trong mạng compose), chỉ bật
+  # health và metrics; gateway cũng chặn /actuator/** từ bên ngoài. ai-assistant đọc CPU, bộ nhớ và uptime từ cổng này.
   MANAGEMENT_SERVER_PORT: "9091"
   MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,metrics
   MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: never
-  # one log file per service in the shared volume, rotated (the Docker json logs stay as they are)
+  # mỗi service một file log trong volume dùng chung, có xoay vòng (log JSON của Docker vẫn giữ nguyên)
   LOGGING_FILE_NAME: /logs/$${spring.application.name}.log
   LOGGING_LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE: 5MB
   LOGGING_LOGBACK_ROLLINGPOLICY_MAX_HISTORY: "2"
@@ -64,9 +64,9 @@ x-dependencies: &dependencies
     condition: service_healthy
 
 services:
-  # Infrastructure Services
+  # Các service hạ tầng
 
-  # PostgreSQL Database
+  # Cơ sở dữ liệu PostgreSQL
   postgres:
     image: pgvector/pgvector:pg16
     mem_limit: ${POSTGRES_MEMORY_LIMIT:-256m}
@@ -92,7 +92,7 @@ services:
     networks:
       - haloticket-network
 
-  # Redis Cache & Fast Locking
+  # Redis: cache và khóa phân tán
   redis:
     image: redis:7-alpine
     mem_limit: ${REDIS_MEMORY_LIMIT:-96m}
@@ -115,7 +115,7 @@ services:
     networks:
       - haloticket-network
 
-  # Apache Kafka (KRaft Mode - Tối ưu heap 192MB)
+  # Apache Kafka (chế độ KRaft, giới hạn heap 192MB)
   kafka:
     image: apache/kafka:3.7.0
     mem_limit: ${KAFKA_MEMORY_LIMIT:-512m}
@@ -152,7 +152,7 @@ services:
     networks:
       - haloticket-network
 
-  # Keycloak IAM (Quarkus with Auto-Import Realm - Tối ưu SerialGC & Heap 256MB)
+  # Keycloak IAM (Quarkus, tự import realm, dùng SerialGC và heap 256MB)
   keycloak:
     image: keycloak/keycloak:24.0.4
     mem_limit: ${KEYCLOAK_MEMORY_LIMIT:-420m}
@@ -196,7 +196,7 @@ services:
     networks:
       - haloticket-network
 
-  # Application Microservices
+  # Các microservice ứng dụng
 
   discovery-server:
     <<: *runtime
@@ -311,7 +311,7 @@ services:
       <<: [*environment, *event-scope]
       SERVER_PORT: "8083"
       TICKET_RESERVATION_INTERNAL_TOKEN: ${TICKET_RESERVATION_INTERNAL_TOKEN:-}
-      # Check-in window: defaults match ticket-service/application.yaml (off).
+      # Cửa sổ check-in: giá trị mặc định khớp ticket-service/application.yaml (tắt).
       CHECKIN_WINDOW_ENABLED: ${CHECKIN_WINDOW_ENABLED:-false}
       CHECKIN_WINDOW_OPEN_BEFORE_MINUTES: ${CHECKIN_WINDOW_OPEN_BEFORE_MINUTES:-180}
       CHECKIN_WINDOW_CLOSE_AFTER_END_MINUTES: ${CHECKIN_WINDOW_CLOSE_AFTER_END_MINUTES:-120}
@@ -479,17 +479,17 @@ services:
     mem_limit: ${AI_ASSISTANT_MEMORY_LIMIT:-384m}
     ports: ["${SERVICE_BIND_ADDRESS:-127.0.0.1}:${AI_ASSISTANT_PORT:-8089}:8089"]
     environment:
-      # shared database account (same effective values as before; the password now comes from .env, not this file).
+      # tài khoản database dùng chung (giá trị hiệu lực như trước; mật khẩu lấy từ .env, không ghi trong file này).
       - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-haloticket}:${POSTGRES_PASSWORD}@postgres:5432/event_db
       - EVENT_DB_URL=postgresql+psycopg2://${POSTGRES_USER:-haloticket}:${POSTGRES_PASSWORD}@postgres:5432/event_db
       - TICKET_DB_URL=postgresql+psycopg2://${POSTGRES_USER:-haloticket}:${POSTGRES_PASSWORD}@postgres:5432/ticket_db
       - BOOKING_DB_URL=postgresql+psycopg2://${POSTGRES_USER:-haloticket}:${POSTGRES_PASSWORD}@postgres:5432/booking_db
-      # full URLs set by the operator in .env (see .env.example). Empty = metering off / chatbot routes answer 503 AI_DB_NOT_CONFIGURED.
+      # URL đầy đủ do người vận hành đặt trong .env (xem .env.example). Để trống = tắt đo lượng dùng / các route chatbot trả 503 AI_DB_NOT_CONFIGURED.
       - AI_OPS_DATABASE_URL=${AI_OPS_DATABASE_URL:-}
-      # admin intelligence: role ai_admin_rw on ai_ops (risk assessments, decisions, pins, dashboard summary). Empty = scores are
-      # still returned but not stored; pins, summary cache and decisions answer 503 AI_DB_NOT_CONFIGURED.
+      # admin intelligence: role ai_admin_rw trên ai_ops (đánh giá rủi ro, quyết định, ghim, tóm tắt dashboard). Để trống = điểm rủi ro
+      # vẫn được trả về nhưng không lưu; ghim, cache tóm tắt và quyết định trả 503 AI_DB_NOT_CONFIGURED.
       - AI_ADMIN_DATABASE_URL=${AI_ADMIN_DATABASE_URL:-}
-      # admin data (events, users, reconciliation, resale) is read through the gateway with the admin's own token
+      # dữ liệu admin (sự kiện, người dùng, đối soát, bán lại) được đọc qua gateway bằng token của chính admin
       - INTERNAL_API_BASE_URL=${INTERNAL_API_BASE_URL:-http://api-gateway:8888}
       - RISK_MEDIUM_THRESHOLD=${RISK_MEDIUM_THRESHOLD:-30}
       - RISK_HIGH_THRESHOLD=${RISK_HIGH_THRESHOLD:-60}
@@ -519,7 +519,7 @@ services:
       - AI_SCOPE_PUBLIC_RELATIONS=${AI_SCOPE_PUBLIC_RELATIONS:-v_venues,v_event_categories}
       - AI_SQL_ALLOWED_RELATIONS=${AI_SQL_ALLOWED_RELATIONS:-v_events,v_event_showtimes,v_ticket_types,v_ticket_sales_daily,v_booking_summary_daily,v_event_views_daily,v_vouchers,v_venues,v_event_categories,v_search_terms}
       - ALERT_SSL_DOMAINS=${ALERT_SSL_DOMAINS:-haloticket-web.pages.dev,haloticket.duckdns.org}
-      # model call limits, cost control and rate limits (numbers only; defaults below).
+      # giới hạn số lần gọi mô hình, kiểm soát chi phí và giới hạn tốc độ (chỉ là số; mặc định ở bên dưới).
       - AI_LLM_DEADLINE_SECONDS=${AI_LLM_DEADLINE_SECONDS:-20}
       - AI_DAILY_CALL_BUDGET=${AI_DAILY_CALL_BUDGET:-2000}
       - AI_SEARCH_CACHE_SECONDS=${AI_SEARCH_CACHE_SECONDS:-300}
@@ -543,12 +543,12 @@ services:
       - AI_MAX_TOKENS_EVENT_CONTENT=${AI_MAX_TOKENS_EVENT_CONTENT:-1200}
       - AI_MAX_TOKENS_ANALYSIS=${AI_MAX_TOKENS_ANALYSIS:-900}
       - AI_MAX_TOKENS_VOUCHER_STRATEGY=${AI_MAX_TOKENS_VOUCHER_STRATEGY:-900}
-      # system monitoring: the services' log files (read only) and their Actuator port
+      # giám sát hệ thống: file log của các service (chỉ đọc) và cổng Actuator của chúng
       - AI_SYSTEM_LOG_DIR=/logs
       - AI_ACTUATOR_PORT=${AI_ACTUATOR_PORT:-9091}
     volumes:
       - service-logs:/logs:ro
-    # process check only: no database or model dependency.
+    # chỉ kiểm tra tiến trình: không phụ thuộc database hay mô hình.
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8089/health', timeout=4)"]
       interval: 30s

@@ -3,24 +3,27 @@ package com.haloticket.ticket_service.util;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/** Nhận dạng mã ghế ảo của vé vào cửa chung (GA) và tách mã loại vé ra khỏi mã đó. */
 public final class GeneralAdmissionSeatIds {
 
     private static final String EXACT_GA = "GENERAL_ADMISSION";
     private static final Pattern GA_STT_PATTERN = Pattern.compile("^.+-(GA|STT)-\\d+$");
     private static final Pattern EXTRACT_TYPE_ID_PATTERN = Pattern.compile("^(.+)-(GA|STT)-\\d+$");
-    /** What the customer chatbot sends for a standing ticket: "<zoneId>-AI-<timestamp>-<n>" (web AIChatMessage). */
+    /** Dạng mã chatbot khách hàng gửi cho vé đứng: {@code <zoneId>-AI-<timestamp>-<n>} (web AIChatMessage). */
     private static final Pattern CHATBOT_PATTERN = Pattern.compile("^(.+)-AI-\\d+-\\d+$");
 
+    /** Chặn việc tạo đối tượng của lớp tiện ích. */
     private GeneralAdmissionSeatIds() {
-        // utility class
+        // lớp tiện ích, không tạo đối tượng
     }
 
     /**
-     * Determines whether the given seatId represents a General Admission (GA) / non-seatmap virtual seat.
-     * Matches "GENERAL_ADMISSION" (case-insensitive) or regex ^.+-(GA|STT)-\d+$.
+     * Kiểm tra mã ghế có phải ghế ảo của vé vào cửa chung (GA), tức không thuộc sơ đồ ghế, hay không.
+     * Khớp {@code GENERAL_ADMISSION} (không phân biệt hoa thường), regex {@code ^.+-(GA|STT)-\d+$}
+     * hoặc dạng của chatbot.
      *
-     * @param seatId the seatId string to check
-     * @return true if GA or STT format, false otherwise
+     * @param seatId mã ghế cần kiểm tra
+     * @return true nếu là dạng GA, STT hoặc chatbot, ngược lại false
      */
     public static boolean isGeneralAdmission(String seatId) {
         if (seatId == null) {
@@ -37,11 +40,11 @@ public final class GeneralAdmissionSeatIds {
     }
 
     /**
-     * Extracts the ticketTypeId prefix from a virtual GA seatId if present.
-     * Example: "e7351c0a-edc3-4757-ab1c-45be5e2e853d-STT-1" -> "e7351c0a-edc3-4757-ab1c-45be5e2e853d"
+     * Tách mã loại vé ở phần đầu của mã ghế GA ảo nếu có.
+     * Ví dụ: {@code e7351c0a-edc3-4757-ab1c-45be5e2e853d-STT-1} cho ra {@code e7351c0a-edc3-4757-ab1c-45be5e2e853d}.
      *
-     * @param seatId the seatId string
-     * @return extracted ticketTypeId if format matches, or null
+     * @param seatId mã ghế
+     * @return mã loại vé nếu đúng định dạng, ngược lại null
      */
     public static String extractTicketTypeId(String seatId) {
         if (seatId == null) {

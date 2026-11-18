@@ -16,6 +16,10 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.*;
 
+/**
+ * Xử lý giai đoạn thanh toán và chuyển vé của giao dịch mua vé bán lại: khởi tạo thanh toán, nhận kết quả thanh toán,
+ * yêu cầu chuyển quyền sở hữu qua outbox, hoàn tất đối soát cho người bán hoặc yêu cầu hoàn tiền khi chuyển vé thất bại.
+ */
 @Service
 @RequiredArgsConstructor
 public class ResalePurchaseService {
@@ -27,6 +31,14 @@ public class ResalePurchaseService {
     private final ObjectMapper objectMapper;
     private final EventTransferPolicyService policyGate;
 
+    /**
+     * Xem trạng thái giao dịch mua của chính người mua.
+     *
+     * @param buyerId mã người mua
+     * @param transactionId mã giao dịch
+     * @return trạng thái giao dịch và saga liên quan
+     * @throws ResponseStatusException HTTP 404 {@code TRANSACTION_NOT_FOUND} nếu không có giao dịch, HTTP 403 nếu không phải của người mua
+     */
     @Transactional(readOnly = true)
     public ResalePurchaseStatusResponse getStatus(String buyerId, String transactionId) {
         MarketplaceTransaction transaction = transactions.findById(transactionId)
@@ -35,6 +47,16 @@ public class ResalePurchaseService {
         return new ResalePurchaseStatusResponse(transaction.getId(), transaction.getStatus(), transaction.getSagaId());
     }
 
+    /**
+     * Khởi tạo thanh toán cho giao dịch đang giữ chỗ: chuyển {@code PENDING_PAYMENT} sang {@code PAYMENT_PROCESSING}
+     * và trả số tiền, tiền tệ cùng hạn thanh toán.
+     *
+     * @param buyerId mã người mua
+     * @param transactionId mã giao dịch
+     * @return thông tin để thanh toán
+     * @throws ResponseStatusException HTTP 404 nếu không có giao dịch, HTTP 403 nếu không phải của người mua,
+     *         HTTP 409 {@code RESERVATION_NOT_PAYABLE} khi trạng thái không cho thanh toán hoặc giữ chỗ đã hết hạn
+     */
     @Transactional
     public PaymentInitiationResponse startPayment(String buyerId, String transactionId) {
         MarketplaceTransaction transaction = transactions.findById(transactionId)
@@ -53,6 +75,16 @@ public class ResalePurchaseService {
                 transaction.getReservationExpiresAt());
     }
 
+    /**
+     * Xử lý thanh toán thành công: kiểm tra số tiền khớp, tạo saga {@code RESALE_PURCHASE} và lượt chuyển nhượng,
+     * chuyển giao dịch sang {@code TRANSFERRING} rồi đưa lệnh chuyển quyền sở hữu vào outbox. Bỏ qua nếu giao dịch không tồn tại
+     * hoặc đã được xử lý.
+     *
+     * @param transactionId mã giao dịch (tương ứng {@code bookingId} của thanh toán)
+     * @param paymentId mã thanh toán
+     * @param paidAmount số tiền đã thanh toán
+     * @throws IllegalStateException khi giao dịch không ở trạng thái {@code PAYMENT_PROCESSING} hoặc số tiền không khớp
+     */
     @Transactional
     public void handlePaymentCompleted(String transactionId, String paymentId, BigDecimal paidAmount) {
         MarketplaceTransaction transaction = transactions.findById(transactionId).orElse(null);
@@ -84,6 +116,12 @@ public class ResalePurchaseService {
         enqueueTransfer(transaction, sagaId);
     }
 
+    /**
+     * Gửi lại lệnh chuyển quyền sở hữu cho saga mua vé bán lại bị quá thời gian chờ, rồi hẹn lần thử kế tiếp sau 30 giây.
+     * Bỏ qua nếu saga hoặc giao dịch không còn ở trạng thái đang chuyển vé.
+     *
+     * @param sagaId mã saga
+     */
     @Transactional
     public void retryTimedOutTransfer(String sagaId) {
         MarketplaceSaga saga = sagas.findById(sagaId).orElse(null);
@@ -97,6 +135,13 @@ public class ResalePurchaseService {
         sagas.save(saga);
     }
 
+    /**
+     * Ghi lệnh yêu cầu chuyển quyền sở hữu vé (từ người bán sang người mua) vào outbox để phát lên Kafka.
+     *
+     * @param transaction giao dịch mua vé
+     * @param sagaId mã saga của giao dịch
+     * @throws IllegalStateException khi không tạo được nội dung lệnh
+     */
     private void enqueueTransfer(MarketplaceTransaction transaction, String sagaId) {
         TicketListing listing = transaction.getTicketListing();
         List<String> selectedIds = transaction.getTicketIds() == null || transaction.getTicketIds().isEmpty()
@@ -117,6 +162,13 @@ public class ResalePurchaseService {
         } catch (Exception exception) { throw new IllegalStateException("Could not request resale ownership transfer", exception); }
     }
 
+    /**
+     * Xử lý khi vé đã chuyển thành công: hoàn tất lượt chuyển nhượng, đánh dấu các vé đã bán và cập nhật trạng thái tin
+     * (bán hết, hết hạn, hoặc mở lại; mở lại nhưng bị tạm dừng nếu ban tổ chức đã tắt bán lại), hoàn tất giao dịch và saga,
+     * rồi tạo khoản đối soát cho người bán sau khi trừ phí nền tảng. Bỏ qua nếu giao dịch không ở trạng thái {@code TRANSFERRING}.
+     *
+     * @param sagaId mã saga của giao dịch mua
+     */
     @Transactional
     public void handleOwnershipTransferred(String sagaId) {
         MarketplaceTransaction transaction = transactions.findBySagaId(sagaId).orElse(null);
@@ -153,6 +205,14 @@ public class ResalePurchaseService {
                 .currency(transaction.getCurrency()).status(SettlementStatus.PENDING_SETTLEMENT).eligibleAt(now).build());
     }
 
+    /**
+     * Xử lý khi chuyển vé thất bại: chuyển giao dịch sang {@code REFUND_PENDING}, đặt saga vào bù trừ
+     * và đưa yêu cầu hoàn tiền vào outbox. Bỏ qua nếu giao dịch không ở trạng thái {@code TRANSFERRING}.
+     *
+     * @param sagaId mã saga của giao dịch mua
+     * @param reason lý do thất bại, được lưu vào saga và gửi kèm yêu cầu hoàn tiền
+     * @throws IllegalStateException khi không tạo được yêu cầu hoàn tiền
+     */
     @Transactional
     public void handleOwnershipTransferFailed(String sagaId, String reason) {
         MarketplaceTransaction transaction = transactions.findBySagaId(sagaId).orElse(null);

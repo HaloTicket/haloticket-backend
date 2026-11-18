@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 
+/** API báo cáo thanh toán dành cho admin: liệt kê các thanh toán thành công trong một khoảng thời gian. */
 @RestController
 @RequestMapping("/api/payments/admin")
 @RequiredArgsConstructor
@@ -27,6 +28,15 @@ public class PaymentReportController {
     @Value("${reports.source-zone:}")
     private String sourceZone;
 
+    /**
+     * Trả các thanh toán thành công có thời điểm xác nhận trong khoảng [from, to). Khoảng tối đa 732 ngày, tối đa 100000 dòng;
+     * thời điểm lưu theo múi giờ nguồn {@code reports.source-zone} (mặc định múi giờ hệ thống).
+     *
+     * @param from thời điểm bắt đầu
+     * @param to thời điểm kết thúc, phải sau {@code from}
+     * @return danh sách thanh toán và số đơn thiếu thời điểm xác nhận
+     * @throws ResponseStatusException 400 khi khoảng không hợp lệ, 422 khi vượt giới hạn dòng, 500 khi múi giờ cấu hình sai
+     */
     @GetMapping("/report-payments")
     public PaymentReportResponse reportPayments(@RequestParam Instant from, @RequestParam Instant to) {
         if (!from.isBefore(to) || Duration.between(from, to).compareTo(Duration.ofDays(732)) > 0) {
@@ -54,6 +64,8 @@ public class PaymentReportController {
         return new PaymentReportResponse(payments, outboxEventRepository.countBookingsMissingConfirmationTimestamp());
     }
 
+    /** Một dòng báo cáo: đơn, thanh toán, thời điểm xác nhận và doanh thu. */
     public record PaymentReportItem(String bookingId, String paymentId, Instant confirmedAt, BigDecimal revenue) {}
+    /** Kết quả báo cáo: danh sách thanh toán và số đơn chưa có thời điểm xác nhận. */
     public record PaymentReportResponse(List<PaymentReportItem> payments, long missingTimestampCount) {}
 }

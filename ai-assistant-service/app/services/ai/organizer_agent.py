@@ -1,3 +1,4 @@
+"""Agent trợ lý dữ liệu cho Ban tổ chức: nhận diện ý định, chạy công cụ truy vấn (doanh thu, suất diễn, voucher, thông báo, SQL) rồi tổng hợp câu trả lời."""
 import os
 import re
 import time
@@ -13,7 +14,7 @@ from app.services.ai.sql_engine import sql_engine
 from app.core.config import settings
 from app.db.session import make_engine
 
-# database URLs
+# URL các cơ sở dữ liệu (lấy từ biến môi trường, mặc định suy ra từ event_db)
 EVENT_DB_URL = os.getenv("EVENT_DB_URL", settings.database_url or "postgresql+psycopg2://haloticket:secretpassword@localhost:5433/event_db")
 TICKET_DB_URL = os.getenv("TICKET_DB_URL", EVENT_DB_URL.replace("/event_db", "/ticket_db"))
 BOOKING_DB_URL = os.getenv("BOOKING_DB_URL", EVENT_DB_URL.replace("/event_db", "/booking_db"))
@@ -37,10 +38,12 @@ except Exception:
 class AgentCache:
     """In-memory TTL Cache để giảm độ trễ và chi phí token cho các truy vấn lặp lại"""
     def __init__(self, ttl_seconds: int = 300):
+        """Khởi tạo cache rỗng với thời gian sống (giây) cho mỗi mục."""
         self.ttl = ttl_seconds
         self.cache: Dict[str, tuple[float, Any]] = {}
 
     def get(self, key: str) -> Optional[Any]:
+        """Lấy giá trị đang còn hạn theo khóa; mục quá hạn bị xóa và trả về None."""
         item = self.cache.get(key)
         if not item:
             return None
@@ -51,13 +54,15 @@ class AgentCache:
         return data
 
     def set(self, key: str, value: Any):
-        # limit cache size to prevent RAM overflow
+        """Lưu giá trị kèm thời điểm hiện tại; khi quá 500 mục thì xóa mục cũ nhất trước."""
+        # giới hạn kích thước cache để tránh tràn RAM
         if len(self.cache) > 500:
             oldest_key = min(self.cache.keys(), key=lambda k: self.cache[k][0])
             del self.cache[oldest_key]
         self.cache[key] = (time.time(), value)
 
     def clear(self):
+        """Xóa toàn bộ mục trong cache."""
         self.cache.clear()
 
 
@@ -72,11 +77,12 @@ class OrganizerAgent:
     """
 
     def __init__(self):
+        """Tạo agent với LLM nhanh (cho câu trả lời thường), LLM thông minh (cho nội dung dài) và cache 5 phút."""
         self.fast_llm = get_fast_llm()
         self.smart_llm = get_smart_llm()
         self.cache = AgentCache(ttl_seconds=300)
 
-    # legacy method: generate event content
+    # phương thức cũ: sinh nội dung sự kiện (luồng mới nằm ở event_content.py)
     def generate_event_content(self, title: str, bullet_points: str) -> dict:
         """Sinh nội dung mô tả sự kiện và điều khoản dựa trên bullet points."""
         prompt = PromptTemplate.from_template(
@@ -101,16 +107,17 @@ class OrganizerAgent:
             if isinstance(content, list):
                 content = "".join([part.get("text", "") if isinstance(part, dict) else str(part) for part in content])
             
-            # clean markdown code blocks if any
+            # bỏ khối mã markdown nếu có
             content = content.strip().removeprefix("```json").removesuffix("```").strip()
             data = json.loads(content)
             
             def clean_markdown(text: str) -> str:
+                """Bỏ tiêu đề, in đậm và in nghiêng markdown khỏi văn bản."""
                 if not text:
                     return ""
-                # strip markdown headers (##, ###, etc.)
+                # bỏ tiêu đề markdown (##, ###, v.v.)
                 text = re.sub(r'#{1,6}\s*', '', text)
-                # strip bold/italic markdown (**text**, *text*, ***text***)
+                # bỏ in đậm/in nghiêng markdown (**text**, *text*, ***text***)
                 text = re.sub(r'\*{1,3}([^*]+)\*{1,3}', r'\1', text)
                 text = re.sub(r'_{1,3}([^_]+)_{1,3}', r'\1', text)
                 return text.strip()
@@ -125,7 +132,7 @@ class OrganizerAgent:
                 "terms_and_conditions": "Lỗi sinh điều khoản. Vui lòng thử lại."
             }
 
-    # tool 1: query event analytics
+    # công cụ 1: truy vấn số liệu phân tích sự kiện
     def _tool_event_analytics(self, event_id: Optional[str], event_title: Optional[str]) -> Dict[str, Any]:
         """Truy vấn dữ liệu doanh thu, số vé đã bán và đơn hàng thực tế"""
         engine = event_engine
@@ -142,7 +149,7 @@ class OrganizerAgent:
 
         try:
             with engine.connect() as conn:
-                # 1. event info
+                # 1. thông tin sự kiện
                 if event_id:
                     ev_row = conn.execute(
                         text("SELECT id, title, event_status, min_price, dates_summary FROM events WHERE id = :eid"),
@@ -152,7 +159,7 @@ class OrganizerAgent:
                         result["event_title"] = ev_row.title or result["event_title"]
                         result["event_status"] = ev_row.event_status
 
-                # 2. total ticket and ticket types
+                # 2. tổng vé và các hạng vé
                 tt_engine = ticket_engine or engine
                 with tt_engine.connect() as tconn:
                     if event_id:
@@ -174,7 +181,7 @@ class OrganizerAgent:
                         })
                         result["total_capacity"] += int(r.total_quantity or 0)
 
-                # 3. revenue and order from bookings / tickets
+                # 3. doanh thu và đơn hàng từ bookings / tickets
                 bk_engine = booking_engine or engine
                 with bk_engine.connect() as bconn:
                     if event_id:
@@ -203,7 +210,7 @@ class OrganizerAgent:
                         result["total_revenue"] = float(bk_row.total_rev or 0)
                         result["paid_orders"] = int(bk_row.total_bookings or 0)
 
-                    # count paid tickets
+                    # đếm vé đã thanh toán
                     if event_id:
                         tk_row = bconn.execute(
                             text("""
@@ -222,7 +229,7 @@ class OrganizerAgent:
                     if tk_row:
                         result["tickets_sold"] = int(tk_row.sold_count or 0)
 
-            # calculate occupancy rate
+            # tính tỷ lệ lấp đầy
             if result["total_capacity"] > 0:
                 result["occupancy_rate"] = round((result["tickets_sold"] / result["total_capacity"]) * 100, 1)
 
@@ -231,7 +238,7 @@ class OrganizerAgent:
 
         return result
 
-    # tool 2: query showtime capacity
+    # công cụ 2: truy vấn sức chứa theo suất diễn
     def _tool_showtime_capacity(self, event_id: Optional[str], event_title: Optional[str]) -> Dict[str, Any]:
         """Truy vấn các suất diễn và tỷ lệ lấp đầy theo từng hạng vé"""
         engine = event_engine
@@ -256,7 +263,7 @@ class OrganizerAgent:
                 tt_engine = ticket_engine or engine
                 with tt_engine.connect() as tconn:
                     for st in st_rows:
-                        # ticket types belong to this showtime
+                        # các hạng vé thuộc suất diễn này
                         tt_rows = tconn.execute(
                             text("SELECT id, name, price, total_quantity, ticket_type_status FROM ticket_types WHERE showtime_id = :stid"),
                             {"stid": st.id}
@@ -287,7 +294,7 @@ class OrganizerAgent:
 
         return result
 
-    # tool 3: recommend voucher strategy
+    # công cụ 3: gợi ý chiến lược voucher
     def _tool_voucher_recommendation(self, analytics_data: Dict[str, Any], user_goal: str) -> Dict[str, Any]:
         """Tính toán và gợi ý chiến lược voucher dựa trên tỷ lệ lấp đầy và mục tiêu bán vé"""
         occupancy = analytics_data.get("occupancy_rate", 0)
@@ -342,7 +349,7 @@ class OrganizerAgent:
                 "rationale": f"Hệ thống tự động đề xuất ưu đãi 10% để thúc đẩy tỷ lệ lấp đầy hiện tại ({occupancy}%)."
             }
 
-    # tool 4: generate announcement
+    # công cụ 4: soạn thông báo
     def _tool_generate_announcement(self, topic: str, event_title: str) -> str:
         """Soạn thảo thông báo / email trang trọng, chuyên nghiệp gửi khán giả"""
         prompt = PromptTemplate.from_template(
@@ -366,7 +373,7 @@ class OrganizerAgent:
         except Exception as e:
             return f"Không thể soạn thảo thông báo: {str(e)}"
 
-    # main agent chat pipeline
+    # pipeline chat chính của agent
     def chat(
         self,
         message: str,
@@ -382,7 +389,7 @@ class OrganizerAgent:
         clean_msg = message.strip()
         msg_lower = clean_msg.lower()
 
-        # 0. cache check
+        # 0. kiểm tra cache
         cache_key = hashlib.md5(f"{msg_lower}:{event_id or ''}".encode()).hexdigest()
         cached_result = self.cache.get(cache_key)
         if cached_result:
@@ -394,7 +401,7 @@ class OrganizerAgent:
         pipeline_steps = []
         actions = []
 
-        # 1. pipeline step 1: intent & planning
+        # 1. bước 1 của pipeline: nhận diện ý định và lập kế hoạch
         step1_start = time.time()
         intent = "GENERAL"
         tool_label = ""
@@ -426,13 +433,13 @@ class OrganizerAgent:
             "duration_ms": int((time.time() - step1_start) * 1000)
         })
 
-        # 2. pipeline step 2: tool execution
+        # 2. bước 2 của pipeline: chạy công cụ
         step2_start = time.time()
         tool_output = {}
 
         if intent == "ANALYTICS":
             tool_output = self._tool_event_analytics(event_id, event_title)
-            # add structured action for quick visual preview
+            # thêm action có cấu trúc để giao diện xem nhanh
             actions.append({
                 "action": "DISPLAY_KPI_SUMMARY",
                 "database_data": {
@@ -484,7 +491,7 @@ class OrganizerAgent:
             "duration_ms": int((time.time() - step2_start) * 1000)
         })
 
-        # 3. pipeline step 3: synthesis & reasoning
+        # 3. bước 3 của pipeline: tổng hợp và suy luận
         step3_start = time.time()
         final_reply = ""
 
@@ -518,7 +525,7 @@ class OrganizerAgent:
                 occ = tool_output.get("occupancy_rate", 0)
                 title = tool_output.get("event_title", "Sự kiện")
 
-                # generate AI synthesis commentary
+                # sinh nhận xét tổng hợp bằng AI
                 synth_prompt = PromptTemplate.from_template(
                     "Bạn là Giám đốc Tài chính & Vận hành Sự kiện tại HaloTicket.\n"
                     "Thông số bán vé của sự kiện '{title}':\n"
@@ -605,7 +612,7 @@ class OrganizerAgent:
             "execution_time_ms": total_exec_time
         }
 
-        # save cache for similar questions
+        # lưu cache cho các câu hỏi tương tự
         self.cache.set(cache_key, response_payload)
 
         return response_payload

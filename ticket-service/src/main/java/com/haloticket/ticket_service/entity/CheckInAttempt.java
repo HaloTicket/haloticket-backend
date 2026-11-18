@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Nhật ký một lần quét vé tại cửa soát (bảng {@code checkin_attempts}), cả thành công lẫn thất bại, kèm thiết bị và lý do lỗi. */
 @Entity
 @Table(name = "checkin_attempts")
 @Getter
@@ -36,6 +37,7 @@ public class CheckInAttempt {
     @Column(name = "attempted_at")
     private LocalDateTime attemptedAt;
 
+    /** Tự đặt thời điểm quét là lúc lưu nếu chưa có. */
     @PrePersist protected void onCreate() {
         if (this.attemptedAt == null) this.attemptedAt = LocalDateTime.now();
     }

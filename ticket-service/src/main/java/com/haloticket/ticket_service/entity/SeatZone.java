@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.util.List;
 
+/** Một khu vực ghế trên sơ đồ (bảng {@code seat_zones}): hình dạng, vị trí, màu sắc, sức chứa và loại vé gắn với khu vực. */
 @Entity
 @Table(name = "seat_zones")
 @Getter
@@ -27,7 +28,7 @@ public class SeatZone {
     private String ticketTypeId;
 
     @Column(name = "shape_type")
-    private String shapeType; // RECTANGLE, CIRCLE, POLYGON, PATH_CURVED
+    private String shapeType; // hình dạng: RECTANGLE, CIRCLE, POLYGON, PATH_CURVED
 
     @Column(name = "color_code")
     private String colorCode;

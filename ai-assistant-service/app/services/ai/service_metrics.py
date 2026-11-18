@@ -1,7 +1,7 @@
-"""CPU, memory and uptime of a Spring Boot service, read from its Actuator metrics port (inside the compose network only).
+"""CPU, bộ nhớ và thời gian chạy của một service Spring Boot, đọc từ cổng metrics Actuator (chỉ trong mạng compose).
 
-Nothing is invented: a value that cannot be read is None. Nothing here raises. The services expose only `health` and
-`metrics`; their management port is never published and the gateway refuses /actuator/** from outside.
+Không bịa số liệu: giá trị không đọc được là None. Không hàm nào ở đây ném ngoại lệ. Các service chỉ mở `health` và
+`metrics`; cổng quản trị không được publish và gateway từ chối /actuator/** từ bên ngoài.
 """
 import asyncio
 import logging
@@ -16,6 +16,7 @@ _MB = 1024 * 1024
 
 
 def format_uptime(seconds: float) -> str:
+    """Đổi số giây thành chuỗi dạng "1d 2h 3m" (bỏ phần ngày khi bằng 0)."""
     seconds = int(max(0, seconds))
     days, rest = divmod(seconds, 86400)
     hours, rest = divmod(rest, 3600)
@@ -24,6 +25,7 @@ def format_uptime(seconds: float) -> str:
 
 
 async def _value(client, base: str, metric: str, tag: Optional[str] = None) -> Optional[float]:
+    """Đọc một metric Actuator (VALUE hoặc TOTAL); trả None nếu HTTP khác 200, không có số đo hoặc có lỗi."""
     params = {"tag": tag} if tag else None
     try:
         response = await client.get(f"{base}/actuator/metrics/{metric}", params=params, timeout=TIMEOUT_SECONDS)
@@ -38,7 +40,7 @@ async def _value(client, base: str, metric: str, tag: Optional[str] = None) -> O
 
 
 async def fetch(client, host: str, port: Optional[int] = None) -> dict:
-    """{cpuLoad: '12.3%', memoryUsage: '236 MB', uptime: '1h 5m'}, each None when it could not be read."""
+    """Trả {cpuLoad: '12.3%', memoryUsage: '236 MB', uptime: '1h 5m'}, mỗi trường là None khi không đọc được; bộ nhớ là heap cộng non-heap."""
     if not host:
         return {"cpuLoad": None, "memoryUsage": None, "uptime": None}
     base = f"http://{host}:{port or settings.ai_actuator_port}"

@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+/** Cài đặt {@link KeycloakAuthPort} bằng Admin REST API của Keycloak, kèm bộ nhớ đệm token quản trị và kho reset token trong bộ nhớ. */
 public class KeycloakAuthAdapter implements KeycloakAuthPort {
 
     private final KeycloakProperties properties;
@@ -37,6 +38,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
     private volatile CachedToken cachedAdminToken;
     private final Map<String, ResetTokenEntry> resetTokens = new ConcurrentHashMap<>();
 
+    /** Tạo adapter với cấu hình Keycloak, RestClient và các kho dữ liệu. */
     public KeycloakAuthAdapter(
             KeycloakProperties properties,
             RestClient restClient,
@@ -49,6 +51,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         this.challengeRepository = challengeRepository;
     }
 
+    /** Từ chối nếu email đã có trong cơ sở dữ liệu nội bộ hoặc trên Keycloak (HTTP 409 {@code USER_ALREADY_EXISTS}). */
     @Override
     public void ensureRegistrationAvailable(String email) {
         String normalizedEmail = email.trim().toLowerCase();
@@ -62,17 +65,19 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         }
     }
 
+    /** Đăng ký tài khoản với mật khẩu người dùng chọn và email đã xác minh. */
     @Override
     public void register(String email, String password) {
         createUser(email, password, true);
     }
 
+    /** Đăng ký tài khoản "ngủ" với mật khẩu ngẫu nhiên và email chưa xác minh, dùng cho tài khoản do quản trị viên hoặc lời mời tạo. */
     @Override
     public void registerDormant(String email) {
         createUser(email, randomPassword(), false);
     }
 
-    /** 24 random characters plus one of each class the realm password policy asks for; never stored, logged or returned. */
+    /** Mật khẩu gồm 24 ký tự ngẫu nhiên cộng đủ mỗi loại ký tự mà chính sách mật khẩu của realm yêu cầu; không lưu, không ghi log, không trả về. */
     private static String randomPassword() {
         String alphabet = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
         SecureRandom random = new SecureRandom();
@@ -81,6 +86,14 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         return value.append("aZ7!").toString();
     }
 
+    /**
+     * Tạo người dùng trên Keycloak, gán vai trò mặc định rồi đồng bộ bản ghi nội bộ.
+     *
+     * @param email email, cũng dùng làm username
+     * @param password mật khẩu ban đầu
+     * @param emailVerified đánh dấu email đã xác minh hay chưa
+     * @throws AuthException HTTP 409 khi đã tồn tại, 503 khi Keycloak không sẵn sàng
+     */
     private void createUser(String email, String password, boolean emailVerified) {
         String adminToken = obtainAdminToken();
         String createUrl = properties.authServerUrl() + "/admin/realms/" + properties.realm() + "/users";
@@ -136,6 +149,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         syncLocalUser(keycloakUserId, email);
     }
 
+    /** Tìm email tài khoản theo email hoặc số điện thoại trong cơ sở dữ liệu nội bộ; không thấy thì trả về rỗng. */
     @Override
     public Optional<String> resolvePasswordResetEmail(String identifier) {
         if (identifier == null || identifier.isBlank()) return Optional.empty();
@@ -148,6 +162,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         return userRepository.findFirstByPhoneNumber(phoneNumber).map(User::getEmail);
     }
 
+    /** Đưa số điện thoại về dạng bắt đầu bằng 0 (bỏ ký tự lạ và tiền tố 84 hoặc 840). */
     private String normalizePhone(String phone) {
         if (phone == null) return "";
         String digits = phone.replaceAll("[^0-9]", "");
@@ -159,6 +174,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         return digits;
     }
 
+    /** Tạo reset token ngẫu nhiên, hạn 10 phút, gắn với email của thử thách và giữ trong bộ nhớ (mất khi khởi động lại). */
     @Override
     public String issueResetToken(String challengeId) {
         AuthOtpChallenge challenge = challengeRepository.findById(challengeId)
@@ -172,6 +188,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         return resetToken;
     }
 
+    /** Đặt mật khẩu mới trên Keycloak bằng reset token còn hạn, rồi xóa token và đánh dấu email đã xác minh. */
     @Override
     public void resetPassword(String resetToken, String password) {
         ResetTokenEntry entry = resetTokens.get(resetToken);
@@ -210,8 +227,8 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
     }
 
     /**
-     * A reset token only exists after the code mailed to this address was verified, so the address is proven: an account
-     * created for an invitation (unverified) becomes verified the first time its owner sets a password this way.
+     * Token đặt lại mật khẩu chỉ tồn tại sau khi mã gửi tới email này đã được xác minh, nên địa chỉ email coi như đã được chứng minh:
+     * tài khoản tạo cho lời mời (chưa xác minh) sẽ thành đã xác minh ngay lần đầu chủ tài khoản đặt mật khẩu theo cách này.
      */
     private void markEmailVerified(String adminToken, String keycloakUserId) {
         try {
@@ -223,10 +240,11 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
                     .retrieve()
                     .toBodilessEntity();
         } catch (Exception ignored) {
-            // the password is already reset; the flag can be set later
+            // mật khẩu đã được đặt lại; có thể đánh dấu email đã xác minh sau
         }
     }
 
+    /** Đặt lại mật khẩu của người dùng Keycloak bằng quyền quản trị (không kiểm tra mật khẩu cũ ở tầng này). */
     @Override
     public void changePassword(String keycloakUserId, String newPassword) {
         String adminToken = obtainAdminToken();
@@ -248,6 +266,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         }
     }
 
+    /** Đăng nhập bằng grant {@code password}; sai thông tin thì báo HTTP 401 {@code INVALID_CREDENTIALS}. */
     @Override
     public AuthResponses.Login login(String email, String password) {
         String tokenUrl = properties.authServerUrl() + "/realms/" + properties.realm() + "/protocol/openid-connect/token";
@@ -287,6 +306,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         }
     }
 
+    /** Làm mới token; chỉ chấp nhận client của dịch vụ hoặc {@code haloticket-web}, hết phiên thì báo HTTP 401. */
     @Override
     public AuthResponses.Login refresh(String refreshToken, String clientId) {
         String requestedClient = clientId == null || clientId.isBlank() ? properties.clientId() : clientId;
@@ -317,6 +337,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         }
     }
 
+    /** Lấy token quản trị bằng client credentials, dùng lại token trong bộ nhớ đệm cho tới trước lúc hết hạn 30 giây. */
     private synchronized String obtainAdminToken() {
         Instant now = Instant.now();
         if (cachedAdminToken != null && cachedAdminToken.expiresAt().isAfter(now.plusSeconds(30))) {
@@ -350,6 +371,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         }
     }
 
+    /** Tìm id người dùng Keycloak theo email chính xác; không có thì trả về {@code null}. */
     private String lookupUserIdByEmail(String adminToken, String email) {
         String searchUrl = properties.authServerUrl() + "/admin/realms/" + properties.realm()
                 + "/users?email=" + email + "&exact=true";
@@ -366,6 +388,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         return null;
     }
 
+    /** Gán vai trò realm cho người dùng; lỗi được bỏ qua để không làm gián đoạn đăng ký. */
     private void assignDefaultRole(String adminToken, String keycloakUserId, String roleName) {
         try {
             String roleUrl = properties.authServerUrl() + "/admin/realms/" + properties.realm()
@@ -394,6 +417,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         }
     }
 
+    /** Tạo bản ghi người dùng nội bộ ({@code ACTIVE}, vai trò {@code CUSTOMER}) nếu chưa có theo id Keycloak hoặc email. */
     private void syncLocalUser(String keycloakId, String email) {
         if (userRepository.findByKeycloakId(keycloakId).isPresent()
                 || userRepository.findByEmail(email).isPresent()) {
@@ -417,6 +441,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
         userRepository.save(user);
     }
 
+    /** Phản hồi token của Keycloak. */
     public record TokenResponse(
             @JsonProperty("access_token") String accessToken,
             @JsonProperty("refresh_token") String refreshToken,
@@ -424,6 +449,7 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
             @JsonProperty("expires_in") int expiresIn
     ) {}
 
+    /** Nội dung yêu cầu tạo người dùng gửi tới Keycloak. */
     public record KeycloakUserCreationRequest(
             String username,
             String email,
@@ -434,24 +460,29 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
             List<KeycloakCredential> credentials
     ) {}
 
+    /** Thông tin mật khẩu gửi tới Keycloak; {@code temporary} false nghĩa là không bắt đổi lại lần đăng nhập đầu. */
     public record KeycloakCredential(
             String type,
             String value,
             boolean temporary
     ) {}
 
+    /** Người dùng Keycloak (chỉ các trường cần dùng). */
     public record KeycloakUserRepresentation(
             String id,
             String username,
             String email
     ) {}
 
+    /** Vai trò realm của Keycloak (chỉ các trường cần dùng). */
     public record KeycloakRoleRepresentation(
             String id,
             String name
     ) {}
 
+    /** Token quản trị được lưu đệm kèm thời điểm hết hạn. */
     private record CachedToken(String token, Instant expiresAt) {}
 
+    /** Dữ liệu gắn với reset token: thử thách, email và thời điểm hết hạn. */
     private record ResetTokenEntry(String challengeId, String email, Instant expiresAt) {}
 }

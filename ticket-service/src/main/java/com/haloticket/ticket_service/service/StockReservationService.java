@@ -18,9 +18,9 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * holds ticket_types stock for unpaid general-admission bookings. The final source of truth stays
- * ticket_types.total_quantity: a hold only raises reserved_quantity, and is consumed in the same transaction
- * that issues the tickets.
+ * Giữ tồn kho {@code ticket_types} cho các booking vé vào cửa chung chưa thanh toán. Nguồn dữ liệu cuối cùng vẫn là
+ * {@code ticket_types.total_quantity}: giữ chỗ chỉ tăng {@code reserved_quantity} và được tiêu thụ trong cùng giao dịch
+ * phát hành vé.
  */
 @Service
 @RequiredArgsConstructor
@@ -30,28 +30,42 @@ public class StockReservationService {
     private final TicketTypeRepository ticketTypes;
     private final TicketStockReservationRepository reservations;
 
+    /** Một dòng cần giữ chỗ: loại vé và số lượng. */
     public record Item(String ticketTypeId, int quantity) {}
 
-    /** raised when a requested type cannot cover its quantity; the whole reservation is rolled back. */
+    /** Được ném khi một loại vé không đủ số lượng yêu cầu; toàn bộ lượt giữ chỗ bị hoàn tác. */
     public static class SoldOutException extends RuntimeException {
         private final String ticketTypeId;
         private final int available;
 
+        /**
+         * @param ticketTypeId mã loại vé không đủ
+         * @param available số vé còn có thể giữ
+         */
         public SoldOutException(String ticketTypeId, int available) {
             super("TICKET_SOLD_OUT");
             this.ticketTypeId = ticketTypeId;
             this.available = available;
         }
 
+        /** Mã loại vé không đủ số lượng. */
         public String getTicketTypeId() { return ticketTypeId; }
 
+        /** Số vé còn có thể giữ tại thời điểm lỗi. */
         public int getAvailable() { return available; }
     }
 
     /**
-     * all-or-nothing, idempotent per booking. 
-     * a booking that already has held rows gets the same answer again;
-     * one whose rows were released or expired cannot be re-reserved under the same id.
+     * Giữ chỗ tất cả hoặc không gì cả, idempotent theo booking. Booking đã có dòng đang giữ thì nhận lại cùng kết quả;
+     * booking có dòng đã bị trả hoặc hết hạn thì không đặt lại được dưới cùng mã.
+     *
+     * @param bookingId mã booking
+     * @param eventId mã sự kiện
+     * @param showtimeId mã suất diễn (có thể rỗng)
+     * @param expiresAt thời điểm hết hạn giữ chỗ, phải ở tương lai
+     * @param items các loại vé và số lượng cần giữ
+     * @throws ResponseStatusException 400 khi yêu cầu không hợp lệ, 409 khi lượt giữ đã đóng
+     * @throws SoldOutException khi một loại vé không đủ tồn kho
      */
     @Transactional
     public void reserve(String bookingId, String eventId, String showtimeId, Instant expiresAt, List<Item> items) {
@@ -67,7 +81,7 @@ public class StockReservationService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "RESERVATION_CLOSED");
         }
 
-        // merge duplicates and lock in a stable order so concurrent bookings cannot deadlock.
+        // gộp các dòng trùng và khóa theo thứ tự cố định để các booking đồng thời không bị deadlock.
         Map<String, Integer> wanted = new TreeMap<>();
         for (Item item : items) {
             if (item == null || item.ticketTypeId() == null || item.ticketTypeId().isBlank() || item.quantity() <= 0) {
@@ -94,10 +108,13 @@ public class StockReservationService {
     }
 
     /**
-     * Puts a closed (RELEASED/EXPIRED) hold back, for a payment that arrived after the hold was closed. One transaction:
-     * the booking's rows are locked, then every closed row is re-reserved with reserveAtomic; if any type cannot cover its
-     * quantity the whole thing rolls back (SoldOutException) and nothing changes. Idempotent when everything is HELD.
-     * A booking with no rows, or with a CONSUMED row (tickets already issued), is not reopenable.
+     * Mở lại lượt giữ chỗ đã đóng ({@code RELEASED} hoặc {@code EXPIRED}) cho trường hợp thanh toán đến sau khi lượt giữ đã đóng.
+     * Trong một giao dịch: khóa các dòng của booking rồi giữ lại từng dòng đã đóng bằng reserveAtomic; nếu một loại vé không đủ
+     * số lượng thì hoàn tác tất cả ({@code SoldOutException}) và không có gì đổi. Idempotent khi mọi dòng đều {@code HELD}.
+     * Booking không có dòng nào, hoặc có dòng {@code CONSUMED} (vé đã phát hành), thì không mở lại được.
+     *
+     * @param bookingId mã booking
+     * @param expiresAt thời điểm hết hạn mới, phải ở tương lai
      */
     @Transactional
     public void reopen(String bookingId, Instant expiresAt) {
@@ -127,18 +144,34 @@ public class StockReservationService {
         log.info("[GA_RESERVATION] reopened bookingId={} rows={}", shortId(bookingId), rows.size());
     }
 
-    /** idempotent. returns how many held rows were released. */
+    /**
+     * Trả lại các dòng đang giữ của booking; idempotent.
+     *
+     * @param bookingId mã booking
+     * @return số dòng đang giữ đã được trả
+     */
     @Transactional
     public int release(String bookingId) {
         return close(reservations.findByBookingIdForUpdate(bookingId), StockReservationStatus.RELEASED);
     }
 
-    /** called from ticket issuance: held stock turns into issued tickets inside the same transaction. */
+    /**
+     * Được gọi lúc phát hành vé: tồn kho đang giữ chuyển thành vé phát hành trong cùng giao dịch.
+     *
+     * @param bookingId mã booking
+     * @return số dòng đã chuyển sang {@code CONSUMED}
+     */
     @Transactional
     public int consumeForBooking(String bookingId) {
         return close(reservations.findByBookingIdForUpdate(bookingId), StockReservationStatus.CONSUMED);
     }
 
+    /**
+     * Chuyển các lượt giữ chỗ đã quá hạn sang {@code EXPIRED} và trả tồn kho.
+     *
+     * @param limit số dòng tối đa xử lý trong một lô
+     * @return số dòng đã xử lý
+     */
     @Transactional
     public int expireDue(int limit) {
         int count = close(reservations.findDueForExpiry(Instant.now(), limit), StockReservationStatus.EXPIRED);
@@ -146,7 +179,15 @@ public class StockReservationService {
         return count;
     }
 
-    /** same type resolution as ticket issuance, so the hold lands on the row that issuance will decrement. */
+    /**
+     * Xác định loại vé theo cùng cách với lúc phát hành vé, để lượt giữ chỗ rơi vào đúng dòng mà phát hành sẽ trừ.
+     *
+     * @param typeId mã loại vé được yêu cầu
+     * @param showtimeId mã suất diễn (có thể rỗng)
+     * @param eventId mã sự kiện
+     * @return loại vé sẽ được giữ chỗ
+     * @throws ResponseStatusException 404 khi không có loại vé, 400 khi sai sự kiện hoặc không có ở suất diễn
+     */
     public TicketType resolveType(String typeId, String showtimeId, String eventId) {
         TicketType requested = ticketTypes.findById(typeId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "TICKET_TYPE_NOT_FOUND"));
@@ -164,6 +205,7 @@ public class StockReservationService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "TICKET_TYPE_UNAVAILABLE_FOR_SHOWTIME"));
     }
 
+    /** Đóng các dòng đang {@code HELD} sang trạng thái {@code target}, trả tồn kho về loại vé; trả số dòng đã đóng. */
     private int close(List<TicketStockReservation> rows, StockReservationStatus target) {
         int count = 0;
         for (TicketStockReservation row : rows) {
@@ -176,6 +218,7 @@ public class StockReservationService {
         return count;
     }
 
+    /** Số vé còn có thể giữ của loại vé: còn lại trừ đang giữ, không âm. */
     private int availableOf(String typeId) {
         return ticketTypes.findById(typeId)
                 .map(t -> Math.max(0, (t.getTotalQuantity() == null ? 0 : t.getTotalQuantity())
@@ -183,6 +226,7 @@ public class StockReservationService {
                 .orElse(0);
     }
 
+    /** Rút gọn mã còn 8 ký tự đầu để ghi log. */
     private static String shortId(String id) {
         return id == null ? "" : id.substring(0, Math.min(8, id.length()));
     }

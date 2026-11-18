@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Ghế đã giữ hoặc bán cho một đơn (bảng {@code seat_reservations}); dùng khóa lạc quan {@code @Version} để tránh hai đơn tranh cùng một ghế. */
 @Entity
 @Table(name = "seat_reservations")
 @Getter
@@ -41,6 +42,7 @@ public class SeatReservation {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    /** Trước khi lưu lần đầu: gán thời gian tạo và đặt trạng thái mặc định {@code HOLDING}. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

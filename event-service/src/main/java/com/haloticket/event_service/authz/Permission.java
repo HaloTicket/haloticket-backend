@@ -1,5 +1,6 @@
 package com.haloticket.event_service.authz;
 
+/** Các quyền chi tiết trong một sự kiện (sửa sự kiện, chính sách, voucher, thành viên, tài chính, chợ vé, đơn hàng, thống kê, check-in). */
 public enum Permission {
     EVENT_EDIT,
     POLICY_WRITE,

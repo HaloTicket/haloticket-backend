@@ -12,6 +12,10 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Khởi tạo dữ liệu mẫu khi ứng dụng chạy: bỏ ràng buộc NOT NULL của cột {@code notifications.template_id}
+ * và thêm các mẫu thông báo mặc định nếu chưa có.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -20,6 +24,12 @@ public class DataInitializer implements CommandLineRunner {
     private final NotificationTemplateRepository notificationTemplateRepository;
     private final EntityManager entityManager;
 
+    /**
+     * Chạy lúc khởi động: cho phép {@code template_id} rỗng (bỏ qua nếu đã làm trước đó) rồi tạo các mẫu
+     * xác nhận vé, nhắc sự kiện và kết quả eKYC.
+     *
+     * @param args tham số dòng lệnh, không dùng
+     */
     @Override
     @Transactional
     public void run(String... args) {
@@ -53,6 +63,15 @@ public class DataInitializer implements CommandLineRunner {
         log.info("Notification Service sample data initialized successfully!");
     }
 
+    /**
+     * Thêm một mẫu thông báo đang hoạt động; bỏ qua nếu mã mẫu đã tồn tại.
+     *
+     * @param id mã mẫu
+     * @param type loại thông báo
+     * @param channel kênh gửi
+     * @param subject mẫu tiêu đề
+     * @param body mẫu nội dung
+     */
     private void upsertTemplate(String id, NotificationType type, NotificationChannel channel,
                                  String subject, String body) {
         if (notificationTemplateRepository.existsById(id)) {

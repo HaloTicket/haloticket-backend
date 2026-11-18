@@ -10,7 +10,7 @@ import java.io.InputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** 422 {code, ticketTypeId, name, sold, held, minAllowed} from ticket-service becomes {@link TicketSyncRejectedException}. */
+/** Phản hồi 422 {code, ticketTypeId, name, sold, held, minAllowed} từ ticket-service được đổi thành {@link TicketSyncRejectedException}; mã trạng thái khác giao cho bộ giải mã mặc định. */
 public class TicketServiceErrorDecoder implements ErrorDecoder {
     private static final String DEFAULT_CODE = "TICKET_SYNC_REJECTED";
     private static final String[] DETAIL_KEYS = {"ticketTypeId", "name", "sold", "held", "minAllowed"};
@@ -18,6 +18,13 @@ public class TicketServiceErrorDecoder implements ErrorDecoder {
     private final ObjectMapper mapper = new ObjectMapper();
     private final ErrorDecoder fallback = new ErrorDecoder.Default();
 
+    /**
+     * Đổi phản hồi lỗi của ticket-service thành ngoại lệ phù hợp.
+     * Với 422, lấy {@code code} và các khóa chi tiết có giá trị trong thân phản hồi; thiếu {@code code} thì dùng {@code TICKET_SYNC_REJECTED}.
+     * @param methodKey khóa của phương thức Feign đã gọi
+     * @param response phản hồi lỗi nhận được
+     * @return {@code TicketSyncRejectedException} cho 422, ngoại lệ mặc định của Feign cho mã khác
+     */
     @Override
     public Exception decode(String methodKey, Response response) {
         if (response.status() != 422) {
@@ -32,6 +39,11 @@ public class TicketServiceErrorDecoder implements ErrorDecoder {
         return new TicketSyncRejectedException(code == null ? DEFAULT_CODE : String.valueOf(code), details, null);
     }
 
+    /**
+     * Đọc thân phản hồi JSON thành map.
+     * @param response phản hồi cần đọc
+     * @return nội dung thân phản hồi; map rỗng nếu không có thân hoặc không đọc được
+     */
     private Map<String, Object> readBody(Response response) {
         if (response.body() == null) return Map.of();
         try (InputStream in = response.body().asInputStream()) {

@@ -8,6 +8,10 @@ import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+/**
+ * Giao dịch mua vé bán lại: gắn với một tin bán, người mua, người bán, số tiền, thông tin thanh toán, hạn giữ chỗ
+ * và danh sách vé đã chọn. Dùng khóa phiên bản ({@code @Version}) để tránh ghi đè đồng thời.
+ */
 @Entity @Table(name = "marketplace_transactions", indexes = @Index(name = "idx_market_tx_listing_status", columnList = "ticket_listing_id,status"))
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class MarketplaceTransaction {
@@ -34,6 +38,8 @@ public class MarketplaceTransaction {
     @Version private Long version;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
+    /** Đặt thời điểm tạo, cập nhật và trạng thái mặc định {@code PENDING_PAYMENT} nếu chưa có, trước khi lưu mới. */
     @PrePersist void onCreate() { createdAt = Instant.now(); updatedAt = createdAt; if (status == null) status = MarketplaceTransactionStatus.PENDING_PAYMENT; }
+    /** Cập nhật thời điểm sửa đổi trước mỗi lần lưu thay đổi. */
     @PreUpdate void onUpdate() { updatedAt = Instant.now(); }
 }

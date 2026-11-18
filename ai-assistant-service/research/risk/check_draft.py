@@ -1,9 +1,10 @@
-"""Cross-checks the numbers typed into the draft (docs/nckh-risk-scoring-report.md) against the result files.
+"""Đối chiếu các số gõ trong bản thảo (docs/nckh-risk-scoring-report.md) với tệp kết quả.
     RISK_SET=t2 python -m research.risk.check_draft [--draft PATH]
 
-Reads the generated report (results/t2/report_t2_*.md), the raw rows (results/t2/C*/..._full.jsonl) and the draft, and prints
-every cell that differs. Decimal commas in the draft and points in the report are treated as the same number. Exit code 1 when
-anything differs, so it can run before a submission."""
+Đọc báo cáo đã sinh (results/t2/report_t2_*.md), các dòng thô (results/t2/C*/..._full.jsonl) và bản thảo, rồi in
+mọi ô bị lệch. Dấu phẩy thập phân trong bản thảo và dấu chấm trong báo cáo được coi là cùng một số. Thoát với mã 1 khi
+có chỗ lệch, nên có thể chạy trước khi nộp bài.
+"""
 import argparse
 import glob
 import json
@@ -17,13 +18,13 @@ DRAFT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__))
 
 
 def num(text: str):
-    """First number in a cell as a float; '67,8% [63,7; 71,5]' -> 67.8. None when there is none."""
+    """Lấy số đầu tiên trong một ô thành float, ví dụ '67,8% [63,7; 71,5]' cho 67.8. Trả về None khi không có số."""
     match = re.search(r"-?\d+(?:[.,]\d+)?", text)
     return float(match.group(0).replace(",", ".")) if match else None
 
 
 def rows_of(markdown: str, start_pattern: str) -> list:
-    """Cells of the first table after a line that matches start_pattern."""
+    """Lấy các ô của bảng đầu tiên nằm sau dòng khớp với start_pattern; trả về danh sách rỗng nếu không thấy dòng đó."""
     lines = markdown.splitlines()
     start = next((i for i, line in enumerate(lines) if re.search(start_pattern, line)), None)
     if start is None:
@@ -41,6 +42,15 @@ def rows_of(markdown: str, start_pattern: str) -> list:
 
 
 def latest_full(config: str, repeats: int = 1):
+    """Tìm tệp kết quả đầy đủ mới nhất của một cấu hình có đúng số lần lặp và chạy bằng mô hình thật.
+
+    Args:
+        config: tên cấu hình (C0 đến C5).
+        repeats: số lần lặp cần khớp.
+
+    Returns:
+        (dòng tiêu đề, các dòng kết quả), hoặc (None, []) nếu không có tệp phù hợp.
+    """
     for path in sorted(glob.glob(os.path.join(RESULTS, config, "*_full.jsonl")), reverse=True):
         with open(path, encoding="utf-8") as handle:
             rows = [json.loads(line) for line in handle if line.strip()]
@@ -50,6 +60,15 @@ def latest_full(config: str, repeats: int = 1):
 
 
 def compare(label: str, draft, report, problems: list, tol: float = 0.05) -> None:
+    """So một số của bản thảo với số của báo cáo; thêm một dòng vào problems khi thiếu số hoặc chênh quá dung sai.
+
+    Args:
+        label: tên của số đang so, dùng trong thông báo.
+        draft: số trong bản thảo (có thể None).
+        report: số trong báo cáo (có thể None).
+        problems: danh sách các chỗ lệch, được thêm vào tại chỗ.
+        tol: dung sai tuyệt đối cho phép.
+    """
     if draft is None or report is None:
         problems.append(f"{label}: thiếu số (bản thảo={draft}, báo cáo={report})")
     elif abs(draft - report) > tol:
@@ -57,9 +76,14 @@ def compare(label: str, draft, report, problems: list, tol: float = 0.05) -> Non
 
 
 def main_table(draft: str, report: str, problems: list) -> int:
+    """So bảng kết quả sáu cấu hình của bản thảo với mục 'Mức rủi ro' của báo cáo (Macro F1, độ chính xác, bỏ sót và báo sai HIGH).
+
+    Returns:
+        số ô đã so.
+    """
     d, r = rows_of(draft, r"Kết quả sáu cấu hình"), rows_of(report, r"## Mức rủi ro")
     columns = {1: "Macro F1", 2: "Chính xác", 3: "Bỏ sót HIGH", 4: "Bỏ sót HIGH thành LOW", 5: "Báo sai HIGH"}
-    report_cols = {1: 4, 2: 3, 3: 5, 4: 6, 5: 7}  # draft column -> report column
+    report_cols = {1: 4, 2: 3, 3: 5, 4: 6, 5: 7}  # cột của bản thảo -> cột của báo cáo
     by_report = {row[0]: row for row in r[1:]}
     checked = 0
     for row in d[1:]:
@@ -74,6 +98,11 @@ def main_table(draft: str, report: str, problems: list) -> int:
 
 
 def confusion_c5(draft: str, report: str, problems: list) -> int:
+    """So ma trận nhầm lẫn của C5 trong bản thảo với báo cáo, từng ô phải khớp tuyệt đối.
+
+    Returns:
+        số ô đã so.
+    """
     d = rows_of(draft, r"Ma trận nhầm lẫn của C5")
     r = rows_of(report, r"^\*\*C5\*\*\s*$")
     checked = 0
@@ -85,7 +114,11 @@ def confusion_c5(draft: str, report: str, problems: list) -> int:
 
 
 def raw_claims(draft: str, problems: list) -> int:
-    """Claims in the text that come straight from the rows: flags removed by the second reading, overlap drops."""
+    """Kiểm các câu trong bản thảo lấy thẳng từ dữ liệu thô: số cờ bị lần đọc hai loại bỏ và số cờ trùng luật bị bỏ.
+
+    Returns:
+        số số liệu đã so.
+    """
     header, rows = latest_full("C5", 1)
     if not rows:
         problems.append("C5: không tìm thấy lần chạy k=1")
@@ -104,18 +137,23 @@ def raw_claims(draft: str, problems: list) -> int:
 
 
 def _vn(value: float, digits: int = 1) -> str:
+    """Định dạng số theo kiểu Việt Nam: dấu phẩy thập phân với số chữ số cho trước."""
     return f"{value:.{digits}f}".replace(".", ",")
 
 
 def _ci(k: int, n: int) -> str:
-    """'62,5%; [30,6; 86,3]' as the draft writes a rate with its Wilson interval."""
+    """Viết một tỷ lệ k/n kèm khoảng tin cậy Wilson theo đúng kiểu bản thảo, ví dụ '62,5%; [30,6; 86,3]'."""
     from research.risk.stats import wilson
     lo, hi = wilson(k, n)
     return f"{_vn(k / n * 100)}%; [{_vn(lo * 100)}; {_vn(hi * 100)}]"
 
 
 def generated_tables(draft: str, problems: list) -> int:
-    """Every row of the tables the scripts print (paper_tables, stability, prevalence) must be in the draft word for word."""
+    """Mọi dòng của các bảng do các script in ra (paper_tables, stability, prevalence, rq4) phải có trong bản thảo, từng chữ.
+
+    Returns:
+        số dòng bảng đã so.
+    """
     import contextlib
     import io
     from research.risk import paper_tables, prevalence, rq4, stability
@@ -136,6 +174,11 @@ def generated_tables(draft: str, problems: list) -> int:
 
 
 def rq2_and_injection_claims(draft: str, problems: list) -> int:
+    """Kiểm các câu về RQ2 (chất lượng cờ của mô hình, kappa của hai người gán) và về nhóm injection xem có khớp dữ liệu không.
+
+    Returns:
+        số câu đã kiểm.
+    """
     from research.risk import flag_review as fr
     from research.risk.common import GOLD_PATH, load_cases, read_jsonl
     from research.risk.prevalence import latest_rows
@@ -176,7 +219,7 @@ def rq2_and_injection_claims(draft: str, problems: list) -> int:
             if expected not in draft:
                 problems.append(f"RQ2, {name}: bản thảo không có đúng chuỗi: {expected}")
     ok = {name.split()[1]: int(expected.split()[0]) for name, expected in claims.items() if name.startswith("injection ")}
-    # the draft says: C0, C1, C3, C4 and C5 got all of them right, C2 got 14 of 15
+    # bản thảo viết: C0, C1, C3, C4 và C5 đúng hết, C2 đúng 14 trong 15
     sentence = "C0, C1, C3, C4 và C5 xếp đúng 15 trong 15 ca"
     if len(inject) != 15 or any(ok[c] != 15 for c in ("C0", "C1", "C3", "C4", "C5")) or ok["C2"] != 14 or sentence not in draft \
             or "C2 xếp đúng 14 trong 15 ca" not in draft:
@@ -185,7 +228,11 @@ def rq2_and_injection_claims(draft: str, problems: list) -> int:
 
 
 def adversarial_checks(draft: str, problems: list) -> int:
-    """The three adversarial tables word for word, and the sentences that carry the counts of what happened to the model's flags."""
+    """Kiểm ba bảng bộ đối kháng từng chữ, và các câu mang số liệu về số phận của các cờ do mô hình đề xuất.
+
+    Returns:
+        số mục đã kiểm.
+    """
     from research.risk import adv_report
     data = adv_report.load()
     in_draft = set(draft.splitlines())
@@ -214,6 +261,7 @@ def adversarial_checks(draft: str, problems: list) -> int:
 
 
 def main() -> None:
+    """Đọc báo cáo mới nhất và bản thảo, chạy mọi phép đối chiếu rồi in các chỗ lệch; thoát với mã 1 nếu có."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--draft", default=DRAFT)
     args = parser.parse_args()

@@ -4,6 +4,7 @@ import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
+/** Cấu hình ZaloPay: app id, hai khóa key1 và key2, endpoint và các URL chuyển hướng và IPN. */
 @Configuration
 @Getter
 public class ZaloPayConfig {

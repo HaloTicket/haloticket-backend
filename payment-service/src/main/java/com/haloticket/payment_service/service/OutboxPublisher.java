@@ -13,6 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Tác vụ nền gửi các sự kiện outbox của payment-service lên Kafka theo mẫu transactional outbox,
+ * để cập nhật trạng thái thanh toán không bị mất khi Kafka tạm lỗi.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -21,6 +25,10 @@ public class OutboxPublisher {
     private final OutboxEventRepository outboxEventRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
 
+    /**
+     * Chạy mỗi giây: lấy tối đa 50 sự kiện {@code PENDING} cũ nhất và gửi lên topic của từng sự kiện.
+     * Gửi xong thì đánh dấu {@code PROCESSED}; lỗi thì tăng số lần thử và chuyển {@code FAILED} khi đạt 5 lần.
+     */
     @Scheduled(fixedDelay = 1000)
     @Transactional
     public void publishPendingEvents() {

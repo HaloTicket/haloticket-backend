@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.util.Map;
 
+/** Yêu cầu tạo thông báo từ một mẫu: mã mẫu, người nhận, biến thay thế và kênh gửi (bỏ trống thì dùng kênh của mẫu). */
 @Data
 public class NotificationCreateRequest {
     private String templateId;

@@ -7,7 +7,10 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-/** status: SYNCED | FAILED | UNAVAILABLE (ticket-service could not be read) | null (never tracked, older events). */
+/**
+ * Tình trạng đồng bộ vé sang ticket-service. {@code status} nhận một trong: {@code SYNCED}, {@code FAILED}, {@code UNAVAILABLE} (không đọc được ticket-service)
+ * hoặc {@code null} (chưa từng theo dõi, với sự kiện cũ).
+ */
 @Data
 @Builder
 @NoArgsConstructor

@@ -5,13 +5,13 @@ import lombok.Data;
 
 import java.util.Map;
 
-/** Head counts for the user management page, in one call instead of one list request per role. */
+/** Số liệu tổng hợp cho trang quản lý người dùng, trả về trong một lần gọi thay vì mỗi vai trò một yêu cầu danh sách. */
 @Data
 @Builder
 public class AdminUserStatsResponse {
     private long total;
-    /** role name to the number of users holding it (a user with two roles counts under both). */
+    /** Tên vai trò và số người giữ vai trò đó (người có hai vai trò được tính ở cả hai). */
     private Map<String, Long> byRole;
-    /** status name to the number of users in it. */
+    /** Tên trạng thái và số người đang ở trạng thái đó. */
     private Map<String, Long> byStatus;
 }

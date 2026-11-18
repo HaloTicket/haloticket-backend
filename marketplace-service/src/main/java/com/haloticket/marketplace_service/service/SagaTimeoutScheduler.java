@@ -10,12 +10,19 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.EnumSet;
 
+/**
+ * Tác vụ định kỳ khôi phục các saga bị treo hoặc quá hạn ở trạng thái chờ hay đang bù trừ.
+ */
 @Component @RequiredArgsConstructor @Slf4j
 public class SagaTimeoutScheduler {
     private final MarketplaceSagaRepository sagaRepository;
     private final TicketListingService listingService;
     private final ResalePurchaseService purchaseService;
 
+    /**
+     * Quét tối đa 50 saga đã đến hạn thử lại. Saga mua vé bán lại đang chờ chuyển vé thì thử chuyển lại;
+     * saga quá hạn thì yêu cầu nhả vé với lý do {@code SAGA_EXPIRED}; saga đang bù trừ thì hẹn thử lại sau 10 giây.
+     */
     @Scheduled(fixedDelayString = "${marketplace.saga.poll-delay-ms:5000}")
     public void recoverExpiredSagas() {
         Instant now = Instant.now();

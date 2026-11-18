@@ -1,13 +1,12 @@
-"""Which events a caller may analyse.
+"""Những sự kiện mà một người gọi được phép phân tích.
 
-An ADMIN sees everything. Anybody else (organizers, whatever their system role) sees only the events where, in
-event-service's own rules, they are OWNER, ADMIN or MANAGER and ACTIVE:
-a staff_assignments row of the user with status ACTIVE and one of those roles. The organizer profile
-(event_organizers) is only a display name and decides nothing here.
-CHECKIN_STAFF and REVOKED members get nothing.
+ADMIN thấy tất cả. Người khác (ban tổ chức, bất kể vai trò hệ thống) chỉ thấy các sự kiện mà theo đúng quy tắc của
+event-service họ là OWNER, ADMIN hoặc MANAGER và đang ACTIVE: tức có dòng staff_assignments của người dùng với trạng thái
+ACTIVE và một trong các vai trò đó. Hồ sơ ban tổ chức (event_organizers) chỉ là tên hiển thị, không quyết định gì ở đây.
+Thành viên CHECKIN_STAFF và REVOKED không nhận được gì.
 
-The token carries the Keycloak id; staff_assignments holds the user-service id. user-service turns one into the other
-(GET /api/users/me/ekyc/organizer-eligibility, called with the caller's own token, so it answers only for that caller).
+Token mang id Keycloak; staff_assignments lưu id của user-service. user-service đổi cái này sang cái kia
+(GET /api/users/me/ekyc/organizer-eligibility, gọi bằng token của chính người gọi nên chỉ trả lời cho người đó).
 """
 import logging
 import threading
@@ -33,20 +32,22 @@ _cache_lock = threading.Lock()
 
 
 class ScopeUnavailable(Exception):
-    """The caller's events could not be worked out (user-service or the database did not answer)."""
+    """Không xác định được các sự kiện của người gọi (user-service hoặc cơ sở dữ liệu không trả lời)."""
 
 
 @dataclass(frozen=True)
 class AnalysisScope:
+    """Phạm vi phân tích: cờ admin và danh sách id sự kiện người gọi được quản lý."""
     is_admin: bool
     event_ids: tuple = ()
 
     @classmethod
     def admin(cls) -> "AnalysisScope":
+        """Tạo phạm vi của admin: không giới hạn sự kiện."""
         return cls(True, ())
 
     def spec(self) -> Optional[ScopeSpec]:
-        """None for an admin (nothing to limit)."""
+        """Dựng ScopeSpec (cột lọc theo bảng, bảng công khai, danh sách sự kiện) cho bộ lọc SQL; None với admin vì không cần giới hạn."""
         if self.is_admin:
             return None
         columns = {}
@@ -57,15 +58,17 @@ class AnalysisScope:
         return ScopeSpec(columns, parse_allowed(settings.ai_scope_public_relations), self.event_ids)
 
     def allows_event(self, event_id: str) -> bool:
+        """Admin được phép mọi sự kiện; người khác chỉ khi event_id nằm trong danh sách của mình."""
         return self.is_admin or event_id in self.event_ids
 
     @property
     def session_value(self) -> str:
-        """What goes into app.allowed_event_ids for the database-side filter of the views (03-ai-organizer-scope.sql)."""
+        """Giá trị đặt vào app.allowed_event_ids cho bộ lọc phía cơ sở dữ liệu của các view (03-ai-organizer-scope.sql)."""
         return "*" if self.is_admin else ",".join(self.event_ids)
 
 
 def fetch_user_id(token: str) -> str:
+    """Đổi token (id Keycloak) thành id user-service bằng cách gọi organizer-eligibility. Ném ScopeUnavailable khi lỗi hoặc không có userId."""
     try:
         response = httpx.get(
             settings.user_service_url.rstrip("/") + "/api/users/me/ekyc/organizer-eligibility",
@@ -83,6 +86,7 @@ def fetch_user_id(token: str) -> str:
 
 
 def events_for_user(user_id: str) -> list:
+    """Lấy id các sự kiện mà người dùng là OWNER, ADMIN hoặc MANAGER đang ACTIVE, đã sắp xếp. Ném ScopeUnavailable khi đọc cơ sở dữ liệu lỗi."""
     try:
         with SessionLocal() as db:
             rows = db.execute(text("""
@@ -97,6 +101,7 @@ def events_for_user(user_id: str) -> list:
 
 
 def resolve_scope(claims: dict, token: str) -> AnalysisScope:
+    """Xác định phạm vi của người gọi: admin thấy tất cả, người khác được tra theo token và cache 30 giây theo `sub`."""
     if roles_of(claims) & ADMIN_ROLES:
         return AnalysisScope.admin()
     subject = str(claims.get("sub", ""))
@@ -113,12 +118,13 @@ def resolve_scope(claims: dict, token: str) -> AnalysisScope:
 
 
 def clear_cache() -> None:
+    """Xóa cache phạm vi (dùng khi kiểm thử)."""
     with _cache_lock:
         _cache.clear()
 
 
 def analysis_scope(request: Request, claims: dict = Depends(require_login)) -> AnalysisScope:
-    """Dependency of the analysis routes: who the caller is and which events that covers."""
+    """Dependency của các route phân tích: xác định người gọi là ai và phạm vi sự kiện tương ứng. Trả HTTP 503 SCOPE_UNAVAILABLE khi không xác định được."""
     if roles_of(claims) & ADMIN_ROLES:
         return AnalysisScope.admin()
     token = request.headers.get("Authorization", "").partition(" ")[2].strip()

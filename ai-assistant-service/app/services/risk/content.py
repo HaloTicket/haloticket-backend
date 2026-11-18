@@ -1,4 +1,4 @@
-"""What an assessment looks at: the texts that are scanned and the fields that make up the content hash."""
+"""Những gì một lần đánh giá xem xét: các văn bản được quét và các trường tạo nên mã băm nội dung."""
 import html
 import re
 
@@ -13,8 +13,8 @@ _LIST_ITEM = re.compile(r"<\s*li(?:\s[^>]*)?>", re.IGNORECASE)
 
 
 def plain_text(value) -> str:
-    """Text of a description. Paragraph, line and list tags of an HTML description become line breaks (and list items a bullet),
-    so the rules can tell a list from the sentence that introduces it."""
+    """Văn bản của phần mô tả. Các thẻ đoạn, dòng và danh sách của mô tả HTML được đổi thành xuống dòng (mục danh sách thành dấu chấm đầu dòng),
+    để các luật phân biệt được danh sách với câu dẫn nhập của nó."""
     raw = str(value or "")
     raw = _LIST_ITEM.sub("\n● ", _BLOCK_END.sub("\n", raw))
     text = html.unescape(_TAG.sub(" ", raw))
@@ -23,6 +23,7 @@ def plain_text(value) -> str:
 
 
 def _tickets(event: dict) -> list:
+    """Rút danh sách vé (tên cắt 120 ký tự và giá) từ sự kiện; bỏ qua phần tử không phải dict."""
     raw = event.get("tickets")
     out = []
     if isinstance(raw, list):
@@ -33,7 +34,7 @@ def _tickets(event: dict) -> list:
 
 
 def build(event: dict) -> dict:
-    """{texts, hash, organizer_user_id, organizer_name, category} from an EventResponse-shaped dict."""
+    """Dựng {texts, hash, organizer_user_id, organizer_name, category} từ một dict có dạng EventResponse; mã băm lấy từ các trường quyết định kết quả đánh giá."""
     organizer = event.get("organizer") if isinstance(event.get("organizer"), dict) else {}
     description = plain_text(event.get("descriptionText") or event.get("description"))
     texts = {"title": plain_text(event.get("title")), "description": description}
@@ -54,5 +55,5 @@ def build(event: dict) -> dict:
 
 
 def from_request(event_id: str, title: str, description: str, organizer_name: str) -> dict:
-    """Fallback when the event cannot be read from the event service: the texts the client sent."""
+    """Phương án dự phòng khi không đọc được sự kiện từ event service: dùng các văn bản mà client gửi lên."""
     return build({"id": event_id, "title": title, "description": description, "organizerName": organizer_name})

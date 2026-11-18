@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/** Cài đặt nghiệp vụ địa điểm tổ chức: CRUD, xác minh và mẫu sơ đồ chỗ ngồi; ghép sơ đồ do nhà tổ chức dựng từ ticket-service. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -25,12 +26,13 @@ public class VenueServiceImpl implements VenueService {
     private final EventRepository eventRepository;
     private final com.haloticket.event_service.client.TicketServiceClient ticketServiceClient;
 
+    /** Lấy toàn bộ địa điểm. Nếu bảng đang trống thì nạp một số địa điểm mặc định và các địa điểm suy ra từ sự kiện, rồi đọc lại. */
     @Override
     @Transactional
     public List<VenueResponse> getAllVenues() {
         List<Venue> venues = venueRepository.findAll();
 
-        // If DB table is empty, auto-sync and seed initial venues from existing DB events
+        // nếu bảng trống thì tự đồng bộ và nạp địa điểm ban đầu từ các sự kiện có sẵn
         if (venues.isEmpty()) {
             syncVenuesFromEvents();
             venues = venueRepository.findAll();
@@ -41,6 +43,10 @@ public class VenueServiceImpl implements VenueService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Lấy địa điểm theo id.
+     * @throws RuntimeException khi không tìm thấy
+     */
     @Override
     public VenueResponse getVenueById(Long id) {
         Venue venue = venueRepository.findById(id)
@@ -48,6 +54,12 @@ public class VenueServiceImpl implements VenueService {
         return mapToResponse(venue);
     }
 
+    /**
+     * Tạo địa điểm mới. Nếu đã có địa điểm cùng tên (không phân biệt hoa thường) thì cập nhật các trường được gửi lên của địa điểm đó thay vì tạo bản trùng. Trường thiếu dùng mặc định (TP. Hồ Chí Minh, sức chứa 1000, loại {@code indoor}, công khai).
+     * @param request thông tin địa điểm
+     * @return địa điểm đã tạo hoặc cập nhật
+     * @throws IllegalArgumentException khi tên trống
+     */
     @Override
     @Transactional
     public VenueResponse createVenue(VenueRequest request) {
@@ -57,7 +69,7 @@ public class VenueServiceImpl implements VenueService {
 
         Optional<Venue> existing = venueRepository.findByNameIgnoreCase(request.getName().trim());
         if (existing.isPresent()) {
-            // Update existing venue if already created
+            // đã có địa điểm cùng tên thì cập nhật địa điểm đó
             Venue venue = existing.get();
             if (request.getAddress() != null) venue.setAddress(request.getAddress().trim());
             if (request.getCity() != null) venue.setCity(request.getCity().trim());
@@ -90,6 +102,10 @@ public class VenueServiceImpl implements VenueService {
         return mapToResponse(saved);
     }
 
+    /**
+     * Cập nhật các trường được gửi lên của địa điểm, trường null giữ nguyên.
+     * @throws RuntimeException khi không tìm thấy
+     */
     @Override
     @Transactional
     public VenueResponse updateVenue(Long id, VenueRequest request) {
@@ -114,6 +130,10 @@ public class VenueServiceImpl implements VenueService {
         return mapToResponse(updated);
     }
 
+    /**
+     * Đảo trạng thái đã xác minh của địa điểm.
+     * @throws RuntimeException khi không tìm thấy
+     */
     @Override
     @Transactional
     public VenueResponse toggleVerification(Long id) {
@@ -127,6 +147,10 @@ public class VenueServiceImpl implements VenueService {
         return mapToResponse(updated);
     }
 
+    /**
+     * Xóa địa điểm theo id.
+     * @throws RuntimeException khi không tìm thấy
+     */
     @Override
     @Transactional
     public void deleteVenue(Long id) {
@@ -137,12 +161,13 @@ public class VenueServiceImpl implements VenueService {
         log.info("Deleted Venue ID: {}", id);
     }
 
+    /** Khởi tạo bảng địa điểm: nạp vài địa điểm mặc định rồi thêm địa điểm theo tên địa điểm của từng sự kiện, đếm số sự kiện đã tổ chức. Lỗi chỉ ghi log. */
     private void syncVenuesFromEvents() {
         try {
             List<Event> events = eventRepository.findAll();
             Map<String, Venue> initialVenues = new LinkedHashMap<>();
 
-            // Preset default venues baseline if empty DB
+            // nạp sẵn các địa điểm mặc định khi cơ sở dữ liệu còn trống
             addPresetVenue(initialVenues, "Sân vận động Quốc gia Mỹ Đình", "Lê Đức Thọ, Mỹ Đình, Nam Từ Liêm", "Hà Nội", 40000, "outdoor", true);
             addPresetVenue(initialVenues, "Sân vận động Quân khu 7", "202 Hoàng Văn Thụ, Phường 9, Phú Nhuận", "TP. Hồ Chí Minh", 25000, "outdoor", true);
             addPresetVenue(initialVenues, "Trung tâm Hội nghị GEM Center", "8 Nguyễn Bỉnh Khiêm, Đa Kao, Quận 1", "TP. Hồ Chí Minh", 3000, "indoor", true);
@@ -176,6 +201,7 @@ public class VenueServiceImpl implements VenueService {
         }
     }
 
+    /** Thêm một địa điểm mặc định vào bản đồ khởi tạo, khóa là tên viết thường. */
     private void addPresetVenue(Map<String, Venue> map, String name, String address, String city, int capacity, String type, boolean verified) {
         String key = name.toLowerCase().trim();
         map.put(key, Venue.builder()
@@ -189,13 +215,17 @@ public class VenueServiceImpl implements VenueService {
                 .build());
     }
 
+    /**
+     * Lấy mẫu sơ đồ của admin cùng các sơ đồ do nhà tổ chức dựng. Sự kiện được coi là diễn ra tại địa điểm khi tên địa điểm của sự kiện và tên địa điểm này chứa nhau; chỉ lấy sự kiện có bản nháp sơ đồ trên ticket-service. Sức chứa và số khu vực hiện là giá trị ước lượng cố định.
+     * @throws RuntimeException khi không tìm thấy địa điểm
+     */
     @Override
     @Transactional(readOnly = true)
     public VenueSeatmapsResponse getVenueSeatmaps(Long id) {
         Venue venue = venueRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy địa điểm với ID: " + id));
 
-        // find events associated with this venue by name or address
+        // tìm các sự kiện gắn với địa điểm này theo tên hoặc địa chỉ
         List<Event> allEvents = eventRepository.findAll();
         List<VenueSeatmapsResponse.OrganizerSeatmapDto> seatmaps = new ArrayList<>();
 
@@ -208,7 +238,7 @@ public class VenueServiceImpl implements VenueService {
                     organizerName = event.getOrganizers().get(0).getName();
                 }
 
-                // check if layout exists from ticket-service or local
+                // kiểm tra sơ đồ có sẵn từ ticket-service hay cục bộ
                 String draftJson = null;
                 try {
                     if (ticketServiceClient != null) {
@@ -244,6 +274,10 @@ public class VenueServiceImpl implements VenueService {
                 .build();
     }
 
+    /**
+     * Lưu mẫu sơ đồ chỗ ngồi (JSON) mà admin đặt cho địa điểm.
+     * @throws RuntimeException khi không tìm thấy
+     */
     @Override
     @Transactional
     public VenueResponse saveVenueSeatmapTemplate(Long id, String seatmapTemplate) {
@@ -256,6 +290,7 @@ public class VenueServiceImpl implements VenueService {
         return mapToResponse(updated);
     }
 
+    /** Chuyển địa điểm sang response; {@code isPublic} trống được coi là công khai. */
     private VenueResponse mapToResponse(Venue venue) {
         return VenueResponse.builder()
                 .id(venue.getId())

@@ -1,4 +1,4 @@
-"""Semantic event search. Nothing is built at import: the embeddings client is created on first use."""
+"""Tìm kiếm sự kiện theo ngữ nghĩa. Không dựng gì khi import: client embedding chỉ được tạo ở lần dùng đầu tiên."""
 import logging
 import threading
 
@@ -10,11 +10,11 @@ log = logging.getLogger("ai.rag")
 
 
 class EmbeddingUnavailable(Exception):
-    """The query could not be turned into a vector (no key, provider error, timeout). Callers degrade to keyword search."""
+    """Không chuyển được câu hỏi thành vector (thiếu key, lỗi nhà cung cấp, quá thời gian). Nơi gọi hạ cấp sang tìm theo từ khóa."""
 
 
-# one statement: threshold and "still valid" are applied before LIMIT, so top-k is taken among usable events only.
-# event_db: event_vectors(event_id, content, embedding), events(id, event_status, is_private, end_time).
+# một câu lệnh: ngưỡng điểm và điều kiện "còn hiệu lực" được áp trước LIMIT, nên top-k chỉ lấy trong các sự kiện dùng được.
+# event_db: bảng event_vectors(event_id, content, embedding), events(id, event_status, is_private, end_time).
 VECTOR_SEARCH_SQL = text(f"""
     SELECT v.event_id AS event_id, v.content AS content,
            1 - (v.embedding <=> CAST(:vec AS vector)) AS score
@@ -28,17 +28,20 @@ VECTOR_SEARCH_SQL = text(f"""
 
 
 def _vector_literal(values) -> str:
+    """Đổi danh sách số thành chuỗi vector của pgvector, dạng [v1,v2,...]."""
     return "[" + ",".join(repr(float(v)) for v in values) + "]"
 
 
 class RAGEngine:
+    """Động cơ tìm kiếm ngữ nghĩa: tạo embedding cho câu hỏi và truy vấn vector gần nhất trong event_db."""
     def __init__(self):
+        """Khởi tạo với embedding chưa tạo (tạo lười) và khóa chống tạo trùng giữa các luồng."""
         self._embeddings = None
         self._lock = threading.Lock()
 
     @property
     def embeddings(self):
-        """Created on the first request (keeps import free of network clients and of key checks)."""
+        """Client embedding, tạo ở yêu cầu đầu tiên (để import không tạo client mạng hay kiểm tra key). Ném EmbeddingUnavailable nếu không tạo được."""
         if self._embeddings is None:
             with self._lock:
                 if self._embeddings is None:
@@ -51,9 +54,11 @@ class RAGEngine:
 
     @embeddings.setter
     def embeddings(self, value):
+        """Gán client embedding (dùng để thay thế khi kiểm thử)."""
         self._embeddings = value
 
     def embed(self, query: str):
+        """Chuyển câu hỏi thành vector (câu rỗng dùng từ "sự kiện"). Ném EmbeddingUnavailable khi lỗi hoặc vector rỗng."""
         search_query = query if query and query.strip() != "" else "sự kiện"
         try:
             vector = self.embeddings.embed_query(search_query)
@@ -67,11 +72,11 @@ class RAGEngine:
         return vector
 
     def search_events(self, db, query: str, top_k: int = 3, min_score: float = SEARCH_MIN_SCORE):
-        """Nearest valid events to the question, best first. `db` is anything with .execute(): a Connection of the
-        read-only event engine, or a Session. Returns plain objects (r.EventVector.event_id, r.EventVector.content,
-        r.distance = cosine distance). Raises EmbeddingUnavailable when the question cannot be embedded; database
-        errors propagate to the caller. The read transaction is ended before returning so the caller can spend
-        seconds on a model call without holding a pooled connection."""
+        """Tìm các sự kiện hợp lệ gần câu hỏi nhất, tốt nhất xếp trước. `db` là bất kỳ đối tượng có .execute():
+        Connection của engine event chỉ đọc hoặc một Session. Trả về các đối tượng đơn giản (r.EventVector.event_id,
+        r.EventVector.content, r.distance = khoảng cách cosine). Ném EmbeddingUnavailable khi không embed được câu hỏi;
+        lỗi cơ sở dữ liệu được ném tiếp cho nơi gọi. Giao dịch đọc được kết thúc trước khi trả về để nơi gọi có thể
+        mất vài giây cho lời gọi mô hình mà không giữ kết nối trong pool."""
         vector = self.embed(query)
         try:
             rows = db.execute(
@@ -86,5 +91,5 @@ class RAGEngine:
         return [vector_hit(r.event_id, r.content, r.score) for r in rows]
 
 
-# a shared instance; building it creates no client and makes no call
+# một instance dùng chung; dựng nó không tạo client và không gọi mạng
 rag_engine = RAGEngine()

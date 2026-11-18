@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Giao dịch ghi nhận từ cổng thanh toán cho một thanh toán (bảng {@code payment_transactions}): mã tham chiếu cổng, dữ liệu gốc và trạng thái. */
 @Entity
 @Table(name = "payment_transactions")
 @Getter
@@ -33,6 +34,7 @@ public class PaymentTransaction {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
+    /** Trước khi lưu: gán thời điểm tạo. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

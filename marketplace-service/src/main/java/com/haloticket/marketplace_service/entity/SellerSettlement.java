@@ -7,6 +7,10 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 
+/**
+ * Khoản đối soát trả tiền cho người bán từ một giao dịch bán lại: tiền gộp, phí nền tảng, tiền thực nhận
+ * và thời điểm đủ điều kiện thanh toán. Mỗi giao dịch có tối đa một khoản đối soát.
+ */
 @Entity
 @Table(name = "seller_settlements", uniqueConstraints =
         @UniqueConstraint(name = "uk_settlement_marketplace_transaction", columnNames = "marketplace_transaction_id"))
@@ -29,6 +33,7 @@ public class SellerSettlement {
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
 
+    /** Đặt thời điểm tạo, cập nhật và mặc định {@code eligibleAt} bằng thời điểm tạo nếu chưa có. */
     @PrePersist
     void onCreate() {
         createdAt = Instant.now();
@@ -36,5 +41,6 @@ public class SellerSettlement {
         if (eligibleAt == null) eligibleAt = createdAt;
     }
 
+    /** Cập nhật thời điểm sửa đổi trước mỗi lần lưu thay đổi. */
     @PreUpdate void onUpdate() { updatedAt = Instant.now(); }
 }

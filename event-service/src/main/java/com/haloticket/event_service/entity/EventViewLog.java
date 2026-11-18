@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Thực thể nhật ký lượt xem sự kiện (bảng {@code event_view_logs}), dùng để tính lượt xem và người xem duy nhất cho phân tích. */
 @Entity
 @Table(name = "event_view_logs", indexes = {
     @Index(name = "idx_event_view_event_id", columnList = "event_id")
@@ -33,6 +34,7 @@ public class EventViewLog {
     @Column(name = "viewed_at", nullable = false)
     private LocalDateTime viewedAt;
 
+    /** Trước khi lưu lần đầu: nếu chưa có thời điểm xem thì lấy thời điểm hiện tại. */
     @PrePersist
     protected void onCreate() {
         if (this.viewedAt == null) {

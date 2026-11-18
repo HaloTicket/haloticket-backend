@@ -6,6 +6,7 @@ import lombok.*;
 
 import java.time.Instant;
 
+/** Một lần thử xác minh eKYC của người dùng, duy nhất theo cặp người dùng và khóa idempotency. */
 @Entity
 @Table(
         name = "ekyc_attempts",
@@ -56,6 +57,7 @@ public class EkycAttempt {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /** Gán thời điểm tạo và cập nhật, và đặt trạng thái mặc định {@code CREATED} nếu chưa có. */
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();
@@ -64,6 +66,7 @@ public class EkycAttempt {
         status = status == null ? EkycAttemptStatus.CREATED : status;
     }
 
+    /** Làm mới thời điểm cập nhật mỗi khi bản ghi thay đổi. */
     @PreUpdate
     void onUpdate() {
         updatedAt = Instant.now();

@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+/** Định kỳ gửi các sự kiện outbox đang chờ lên Kafka theo mô hình transactional outbox. */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -22,6 +23,10 @@ public class OutboxPublisher {
     private final OutboxEventRepository outboxEventRepository;
     private final KafkaTemplate<String, String> kafkaTemplate;
 
+    /**
+     * Mỗi giây lấy tối đa 50 sự kiện {@code PENDING} cũ nhất và gửi lên Kafka (chờ tối đa 10 giây mỗi sự kiện). Gửi được thì đánh dấu
+     * {@code PROCESSED}; lỗi thì tăng số lần thử và sau 5 lần đánh dấu {@code FAILED}.
+     */
     @Scheduled(fixedDelay = 1000)
     @Transactional
     public void publishPendingEvents() {

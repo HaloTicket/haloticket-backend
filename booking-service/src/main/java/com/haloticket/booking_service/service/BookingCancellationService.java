@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/** Hủy đơn theo yêu cầu của chính người mua: nhả ghế và tồn kho, xóa khóa giữ ghế trong Redis và ghi sự kiện outbox {@code BOOKING_CANCELLED}. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -36,6 +37,15 @@ public class BookingCancellationService {
     private final SeatWebsocketService websocketService;
     private final GaReservationService gaReservationService;
 
+    /**
+     * Hủy một đơn {@code PENDING} của người mua. Tìm đơn theo id hoặc theo mã đơn, có khóa ghi bi quan.
+     * Hủy lần hai trả lại đơn đã hủy (idempotent); đơn đã thanh toán thì không hủy được.
+     * @param idOrCode id hoặc mã hiển thị của đơn
+     * @param customerId mã người mua đang gọi, phải là chủ đơn
+     * @return đơn sau khi hủy
+     * @throws ResponseStatusException HTTP 404 {@code BOOKING_NOT_FOUND} khi không có đơn hoặc không phải của người gọi,
+     *                                HTTP 409 {@code BOOKING_NOT_CANCELLABLE} khi đơn không còn ở trạng thái chờ thanh toán
+     */
     @Transactional
     public BookingResponse cancelOwnBooking(String idOrCode, String customerId) {
         Booking booking = bookingRepository.findByIdForUpdate(idOrCode)
@@ -43,7 +53,7 @@ public class BookingCancellationService {
                         .flatMap(found -> bookingRepository.findByIdForUpdate(found.getId())))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND"));
 
-        // same answer for "missing" and "someone else's" so ids cannot be probed.
+        // trả lời giống nhau cho "không tồn tại" và "đơn của người khác" để không dò được id
         if (booking.getCustomerId() == null || !booking.getCustomerId().equals(customerId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND");
         }
@@ -91,6 +101,7 @@ public class BookingCancellationService {
         return toResponse(booking);
     }
 
+    /** Chuyển đơn sang {@code BookingResponse}. */
     private BookingResponse toResponse(Booking booking) {
         return BookingResponse.builder()
                 .id(booking.getId())

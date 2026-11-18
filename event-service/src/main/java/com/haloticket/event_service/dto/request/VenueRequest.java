@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/** Dữ liệu tạo hoặc sửa địa điểm tổ chức sự kiện. */
 @Data
 @Builder
 @NoArgsConstructor
@@ -15,7 +16,7 @@ public class VenueRequest {
     private String city;
     private String ward;
     private Integer capacity;
-    private String type; // "indoor", "outdoor", "hybrid"
+    private String type; // loại địa điểm: "indoor", "outdoor", "hybrid"
     private Boolean verified;
     private Boolean isPublic;
     private String organizerId;

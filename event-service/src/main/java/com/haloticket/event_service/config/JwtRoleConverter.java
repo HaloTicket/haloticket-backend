@@ -7,8 +7,14 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.stereotype.Component;
 import java.util.*;
 
+/** Chuyển JWT thành {@code JwtAuthenticationToken} với quyền lấy từ claim {@code roles} và {@code realm_access.roles}. */
 @Component
 public class JwtRoleConverter implements Converter<Jwt, JwtAuthenticationToken> {
+    /**
+     * Gộp vai trò từ hai claim, thêm tiền tố {@code ROLE_} (viết hoa) nếu chưa có rồi tạo authority.
+     * @param jwt JWT đã được xác thực
+     * @return token xác thực với chủ thể là {@code sub} của JWT
+     */
     @Override public JwtAuthenticationToken convert(Jwt jwt) {
         Set<String> roles = new HashSet<>();
         List<String> direct = jwt.getClaimAsStringList("roles");

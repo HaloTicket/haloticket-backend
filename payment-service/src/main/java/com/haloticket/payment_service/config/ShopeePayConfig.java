@@ -4,6 +4,7 @@ import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
+/** Cấu hình ShopeePay: mã đối tác, khóa bí mật, mã merchant và các URL chuyển hướng và IPN. */
 @Configuration
 @Getter
 public class ShopeePayConfig {

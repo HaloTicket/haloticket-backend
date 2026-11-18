@@ -12,18 +12,33 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.util.Set;
 
+/** Quản lý chính sách bán lại vé của sự kiện: đọc, tạo hoặc cập nhật, kèm kiểm tra khoảng giá, khóa phiên bản lạc quan và ghi nhật ký kiểm toán. */
 @Service @RequiredArgsConstructor
 public class ResalePolicyService {
     private final ResalePolicyRepository policyRepository;
     private final EventAccessService access;
     private final TransferPolicySupport support;
 
+    /**
+     * Lấy chính sách bán lại vé của sự kiện.
+     * @param eventId id sự kiện
+     * @return chính sách hiện hành
+     * @throws ResponseStatusException 404 {@code POLICY_NOT_CONFIGURED} khi sự kiện chưa cấu hình chính sách
+     */
     @Transactional(readOnly = true)
     public ResalePolicyResponse get(String eventId) {
         return policyRepository.findByEventId(eventId).map(ResalePolicyResponse::from)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "POLICY_NOT_CONFIGURED"));
     }
 
+    /**
+     * Tạo mới hoặc cập nhật chính sách bán lại vé. Yêu cầu quyền ghi; giá tối thiểu và tối đa (theo phần trăm giá gốc) bắt buộc, tối đa không nhỏ hơn tối thiểu, phí dịch vụ trong 0..100. Đối chiếu {@code expectedVersion} rồi ghi nhật ký kiểm toán và outbox.
+     * @param eventId id sự kiện
+     * @param request nội dung chính sách mới
+     * @param authorization header Authorization của request
+     * @return chính sách sau khi lưu
+     * @throws ResponseStatusException 422 {@code INVALID_RESALE_POLICY} khi dữ liệu sai, 409 {@code POLICY_CHANGED} khi phiên bản đã đổi
+     */
     @Transactional
     public ResalePolicyResponse upsert(String eventId, ResalePolicyRequest request, String authorization) {
         String actor = access.requireWrite(eventId, authorization);

@@ -11,6 +11,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+/** Lắng nghe sự kiện Kafka liên quan thanh toán. */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -19,6 +20,12 @@ public class PaymentEventListener {
     private final PaymentRepository paymentRepository;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Khi đơn đặt chỗ được tạo, khởi tạo bản ghi thanh toán {@code PENDING} với số tiền của đơn. Bỏ qua nếu thiếu {@code bookingId}
+     * hoặc đã có thanh toán cho đơn; lỗi chỉ được ghi log.
+     *
+     * @param message JSON sự kiện {@code BOOKING_CREATED}
+     */
     @KafkaListener(topics = "haloticket.booking.created.v1", groupId = "payment-service")
     @Transactional
     public void handleBookingCreated(String message) {

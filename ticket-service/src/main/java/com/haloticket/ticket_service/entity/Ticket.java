@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Vé đã phát hành cho một chủ sở hữu (bảng {@code tickets}): loại vé, ghế, giá, mã QR, trạng thái và các khóa chống phát hành trùng. */
 @Entity
 @Table(name = "tickets")
 @Getter
@@ -86,6 +87,7 @@ public class Ticket {
     private LocalDateTime usedAt;
 
 
+    /** Khi lưu: ghi thời điểm tạo, mặc định trạng thái {@code VALID} và phiên bản QR bằng 1. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

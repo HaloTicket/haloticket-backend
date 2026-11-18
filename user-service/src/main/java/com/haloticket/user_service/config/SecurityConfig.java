@@ -15,9 +15,10 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.StringUtils;
 
+/** Cấu hình bảo mật của user-service: resource server JWT, kiểm tra audience và quy tắc phân quyền theo đường dẫn. */
 @Configuration
 @EnableWebSecurity
-// second layer behind the route rule below: @PreAuthorize on AdminUserController
+// lớp bảo vệ thứ hai sau quy tắc theo đường dẫn bên dưới: @PreAuthorize trên AdminUserController
 @EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
@@ -30,9 +31,10 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
     private String jwkSetUri;
 
+    /** Bộ giải mã JWT: lấy khóa từ jwk-set-uri nếu có, ngược lại từ issuer; kiểm tra issuer và audience {@code user-service}. */
     @Bean
     JwtDecoder jwtDecoder() {
-        // containers fetch keys internally while tokens retain their public issuer.
+        // các container lấy khóa qua địa chỉ nội bộ trong khi token vẫn mang issuer công khai.
         NimbusJwtDecoder decoder = StringUtils.hasText(jwkSetUri)
                 ? NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build()
                 : NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
@@ -42,6 +44,10 @@ public class SecurityConfig {
         return decoder;
     }
 
+    /**
+     * Chuỗi lọc bảo mật: tắt CSRF; cho phép OPTIONS, actuator, {@code /api/auth/**} và {@code /api/internal/**}; đường dẫn quản trị
+     * cần vai trò ADMIN; còn lại phải đăng nhập.
+     */
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
@@ -50,7 +56,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/actuator/**", "/health").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/internal/**").permitAll() // Internal calls from other microservices
+                        .requestMatchers("/api/internal/**").permitAll() // Các lệnh gọi nội bộ từ những microservice khác
                         .requestMatchers("/api/users/me").authenticated()
                         .requestMatchers("/api/users/admin", "/api/users/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

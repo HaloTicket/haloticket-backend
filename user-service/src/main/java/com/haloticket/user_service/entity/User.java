@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.Set;
 import com.haloticket.user_service.config.GenderConverter;
 
+/** Người dùng của hệ thống, liên kết với tài khoản Keycloak qua {@code keycloakId}, kèm vai trò và hồ sơ eKYC. */
 @Entity
 @Table(name = "users")
 @Getter
@@ -62,12 +63,14 @@ public class User {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Gán thời điểm tạo và cập nhật trước khi lưu lần đầu. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
 
+    /** Làm mới thời điểm cập nhật mỗi khi bản ghi thay đổi. */
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

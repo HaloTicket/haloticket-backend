@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/** Thông tin nhà tổ chức hiển thị cùng sự kiện. */
 @Data
 @Builder
 @NoArgsConstructor

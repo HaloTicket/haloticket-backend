@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import java.time.LocalDateTime;
 
+/** Thông tin tóm tắt của đơn đặt vé trả về cho client, gồm thời điểm hết hạn giữ chỗ. */
 @Data
 @Builder
 public class BookingResponse {

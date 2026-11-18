@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
 
+/** Giữ và nhả ghế tạm thời bằng khóa Redisson và khóa Redis có thời hạn 15 phút, rồi báo trạng thái ghế qua WebSocket. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -20,15 +21,24 @@ public class SeatHoldService {
 
     private static final long HOLD_TTL_MINUTES = 15;
 
+    /**
+     * Giữ một ghế cho người dùng trong 15 phút. Dùng khóa phân tán để hai người không giữ cùng ghế; nếu ghế đã bị giữ thì chỉ thành công khi
+     * đúng người đang giữ.
+     * @param eventId mã sự kiện
+     * @param showtimeId mã suất chiếu, null thì khóa theo sự kiện
+     * @param seatId mã ghế
+     * @param userId mã người giữ (mã người dùng hoặc id phiên ẩn danh)
+     * @return true khi giữ được (hoặc đã giữ sẵn bởi chính người này), false khi ghế bị người khác giữ hoặc không lấy được khóa
+     */
     public boolean holdSeat(String eventId, String showtimeId, String seatId, String userId) {
         String showtimePrefix = showtimeId != null ? "showtime:" + showtimeId : "event:" + eventId;
         String lockKey = "lock:seat:" + showtimePrefix + ":" + seatId;
-        String holdKey = "seat:hold:" + showtimePrefix + ":" + seatId; // fixed prefix to match TicketService
+        String holdKey = "seat:hold:" + showtimePrefix + ":" + seatId; // tiền tố cố định để khớp với TicketService
         String eventHeldSetKey = showtimePrefix + ":held_seats";
 
         RLock lock = redissonClient.getLock(lockKey);
         try {
-            if (lock.tryLock(5, TimeUnit.SECONDS)) { // use default watchdog lease time instead of strict 1000ms
+            if (lock.tryLock(5, TimeUnit.SECONDS)) { // dùng thời gian thuê mặc định của watchdog thay vì 1000ms cứng nhắc
                 try {
                     var bucket = redissonClient.getBucket(holdKey, StringCodec.INSTANCE);
                     if (bucket.isExists()) {
@@ -36,7 +46,7 @@ public class SeatHoldService {
                     }
                     
                     bucket.set(userId, HOLD_TTL_MINUTES, TimeUnit.MINUTES);
-                    redissonClient.getSet(eventHeldSetKey).add(seatId); // add to set for TicketService
+                    redissonClient.getSet(eventHeldSetKey).add(seatId); // thêm vào tập để TicketService đọc
                     
                     websocketService.broadcastSeatStatus(eventId, showtimeId, seatId, "HELD");
                     return true;
@@ -53,6 +63,13 @@ public class SeatHoldService {
         return false;
     }
 
+    /**
+     * Nhả ghế đang giữ, chỉ khi đúng người đang giữ, rồi báo ghế trống qua WebSocket.
+     * @param eventId mã sự kiện
+     * @param showtimeId mã suất chiếu, null thì khóa theo sự kiện
+     * @param seatId mã ghế
+     * @param userId mã người nhả, phải là người đang giữ
+     */
     public void releaseSeat(String eventId, String showtimeId, String seatId, String userId) {
         String showtimePrefix = showtimeId != null ? "showtime:" + showtimeId : "event:" + eventId;
         String holdKey = "seat:hold:" + showtimePrefix + ":" + seatId;
@@ -62,7 +79,7 @@ public class SeatHoldService {
         
         if (bucket.isExists() && userId.equals(bucket.get())) {
             bucket.delete();
-            redissonClient.getSet(eventHeldSetKey).remove(seatId); // remove from set
+            redissonClient.getSet(eventHeldSetKey).remove(seatId); // xóa khỏi tập
             websocketService.broadcastSeatStatus(eventId, showtimeId, seatId, "AVAILABLE");
         }
     }

@@ -1,5 +1,6 @@
 package com.haloticket.notification_service.exception;
 
+/** Mã lỗi nghiệp vụ của notification-service, trả về trong trường {@code code} của phản hồi lỗi. */
 public enum NotificationErrorCode {
     TEMPLATE_NOT_FOUND,
     TEMPLATE_INACTIVE,

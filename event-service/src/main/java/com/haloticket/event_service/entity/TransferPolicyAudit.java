@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
 
+/** Thực thể nhật ký kiểm toán thay đổi chính sách chuyển nhượng (bảng {@code transfer_policy_audit}): người sửa, phiên bản, nội dung trước và sau dạng JSON. */
 @Entity @Table(name = "transfer_policy_audit")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class TransferPolicyAudit {

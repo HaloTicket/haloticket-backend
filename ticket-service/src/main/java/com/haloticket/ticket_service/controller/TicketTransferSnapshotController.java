@@ -10,19 +10,21 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
-/** Minimal service-only snapshot for policy reconciliation; never contains QR data. */
+/** Ảnh chụp tối thiểu chỉ dùng giữa các dịch vụ để đối soát chính sách chuyển nhượng; không bao giờ chứa dữ liệu QR. */
 @RestController
 @RequestMapping("/api/internal/tickets")
 public class TicketTransferSnapshotController {
     private final TicketRepository tickets;
     private final String serviceToken;
 
+    /** Khởi tạo với repository vé và token dịch vụ ({@code transfer.internal-token}). */
     public TicketTransferSnapshotController(TicketRepository tickets,
             @Value("${transfer.internal-token:}") String serviceToken) {
         this.tickets = tickets;
         this.serviceToken = serviceToken;
     }
 
+    /** Trả ảnh chụp trạng thái của vé cho dịch vụ chuyển nhượng; token sai hoặc chưa cấu hình thì 403, không có vé thì 404. */
     @GetMapping("/{ticketId}/transfer-snapshot")
     public TransferSnapshot snapshot(@PathVariable String ticketId,
             @RequestHeader(value = "X-Transfer-Service-Token", required = false) String token) {
@@ -41,9 +43,11 @@ public class TicketTransferSnapshotController {
                 ticket.getGiftTransferCount());
     }
 
+    /** Dữ liệu vé phục vụ chuyển nhượng: chủ vé, trạng thái, mã khóa thao tác, loại vé, suất diễn, giá gốc và số lần tặng. */
     public record TransferSnapshot(String ticketId, String eventId, String ownerId, TicketStatus status,
             String lockOperationId, String ticketTypeId, String showtimeId, BigDecimal originalPrice,
             int giftTransferCount) {
+        /** Constructor rút gọn không có {@code giftTransferCount}, đặt số lần tặng vé bằng 0. */
         public TransferSnapshot(String ticketId, String eventId, String ownerId, TicketStatus status,
                 String lockOperationId, String ticketTypeId, String showtimeId, BigDecimal originalPrice) {
             this(ticketId, eventId, ownerId, status, lockOperationId, ticketTypeId, showtimeId, originalPrice, 0);

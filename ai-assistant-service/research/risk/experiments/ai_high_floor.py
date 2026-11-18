@@ -1,5 +1,6 @@
-"""Dev-split test of letting a verified, high-confidence model flag of an explicit kind force HIGH
-(python -m research.risk.experiments.ai_high_floor [base|prompt_big]). The shipped rule: a model flag alone is at most MEDIUM."""
+"""Thử trên tập dev việc để một cờ của mô hình, đã được xác minh, độ tin cậy cao và thuộc loại tường minh, ép mức lên HIGH
+(python -m research.risk.experiments.ai_high_floor [base|prompt_big]). Luật đang dùng: một cờ của mô hình đứng một mình thì tối đa là MEDIUM.
+"""
 import json, sys
 from research.risk import common, run_configs as rc
 from research.risk.experiments import model_variants as mv
@@ -15,6 +16,7 @@ gateway = rc.Gateway("live", "groq-oss20b" if variant == "base" else f"variant-{
 original = engine.ai_findings
 for name, kinds in (("shipped", ()), ("HIGH for VEILED_PROHIBITED", ("VEILED_PROHIBITED",)), ("HIGH for VEILED_PROHIBITED+SCAM_PATTERN", ("VEILED_PROHIBITED", "SCAM_PATTERN"))):
     def patched(flags, kinds=kinds):
+        """Bản thay cho engine.ai_findings: gọi bản gốc rồi đặt min_level là HIGH cho các phát hiện thuộc loại đang thử có độ tin cậy HIGH."""
         out = original(flags)
         for finding in out:
             if finding["code"] in kinds and finding.get("confidence") == "HIGH":

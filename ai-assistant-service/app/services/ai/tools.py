@@ -1,10 +1,10 @@
-"""Tools of the customer chatbot. Read-only: they never write; request_user_confirmation only describes what the user may
-confirm in the web app.
+"""Các công cụ (tool) của chatbot khách hàng. Chỉ đọc: không bao giờ ghi; request_user_confirmation chỉ mô tả
+thao tác mà người dùng có thể xác nhận trên web.
 
-Engines are the narrow read-only chatbot roles, obtained lazily at call time (nothing is created at import):
+Engine là các role chatbot chỉ đọc, hẹp quyền, lấy lười tại lúc gọi (không tạo gì khi import):
   event_db  -> events, event_showtimes
   ticket_db -> ticket_types, seat_layouts, seats, seat_rows, seat_zones
-Database failures are not turned into success results: they raise AiError (AI_DB_NOT_CONFIGURED / AI_UNAVAILABLE).
+Lỗi cơ sở dữ liệu không bị biến thành kết quả thành công: chúng ném AiError (AI_DB_NOT_CONFIGURED / AI_UNAVAILABLE).
 """
 import json
 import logging
@@ -27,6 +27,7 @@ VN_TZ = timezone(timedelta(hours=7))
 
 
 def to_naive_vn_datetime(dt):
+    """Chuyển datetime hoặc chuỗi ISO về giờ Việt Nam (UTC+7) không kèm múi giờ; None nếu rỗng hoặc chuỗi không đọc được."""
     if dt is None:
         return None
     if isinstance(dt, str):
@@ -40,21 +41,22 @@ def to_naive_vn_datetime(dt):
 
 
 def event_db():
-    """Read-only engine of event_db (created on first use)."""
+    """Engine chỉ đọc của event_db (tạo ở lần dùng đầu)."""
     return get_chatbot_engine("event")
 
 
 def ticket_db():
-    """Read-only engine of ticket_db (created on first use)."""
+    """Engine chỉ đọc của ticket_db (tạo ở lần dùng đầu)."""
     return get_chatbot_engine("ticket")
 
 
 def _db_unavailable(failure: Exception) -> AiError:
+    """Ghi log lỗi cơ sở dữ liệu (chỉ tên lỗi) và trả AiError AI_UNAVAILABLE để nơi gọi ném tiếp."""
     log.warning("chatbot tool database error: %s", type(failure).__name__)
     return ai_error(AI_UNAVAILABLE)
 
 
-# the model chooses the id list, so it is capped
+# mô hình quyết định danh sách id nên số lượng bị giới hạn
 MAX_EVENT_CARDS = 10
 MAX_SEATS_PER_REQUEST = 10
 MAX_TICKETS_PER_ORDER = 20
@@ -65,14 +67,15 @@ SEAT_MAP_RECHECK_NOTE = (
 )
 
 
-# seats
+# ghế
 def _natural_key(value) -> list:
-    """Sort key that never compares int with str: '2' < '10' < 'A1' < 'B2'."""
+    """Khóa sắp xếp tự nhiên không bao giờ so sánh int với str: '2' < '10' < 'A1' < 'B2'."""
     parts = re.split(r"(\d+)", str(value))
     return [(0, int(p), "") if p.isdigit() else (1, 0, p.lower()) for p in parts if p != ""]
 
 
 def _as_int(value) -> Optional[int]:
+    """Đổi giá trị thành int nếu là số nguyên thật (kể cả float nguyên hoặc chuỗi số); bool và giá trị khác trả None."""
     if isinstance(value, bool):
         return None
     if isinstance(value, int):
@@ -85,6 +88,7 @@ def _as_int(value) -> Optional[int]:
 
 
 def _seat_number(seat: dict):
+    """Lấy số ghế từ khóa `number`, nếu thiếu thì dùng `col`."""
     number = seat.get("number")
     if number is None or number == "":
         number = seat.get("col")
@@ -92,7 +96,7 @@ def _seat_number(seat: dict):
 
 
 def _zone_list(zones) -> List[Dict[str, Any]]:
-    """[{'id','name','tier'}] from a layout whose zones are a dict (id -> zone) or a list."""
+    """Danh sách [{'id','name','tier'}] từ sơ đồ mà zones là dict (id -> khu) hoặc list."""
     out = []
     if isinstance(zones, dict):
         for zid, zobj in zones.items():
@@ -107,6 +111,7 @@ def _zone_list(zones) -> List[Dict[str, Any]]:
 
 
 def _match_zone(zones: List[Dict[str, Any]], wanted: str) -> Optional[Dict[str, Any]]:
+    """Tìm khu theo tên: ưu tiên khớp chính xác, sau đó khớp chứa nhau (không phân biệt hoa thường); None nếu không có."""
     w = (wanted or "").strip().lower()
     if not w:
         return None
@@ -121,6 +126,7 @@ def _match_zone(zones: List[Dict[str, Any]], wanted: str) -> Optional[Dict[str, 
 
 
 def _json(payload: dict) -> str:
+    """Chuyển dict thành chuỗi JSON giữ nguyên ký tự tiếng Việt."""
     return json.dumps(payload, ensure_ascii=False)
 
 
@@ -198,7 +204,7 @@ def find_adjacent_seats(event_id: str, zone: str, num_seats: int) -> str:
                 if number is None:
                     continue
                 if (zname.strip().lower(), row.strip().lower(), str(number).strip().lower()) in unavailable:
-                    continue  # the seats table says it is taken
+                    continue  # bảng seats cho biết ghế đã bị chiếm
                 groups.setdefault((zid, row), []).append((number, _as_int(number), s, zname, z))
 
             if not groups:
@@ -222,8 +228,8 @@ def find_adjacent_seats(event_id: str, zone: str, num_seats: int) -> str:
 
 
 def _unavailable_from_table(conn, layout_id) -> set:
-    """Seats the `seats` table marks as not AVAILABLE, keyed (zone name, row, number) lower-cased. Empty when the layout
-    has no rows in the table (the draft is then the only source)."""
+    """Các ghế mà bảng `seats` đánh dấu không còn AVAILABLE, khóa (tên khu, hàng, số ghế) viết thường. Rỗng khi sơ đồ
+    không có dòng nào trong bảng (khi đó bản nháp là nguồn duy nhất)."""
     rows = conn.execute(text('''
         SELECT sz.name AS zone_name, sr.label AS row_label, s.seat_number AS seat_number, s.seat_status AS seat_status
         FROM seats s
@@ -240,7 +246,7 @@ def _unavailable_from_table(conn, layout_id) -> set:
 
 
 def _adjacent_run(entries: list, n: int) -> Optional[list]:
-    """n seats of ONE (zone, row) with consecutive integer numbers, or None. Non-numeric numbers never form a run."""
+    """n ghế của MỘT (khu, hàng) có số nguyên liên tiếp, hoặc None. Số ghế không phải số nguyên không bao giờ tạo thành dãy."""
     numeric = {}
     for number, as_int, seat, zname, z in entries:
         if as_int is not None and as_int not in numeric:
@@ -253,6 +259,7 @@ def _adjacent_run(entries: list, n: int) -> Optional[list]:
 
 
 def _general_admission(conn, event_id: str, zone: str, n: int) -> str:
+    """Trả lời cho sự kiện vé tự do (không có sơ đồ ghế): chọn hạng vé ACTIVE khớp tên khu (mặc định hạng rẻ nhất) và tính tổng tiền."""
     types = conn.execute(text('''
         SELECT name, price
         FROM ticket_types
@@ -277,6 +284,7 @@ def _general_admission(conn, event_id: str, zone: str, n: int) -> str:
 
 
 def _success_adjacent(conn, event_id, key, run, tier_price, n) -> str:
+    """Dựng kết quả thành công khi tìm được dãy ghế liền kề; giá lấy từ hạng vé của sơ đồ, thiếu thì lấy hạng ACTIVE rẻ nhất."""
     zid, row = key
     first_number, first_seat, zname, zobj = run[0]
     tier_id = first_seat.get("tierId") or (zobj or {}).get("tier")
@@ -305,7 +313,8 @@ def _success_adjacent(conn, event_id, key, run, tier_price, n) -> str:
 
 
 def _no_adjacent(event_id, target, groups, ordered_keys, n) -> str:
-    best = max(ordered_keys, key=lambda k: len(groups[k]))  # first of the fullest rows
+    """Dựng kết quả khi không có đủ ghế liền kề: gợi ý các ghế trống gần nhau ở hàng nhiều ghế nhất và ghi rõ là KHÔNG liền kề."""
+    best = max(ordered_keys, key=lambda k: len(groups[k]))  # hàng đầu tiên trong các hàng đầy nhất
     entries = sorted(groups[best], key=lambda e: _natural_key(e[0]))[:n]
     zname = entries[0][3] if entries else (target["name"] if target else "")
     labels = [f"{best[1]}{e[0]}" for e in entries]
@@ -320,8 +329,9 @@ def _no_adjacent(event_id, target, groups, ordered_keys, n) -> str:
     })
 
 
-# confirmation (prices computed here)
+# xác nhận (giá được tính tại đây)
 def _money(value) -> Optional[Decimal]:
+    """Đổi giá trị thành Decimal; None nếu không hợp lệ."""
     try:
         return Decimal(str(value))
     except (InvalidOperation, ValueError):
@@ -329,10 +339,12 @@ def _money(value) -> Optional[Decimal]:
 
 
 def _norm_name(value) -> str:
+    """Chuẩn hóa tên để so sánh: chữ thường, gộp khoảng trắng."""
     return " ".join(str(value or "").lower().split())
 
 
 def _confirmation_error(message: str) -> str:
+    """Dựng JSON báo lỗi cho thao tác BOOK_TICKETS."""
     return _json({"status": "error", "action_type": "BOOK_TICKETS", "message": message})
 
 
@@ -445,7 +457,7 @@ def request_user_confirmation(action_type: str, data: str) -> str:
     return _json({"status": "waiting_for_user", "action_type": "BOOK_TICKETS", "data": _json(confirmed)})
 
 
-# cards
+# thẻ sự kiện
 @tool
 def show_event_cards(event_ids: List[str]) -> str:
     """
@@ -586,7 +598,8 @@ def show_ticket_types(event_id: str) -> str:
 
 
 def _ticket_types_payload(event_id: str) -> str:
-    # fetch event info from event_db
+    """Dựng JSON danh sách suất diễn, trạng thái bán và hạng vé (kèm cờ ghế ngồi/khu đứng) của một sự kiện từ event_db và ticket_db."""
+    # lấy thông tin sự kiện từ event_db
     with event_db().connect() as conn:
         ev_query = text("""
             SELECT id, title, banner_url, thumbnail_url, location_name, city, 
@@ -601,7 +614,7 @@ def _ticket_types_payload(event_id: str) -> str:
                 "message": f"Không tìm thấy thông tin sự kiện '{event_id}'."
             }, ensure_ascii=False)
 
-        # fetch showtimes from event_db
+        # lấy các suất diễn từ event_db
         st_query = text("""
             SELECT id, name, start_time, end_time, sale_start_time, sale_end_time
             FROM event_showtimes
@@ -610,7 +623,7 @@ def _ticket_types_payload(event_id: str) -> str:
         """)
         showtimes_rows = conn.execute(st_query, {"eid": event_id}).fetchall()
 
-    # fetch ticket types from ticket_db
+    # lấy các hạng vé từ ticket_db
     with ticket_db().connect() as conn:
         tt_query = text("""
             SELECT id, showtime_id, name, price, description, ticket_type_status, 
@@ -621,7 +634,7 @@ def _ticket_types_payload(event_id: str) -> str:
         """)
         ticket_rows = conn.execute(tt_query, {"eid": event_id}).fetchall()
 
-        # fetch seat layout from ticket_db
+        # lấy sơ đồ ghế từ ticket_db
         sl_query = text("""
             SELECT id, draft_json, image_url, status
             FROM seat_layouts
@@ -631,7 +644,7 @@ def _ticket_types_payload(event_id: str) -> str:
         """)
         layout_row = conn.execute(sl_query, {"eid": event_id}).fetchone()
 
-    # determine seatmap info & seated vs standing zones
+    # xác định thông tin sơ đồ ghế và khu có ghế ngồi hay khu đứng
     has_seatmap = False
     seatmap_image_url = None
     tier_seated_map = {}
@@ -666,7 +679,7 @@ def _ticket_types_payload(event_id: str) -> str:
 
     now = datetime.now(VN_TZ).replace(tzinfo=None)
     
-    # format all tickets belonging to event for direct access
+    # định dạng toàn bộ vé của sự kiện để truy cập trực tiếp
     all_event_tickets = []
     for t in ticket_rows:
         clean_t_name = t.name.lower().replace(" ", "").replace("-", "")
@@ -689,7 +702,7 @@ def _ticket_types_payload(event_id: str) -> str:
             "area_type": "Ghế ngồi (SEATED)" if is_seated else "Khu đứng / Tự do (STANDING)"
         })
 
-    # process showtimes and associate tickets
+    # xử lý các suất diễn và gắn vé tương ứng
     showtimes_list = []
     if showtimes_rows:
         for st in showtimes_rows:
@@ -698,7 +711,7 @@ def _ticket_types_payload(event_id: str) -> str:
             st_sale_start = to_naive_vn_datetime(st.sale_start_time or ev.sale_start_time)
             st_sale_end = to_naive_vn_datetime(st.sale_end_time or ev.sale_end_time or st.end_time)
             
-            # match tickets belonging to this showtime
+            # khớp các vé thuộc suất diễn này
             st_id_str = str(st.id).strip().lower() if st.id else ""
             matched_tickets = [
                 t for t in ticket_rows 
@@ -707,7 +720,7 @@ def _ticket_types_payload(event_id: str) -> str:
             if not matched_tickets and ticket_rows:
                 matched_tickets = list(ticket_rows)
             
-            # calculate showtime status
+            # tính trạng thái suất diễn
             if st_sale_start and now < st_sale_start:
                 st_status = "UPCOMING"
                 st_label = "Sắp mở bán"
@@ -754,7 +767,7 @@ def _ticket_types_payload(event_id: str) -> str:
                 "tickets": formatted_tickets
             })
     else:
-        # fallback single showtime
+        # dự phòng: một suất diễn duy nhất
         st_start = ev.start_time
         st_end = ev.end_time
         st_sale_start = ev.sale_start_time

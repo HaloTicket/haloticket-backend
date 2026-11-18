@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Set;
 
+/** Thực thể chính sách bán lại vé của sự kiện (bảng {@code resale_policies}), mỗi sự kiện tối đa một bản: biên độ giá, phí dịch vụ, thời gian mở và phạm vi loại vé. Có {@code version} để khóa lạc quan. */
 @Entity
 @Table(name = "resale_policies", uniqueConstraints = @UniqueConstraint(name = "uk_resale_policy_event", columnNames = "event_id"))
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
@@ -28,6 +29,8 @@ public class ResalePolicy {
     @Version private Long version;
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
+    /** Trước khi lưu lần đầu: đặt thời điểm tạo và cập nhật. */
     @PrePersist void onCreate() { createdAt = Instant.now(); updatedAt = createdAt; }
+    /** Trước mỗi lần cập nhật: làm mới thời điểm cập nhật. */
     @PreUpdate void onUpdate() { updatedAt = Instant.now(); }
 }

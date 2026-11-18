@@ -1,7 +1,8 @@
-"""A deterministic stand-in for the model, for tests and for checking the runner without spending quota.
+"""Mô hình giả có tính xác định, dùng cho kiểm thử và để chạy thử bộ chạy mà không tốn hạn mức.
 
-It is NOT a measurement of anything: its answers come from a few keyword lists. Results produced with it must never be
-reported (the runner stamps them llm="fake")."""
+Đây KHÔNG phải là phép đo nào cả: câu trả lời chỉ dựa vào vài danh sách từ khóa. Kết quả sinh ra từ nó không bao giờ được
+báo cáo (bộ chạy đóng dấu llm="fake").
+"""
 import json
 import re
 
@@ -10,6 +11,7 @@ CONTACT = ("inb", "ib ", "kb ", "zalo", "za lô", "f.b")
 
 
 def _find(text: str, words) -> str:
+    """Tìm từ đầu tiên của words xuất hiện trong text (không phân biệt hoa thường); trả về đoạn gốc trong text hoặc chuỗi rỗng."""
     low = text.lower()
     for word in words:
         at = low.find(word)
@@ -19,7 +21,16 @@ def _find(text: str, words) -> str:
 
 
 def respond(stage: str, prompt: str, texts: dict) -> tuple:
-    """(text, model_name) for the stage of the call: flags, verify or direct."""
+    """Trả lời giả cho một bước gọi mô hình.
+
+    Args:
+        stage: bước của lời gọi, một trong flags, verify hoặc direct.
+        prompt: nội dung prompt (bước verify đọc danh sách mã được hỏi từ đây).
+        texts: các văn bản của sự kiện, dùng trường description.
+
+    Returns:
+        (văn bản JSON trả lời, tên mô hình giả).
+    """
     description = texts.get("description", "")
     if stage == "flags":
         flags = []

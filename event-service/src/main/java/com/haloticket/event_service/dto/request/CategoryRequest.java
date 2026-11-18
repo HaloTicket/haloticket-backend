@@ -3,7 +3,7 @@ package com.haloticket.event_service.dto.request;
 import com.haloticket.event_service.enums.CategoryStatus;
 import lombok.Data;
 
-/** What the admin sends to create or change a category. Fields left out keep their value on an update. */
+/** Dữ liệu quản trị viên gửi khi tạo hoặc sửa danh mục. Khi cập nhật, trường nào không gửi thì giữ nguyên giá trị cũ. */
 @Data
 public class CategoryRequest {
     private String name;

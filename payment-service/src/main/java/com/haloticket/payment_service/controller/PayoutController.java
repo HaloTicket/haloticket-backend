@@ -20,6 +20,10 @@ import org.springframework.format.annotation.DateTimeFormat;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * API chi trả {@code /api/payouts}: admin duyệt, từ chối, tranh chấp, ghi nhận chuyển khoản và xem tổng hợp;
+ * ban tổ chức xem số dư, báo giá và gửi yêu cầu chi trả.
+ */
 @RestController
 @RequestMapping("/api/payouts")
 @RequiredArgsConstructor
@@ -31,17 +35,33 @@ public class PayoutController {
     private final PayoutRepository payoutRepository;
     private final EventServiceClient eventServiceClient;
 
-    // admin endpoints
+    // các endpoint dành cho admin
+    /**
+     * Liệt kê các yêu cầu chi trả đang chờ admin xử lý.
+     *
+     * @return danh sách yêu cầu chờ duyệt
+     */
     @GetMapping("/admin/pending")
     public ResponseEntity<List<PayoutResponse>> getPendingPayouts() {
         return ResponseEntity.ok(payoutService.getPendingPayouts());
     }
 
+    /**
+     * Liệt kê mọi yêu cầu chi trả cho admin.
+     *
+     * @return danh sách yêu cầu chi trả
+     */
     @GetMapping("/admin/all")
     public ResponseEntity<List<PayoutResponse>> getAllAdminPayouts() {
         return ResponseEntity.ok(payoutService.getAllAdminPayouts());
     }
 
+    /**
+     * Tổng hợp tài chính nền tảng: doanh thu đã thu, phí nền tảng, tiền đang giữ (từ các đối soát đã xác nhận),
+     * tiền đang xử lý (chờ duyệt, đã duyệt, đang chuyển, cần xác minh, tranh chấp), tiền đã chi và số yêu cầu theo trạng thái.
+     *
+     * @return số liệu tổng hợp, số tiền dạng chuỗi
+     */
     @GetMapping("/admin/summary")
     public ResponseEntity<AdminFinanceSummary> getAdminFinanceSummary() {
         List<PayoutReconciliation> confirmed = reconciliationRepository.findAll().stream()
@@ -62,6 +82,15 @@ public class PayoutController {
                 Long.toString(processing), Long.toString(paid), counts));
     }
 
+    /**
+     * Admin xác minh tài khoản ngân hàng của ban tổ chức bằng mã tham chiếu ngân hàng.
+     *
+     * @param organizerId mã người dùng của ban tổ chức
+     * @param jwt token của admin (ghi nhận người xác minh)
+     * @param body phải có {@code verificationReference}
+     * @return tài khoản đã được đánh dấu xác minh
+     * @throws ResponseStatusException 400 khi thiếu mã tham chiếu, 404 khi chưa có tài khoản
+     */
     @PutMapping("/admin/organizers/{organizerId}/payout-account/verify")
     public ResponseEntity<?> verifyOrganizerPayoutAccount(@PathVariable String organizerId,
             @AuthenticationPrincipal Jwt jwt, @RequestBody Map<String, String> body) {
@@ -80,11 +109,24 @@ public class PayoutController {
         return ResponseEntity.ok(payoutAccountRepository.save(account));
     }
 
+    /**
+     * Admin duyệt một yêu cầu chi trả.
+     *
+     * @param id mã yêu cầu
+     * @return yêu cầu sau khi duyệt
+     */
     @PostMapping("/admin/{id}/approve")
     public ResponseEntity<PayoutResponse> approvePayout(@PathVariable String id) {
         return ResponseEntity.ok(payoutService.approvePayout(id));
     }
 
+    /**
+     * Admin đánh dấu yêu cầu chi trả đang tranh chấp.
+     *
+     * @param id mã yêu cầu
+     * @param body có thể chứa {@code reason}
+     * @return yêu cầu sau cập nhật
+     */
     @PostMapping("/admin/{id}/dispute")
     public ResponseEntity<PayoutResponse> disputePayout(
             @PathVariable String id,
@@ -93,16 +135,37 @@ public class PayoutController {
         return ResponseEntity.ok(payoutService.disputePayout(id, reason));
     }
 
+    /**
+     * Admin mở lại yêu cầu chi trả đã bị tranh chấp hoặc từ chối.
+     *
+     * @param id mã yêu cầu
+     * @return yêu cầu sau cập nhật
+     */
     @PostMapping("/admin/{id}/reopen")
     public ResponseEntity<PayoutResponse> reopenPayout(@PathVariable String id) {
         return ResponseEntity.ok(payoutService.reopenPayout(id));
     }
 
+    /**
+     * Admin từ chối yêu cầu chi trả.
+     *
+     * @param id mã yêu cầu
+     * @param body có thể chứa {@code reason}
+     * @return yêu cầu sau cập nhật
+     */
     @PostMapping("/admin/{id}/reject")
     public ResponseEntity<PayoutResponse> rejectPayout(@PathVariable String id, @RequestBody(required = false) Map<String, String> body) {
         return ResponseEntity.ok(payoutService.rejectPayout(id, body == null ? null : body.get("reason")));
     }
 
+    /**
+     * Chi tiết một yêu cầu chi trả cho admin: tên sự kiện, ảnh chụp tài khoản nhận, trạng thái xác minh tài khoản,
+     * các thao tác được phép theo trạng thái và dòng thời gian.
+     *
+     * @param id mã yêu cầu
+     * @return chi tiết yêu cầu
+     * @throws ResponseStatusException HTTP 404 khi không có yêu cầu
+     */
     @GetMapping("/admin/{id}")
     public ResponseEntity<AdminPayoutDetail> getAdminDetail(@PathVariable String id) {
         var payout = payoutRepository.findById(id).orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND));
@@ -128,11 +191,25 @@ public class PayoutController {
                 payoutResponse.getReservedAmountSnapshot()));
     }
 
+    /**
+     * Admin bắt đầu quá trình chuyển tiền cho yêu cầu đã duyệt.
+     *
+     * @param id mã yêu cầu
+     * @return yêu cầu sau cập nhật
+     */
     @PostMapping("/admin/{id}/start")
     public ResponseEntity<PayoutResponse> startDisbursement(@PathVariable String id) {
         return ResponseEntity.ok(payoutService.startDisbursement(id));
     }
 
+    /**
+     * Admin ghi nhận đã chuyển tiền: mã tham chiếu, biên lai và thời điểm chuyển ({@code transferredAt} có thể kèm hoặc không kèm offset).
+     *
+     * @param id mã yêu cầu
+     * @param body gồm {@code reference}, {@code receiptUrl}, {@code transferredAt}
+     * @return yêu cầu sau khi hoàn tất
+     * @throws ResponseStatusException HTTP 400 khi {@code transferredAt} sai định dạng
+     */
     @PostMapping("/admin/{id}/complete")
     public ResponseEntity<PayoutResponse> completeDisbursement(@PathVariable String id, @RequestBody Map<String, String> body) {
         java.time.LocalDateTime transferredAt = null;
@@ -148,7 +225,14 @@ public class PayoutController {
                 transferredAt, body == null ? null : body.get("receiptUrl")));
     }
 
-    // organizer endpoints
+    // các endpoint dành cho ban tổ chức
+    /**
+     * Liệt kê các yêu cầu chi trả của ban tổ chức đang đăng nhập.
+     *
+     * @param authorization header Authorization
+     * @param jwt token đang xác thực
+     * @return danh sách yêu cầu
+     */
     @GetMapping("/organizer")
     public ResponseEntity<List<PayoutResponse>> getOrganizerPayouts(@RequestHeader("Authorization") String authorization,
                                                                      @AuthenticationPrincipal Jwt jwt) {
@@ -156,11 +240,18 @@ public class PayoutController {
         return ResponseEntity.ok(payoutService.getOrganizerPayouts(organizerId));
     }
 
+    /**
+     * Chi tiết một yêu cầu chi trả của ban tổ chức, bổ sung tên và giờ kết thúc sự kiện khi event-service trả lời được.
+     *
+     * @param authorization header Authorization
+     * @param id mã yêu cầu
+     * @return chi tiết yêu cầu
+     */
     @GetMapping("/organizer/{id}")
     public ResponseEntity<PayoutResponse> getOrganizerDetail(@RequestHeader("Authorization") String authorization, @PathVariable String id) {
         var response = payoutService.getOrganizerPayout(payoutService.resolveOrganizerId(authorization), id);
-        // Event-name enrichment is ancillary: an event-service outage must not hide an
-        // otherwise-owned payout request and its persisted status/amount/account snapshot.
+        // Bổ sung tên sự kiện chỉ là phần phụ: event-service gặp sự cố không được làm ẩn
+        // yêu cầu chi trả hợp lệ của ban tổ chức cùng trạng thái, số tiền và ảnh chụp tài khoản đã lưu.
         try {
             var events = eventServiceClient.getMyEvents(authorization);
             if (events != null) events.stream()
@@ -176,22 +267,55 @@ public class PayoutController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Ban tổ chức hủy yêu cầu chi trả của mình.
+     *
+     * @param jwt token đang xác thực
+     * @param authorization header Authorization
+     * @param id mã yêu cầu
+     * @return yêu cầu sau khi hủy
+     */
     @PostMapping("/organizer/{id}/cancel")
     public ResponseEntity<PayoutResponse> cancelOrganizerPayout(@AuthenticationPrincipal Jwt jwt, @RequestHeader("Authorization") String authorization, @PathVariable String id) {
         return ResponseEntity.ok(payoutService.cancelPayout(payoutService.resolveOrganizerId(authorization), id));
     }
 
+    /**
+     * Tìm yêu cầu chi trả theo khóa idempotency mà ban tổ chức đã gửi.
+     *
+     * @param jwt token đang xác thực
+     * @param authorization header Authorization
+     * @param key khóa idempotency
+     * @return yêu cầu tương ứng
+     */
     @GetMapping("/organizer/requests/by-key/{key}")
     public ResponseEntity<PayoutResponse> getByIdempotencyKey(@AuthenticationPrincipal Jwt jwt, @RequestHeader("Authorization") String authorization, @PathVariable String key) {
         return ResponseEntity.ok(payoutService.getByIdempotencyKey(payoutService.resolveOrganizerId(authorization), key));
     }
 
+    /**
+     * Tổng hợp tài chính của ban tổ chức: đã thu, phí, hoàn tiền, đang giữ, khả dụng, đang xử lý, đã chi và từng sự kiện.
+     *
+     * @param authorization header Authorization
+     * @param jwt token đang xác thực
+     * @return số liệu tài chính
+     */
     @GetMapping("/organizer/summary")
     public ResponseEntity<com.haloticket.payment_service.dto.response.OrganizerFinanceResponse> getSummary(
             @RequestHeader("Authorization") String authorization, @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(payoutService.getOrganizerFinance(payoutService.resolveOrganizerId(authorization), authorization));
     }
 
+    /**
+     * Dòng tiền theo ngày của ban tổ chức. Mặc định 30 ngày gần nhất tính đến hôm nay; thiếu một đầu thì suy ra từ đầu còn lại.
+     *
+     * @param authorization header Authorization
+     * @param jwt token đang xác thực
+     * @param from ngày bắt đầu, tùy chọn
+     * @param to ngày kết thúc, tùy chọn
+     * @param eventId lọc theo sự kiện, tùy chọn
+     * @return chuỗi dòng tiền theo ngày
+     */
     @GetMapping("/organizer/analytics")
     public ResponseEntity<com.haloticket.payment_service.dto.response.OrganizerCashFlowResponse> getOrganizerAnalytics(
             @RequestHeader("Authorization") String authorization, @AuthenticationPrincipal Jwt jwt,
@@ -210,17 +334,42 @@ public class PayoutController {
         return ResponseEntity.ok(payoutService.getOrganizerAnalytics(payoutService.resolveOrganizerId(authorization), authorization, from, to, eventId));
     }
 
-    // Preserves direct Java callers while the optional query parameter remains backward compatible over HTTP.
+    // Giữ tương thích cho nơi gọi trực tiếp trong Java, còn tham số truy vấn tùy chọn vẫn tương thích ngược qua HTTP.
+    /**
+     * Phiên bản không có {@code eventId} (không lọc theo sự kiện), giữ cho nơi gọi trực tiếp trong Java.
+     *
+     * @param authorization header Authorization
+     * @param jwt token đang xác thực
+     * @param from ngày bắt đầu
+     * @param to ngày kết thúc
+     * @return chuỗi dòng tiền theo ngày
+     */
     public ResponseEntity<com.haloticket.payment_service.dto.response.OrganizerCashFlowResponse> getOrganizerAnalytics(
             String authorization, Jwt jwt, java.time.LocalDate from, java.time.LocalDate to) {
         return getOrganizerAnalytics(authorization, jwt, from, to, null);
     }
 
+    /**
+     * Liệt kê tình hình tài chính từng sự kiện của ban tổ chức.
+     *
+     * @param authorization header Authorization
+     * @param jwt token đang xác thực
+     * @return danh sách sự kiện kèm số liệu
+     */
     @GetMapping("/organizer/events")
     public ResponseEntity<?> getOrganizerEvents(@RequestHeader("Authorization") String authorization, @AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(payoutService.getOrganizerFinance(payoutService.resolveOrganizerId(authorization), authorization).getItems());
     }
 
+    /**
+     * Liệt kê các sự kiện đủ điều kiện yêu cầu chi trả; hiện chỉ hỗ trợ loại {@code FINAL_SETTLEMENT}.
+     *
+     * @param authorization header Authorization
+     * @param jwt token đang xác thực
+     * @param type loại chi trả
+     * @return danh sách sự kiện đủ điều kiện
+     * @throws ResponseStatusException HTTP 400 khi loại không được hỗ trợ
+     */
     @GetMapping("/organizer/eligible-events")
     public ResponseEntity<?> getEligibleEvents(@RequestHeader("Authorization") String authorization, @AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "FINAL_SETTLEMENT") String type) {
@@ -230,6 +379,14 @@ public class PayoutController {
                 .filter(item -> item.getEligibility().isEligible()).toList());
     }
 
+    /**
+     * Gửi yêu cầu chi trả. Header {@code Idempotency-Key} giúp tránh tạo trùng khi gửi lại.
+     *
+     * @param authorization header Authorization
+     * @param idempotencyKey khóa idempotency, tùy chọn
+     * @param request nội dung yêu cầu
+     * @return yêu cầu vừa tạo
+     */
     @PostMapping("/organizer/request")
     public ResponseEntity<PayoutResponse> requestPayout(
             @RequestHeader("Authorization") String authorization,
@@ -238,6 +395,13 @@ public class PayoutController {
         return ResponseEntity.ok(payoutService.requestPayout(payoutService.resolveOrganizerId(authorization), authorization, request, idempotencyKey));
     }
 
+    /**
+     * Báo giá một lần chi trả: số tiền khả dụng, phí và số tiền dự kiến nhận.
+     *
+     * @param authorization header Authorization
+     * @param request sự kiện, loại và số tiền yêu cầu
+     * @return báo giá
+     */
     @PostMapping("/organizer/quote")
     public ResponseEntity<com.haloticket.payment_service.dto.response.PayoutQuoteResponse> quote(
             @RequestHeader("Authorization") String authorization, @RequestBody QuoteRequest request) {
@@ -245,7 +409,9 @@ public class PayoutController {
     }
 
 
+    /** Nội dung yêu cầu báo giá: sự kiện, loại chi trả và số tiền yêu cầu. */
     public record QuoteRequest(String eventId, String type, Long requestedAmount) {}
+    /** Chi tiết yêu cầu chi trả cho admin, gồm số tiền, ảnh chụp tài khoản, các thao tác được phép, dòng thời gian và các ảnh chụp chính sách. */
     public record AdminPayoutDetail(String id, String eventId, String eventName, String organizerUserId,
             com.haloticket.payment_service.enums.PayoutStatus status, String requestType, Double grossAmount,
             Double platformFee, Double netAmount, AccountSnapshot accountSnapshot, Boolean accountVerified,
@@ -254,8 +420,10 @@ public class PayoutController {
             List<PayoutResponse.TimelineEntry> timeline, Integer advanceRateSnapshot, Long policyVersionSnapshot,
             String policyScopeSnapshot, String availableAmountSnapshot, String advanceBaseSnapshot,
             String advanceLimitSnapshot, String paidAmountSnapshot, String reservedAmountSnapshot) {}
+    /** Ảnh chụp tài khoản nhận tiền tại thời điểm yêu cầu: chủ tài khoản, số tài khoản, ngân hàng. */
     public record AccountSnapshot(String accountHolder, String accountNumber, String bankName) {}
 
+    /** Tổng hợp tài chính nền tảng cho admin: số tiền dạng chuỗi và số yêu cầu theo trạng thái. */
     public record AdminFinanceSummary(String collectedRevenue, String platformFees, String heldAmount,
             String processingAmount, String paidAmount, Map<String, Long> countsByStatus) {}
 }

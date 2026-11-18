@@ -8,6 +8,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/** Thông tin một mẫu thông báo trả về cho client. */
 @Data
 @Builder
 public class NotificationTemplateResponse {

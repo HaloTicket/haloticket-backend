@@ -24,6 +24,10 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+/**
+ * API quản trị để phát lại sự kiện {@code BOOKING_CONFIRMED} lên Kafka cho đơn đã thanh toán,
+ * dùng khi ticket-service chưa phát hành vé. Chỉ vai trò ADMIN được gọi.
+ */
 @RestController
 @RequestMapping("/api/bookings/admin")
 @RequiredArgsConstructor
@@ -37,6 +41,17 @@ public class AdminBookingController {
     private final KafkaTemplate<String, String> kafkaTemplate;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Phát lại sự kiện xác nhận đơn lên topic {@code haloticket.booking.confirmed.v1}.
+     * Ưu tiên payload gốc trong outbox; nếu không có hoặc lỗi parse thì dựng lại từ đơn hàng.
+     * Mặc định chạy thử ({@code dryRun=true}), chỉ trả payload mà không gửi Kafka.
+     * @param bookingId mã đơn cần phát lại
+     * @param dryRun {@code true} để chỉ xem trước, {@code false} để gửi thật
+     * @param jwt token của quản trị viên, dùng ghi nhật ký kiểm toán
+     * @return payload, trạng thái đơn và thông báo kết quả
+     * @throws NoSuchElementException khi không tìm thấy đơn
+     * @throws IllegalStateException khi đơn chưa ở trạng thái PAID hoặc CONFIRMED
+     */
     @PostMapping("/{bookingId}/republish-confirmed")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> republishConfirmed(
@@ -99,6 +114,12 @@ public class AdminBookingController {
         }
     }
 
+    /**
+     * Dựng lại payload {@code BOOKING_CONFIRMED} từ dữ liệu đơn, ghế đã giữ và thông tin sự kiện
+     * (lấy từ event-service; nếu lỗi thì bỏ qua các trường sự kiện).
+     * @param booking đơn hàng cần dựng payload
+     * @return payload dạng map giữ nguyên thứ tự trường
+     */
     private Map<String, Object> reconstructPayload(Booking booking) {
         Map<String, Object> payloadMap = new LinkedHashMap<>();
         payloadMap.put("bookingId", booking.getId());

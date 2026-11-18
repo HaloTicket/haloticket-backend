@@ -29,14 +29,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The short database transactions of event saving. A separate bean so that {@link Transactional} really applies (the
- * orchestrating EventServiceImpl is not transactional and calls ticket-service only after this transaction has committed).
+ * Các giao dịch cơ sở dữ liệu ngắn khi lưu sự kiện. Là bean riêng để {@link Transactional} thật sự có hiệu lực ({@code EventServiceImpl}
+ * điều phối nhưng không dùng transaction, và chỉ gọi ticket-service sau khi giao dịch này đã commit).
  */
 @Component
 @RequiredArgsConstructor
 public class EventCatalogWriter {
 
-    /** The saved event and the approval status it had before this save. */
+    /** Sự kiện đã lưu và trạng thái duyệt mà nó có trước lần lưu này. */
     public record Saved(Event event, EventApprovalStatus oldApprovalStatus) {}
 
     private final EventRepository eventRepository;
@@ -45,12 +45,20 @@ public class EventCatalogWriter {
     private final EventPermissions eventPermissions;
     private final ObjectMapper objectMapper;
 
-    /** Who may change an event: OWNER or ADMIN of the event (ACTIVE assignment) or a platform admin. */
+    /** Ai được sửa sự kiện: OWNER hoặc ADMIN của sự kiện (phân công ACTIVE) hoặc admin nền tảng. */
     private boolean mayEdit(Event event, String userId) {
         return eventPermissions.forUser(userId, event.getId(), EventAccessService.isPlatformAdmin())
                 .has(Permission.EVENT_EDIT);
     }
 
+    /**
+     * Tạo mới hoặc cập nhật sự kiện trong một giao dịch: hồ sơ nhà tổ chức, phân công OWNER cho người tạo, danh mục, thông tin cơ bản, ảnh, suất diễn, bản chụp vé, giá thấp nhất, câu hỏi tùy chỉnh và trạng thái duyệt. Sự kiện đã duyệt khi sửa sẽ chuyển sang {@code UPDATE_PENDING} (hoặc {@code DRAFT} nếu lưu nháp); sự kiện mới hoặc chưa duyệt chuyển {@code PENDING} hay {@code DRAFT} theo {@code status}.
+     * @param request dữ liệu sự kiện; có {@code eventId} thì là cập nhật
+     * @param uid id người dùng thực hiện
+     * @return sự kiện đã lưu cùng trạng thái duyệt trước đó
+     * @throws ResponseStatusException 404 {@code EVENT_NOT_FOUND}, 403 {@code EVENT_OWNERSHIP_REQUIRED} khi không có quyền sửa
+     * @throws IllegalArgumentException khi thời gian kết thúc không sau thời gian bắt đầu
+     */
     @Transactional
     public Saved save(EventCreateRequest request, String uid) {
         Event eventToSave;
@@ -64,7 +72,7 @@ public class EventCatalogWriter {
             eventToSave = new Event();
         }
 
-        // create or update Organizer profile
+        // tạo mới hoặc cập nhật hồ sơ nhà tổ chức
         List<EventOrganizer> organizers = new ArrayList<>();
         EventOrganizer organizer = eventOrganizerRepository
                 .findFirstByUserIdOrderByCreatedAtDesc(uid)
@@ -87,7 +95,7 @@ public class EventCatalogWriter {
         organizer = eventOrganizerRepository.save(organizer);
         organizers.add(organizer);
 
-        // auto create OWNER StaffAssignment, in the same save as the event
+        // tự tạo phân công OWNER cho người tạo, trong cùng lần lưu với sự kiện
         if (eventToSave.getId() == null) {
             StaffAssignment staff = StaffAssignment.builder()
                     .event(eventToSave)
@@ -102,7 +110,7 @@ public class EventCatalogWriter {
             eventToSave.getStaffAssignments().add(staff);
         }
 
-        // find category
+        // tìm danh mục
         EventCategory category = null;
         if (request.getCategoryId() != null) {
             category = eventCategoryRepository.findById(request.getCategoryId()).orElse(null);
@@ -166,7 +174,7 @@ public class EventCatalogWriter {
                 if (stReq.getId() != null && existingShowtimes.containsKey(stReq.getId())) {
                     st = existingShowtimes.get(stReq.getId());
                 } else {
-                    // fallback to name matching
+                    // không khớp id thì dự phòng so khớp theo tên
                     for (EventShowtime existing : existingShowtimes.values()) {
                         if (existing.getName() != null && existing.getName().equals(stReq.getName())) {
                             st = existing;
@@ -270,7 +278,7 @@ public class EventCatalogWriter {
         if (flatShowtimeTickets) {
             stampShowtimeIds(saved, request);
         }
-        // everything the response needs is read now: the response is built after this transaction has ended
+        // đọc sẵn mọi dữ liệu response cần: response được dựng sau khi giao dịch này đã kết thúc
         if (saved.getShowtimes() != null) saved.getShowtimes().size();
         if (saved.getGalleryImages() != null) saved.getGalleryImages().size();
         if (saved.getOrganizers() != null) saved.getOrganizers().size();
@@ -278,8 +286,8 @@ public class EventCatalogWriter {
     }
 
     /**
-     * The snapshot of showtime-specific tickets is a flat list; each ticket now also carries its showtime id so that a resync
-     * can send every showtime its own tickets.
+     * Bản chụp vé riêng của từng suất diễn là một danh sách phẳng; mỗi vé nay mang thêm id suất diễn để lần đồng bộ lại có thể
+     * gửi cho mỗi suất đúng vé của nó. Suất được xác định bằng cách so tên với các suất đã lưu.
      */
     private void stampShowtimeIds(Event saved, EventCreateRequest request) {
         if (saved.getShowtimes() == null) return;
@@ -306,7 +314,13 @@ public class EventCatalogWriter {
         }
     }
 
-    /** Short transaction: records the outcome of a ticket sync on the event. */
+    /**
+     * Giao dịch ngắn ghi kết quả đồng bộ vé lên sự kiện. Thành công thì xóa lỗi và ghi thời điểm đồng bộ; thất bại thì lưu mã lỗi (cắt 64 ký tự).
+     *
+     * @param eventId id sự kiện; không tồn tại thì không làm gì
+     * @param status kết quả đồng bộ
+     * @param error mã lỗi khi thất bại, có thể null
+     */
     @Transactional
     public void markSync(String eventId, TicketSyncStatus status, String error) {
         eventRepository.findById(eventId).ifPresent(event -> {
@@ -317,6 +331,7 @@ public class EventCatalogWriter {
         });
     }
 
+    /** Cắt chuỗi còn tối đa 64 ký tự; null giữ nguyên. */
     private static String truncate(String s) {
         return s == null || s.length() <= 64 ? s : s.substring(0, 64);
     }

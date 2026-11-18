@@ -29,6 +29,10 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
+/**
+ * Lắng nghe các sự kiện Kafka của saga đặt vé, marketplace, thanh toán và sự kiện để tạo thông báo trong ứng dụng
+ * (chuông, STOMP) và gửi email tương ứng.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -50,6 +54,13 @@ public class SagaNotificationListener {
     @Value("${notification.frontend-base-url:http://localhost:5173}")
     private String frontendBaseUrl;
 
+    /**
+     * Xử lý lô vé đã phát hành: lưu thông báo trong ứng dụng rồi gửi email xác nhận đơn.
+     * Bỏ qua lô thiếu mã đặt chỗ, email khách hoặc danh sách vé; thông báo đã {@code SENT} thì không gửi lại.
+     *
+     * @param payload JSON sự kiện {@code TICKETS_ISSUED}
+     * @throws IllegalStateException khi thiếu mẫu hoạt động hoặc xử lý lỗi (để Kafka thử lại)
+     */
     @KafkaListener(topics = "haloticket.tickets.issued.v1", groupId = "notification-service-saga")
     public void handleTicketsIssuedNotification(String payload) {
         try {
@@ -71,7 +82,7 @@ public class SagaNotificationListener {
             NotificationEvent event = new NotificationEvent("order-confirmation:" + bookingId,
                     template.getId(), node.path("customerId").asText(""), customerEmail,
                     NotificationChannel.EMAIL, vars, null);
-            // the bell entry names the order and links to it (the web reads bookingCode from the variables)
+            // thông báo trong chuông ghi tên đơn và dẫn tới đơn (web đọc bookingCode từ biến)
             var notification = notificationService.processEvent(event, "TICKETS_ISSUED", "Vé của bạn đã sẵn sàng",
                     "Đơn " + bookingCode + " (" + vars.get("eventTitle") + "): " + vars.get("ticketCount")
                             + " đã được phát hành. Nhấn để xem vé.");
@@ -85,6 +96,13 @@ public class SagaNotificationListener {
         }
     }
 
+    /**
+     * Dựng biến cho email xác nhận đơn: tên khách, mã đơn, sự kiện, số vé, tổng tiền, đường dẫn đơn và các dòng vé HTML.
+     *
+     * @param node JSON sự kiện phát hành vé
+     * @param tickets mảng vé trong sự kiện
+     * @return biến thay thế cho mẫu {@code order-confirmation.html}
+     */
     private Map<String, String> orderVariables(JsonNode node, JsonNode tickets) {
         Map<String, String> vars = new HashMap<>();
         String name = node.path("customerName").asText("");
@@ -115,12 +133,25 @@ public class SagaNotificationListener {
         return vars;
     }
 
+    /**
+     * Nối một phần thông tin chỗ ngồi (khu, hàng, ghế) vào chuỗi, ngăn cách bằng dấu chấm giữa; bỏ qua giá trị rỗng.
+     *
+     * @param seat bộ đệm chuỗi chỗ ngồi
+     * @param label nhãn hiển thị, ví dụ "Hàng "
+     * @param value giá trị, được escape HTML
+     */
     private static void appendSeatPart(StringBuilder seat, String label, String value) {
         if (value.isBlank()) return;
         if (!seat.isEmpty()) seat.append(" · ");
         seat.append(label).append(escapeHtml(value));
     }
 
+    /**
+     * Định dạng số tiền theo kiểu Việt Nam kèm ký hiệu ₫.
+     *
+     * @param amount nút JSON số tiền
+     * @return chuỗi đã định dạng, hoặc dấu gạch nếu không phải số
+     */
     private static String formatAmount(JsonNode amount) {
         if (!amount.isNumber()) return "—";
         DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(Locale.forLanguageTag("vi-VN"));
@@ -128,10 +159,22 @@ public class SagaNotificationListener {
         return format.format(amount.decimalValue()) + " ₫";
     }
 
+    /**
+     * Escape HTML cho giá trị do người dùng nhập, dùng chung bộ escape của {@code EmailTemplateRenderer}.
+     *
+     * @param value giá trị gốc
+     * @return chuỗi đã escape
+     */
     private static String escapeHtml(String value) {
         return EmailTemplateRenderer.escape(value);
     }
 
+    /**
+     * Xử lý lời mời nhận vé tặng: lưu thông báo trong ứng dụng cho người nhận, rồi gửi email lời mời (cố gắng hết sức,
+     * lỗi email không ảnh hưởng thông báo đã lưu). Bỏ qua sự kiện thiếu email hoặc token.
+     *
+     * @param payload JSON sự kiện mời tặng vé
+     */
     @KafkaListener(topics = "haloticket.marketplace.gift.invited.v1", groupId = "notification-service-marketplace")
     public void handleGiftInvitation(String payload) {
         try {
@@ -141,12 +184,12 @@ public class SagaNotificationListener {
             String sagaId = node.path("sagaId").asText();
             String recipientUserId = node.path("recipientUserId").asText();
             if (email.isBlank() || token.isBlank()) {
-                // the payload holds the invitation token; log only which saga it belongs to
+                // payload chứa token mời; chỉ ghi log saga tương ứng
                 log.error("Gift invitation missing email or token, skipping saga {}", sagaId);
                 return;
             }
 
-            // 1. save notification to DB + broadcast via STOMP (most important)
+            // 1. lưu thông báo vào DB và phát qua STOMP (quan trọng nhất)
             try {
                 notificationService.publishDirectNotification(recipientUserId, "GIFT_INVITATION",
                         "Lời mời tặng vé", "Bạn có lời mời nhận vé. Mã lời mời: " + sagaId);
@@ -155,7 +198,7 @@ public class SagaNotificationListener {
                 log.error("Failed to save gift notification for saga {}", sagaId, notifError);
             }
 
-            // 2. send beautiful HTML email (best-effort, failure does not block notification)
+            // 2. gửi email HTML (cố gắng hết sức, lỗi không ảnh hưởng thông báo đã lưu)
             try {
                 String link = giftAcceptBaseUrl + "?sagaId=" + URLEncoder.encode(sagaId, StandardCharsets.UTF_8)
                         + "&token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
@@ -191,7 +234,7 @@ public class SagaNotificationListener {
                             + escapeHtml(giftMessage) + "\"</p></div>";
                 }
 
-                // format expiresAt nicely (e.g. 15:30 ngày 20/09/2026)
+                // định dạng expiresAt dễ đọc (ví dụ 15:30 ngày 20/09/2026)
                 String expiresAtRaw = node.path("expiresAt").asText("");
                 String expiresAtFormatted = expiresAtRaw;
                 try {
@@ -229,16 +272,31 @@ public class SagaNotificationListener {
         }
     }
 
+    /**
+     * Phát thông báo khi việc tặng vé hoàn tất và quyền sở hữu vé đã chuyển.
+     *
+     * @param payload JSON sự kiện tặng vé thành công
+     */
     @KafkaListener(topics = "haloticket.marketplace.gift.completed.v1", groupId = "notification-service-marketplace")
     public void handleGiftCompleted(String payload) {
         publishMarketplaceNotification(payload, "GIFT_COMPLETED", "Tặng vé thành công", "Vé đã được chuyển quyền sở hữu thành công.");
     }
 
+    /**
+     * Phát thông báo khi lời mời tặng vé bị hủy hoặc hết hạn.
+     *
+     * @param payload JSON sự kiện hủy tặng vé
+     */
     @KafkaListener(topics = "haloticket.marketplace.gift.cancelled.v1", groupId = "notification-service-marketplace")
     public void handleGiftCancelled(String payload) {
         publishMarketplaceNotification(payload, "GIFT_CANCELLED", "Tặng vé đã hủy", "Lời mời tặng vé đã được hủy hoặc hết hạn.");
     }
 
+    /**
+     * Phát thông báo kết quả đăng bán lại vé: thành công hoặc thất bại, dựa vào trường {@code status} của sự kiện.
+     *
+     * @param payload JSON sự kiện listing
+     */
     @KafkaListener(topics = {"haloticket.marketplace.listing.activated.v1", "haloticket.marketplace.listing.failed.v1"}, groupId = "notification-service-marketplace")
     public void handleResaleListing(String payload) {
         JsonNode node;
@@ -249,17 +307,40 @@ public class SagaNotificationListener {
         publishMarketplaceNotification(node, eventType, title, message);
     }
 
+    /**
+     * Phân tích JSON rồi phát thông báo marketplace.
+     *
+     * @param payload JSON sự kiện
+     * @param type loại thông báo
+     * @param title tiêu đề
+     * @param message nội dung
+     * @throws IllegalStateException khi JSON không hợp lệ
+     */
     private void publishMarketplaceNotification(String payload, String type, String title, String message) {
         try { publishMarketplaceNotification(objectMapper.readTree(payload), type, title, message); }
         catch (Exception exception) { throw new IllegalStateException("Invalid marketplace notification payload", exception); }
     }
 
+    /**
+     * Phát thông báo trực tiếp cho người nhận: ưu tiên {@code recipientEmail}, nếu không có thì dùng {@code sellerId}; bỏ qua khi không xác định được người nhận.
+     *
+     * @param node JSON sự kiện
+     * @param type loại thông báo
+     * @param title tiêu đề
+     * @param message nội dung
+     */
     private void publishMarketplaceNotification(JsonNode node, String type, String title, String message) {
         String recipient = node.hasNonNull("recipientEmail") ? node.get("recipientEmail").asText() : node.path("sellerId").asText(null);
         if (recipient == null || recipient.isBlank()) return;
         notificationService.publishDirectNotification(recipient, type, title, message);
     }
 
+    /**
+     * Gửi email mời tham gia ban tổ chức sự kiện. Có token thì dẫn tới trang chấp nhận lời mời, không có thì dẫn tới trang quản trị sự kiện;
+     * không bao giờ gửi mật khẩu trong email.
+     *
+     * @param payloadStr JSON gồm email, tên, sự kiện, vai trò, cờ {@code isNewUser} và {@code invitationToken}
+     */
     @KafkaListener(topics = "notification.event.member.invitation", groupId = "notification-service-saga")
     public void onEventMemberInvitation(String payloadStr) {
         try {
@@ -273,7 +354,7 @@ public class SagaNotificationListener {
             String token = payload.get("invitationToken") instanceof String value && !value.isBlank() ? value : null;
             String setPasswordUrl = base + "/forgot-password";
 
-            // everything a person typed (names, event title) goes into the mail escaped, never as markup
+            // mọi nội dung người dùng nhập (tên, tiêu đề sự kiện) được escape khi đưa vào email, không bao giờ là mã HTML
             Map<String, String> variables = new HashMap<>();
             variables.put("name", String.valueOf(payload.get("name")));
             variables.put("eventTitle", String.valueOf(payload.get("eventTitle")));
@@ -286,7 +367,7 @@ public class SagaNotificationListener {
             else if ("CHECKIN_STAFF".equals(role)) roleDisplayName = "Nhân viên Check-in";
             variables.put("role", String.valueOf(roleDisplayName));
 
-            // no password is ever sent: a person without a password sets one with the code mailed by "forgot password"
+            // không bao giờ gửi mật khẩu: người chưa có mật khẩu sẽ đặt bằng mã xác nhận gửi qua chức năng quên mật khẩu
             boolean isNewUser = Boolean.TRUE.equals(payload.get("isNewUser"));
             String setPasswordBlock = "<div style=\"margin-top:20px;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid #e3eaf4;\">\n" +
                     "    <p style=\"margin:0 0 8px;\">Chưa có mật khẩu? Hãy thiết lập mật khẩu cho tài khoản này: chúng tôi sẽ gửi mã xác nhận đến chính email này.</p>\n" +
@@ -308,10 +389,10 @@ public class SagaNotificationListener {
                 variables.put("expiryNote", "");
             }
 
-            // process template
+            // dựng nội dung từ mẫu
             String htmlContent = templateRenderer.render("event-member-invitation.html", variables);
 
-            // send email
+            // gửi email
             jakarta.mail.internet.MimeMessage message = mailSender.createMimeMessage();
             org.springframework.mail.javamail.MimeMessageHelper helper = new org.springframework.mail.javamail.MimeMessageHelper(message, true, "UTF-8");
 
@@ -326,10 +407,22 @@ public class SagaNotificationListener {
         }
     }
 
+    /**
+     * Mã hóa giá trị để đặt vào một đoạn đường dẫn URL (dấu cách thành {@code %20}).
+     *
+     * @param value giá trị gốc
+     * @return đoạn URL đã mã hóa
+     */
     private static String urlSegment(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
+    /**
+     * Phát thông báo trực tiếp từ các topic thanh toán, rút tiền, sự kiện được duyệt hoặc bị từ chối.
+     * Người nhận lấy từ {@code recipientUserId}, nếu thiếu thì dùng {@code userId}; bỏ qua khi thiếu người nhận hoặc loại.
+     *
+     * @param payload JSON gồm người nhận, loại, tiêu đề, nội dung và biến (tùy chọn)
+     */
     @KafkaListener(topics = {
             "haloticket.payout.requested.v1",
             "haloticket.payout.approved.v1",

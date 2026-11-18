@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+/** Cài đặt nghiệp vụ đặt vé: kiểm tra đơn, giữ ghế và tồn kho, tính tiền và voucher, lưu đơn kèm sự kiện outbox, và tra cứu đơn. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -64,25 +65,33 @@ public class BookingServiceImpl implements BookingService {
     private final OrderLimitValidator orderLimitValidator;
     private final OrderShapeValidator orderShapeValidator;
 
+    /**
+     * Tạo đơn đặt vé: kiểm tra hình dạng và giới hạn số vé, kiểm tra thời gian mở bán của suất chiếu, kiểm tra ghế trong Redis (có khóa phân tán Redisson),
+     * tính tiền và áp voucher, lưu đơn {@code PENDING} hết hạn sau 15 phút, giữ tồn kho vé vào cổng tự do, giữ ghế trong Redis và ghi sự kiện outbox {@code BOOKING_CREATED}.
+     * @param request thông tin đơn cần tạo
+     * @return đơn vừa tạo
+     * @throws IllegalArgumentException khi ghế đã bị người khác giữ
+     * @throws RuntimeException khi suất chiếu chưa mở bán hoặc đã hết hạn bán, không lấy được khóa, hoặc bị gián đoạn
+     */
     @Override
     @Transactional
     public BookingResponse createBooking(BookingCreateRequest request) {
         String eventId = request.getEventId();
-        // 422 INVALID_ORDER_ITEMS / DUPLICATE_SEAT_IDS / SEAT_COUNT_EXCEEDS_QUANTITY / SEAT_COUNT_MISMATCH: an order that
-        // could not be issued after payment is refused before anything is held
+        // 422 INVALID_ORDER_ITEMS / DUPLICATE_SEAT_IDS / SEAT_COUNT_EXCEEDS_QUANTITY / SEAT_COUNT_MISMATCH: đơn không thể phát hành vé
+        // sau thanh toán thì bị từ chối trước khi giữ bất cứ thứ gì
         orderShapeValidator.validate(request);
-        // general-admission lines are held as stock in ticket-service; the rest goes through the per-seat flow
+        // dòng vé vào cổng tự do được giữ theo tồn kho ở ticket-service; phần còn lại đi theo luồng từng ghế
         GaReservationService.Plan gaPlan = gaReservationService.plan(request);
         List<String> seatIds = gaPlan.seatIds();
-        // 422 QUANTITY_OUT_OF_RANGE when the quantity of a ticket type is below minPerOrder or above maxPerOrder
+        // 422 QUANTITY_OUT_OF_RANGE khi số lượng của một loại vé nhỏ hơn minPerOrder hoặc lớn hơn maxPerOrder
         orderLimitValidator.validate(request);
 
-        // 1. acquire Redisson Distributed Lock for Event
+        // 1. lấy khóa phân tán Redisson theo sự kiện
         String lockKey = "lock:event:" + eventId + ":booking";
         RLock lock = redissonClient.getLock(lockKey);
 
         try {
-            // validate showtime sale time
+            // kiểm tra thời gian mở bán của suất chiếu
             if (request.getShowtimeId() != null) {
                 EventResponse eventResp = eventServiceClient.getEventById(eventId);
                 if (eventResp != null && eventResp.getShowtimes() != null) {
@@ -101,8 +110,8 @@ public class BookingServiceImpl implements BookingService {
                 }
             }
 
-            // wait up to 3 seconds for lock, auto-release after 5 seconds to prevent
-            // deadlocks
+            // chờ tối đa 3 giây để lấy khóa, tự nhả sau 5 giây để tránh
+            // deadlock
             boolean stockOnlyOrder = gaPlan.hasGa() && !gaPlan.hasSeats();
             if (!stockOnlyOrder) {
                 boolean isLocked = lock.tryLock(3, 5, TimeUnit.SECONDS);
@@ -111,7 +120,7 @@ public class BookingServiceImpl implements BookingService {
                 }
             }
 
-            // 2. check seat availability in Redis
+            // 2. kiểm tra ghế còn trống trong Redis
             if (seatIds != null && !seatIds.isEmpty()) {
                 String currentCustomerId = request.getCustomerId() != null ? request.getCustomerId() : "ANONYMOUS";
                 String showtimePrefix = request.getShowtimeId() != null ? "showtime:" + request.getShowtimeId()
@@ -153,7 +162,7 @@ public class BookingServiceImpl implements BookingService {
                 }
             }
 
-            // 3. create Booking DB record with 15-min expiration TTL
+            // 3. tạo bản ghi Booking trong CSDL, hết hạn sau 15 phút
             LocalDateTime now = LocalDateTime.now();
             LocalDateTime expiresAt = now.plusMinutes(15);
             String bookingCode = "HALO-" + System.currentTimeMillis();
@@ -196,7 +205,7 @@ public class BookingServiceImpl implements BookingService {
                 }
                 final String voucherBuyer = request.getCustomerId();
                 final VoucherResponse voucherToApply = appliedVoucher;
-                // refused with the reason (400) when it does not apply; never ignored, so the buyer is not charged in full by surprise
+                // bị từ chối kèm lý do (400) khi không áp dụng được; không bao giờ bị bỏ qua, để người mua không bị tính đủ tiền một cách bất ngờ
                 discountAmount = VoucherPolicy.discountFor(appliedVoucher, orderTicketsCount, subtotal, request.getShowtimeId(),
                         LocalDateTime.now(),
                         () -> voucherBuyer == null || "ANONYMOUS".equals(voucherBuyer) ? 0L
@@ -228,13 +237,13 @@ public class BookingServiceImpl implements BookingService {
 
             Booking savedBooking = bookingRepository.save(booking);
 
-            // 3b. hold general-admission stock; sold out / unavailable rolls this booking back
+            // 3b. giữ tồn kho vé vào cổng tự do; hết vé hoặc không khả dụng thì hoàn tác đơn này
             if (gaPlan.hasGa()) {
                 gaReservationService.reserve(savedBooking.getId(), request, gaPlan, expiresAt);
                 savedBooking.setGaReserved(true);
             }
 
-            // 4. reserve seats & set 15-min hold TTL in Redis
+            // 4. giữ ghế và đặt khóa giữ 15 phút trong Redis
             List<SeatReservation> reservations = new ArrayList<>();
             if (seatIds != null && !seatIds.isEmpty()) {
                 for (String seatId : seatIds) {
@@ -247,7 +256,7 @@ public class BookingServiceImpl implements BookingService {
                             .build();
                     reservations.add(reservation);
 
-                    // set hold TTL key in Redis (900 seconds = 15 mins)
+                    // đặt khóa giữ ghế có thời hạn trong Redis (900 giây = 15 phút)
                     String showtimePrefix = request.getShowtimeId() != null ? "showtime:" + request.getShowtimeId()
                             : "event:" + eventId;
                     String seatHoldKey = "seat:hold:" + showtimePrefix + ":" + seatId;
@@ -257,7 +266,7 @@ public class BookingServiceImpl implements BookingService {
                 seatReservationRepository.saveAll(reservations);
             }
 
-            // 5. save Outbox Event (BOOKING_CREATED)
+            // 5. lưu sự kiện Outbox (BOOKING_CREATED)
             try {
                 Map<String, Object> eventPayload = new HashMap<>();
                 eventPayload.put("bookingId", savedBooking.getId());
@@ -309,6 +318,12 @@ public class BookingServiceImpl implements BookingService {
         }
     }
 
+    /**
+     * Lấy đơn theo id, hoặc theo mã đơn nếu không có id khớp. Việc kiểm tra quyền xem do tầng controller đảm nhiệm.
+     * @param idOrCode id hoặc mã hiển thị của đơn
+     * @return thông tin đơn
+     * @throws ResponseStatusException HTTP 404 {@code BOOKING_NOT_FOUND} khi không có đơn
+     */
     @Override
     @Transactional(readOnly = true)
     public BookingResponse getBookingById(String idOrCode) {
@@ -329,6 +344,14 @@ public class BookingServiceImpl implements BookingService {
                 .build();
     }
 
+    /**
+     * Lấy chi tiết đơn theo mã đơn (hoặc id) kèm tên loại vé lấy từ ticket-service; không lấy được tên thì dùng "Vé sự kiện".
+     * Đơn của người khác trả 404 giống đơn không tồn tại.
+     * @param bookingCode mã hiển thị hoặc id của đơn
+     * @param customerId mã người mua đang gọi, phải là chủ đơn
+     * @return chi tiết đơn
+     * @throws ResponseStatusException HTTP 404 {@code BOOKING_NOT_FOUND} khi không có đơn hoặc không phải của người gọi
+     */
     @Override
     @Transactional(readOnly = true)
     public BookingDetailResponse getBookingByCode(String bookingCode, String customerId) {
@@ -337,7 +360,7 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND"));
 
         if (booking.getCustomerId() == null || !booking.getCustomerId().equals(customerId)) {
-            // return 404 instead of 403 to prevent enumeration
+            // trả 404 thay vì 403 để không dò được mã đơn
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "BOOKING_NOT_FOUND");
         }
 

@@ -6,6 +6,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+/** Chạy các câu {@code ALTER TABLE} khi khởi động để đổi các cột văn bản dài (URL, mô tả, địa chỉ) sang kiểu {@code TEXT}. */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -13,6 +14,10 @@ public class DatabaseSchemaInitializer implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Thực thi lần lượt từng câu lệnh đổi kiểu cột. Câu lỗi chỉ được ghi cảnh báo, không chặn khởi động.
+     * @param args tham số dòng lệnh, không dùng
+     */
     @Override
     public void run(String... args) {
         log.info("Running database schema column type checks/updates for event_db...");

@@ -8,6 +8,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** Thực thể hồ sơ nhà tổ chức (bảng {@code event_organizers}), gắn với một người dùng của user-service và liên kết nhiều-nhiều với sự kiện. */
 @Entity
 @Table(name = "event_organizers")
 @Getter
@@ -46,6 +47,7 @@ public class EventOrganizer {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Trước khi lưu lần đầu: đặt thời điểm tạo và cập nhật; trạng thái mặc định là {@code ACTIVE}. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -53,6 +55,7 @@ public class EventOrganizer {
         if (this.status == null) this.status = EventOrganizerStatus.ACTIVE;
     }
 
+    /** Trước mỗi lần cập nhật: làm mới thời điểm cập nhật. */
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

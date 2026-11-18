@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.ArrayList;
 import java.util.Objects;
 
+/** Nghe sự kiện thanh toán từ Kafka và cập nhật đơn: xác nhận đơn đã thanh toán (ghế thành đã bán, ghi outbox {@code BOOKING_CONFIRMED}) hoặc hủy đơn khi thanh toán thất bại. */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -51,6 +52,11 @@ public class BookingEventListener {
     private final PaymentExceptionService paymentExceptionService;
     private final LatePaymentProperties latePaymentProperties;
 
+    /**
+     * Xử lý sự kiện thanh toán thành công. Đơn đang {@code PENDING} được chuyển sang {@code PAID} và xác nhận;
+     * đơn đã đóng (hủy, hết hạn...) được chuyển sang xử lý thanh toán muộn. Ném lại ngoại lệ để Kafka giao lại thông điệp.
+     * @param message payload JSON của sự kiện, chứa {@code bookingId}
+     */
     @KafkaListener(topics = "haloticket.payment.completed.v1", groupId = "booking-service")
     @Transactional
     public void handlePaymentCompleted(String message) {
@@ -86,8 +92,11 @@ public class BookingEventListener {
     }
 
     /**
-     * Shared by the normal payment and a late payment that re-opened the stock: seats become SOLD and the
-     * BOOKING_CONFIRMED outbox event is written. The booking is already PAID and saved; same transaction.
+     * Dùng chung cho thanh toán bình thường và thanh toán muộn đã mở lại tồn kho: ghế chuyển sang SOLD (đồng bộ Redis và WebSocket),
+     * đếm lượt dùng voucher và ghi sự kiện outbox BOOKING_CONFIRMED. Đơn đã là PAID và đã lưu; cùng một giao dịch.
+     * @param booking đơn đã thanh toán
+     * @param reservations các ghế đã giữ của đơn
+     * @throws JsonProcessingException khi không tạo được JSON payload
      */
     private void confirmPaidBooking(Booking booking, List<SeatReservation> reservations) throws JsonProcessingException {
         List<String> seatIds = new ArrayList<>();
@@ -98,17 +107,17 @@ public class BookingEventListener {
             String showtimeId = booking.getShowtimeId() != null ? booking.getShowtimeId() : res.getShowtimeId();
             String showtimePrefix = showtimeId != null ? "showtime:" + showtimeId : "event:" + booking.getEventId();
             
-            // mark seat as sold in Redis
+            // đánh dấu ghế đã bán trong Redis
             String soldKey = "seat:sold:" + showtimePrefix + ":" + res.getSeatId();
             stringRedisTemplate.opsForValue().set(soldKey, booking.getId());
             stringRedisTemplate.opsForSet().add(showtimePrefix + ":sold_seats", res.getSeatId());
 
-            // remove hold key and remove from held_seats set
+            // xóa khóa giữ ghế và bỏ khỏi tập held_seats
             String holdKey = "seat:hold:" + showtimePrefix + ":" + res.getSeatId();
             stringRedisTemplate.delete(holdKey);
             stringRedisTemplate.opsForSet().remove(showtimePrefix + ":held_seats", res.getSeatId());
 
-            // also ensure showtime keys and event keys are cleanly synced
+            // đồng bộ cả khóa theo suất chiếu và theo sự kiện cho nhất quán
             if (showtimeId != null) {
                 stringRedisTemplate.delete("seat:hold:showtime:" + showtimeId + ":" + res.getSeatId());
                 stringRedisTemplate.opsForSet().remove("showtime:" + showtimeId + ":held_seats", res.getSeatId());
@@ -118,12 +127,12 @@ public class BookingEventListener {
             stringRedisTemplate.delete("seat:hold:event:" + booking.getEventId() + ":" + res.getSeatId());
             stringRedisTemplate.opsForSet().remove("event:" + booking.getEventId() + ":held_seats", res.getSeatId());
             
-            // broadcast websocket
+            // phát WebSocket
             websocketService.broadcastSeatStatus(booking.getEventId(), showtimeId, res.getSeatId(), "SOLD");
         }
         seatReservationRepository.saveAll(reservations);
         
-        // publish booking.confirmed event for ticket-service and notification-service
+        // phát sự kiện booking.confirmed cho ticket-service và notification-service
         Map<String, Object> payloadMap = new HashMap<>();
         payloadMap.put("bookingId", booking.getId());
         payloadMap.put("bookingCode", booking.getBookingCode());
@@ -150,7 +159,7 @@ public class BookingEventListener {
             log.warn("Event details unavailable for booking {}", booking.getId(), e);
         }
 
-        // if booking used a voucher, increment voucher used count
+        // nếu đơn dùng voucher thì tăng số lượt đã dùng của voucher
         if (booking.getVoucherId() != null && !booking.getVoucherId().isBlank()
                 && booking.getDiscountAmount() != null && booking.getDiscountAmount() > 0) {
             try {
@@ -194,10 +203,13 @@ public class BookingEventListener {
     }
 
     /**
-     * A payment arrived for a booking that is no longer PENDING. PAID/CONFIRMED: already applied (a redelivery), ignore.
-     * CANCELLED/EXPIRED: a general-admission-only order takes its stock back and becomes PAID if there is stock left;
-     * otherwise, and for orders with seats, an OPEN payment exception asks an admin to refund by hand. Any other status is
-     * recorded too. A ticket-service that cannot be reached throws, so Kafka delivers the message again.
+     * Có thanh toán đến cho đơn không còn PENDING. PAID/CONFIRMED: đã áp dụng rồi (giao lại thông điệp), bỏ qua.
+     * CANCELLED/EXPIRED: đơn chỉ có vé vào cổng tự do sẽ lấy lại tồn kho và thành PAID nếu còn hàng;
+     * ngược lại, và với đơn có ghế, tạo ngoại lệ thanh toán OPEN để admin hoàn tiền thủ công. Trạng thái khác cũng được ghi nhận.
+     * Nếu không gọi được ticket-service thì ném ngoại lệ để Kafka giao lại thông điệp.
+     * @param booking đơn nhận thanh toán muộn
+     * @param node payload JSON của sự kiện thanh toán
+     * @throws JsonProcessingException khi không tạo được JSON payload
      */
     private void handlePaymentForClosedBooking(Booking booking, JsonNode node) throws JsonProcessingException {
         String bookingId = booking.getId();
@@ -237,7 +249,7 @@ public class BookingEventListener {
             return;
         }
 
-        // throws when ticket-service cannot be reached: the message is delivered again
+        // ném ngoại lệ khi không gọi được ticket-service: thông điệp sẽ được giao lại
         GaReservationService.ReopenOutcome outcome = gaReservationService.reopen(bookingId,
                 Instant.now().plusSeconds(60L * Math.max(1, latePaymentProperties.getReopenMinutes())));
         if (!outcome.reopened()) {
@@ -254,6 +266,11 @@ public class BookingEventListener {
         confirmPaidBooking(booking, reservations);
     }
 
+    /**
+     * Xử lý sự kiện thanh toán thất bại: hủy đơn {@code PENDING}, hủy các ghế đã giữ, xóa khóa giữ ghế trong Redis,
+     * báo ghế trống qua WebSocket và nhả tồn kho vé vào cổng tự do. Đơn không còn PENDING thì bỏ qua.
+     * @param message payload JSON của sự kiện, chứa {@code bookingId}
+     */
     @KafkaListener(topics = "haloticket.payment.failed.v1", groupId = "booking-service")
     @Transactional
     public void handlePaymentFailed(String message) {
@@ -291,7 +308,7 @@ public class BookingEventListener {
                 stringRedisTemplate.delete("seat:hold:event:" + booking.getEventId() + ":" + res.getSeatId());
                 stringRedisTemplate.opsForSet().remove("event:" + booking.getEventId() + ":held_seats", res.getSeatId());
                 
-                // broadcast WebSocket
+                // phát WebSocket
                 websocketService.broadcastSeatStatus(booking.getEventId(), showtimeId, res.getSeatId(), "AVAILABLE");
             }
             seatReservationRepository.saveAll(reservations);

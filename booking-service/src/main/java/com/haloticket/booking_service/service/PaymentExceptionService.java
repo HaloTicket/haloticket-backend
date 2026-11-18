@@ -17,9 +17,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Records payments that need a person and tells the admins through the outbox. Runs inside the caller's transaction so
- * the record, the notification and the booking change commit together. Idempotent: a repeated call for the same
- * (payment, kind), or (booking, kind) when there is no payment id, creates nothing.
+ * Ghi nhận các khoản thanh toán cần người xử lý và báo cho admin qua outbox. Chạy trong giao dịch của bên gọi để
+ * bản ghi, thông báo và thay đổi của đơn cùng commit. Idempotent: gọi lặp cho cùng (thanh toán, loại), hoặc
+ * (đơn, loại) khi không có mã thanh toán, thì không tạo thêm.
  */
 @Service
 @RequiredArgsConstructor
@@ -35,7 +35,17 @@ public class PaymentExceptionService {
     private final OutboxEventRepository outboxEventRepository;
     private final ObjectMapper objectMapper;
 
-    /** @return true when a new OPEN record was created, false when one already existed. */
+    /**
+     * Ghi nhận một ngoại lệ thanh toán ở trạng thái OPEN và báo cho admin; nếu đã có thì chỉ làm mới lý do (với {@code ISSUANCE_FAILED}).
+     * @param bookingId mã đơn
+     * @param bookingCode mã hiển thị của đơn, dùng trong thông báo
+     * @param paymentId mã thanh toán, có thể rỗng
+     * @param kind loại ngoại lệ
+     * @param amount số tiền
+     * @param provider cổng thanh toán, bị cắt còn tối đa {@code PROVIDER_MAX} ký tự
+     * @param detail lý do chi tiết, bị cắt còn tối đa {@code DETAIL_MAX} ký tự
+     * @return true khi tạo mới bản ghi OPEN, false khi đã có sẵn
+     */
     public boolean record(String bookingId, String bookingCode, String paymentId, PaymentExceptionKind kind,
                           Double amount, String provider, String detail) {
         boolean hasPayment = paymentId != null && !paymentId.isBlank();
@@ -63,7 +73,7 @@ public class PaymentExceptionService {
         return true;
     }
 
-    /** An order whose tickets failed again (admin re-issue, redelivery): the record shows the LATEST reason, not the first one. */
+    /** Đơn có vé lại phát hành lỗi (admin phát lại, thông điệp giao lại): bản ghi hiển thị lý do MỚI NHẤT chứ không phải lần đầu. */
     private void refreshOpenIssuanceDetail(String bookingId, PaymentExceptionKind kind, String detail) {
         if (kind != PaymentExceptionKind.ISSUANCE_FAILED || detail == null || detail.isBlank()) return;
         repository.findFirstByBookingIdAndKindAndStatus(bookingId, kind, PaymentExceptionStatus.OPEN).ifPresent(open -> {
@@ -75,8 +85,16 @@ public class PaymentExceptionService {
         });
     }
 
+    /**
+     * Ghi sự kiện outbox thông báo cho admin có khoản thanh toán cần đối soát thủ công.
+     * @param bookingId mã đơn
+     * @param bookingCode mã hiển thị của đơn, thiếu thì dùng id rút gọn
+     * @param kind loại ngoại lệ
+     * @param amount số tiền, null thì hiển thị "?"
+     * @throws IllegalStateException khi không tạo được JSON thông báo
+     */
     private void notifyAdmins(String bookingId, String bookingCode, PaymentExceptionKind kind, Double amount) {
-        // no personal data: booking code and amount only
+        // không có dữ liệu cá nhân: chỉ mã đơn và số tiền
         String code = bookingCode != null ? bookingCode : shortId(bookingId);
         String amountText = amount == null ? "?" : String.valueOf(Math.round(amount));
         Map<String, String> payload = new LinkedHashMap<>();
@@ -101,15 +119,18 @@ public class PaymentExceptionService {
         }
     }
 
+    /** Cắt chuỗi còn tối đa {@code max} ký tự; null giữ nguyên. */
     static String truncate(String value, int max) {
         if (value == null) return null;
         return value.length() <= max ? value : value.substring(0, max);
     }
 
+    /** Chuỗi rỗng hoặc chỉ có khoảng trắng thì thành null. */
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
     }
 
+    /** Rút gọn id còn 8 ký tự đầu để ghi log. */
     private static String shortId(String id) {
         return id == null ? "" : id.substring(0, Math.min(8, id.length()));
     }

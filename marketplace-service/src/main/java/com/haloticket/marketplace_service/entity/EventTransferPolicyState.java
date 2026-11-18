@@ -4,6 +4,10 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
 
+/**
+ * Bản sao chính sách chuyển nhượng của một sự kiện (bảng {@code event_transfer_policy_state}): bật hoặc tắt bán lại
+ * và tặng vé, phiên bản chính sách và khung thời gian mở, đóng. Được cập nhật khi nhận sự kiện từ {@code event-service}.
+ */
 @Entity @Table(name = "event_transfer_policy_state")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class EventTransferPolicyState {

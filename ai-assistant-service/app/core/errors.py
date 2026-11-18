@@ -1,7 +1,7 @@
-"""Error contract of the AI routes: AiError becomes a flat body {code, message[, retry_after_seconds]}.
+"""Hợp đồng lỗi của các route AI: `AiError` được trả thành body phẳng `{code, message[, retry_after_seconds]}`.
 
-Only AiError is handled here; HTTPException (detail dicts) keeps its existing shape. The message is always a fixed
-friendly text, never str() of another exception.
+Chỉ `AiError` được xử lý ở đây; `HTTPException` (detail dạng dict) giữ nguyên hình dạng cũ. Thông điệp luôn là văn bản cố định
+thân thiện, không bao giờ là `str()` của một ngoại lệ khác.
 """
 from typing import Optional
 
@@ -30,7 +30,9 @@ _TABLE = {
 
 
 class AiError(Exception):
+    """Lỗi nghiệp vụ của các route AI, mang mã lỗi, mã HTTP, thông điệp và (tùy chọn) số giây nên thử lại."""
     def __init__(self, code: str, status: int, message: str, retry_after: Optional[int] = None):
+        """Khởi tạo lỗi với mã lỗi, mã HTTP, thông điệp hiển thị và số giây nên chờ trước khi thử lại (nếu có)."""
         super().__init__(code)
         self.code = code
         self.status = status
@@ -39,13 +41,16 @@ class AiError(Exception):
 
 
 def ai_error(code: str, message: Optional[str] = None, retry_after: Optional[int] = None) -> AiError:
+    """Tạo `AiError` từ mã lỗi, tra mã HTTP và thông điệp mặc định trong bảng; mã lạ thành 500."""
     status, default = _TABLE.get(code, (500, "Đã xảy ra lỗi."))
     return AiError(code, status, message or default, retry_after)
 
 
 def install_error_handlers(app: FastAPI) -> None:
+    """Đăng ký bộ xử lý biến `AiError` thành phản hồi JSON phẳng; lỗi 429 có thêm header `Retry-After`."""
     @app.exception_handler(AiError)
     async def _ai_error_handler(request: Request, exc: AiError):
+        """Dựng phản hồi JSON cho `AiError`."""
         body = {"code": exc.code, "message": exc.message}
         headers = None
         if exc.retry_after is not None:

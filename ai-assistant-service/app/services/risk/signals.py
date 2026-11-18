@@ -1,7 +1,7 @@
-"""Layer B: signals from data. A signal that cannot be read is NOT_ASSESSED: it adds no points and never counts as safe.
+"""Lớp B: tín hiệu từ dữ liệu. Tín hiệu không đọc được là NOT_ASSESSED: không cộng điểm và không bao giờ được coi là an toàn.
 
-The data comes in through a SignalSource (functions), so tests supply fixtures and production supplies the HTTP and SQL
-readers from app.services.admin_intel.upstream. Every reader may raise; nothing here lets that escape.
+Dữ liệu đi vào qua một SignalSource (các hàm), nên kiểm thử cấp dữ liệu giả còn production cấp bộ đọc HTTP và SQL
+từ app.services.admin_intel.upstream. Bộ đọc nào cũng có thể ném ngoại lệ; ở đây không cho ngoại lệ thoát ra ngoài.
 """
 import logging
 import re
@@ -14,31 +14,34 @@ log = logging.getLogger("ai.risk.signals")
 
 MIN_PRICE_SAMPLES = 5
 DUPLICATE_THRESHOLD = 0.6
-DUPLICATE_TITLE_THRESHOLD = 0.5  # "Giải cờ vua Đà Nẵng" against "Giải cờ vua Cần Thơ" scores 0.56: a changed city still counts as the same title
-DUPLICATE_CERTAIN = 0.9  # description alone this close to another event is a copy whatever the title says
+DUPLICATE_TITLE_THRESHOLD = 0.5  # "Giải cờ vua Đà Nẵng" so với "Giải cờ vua Cần Thơ" được 0.56: đổi thành phố vẫn tính là cùng tên
+DUPLICATE_CERTAIN = 0.9  # riêng phần mô tả gần giống một sự kiện khác tới mức này thì là bản sao, bất kể tên
 MAX_DUPLICATE_CANDIDATES = 500
 
 
 @dataclass
 class SignalSource:
-    user: Callable[[str], dict]                 # user-service admin detail: createdAt, ekycStatus
-    approvals: Callable[[], list]               # every event (EventResponse-shaped dicts)
-    category_prices: Callable[[str], list]      # min_price of APPROVED events of a category (v_events)
+    """Các hàm đọc dữ liệu cho lớp B: chi tiết người dùng, toàn bộ sự kiện và giá thấp nhất theo thể loại."""
+    user: Callable[[str], dict]                 # chi tiết admin của user-service: createdAt, ekycStatus
+    approvals: Callable[[], list]               # mọi sự kiện (dict có dạng EventResponse)
+    category_prices: Callable[[str], list]      # min_price của các sự kiện APPROVED trong một thể loại (v_events)
 
 
 def _finding(code: str, weight: int, message: str, severity: str = "MEDIUM", evidence: Optional[list] = None, min_level: str = "LOW") -> dict:
+    """Dựng một phát hiện của lớp tín hiệu với các trường chuẩn (layer, code, severity, weight, message, evidence, min_level)."""
     return {"layer": "SIGNAL", "code": code, "severity": severity, "weight": weight, "message": message, "evidence": evidence or [],
             "min_level": min_level}
 
 
 def title_similarity(a: str, b: str) -> float:
-    """Word-level Jaccard of two titles (a city or year changed in an otherwise equal title still scores high)."""
+    """Jaccard theo từ của hai tên (đổi thành phố hay năm trong tên vốn giống nhau vẫn được điểm cao)."""
     words = lambda text: set(re.findall(r"\w+", (text or "").lower()))
     left, right = words(a), words(b)
     return len(left & right) / len(left | right) if left | right else 0.0
 
 
 def _parse_time(value) -> Optional[datetime]:
+    """Đọc thời gian ISO (chấp nhận hậu tố Z); thiếu múi giờ thì coi là UTC. Trả None nếu rỗng hoặc sai định dạng."""
     if not value:
         return None
     try:
@@ -49,6 +52,7 @@ def _parse_time(value) -> Optional[datetime]:
 
 
 def _shingles(text: str) -> set:
+    """Tập các cụm 3 từ liên tiếp của văn bản (văn bản dưới 3 từ thì dùng cả câu)."""
     words = re.findall(r"\w+", (text or "").lower())
     if len(words) < 3:
         return {" ".join(words)} if words else set()
@@ -56,6 +60,7 @@ def _shingles(text: str) -> set:
 
 
 def similarity(a: str, b: str) -> float:
+    """Độ giống nhau của hai văn bản theo Jaccard trên các cụm 3 từ; 0.0 nếu một bên rỗng."""
     sa, sb = _shingles(a), _shingles(b)
     if not sa or not sb:
         return 0.0
@@ -63,6 +68,7 @@ def similarity(a: str, b: str) -> float:
 
 
 def _guard(name: str, function: Callable) -> dict:
+    """Chạy một hàm đánh giá tín hiệu; lỗi thì ghi log và trả not_assessed thay vì cho ngoại lệ lan ra."""
     try:
         finding = function()
     except Exception as failure:
@@ -72,7 +78,7 @@ def _guard(name: str, function: Callable) -> dict:
 
 
 def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datetime] = None) -> list:
-    """The six signals for one event (EventResponse-shaped dict). Returns [{name, status, finding?}]."""
+    """Sáu tín hiệu cho một sự kiện (dict có dạng EventResponse). Trả [{name, status, finding?}]."""
     now = now or datetime.now(timezone.utc)
     organizer = event.get("organizer") if isinstance(event.get("organizer"), dict) else {}
     user_id = organizer.get("userId")
@@ -80,6 +86,7 @@ def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datet
     cache: dict = {}
 
     def user() -> dict:
+        """Chi tiết người dùng của ban tổ chức, gọi một lần rồi dùng lại; ném LookupError nếu không có id ban tổ chức."""
         if "user" not in cache:
             if not user_id:
                 raise LookupError("no organizer id")
@@ -87,11 +94,13 @@ def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datet
         return cache["user"]
 
     def events() -> list:
+        """Toàn bộ sự kiện, gọi một lần rồi dùng lại."""
         if "events" not in cache:
             cache["events"] = source.approvals()
         return cache["events"]
 
     def account():
+        """Tín hiệu tuổi tài khoản: dưới 7 ngày (12 điểm, sàn MEDIUM) hoặc dưới 30 ngày (6 điểm); lâu hơn thì không có phát hiện."""
         created = _parse_time(user().get("createdAt"))
         if created is None:
             raise LookupError("no createdAt")
@@ -105,6 +114,7 @@ def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datet
         return None
 
     def ekyc():
+        """Tín hiệu eKYC: ban tổ chức chưa ở trạng thái APPROVED thì 15 điểm."""
         status = user().get("ekycStatus")
         if status is None:
             raise LookupError("no ekyc status")
@@ -114,6 +124,7 @@ def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datet
         return None
 
     def history():
+        """Tín hiệu lịch sử: các sự kiện khác của ban tổ chức bị từ chối từ 2 lần trở lên và nhiều hơn số được duyệt thì 15 điểm."""
         if not user_id:
             raise LookupError("no organizer id")
         others = [e for e in events()
@@ -126,6 +137,7 @@ def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datet
         return None
 
     def price():
+        """Tín hiệu giá: giá vé thấp nhất lớn hơn 5 lần hoặc nhỏ hơn 0,1 lần trung vị của cùng thể loại thì 10 điểm; cần ít nhất MIN_PRICE_SAMPLES mẫu so sánh."""
         category = event.get("categoryName")
         price_now = event.get("minPrice")
         if not category or price_now is None:
@@ -141,6 +153,7 @@ def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datet
         return None
 
     def duplicate():
+        """Tín hiệu trùng lặp: tìm sự kiện của người khác giống nhất về nội dung (và về tên, trừ khi mô tả gần như y hệt) thì 25 điểm."""
         mine = f"{texts.get('title', '')} {texts.get('description', '')}"
         best_score, best_event = 0.0, None
         for other in events()[:MAX_DUPLICATE_CANDIDATES]:
@@ -148,10 +161,10 @@ def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datet
                 continue
             other_organizer = other.get("organizer") if isinstance(other.get("organizer"), dict) else {}
             if user_id and other_organizer.get("userId") == user_id and other.get("eventApprovalStatus") == "APPROVED":
-                continue  # a show the same organiser already had approved (a series, a new season) is not a copy of someone else
+                continue  # chương trình mà chính ban tổ chức này đã được duyệt (một series, một mùa mới) không phải bản sao của người khác
             other_text = f"{other.get('title', '')} {other.get('descriptionText') or other.get('description') or ''}"
             score = similarity(mine, other_text)
-            # a copy keeps the title (or changes only a city or a year): similar text under an unrelated title is not enough
+            # bản sao giữ nguyên tên (hoặc chỉ đổi thành phố hay năm): nội dung giống nhưng tên không liên quan thì chưa đủ
             same_description = similarity(texts.get("description", ""), str(other.get("descriptionText") or other.get("description") or ""))
             counts = same_description >= DUPLICATE_CERTAIN or (score >= DUPLICATE_THRESHOLD
                                                               and title_similarity(texts.get("title", ""), other.get("title", "")) >= DUPLICATE_TITLE_THRESHOLD)
@@ -163,6 +176,7 @@ def evaluate(event: dict, texts: dict, source: SignalSource, now: Optional[datet
         return None
 
     def schedule():
+        """Tín hiệu lịch và địa điểm: thiếu hoặc sai thời gian, thiếu địa điểm (trừ sự kiện online); mỗi vấn đề 10 điểm, tối đa 20."""
         issues = []
         start, end = _parse_time(event.get("startTime")), _parse_time(event.get("endTime"))
         approval = str(event.get("eventApprovalStatus") or "")

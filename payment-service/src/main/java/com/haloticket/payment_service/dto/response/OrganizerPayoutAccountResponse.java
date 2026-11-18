@@ -4,6 +4,7 @@ import com.haloticket.payment_service.enums.PayoutAccountVerificationStatus;
 import lombok.Builder;
 import lombok.Data;
 
+/** Thông tin tài khoản nhận tiền của ban tổ chức trả về client, kèm trạng thái xác minh và phiên bản. */
 @Data
 @Builder
 public class OrganizerPayoutAccountResponse {

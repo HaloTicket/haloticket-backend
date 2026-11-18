@@ -9,6 +9,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+/** Chi tiết người dùng cho quản trị viên: hồ sơ, vai trò và thông tin eKYC kèm ngân hàng, thuế. */
 @Data
 @Builder
 public class AdminUserDetailResponse {
@@ -24,7 +25,7 @@ public class AdminUserDetailResponse {
     private LocalDateTime createdAt;
     private LocalDateTime lastLoginAt;
     
-    // Ekyc info
+    // Thông tin eKYC
     private String ekycStatus;
     private String ekycDocumentType;
     private String ekycDocumentNumber;

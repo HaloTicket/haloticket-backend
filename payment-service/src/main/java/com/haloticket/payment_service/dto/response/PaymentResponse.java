@@ -4,6 +4,7 @@ import com.haloticket.payment_service.enums.PaymentStatus;
 import lombok.Builder;
 import lombok.Data;
 
+/** Thông tin thanh toán trả về client: mã, đơn, số tiền, trạng thái và URL thanh toán. */
 @Data
 @Builder
 public class PaymentResponse {

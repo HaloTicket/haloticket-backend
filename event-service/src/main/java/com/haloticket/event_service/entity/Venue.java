@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+/** Thực thể địa điểm tổ chức sự kiện (bảng {@code venues}): vị trí, sức chứa, loại, trạng thái xác minh và mẫu sơ đồ chỗ ngồi. */
 @Entity
 @Table(name = "venues")
 @Getter
@@ -34,7 +35,7 @@ public class Venue {
     private Integer capacity;
 
     @Column(name = "type")
-    private String type; // "indoor", "outdoor", "hybrid"
+    private String type; // loại địa điểm: "indoor", "outdoor", "hybrid"
 
     @Column(name = "verified")
     private Boolean verified;
@@ -57,6 +58,7 @@ public class Venue {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Trước khi lưu lần đầu: điền giá trị mặc định cho trường còn trống (chưa xác minh, công khai, 0 sự kiện đã tổ chức, sức chứa 1000, loại {@code indoor}). */
     @PrePersist
     public void prePersist() {
         if (createdAt == null) createdAt = LocalDateTime.now();
@@ -68,6 +70,7 @@ public class Venue {
         if (type == null) type = "indoor";
     }
 
+    /** Trước mỗi lần cập nhật: làm mới thời điểm cập nhật. */
     @PreUpdate
     public void preUpdate() {
         updatedAt = LocalDateTime.now();

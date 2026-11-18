@@ -7,6 +7,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/** Thông tin một thông báo trả về cho client, gồm nội dung hiển thị, trạng thái đọc, trạng thái gửi và mốc thời gian. */
 @Data
 @Builder
 public class NotificationResponse {

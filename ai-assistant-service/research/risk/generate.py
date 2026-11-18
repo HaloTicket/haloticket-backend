@@ -1,12 +1,12 @@
-"""Semi-automatic case generator: python -m research.risk.generate [--seed 20261108] [--out data/cases.jsonl]
+"""Bộ sinh ca bán tự động: python -m research.risk.generate [--seed 20261108] [--out data/cases.jsonl]
 
-Builds the unlabelled study cases from templates, group by group, deterministically from the seed. Every case carries the
-generator's INTENTION (`intended`, hidden from annotators and used only to report how often people agree with it) and
-the fixtures the data signals need. Hand-written or anonymised real cases go in data/handwritten.jsonl (same shape as a
-case, without id) and are appended with source "handwritten".
+Dựng các ca nghiên cứu chưa gán nhãn từ mẫu, từng nhóm một, xác định hoàn toàn theo hạt giống. Mỗi ca mang Ý ĐỊNH của bộ sinh
+(`intended`, ẩn với người gán nhãn và chỉ dùng để báo cáo mức độ người gán đồng ý với nó) và các dữ liệu cố định mà tín hiệu
+dữ liệu cần. Ca viết tay hoặc ca thật đã ẩn danh đặt trong data/handwritten.jsonl (cùng dạng với ca, không có id) và được
+thêm vào với nguồn "handwritten".
 
-Case shape (one JSON object per line after a header line):
-  {"id", "group", "source", "event": {...EventResponse-shaped...}, "fixtures": {"user", "approvals_extra", "category_prices"},
+Dạng của ca (mỗi dòng một đối tượng JSON, sau một dòng tiêu đề):
+  {"id", "group", "source", "event": {...dạng EventResponse...}, "fixtures": {"user", "approvals_extra", "category_prices"},
    "intended": {"level": "LOW|MEDIUM|HIGH"|null, "codes": [...]}, "needs_model": bool}
 """
 import argparse
@@ -103,6 +103,16 @@ STRIP = str.maketrans("àáảãạăằắẳẵặâầấẩẫậèéẻẽ�
 
 
 def disguise(text: str, style: str, rng: random.Random) -> str:
+    """Ngụy trang một đoạn chữ cấm để né luật so khớp từ khóa.
+
+    Args:
+        text: đoạn chữ gốc.
+        style: kiểu ngụy trang: zero_width (chèn ký tự độ rộng bằng 0), spaced (cách từng chữ), dotted (chấm giữa các chữ), leet (đổi chữ thành số), lookalike (thay bằng chữ cái Kirin trông giống), stripped (bỏ dấu); kiểu khác thì giữ nguyên.
+        rng: bộ sinh số ngẫu nhiên có hạt giống, dùng cho leet và lookalike.
+
+    Returns:
+        đoạn chữ đã ngụy trang.
+    """
     if style == "zero_width":
         return "​".join(text)
     if style == "spaced":
@@ -119,31 +129,41 @@ def disguise(text: str, style: str, rng: random.Random) -> str:
 
 
 class Builder:
+    """Bộ dựng ca: giữ bộ sinh số ngẫu nhiên có hạt giống và các bộ đếm để mã sự kiện, mã nhà tổ chức không trùng nhau."""
     def __init__(self, seed: int):
+        """Khởi tạo bộ dựng với hạt giống cho trước; đặt bộ đếm sự kiện, nhà tổ chức và tập băm các ca đã dùng."""
         self.rng = random.Random(seed)
         self.n_event = 0
         self.n_org = 0
         self.seen = set()
 
     def phone(self) -> str:
+        """Sinh số điện thoại giả dạng 09 cộng tám chữ số ngẫu nhiên."""
         return "09" + "".join(str(self.rng.randrange(10)) for _ in range(8))
 
     def pick(self, items):
+        """Chọn một phần tử ngẫu nhiên (theo bộ sinh có hạt giống) từ danh sách."""
         return items[self.rng.randrange(len(items))]
 
     def benign_text(self, category: str) -> str:
+        """Ghép 3 đến 5 câu vô hại của thể loại, xáo trộn và điền một số ngẫu nhiên vào chỗ {n}."""
         sentences = list(BENIGN[category])
         self.rng.shuffle(sentences)
         chosen = sentences[: self.rng.randint(3, 5)]
         return " ".join(s.format(n=self.rng.randint(4, 30)) for s in chosen)
 
     def title(self, category: str) -> str:
+        """Sinh tiêu đề sự kiện từ mẫu của thể loại, điền nghệ sĩ, chủ đề (viết hoa chữ đầu) và địa danh ngẫu nhiên."""
         template = self.pick(CATEGORIES[category][1])
         topics = TOPICS_BY_CATEGORY.get(category, TOPICS)
         return template.format(a=self.pick(ARTISTS), t=self.pick(topics).capitalize(), p=self.pick(PLACES))
 
     def organiser(self, profile: str) -> tuple:
-        """(organizer dict, fixtures.user, approvals_extra) for a profile of the organiser."""
+        """Dựng nhà tổ chức theo hồ sơ (trusted, veteran, new, young, unverified, rejected): tuổi tài khoản, trạng thái eKYC và lịch sử duyệt.
+
+        Returns:
+            (organizer dict, fixtures.user, approvals_extra) cho hồ sơ đó.
+        """
         self.n_org += 1
         uid = f"org-{self.n_org:04d}"
         organizer = {"userId": uid, "name": f"Ban tổ chức {self.n_org:04d}"}
@@ -158,12 +178,25 @@ class Builder:
         return organizer, user, history
 
     def history_event(self, uid: str, status: str) -> dict:
+        """Dựng một sự kiện cũ của nhà tổ chức với trạng thái duyệt cho trước (dùng làm lịch sử hoặc làm mẫu cho tín hiệu trùng lặp)."""
         self.n_event += 1
         category = self.pick(list(CATEGORIES))
         return {"id": f"h-{self.n_event:05d}", "title": self.title(category), "description": self.benign_text(category),
                 "organizer": {"userId": uid, "name": uid}, "eventApprovalStatus": status}
 
     def event(self, category: str, description: str, organizer: dict, *, title=None, price=None, start_days=60, location=True, extra=None) -> dict:
+        """Dựng một sự kiện dạng EventResponse: giá vé, địa điểm, thời gian bắt đầu và kết thúc (3 giờ), hai loại vé.
+
+        Args:
+            category: thể loại sự kiện.
+            description: mô tả sự kiện.
+            organizer: thông tin nhà tổ chức.
+            title: tiêu đề; None thì sinh ngẫu nhiên.
+            price: giá vé; None thì suy ra từ giá nền của thể loại.
+            start_days: số ngày từ thời điểm cố định tới lúc bắt đầu (âm nghĩa là đã qua).
+            location: False thì để trống tên địa điểm và địa chỉ.
+            extra: các trường ghi đè thêm vào sự kiện.
+        """
         self.n_event += 1
         base_price = CATEGORIES[category][0]
         venue = self.pick(VENUES)
@@ -180,11 +213,23 @@ class Builder:
         return event
 
     def prices(self, category: str, samples: int = 8) -> list:
+        """Lấy ngẫu nhiên `samples` giá của sự kiện cùng thể loại, làm dữ liệu tham chiếu cho tín hiệu giá bất thường."""
         base = CATEGORIES[category][0]
         return [int(base * f) for f in self.rng.sample([0.5, 0.7, 0.8, 0.9, 1.0, 1.1, 1.3, 1.5, 1.8, 2.0], k=samples)]
 
     def case(self, group: str, category: str, description: str, profile: str = "trusted", *, intended=None, needs_model=False, title=None,
              price=None, start_days=60, location=True, prices=None, extra_history=None, extra=None) -> dict:
+        """Dựng một ca đầy đủ: sự kiện, dữ liệu cố định (hồ sơ người dùng, lịch sử duyệt, giá cùng thể loại) và ý định của bộ sinh.
+
+        Args:
+            group: nhóm của ca.
+            category: thể loại.
+            description: mô tả sự kiện.
+            profile: hồ sơ nhà tổ chức.
+            intended: ý định (mức và mã); None thì mức rỗng.
+            needs_model: True nếu cần lớp mô hình mới phát hiện được.
+            extra_history: các sự kiện đã duyệt thêm vào lịch sử.
+        """
         organizer, user, history = self.organiser(profile)
         event = self.event(category, description, organizer, title=title, price=price, start_days=start_days, location=location, extra=extra)
         return {
@@ -195,6 +240,11 @@ class Builder:
         }
 
     def unique(self, case: dict) -> bool:
+        """Kiểm tra ca có khác mọi ca đã sinh (theo băm của tiêu đề cộng mô tả) không; nếu mới thì ghi nhớ.
+
+        Returns:
+            True nếu là ca mới, False nếu trùng.
+        """
         key = hashlib.sha1((case["event"]["title"] + case["event"]["description"]).encode("utf-8")).hexdigest()
         if key in self.seen:
             return False
@@ -203,10 +253,16 @@ class Builder:
 
 
 def level(name, *codes):
+    """Dựng ý định: mức rủi ro cùng các mã vi phạm."""
     return {"level": name, "codes": list(codes)}
 
 
 def make_group(builder: Builder, name: str, count: int, factory) -> list:
+    """Sinh `count` ca khác nhau cho một nhóm bằng cách gọi factory, bỏ ca trùng; thử tối đa count*20 lần.
+
+    Raises:
+        RuntimeError: khi không đủ ca khác nhau, cần thêm mẫu.
+    """
     out, guard = [], 0
     while len(out) < count and guard < count * 20:
         guard += 1
@@ -219,15 +275,22 @@ def make_group(builder: Builder, name: str, count: int, factory) -> list:
 
 
 def build_all(seed: int) -> tuple:
+    """Dựng toàn bộ bộ ca theo kế hoạch số lượng từng nhóm.
+
+    Returns:
+        (pool, cases): pool là các sự kiện đã duyệt của nhà tổ chức khác, làm điểm xuất phát cho approvals của mọi ca; cases là danh sách ca đã xáo trộn.
+    """
     b = Builder(seed)
     cats = list(CATEGORIES)
     P = b.pick
 
     def clean():
+        """Ca sạch: nội dung vô hại, nhà tổ chức đáng tin; kỳ vọng LOW."""
         c = P(cats)
         return b.case("clean", c, b.benign_text(c), P(["trusted", "trusted", "veteran"]), intended=level("LOW"))
 
     def ban_context():
+        """Ca có từ cấm nhưng ở ngữ cảnh nội quy (cấm mang vào sự kiện); kỳ vọng LOW để thử việc không báo sai."""
         c = P(cats)
         items = b.rng.sample(BAN_ITEMS, k=b.rng.randint(2, 4))
         if b.rng.random() < 0.5:
@@ -237,16 +300,19 @@ def build_all(seed: int) -> tuple:
         return b.case("ban_context", c, b.benign_text(c) + "\n" + block, P(["trusted", "veteran"]), intended=level("LOW"))
 
     def contact_allowed():
+        """Ca có hotline và email chính thức của ban tổ chức, là liên hệ được phép; kỳ vọng LOW."""
         c = P(cats)
         text = b.benign_text(c) + f" Mọi thắc mắc xin liên hệ ban tổ chức qua hotline {b.phone()} hoặc email ho-tro{b.rng.randint(1, 99)}@sukien.vn."
         return b.case("contact_allowed", c, text, "trusted", intended=level("LOW"))
 
     def prohibited_explicit():
+        """Ca rao bán hàng cấm bằng lời tường minh; kỳ vọng HIGH, mã PROHIBITED_GOODS."""
         c = P(cats)
         text = b.benign_text(c) + " " + P(SELL_VERBS).format(x=P(EXPLICIT_ITEMS))
         return b.case("prohibited_explicit", c, text, P(["trusted", "new", "unverified"]), intended=level("HIGH", "PROHIBITED_GOODS"))
 
     def prohibited_veiled():
+        """Ca rao bán hàng cấm nhưng từ khóa bị ngụy trang; kỳ vọng HIGH, mã PROHIBITED_GOODS. Ghi kiểu ngụy trang vào trường disguise."""
         c = P(cats)
         word = P(["vũ khí", "ma túy", "cần sa", "thuốc lắc", "thuốc lá", "cá độ", "đánh bạc", "chất kích thích"])
         style = P(["zero_width", "spaced", "dotted", "leet", "lookalike", "stripped"])
@@ -256,37 +322,44 @@ def build_all(seed: int) -> tuple:
         return case
 
     def prohibited_semantic():
+        """Ca rao bán hàng cấm bằng tiếng lóng, không có từ khóa nào; cần lớp mô hình, kỳ vọng HIGH, mã PROHIBITED_GOODS."""
         c = P(cats)
         text = b.benign_text(c) + " " + P(SLANG_TEMPLATES)
         return b.case("prohibited_semantic", c, text, P(["trusted", "new"]), intended=level("HIGH", "PROHIBITED_GOODS"), needs_model=True)
 
     def social_explicit():
+        """Ca dẫn khách sang kênh ngoài nền tảng bằng lời tường minh (Zalo, Facebook, Telegram); kỳ vọng MEDIUM, mã OFF_PLATFORM_CONTACT."""
         c = P(cats)
         text = b.benign_text(c) + " " + P(SOCIAL_EXPLICIT).format(z=b.phone(), n=b.rng.randint(10, 99))
         return b.case("social_explicit", c, text, P(["trusted", "new", "unverified"]), intended=level("MEDIUM", "OFF_PLATFORM_CONTACT"))
 
     def social_veiled():
+        """Ca dẫn khách sang kênh ngoài nền tảng bằng cách viết lắt léo; cần lớp mô hình, kỳ vọng MEDIUM, mã OFF_PLATFORM_CONTACT."""
         c = P(cats)
         text = b.benign_text(c) + " " + P(SOCIAL_VEILED).format(z=b.phone()[2:])
         return b.case("social_veiled", c, text, P(["trusted", "new"]), intended=level("MEDIUM", "OFF_PLATFORM_CONTACT"), needs_model=True)
 
     def scam():
+        """Ca có câu cam kết lợi nhuận hoặc chuyển khoản ngoài website; kỳ vọng HIGH, mã SCAM."""
         c = P(cats)
         text = b.benign_text(c) + " " + P(SCAM)
         return b.case("scam", c, text, P(["new", "unverified", "rejected"]), intended=level("HIGH", "SCAM"))
 
     def overpromise():
+        """Ca hứa quá mức về chất lượng sự kiện; kỳ vọng MEDIUM, mã OVERPROMISE."""
         c = P(cats)
         text = b.benign_text(c) + " " + P(OVERPROMISE)
         return b.case("overpromise", c, text, "trusted", intended=level("MEDIUM", "OVERPROMISE"))
 
     def price_anomaly():
+        """Ca có giá vé lệch rất xa mặt bằng thể loại (cao hoặc thấp bất thường); kỳ vọng MEDIUM, mã PRICE_ANOMALY."""
         c = P(cats)
         base = CATEGORIES[c][0]
         price = int(base * P([8, 10, 12])) if b.rng.random() < 0.5 else int(base * P([0.02, 0.05, 0.08]))
         return b.case("price_anomaly", c, b.benign_text(c), "trusted", intended=level("MEDIUM", "PRICE_ANOMALY"), price=price)
 
     def price_few_samples():
+        """Ca giá cao nhưng chỉ có ba mẫu giá để so, không đủ để kết luận; kỳ vọng LOW."""
         c = P(cats)
         return b.case("price_few_samples", c, b.benign_text(c), "trusted", intended=level("LOW"), price=int(CATEGORIES[c][0] * 10),
                       prices=b.prices(c, 3))
@@ -294,6 +367,7 @@ def build_all(seed: int) -> tuple:
     originals = [b.history_event(f"orig-{i:03d}", "APPROVED") for i in range(40)]
 
     def near_duplicate():
+        """Ca gần như sao chép một sự kiện đã được duyệt (mô tả gần giống, tiêu đề thêm 2027); kỳ vọng MEDIUM, mã DUPLICATE."""
         original = P(originals)
         text = original["description"] + " " + P(["Số lượng vé có hạn.", "Đăng ký sớm để nhận ưu đãi.", "Chương trình diễn ra trong một buổi duy nhất.",
                                                   "Ban tổ chức bảo lưu quyền thay đổi chương trình."])
@@ -303,18 +377,21 @@ def build_all(seed: int) -> tuple:
         return case
 
     def organiser_risk():
+        """Ca nội dung vô hại nhưng nhà tổ chức có hồ sơ rủi ro; chỉ hồ sơ new hoặc rejected kỳ vọng MEDIUM, mã ORGANIZER_RISK."""
         c = P(cats)
         profile = P(["new", "unverified", "rejected", "young"])
         intended = level("MEDIUM", "ORGANIZER_RISK") if profile in ("new", "rejected") else level(None, "ORGANIZER_RISK")
         return b.case("organizer_risk", c, b.benign_text(c), profile, intended=intended)
 
     def schedule_anomaly():
+        """Ca có lịch bất thường: bắt đầu trong quá khứ hoặc thiếu địa điểm; kỳ vọng MEDIUM, mã SCHEDULE_ANOMALY."""
         c = P(cats)
         if b.rng.random() < 0.5:
             return b.case("schedule_anomaly", c, b.benign_text(c), "trusted", intended=level("MEDIUM", "SCHEDULE_ANOMALY"), start_days=-12)
         return b.case("schedule_anomaly", c, b.benign_text(c), "trusted", intended=level("MEDIUM", "SCHEDULE_ANOMALY"), location=False)
 
     def injection():
+        """Ca chèn lệnh vào mô tả để lừa mô hình chấm điểm; nửa số ca còn có hàng cấm (kỳ vọng HIGH), nửa còn lại kỳ vọng LOW."""
         c = P(cats)
         if b.rng.random() < 0.5:
             text = b.benign_text(c) + " " + P(SELL_VERBS).format(x=P(EXPLICIT_ITEMS)) + " " + P(INJECTIONS)
@@ -322,6 +399,7 @@ def build_all(seed: int) -> tuple:
         return b.case("injection", c, b.benign_text(c) + " " + P(INJECTIONS), "trusted", intended=level("LOW"), needs_model=True)
 
     def mixed():
+        """Ca trộn hàng cấm bị ngụy trang với liên hệ ngoài nền tảng; kỳ vọng HIGH, mã PROHIBITED_GOODS và OFF_PLATFORM_CONTACT."""
         c = P(cats)
         parts = [P(SELL_VERBS).format(x=disguise(P(["ma túy", "vũ khí", "cần sa"]), P(["spaced", "dotted", "leet", "zero_width"]), b.rng)),
                  P(SOCIAL_EXPLICIT).format(z=b.phone(), n=b.rng.randint(10, 99))]
@@ -329,6 +407,7 @@ def build_all(seed: int) -> tuple:
                       intended=level("HIGH", "PROHIBITED_GOODS", "OFF_PLATFORM_CONTACT"))
 
     def borderline():
+        """Ca nhập nhằng (rượu bia cho người lớn, thuốc lá điện tử có giới hạn tuổi, kể chuyện về ma túy) chưa có ý định rõ; cần lớp mô hình."""
         c = P(cats)
         return b.case("borderline", c, b.benign_text(c) + " " + P(BORDERLINE), P(["trusted", "veteran"]), intended=level(None), needs_model=True)
 
@@ -343,13 +422,14 @@ def build_all(seed: int) -> tuple:
     cases = []
     for name, count, factory in plan:
         cases.extend(make_group(b, name, count, factory))
-    b.rng.shuffle(cases)  # the file order carries no information about the group
-    # the pool every case's approvals start from: other organisers' approved events (candidates for the duplicate signal)
+    b.rng.shuffle(cases)  # thứ tự trong tệp không mang thông tin gì về nhóm
+    # tập mà approvals của mọi ca bắt đầu từ đó: các sự kiện đã duyệt của nhà tổ chức khác (ứng viên cho tín hiệu trùng lặp)
     pool = originals + [b.history_event(f"pool-{i:03d}", "APPROVED") for i in range(30)]
     return pool, cases
 
 
 def main() -> None:
+    """Sinh bộ ca, thêm ca viết tay, đánh số mã ca theo tiền tố và ghi tệp JSON Lines kèm dòng tiêu đề; từ chối ghi đè nếu tệp đã có mà thiếu --force."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--out", default=CASES_PATH)

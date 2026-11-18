@@ -18,6 +18,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * API cho ban tổ chức: xem danh sách đơn của sự kiện và dữ kiện tài chính các đơn đã thanh toán.
+ */
 @RestController
 @RequestMapping("/api/bookings/events/{eventId}/organizer")
 @RequiredArgsConstructor
@@ -28,6 +31,17 @@ public class OrganizerBookingController {
     private final EventAccessClient eventAccess;
     private final EventServiceClient eventServiceClient;
 
+    /**
+     * Liệt kê đơn của sự kiện theo trang (mới nhất trước), có tìm kiếm và lọc suất chiếu; kèm phương thức thanh toán lấy từ payment-service.
+     * Lỗi khi gọi payment-service chỉ làm thiếu phương thức thanh toán, không làm hỏng kết quả.
+     * @param eventId mã sự kiện
+     * @param authorization header Authorization của người gọi, dùng kiểm tra quyền ORDERS_VIEW
+     * @param search từ khóa tìm kiếm, bỏ trống để lấy tất cả
+     * @param showtimeId mã suất chiếu cần lọc, có thể null
+     * @param page số trang bắt đầu từ 0
+     * @param size số dòng mỗi trang
+     * @return trang chi tiết đơn
+     */
     @GetMapping
     public ResponseEntity<Page<BookingDetailDto>> getEventBookings(
             @PathVariable String eventId,
@@ -37,7 +51,7 @@ public class OrganizerBookingController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        // the caller must hold ORDERS_VIEW of this event (event-service answers, with the caller token)
+        // người gọi phải có quyền ORDERS_VIEW của sự kiện này (event-service trả lời, dùng token của người gọi)
         eventAccess.require(eventId, "ORDERS_VIEW", authorization);
         if (search == null) {
             search = "";
@@ -55,7 +69,7 @@ public class OrganizerBookingController {
             try {
                 paymentMethods = paymentServiceClient.getPaymentMethodsByBookingIds(bookingIds);
             } catch (Exception e) {
-                // ignore or log exception
+                // bỏ qua lỗi (có thể ghi log)
             }
         }
         
@@ -78,6 +92,13 @@ public class OrganizerBookingController {
         return ResponseEntity.ok(dtoPage);
     }
 
+    /**
+     * Trả mã và tổng tiền các đơn đã thanh toán của sự kiện cho báo cáo tài chính.
+     * Chỉ quản trị viên hoặc chủ sự kiện được xem; người khác nhận 404.
+     * @param eventId mã sự kiện
+     * @param authorization header Authorization của người gọi
+     * @return danh sách mã đơn đã thanh toán và tổng số tiền
+     */
     @GetMapping("/finance-facts")
     public ResponseEntity<FinanceFactsResponse> getFinanceFacts(@PathVariable String eventId,
             @RequestHeader("Authorization") String authorization) {
@@ -90,5 +111,6 @@ public class OrganizerBookingController {
                 rows.stream().mapToLong(row -> row.getAmount() == null ? 0L : Math.round(row.getAmount())).sum()));
     }
 
+    /** Dữ kiện tài chính của sự kiện: các mã đơn đã thanh toán và tổng số tiền. */
     public record FinanceFactsResponse(String eventId, List<String> paidBookingIds, long paidBookingAmount) {}
 }

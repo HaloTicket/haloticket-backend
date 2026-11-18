@@ -7,10 +7,18 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 
+/** Thông tin một vé thuộc sở hữu của người dùng: loại vé, giá, trạng thái, mã QR (chỉ khi vé còn hiệu lực) và vị trí ghế. */
 public record OwnedTicketResponse(String id, String bookingCode, String eventId, String ticketTypeId, String ticketTypeName,
                                   BigDecimal price, BigDecimal originalPrice, String acquisitionType, String status,
                                   String qrCode, Integer qrVersion, LocalDateTime issuedAt, String seatName,
                                   String bookingId, String showtimeId, String section, String row, String seatNumber) {
+    /**
+     * Chuyển entity {@code Ticket} sang DTO. Giá gốc lấy từ vé, thiếu thì lấy giá loại vé; mã QR chỉ trả khi vé {@code VALID};
+     * tên ghế dựng từ ghế thật, nếu không có thì từ nhãn hàng và số ghế lưu trên vé.
+     *
+     * @param ticket vé cần chuyển đổi
+     * @return thông tin vé dạng DTO
+     */
     public static OwnedTicketResponse from(Ticket ticket) {
         BigDecimal price = ticket.getOriginalPrice();
         String typeId = null;

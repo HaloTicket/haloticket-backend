@@ -18,6 +18,9 @@ import org.springframework.kafka.core.ProducerFactory;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Cấu hình Kafka producer và consumer của {@code marketplace-service}. Dữ liệu truyền dưới dạng chuỗi (JSON).
+ */
 @Configuration
 @EnableKafka
 public class KafkaConfig {
@@ -25,6 +28,11 @@ public class KafkaConfig {
     @Value("${spring.kafka.bootstrap-servers:${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}}")
     private String bootstrapServers;
 
+    /**
+     * Tạo producer factory với {@code acks=all} và bật idempotence để tránh mất hoặc trùng thông điệp khi gửi.
+     *
+     * @return producer factory khóa và giá trị kiểu chuỗi
+     */
     @Bean
     public ProducerFactory<String, String> producerFactory() {
         Map<String, Object> properties = new HashMap<>();
@@ -36,11 +44,22 @@ public class KafkaConfig {
         return new DefaultKafkaProducerFactory<>(properties);
     }
 
+    /**
+     * Tạo {@code KafkaTemplate} dùng để phát sự kiện.
+     *
+     * @return template xây từ {@code producerFactory}
+     */
     @Bean
     public KafkaTemplate<String, String> kafkaTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
 
+    /**
+     * Tạo consumer factory thuộc nhóm {@code marketplace-service}, đọc từ đầu khi chưa có offset
+     * và tắt tự động commit offset (commit do container listener quản lý).
+     *
+     * @return consumer factory khóa và giá trị kiểu chuỗi
+     */
     @Bean
     public ConsumerFactory<String, String> consumerFactory() {
         Map<String, Object> properties = new HashMap<>();
@@ -53,6 +72,11 @@ public class KafkaConfig {
         return new DefaultKafkaConsumerFactory<>(properties);
     }
 
+    /**
+     * Tạo container factory cho các {@code @KafkaListener}, dùng {@code consumerFactory} ở trên.
+     *
+     * @return container factory của listener
+     */
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory() {
         ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();

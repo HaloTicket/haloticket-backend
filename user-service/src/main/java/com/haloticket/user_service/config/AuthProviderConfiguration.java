@@ -14,10 +14,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
+/** Cấu hình các cổng xác thực: gửi OTP và Keycloak, kèm bản dự phòng báo lỗi 503 khi nhà cung cấp chưa sẵn sàng. */
 @Configuration
 @EnableConfigurationProperties(KeycloakProperties.class)
 public class AuthProviderConfiguration {
 
+    /** Cổng gửi OTP mặc định, chỉ dùng khi chưa có bean khác: luôn báo lỗi 503 {@code OTP_DELIVERY_UNAVAILABLE}. */
     @Bean
     @ConditionalOnMissingBean(OtpDeliveryPort.class)
     OtpDeliveryPort otpDeliveryPort() {
@@ -26,6 +28,13 @@ public class AuthProviderConfiguration {
         };
     }
 
+    /**
+     * Bộ chuyển đổi gọi Keycloak thật, bật khi {@code keycloak.enabled} là true hoặc không khai báo.
+     *
+     * @param properties cấu hình Keycloak
+     * @param userRepository kho người dùng
+     * @param challengeRepository kho thử thách OTP
+     */
     @Bean
     @ConditionalOnProperty(name = "keycloak.enabled", havingValue = "true", matchIfMissing = true)
     KeycloakAuthPort keycloakAuthAdapter(
@@ -37,6 +46,7 @@ public class AuthProviderConfiguration {
         return new KeycloakAuthAdapter(properties, restClient, userRepository, challengeRepository);
     }
 
+    /** Cổng Keycloak dự phòng khi không có bean thật: mọi thao tác đều báo lỗi 503 {@code KEYCLOAK_UNAVAILABLE}. */
     @Bean
     @ConditionalOnMissingBean(KeycloakAuthPort.class)
     KeycloakAuthPort fallbackKeycloakAuthPort() {

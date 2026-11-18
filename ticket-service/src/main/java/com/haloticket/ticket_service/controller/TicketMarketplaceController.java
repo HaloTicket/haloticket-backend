@@ -18,6 +18,7 @@ import com.haloticket.ticket_service.service.TicketService;
 
 import org.springframework.transaction.annotation.Transactional;
 
+/** API vé của người dùng: danh sách vé sở hữu, chi tiết vé và điều kiện bán lại. Người dùng xác định qua JWT. */
 @RestController
 @RequestMapping("/api/tickets")
 @RequiredArgsConstructor
@@ -25,6 +26,7 @@ public class TicketMarketplaceController {
     private final TicketRepository ticketRepository;
     private final TicketService ticketService;
 
+    /** Liệt kê vé của người dùng hiện tại theo từng trang; thiếu JWT thì trả 401. */
     @GetMapping("/mine")
     @Transactional(readOnly = true)
     public Page<OwnedTicketResponse> myTickets(
@@ -35,16 +37,21 @@ public class TicketMarketplaceController {
         return ticketService.getMyTickets(jwt.getSubject(), PageRequest.of(page, size));
     }
 
+    /** Lấy chi tiết một vé của người dùng hiện tại; vé của người khác được trả 404 như vé không tồn tại. */
     @GetMapping("/{ticketId}")
     @Transactional(readOnly = true)
     public OwnedTicketResponse myTicket(@PathVariable String ticketId, @AuthenticationPrincipal Jwt jwt) {
         if (jwt == null || jwt.getSubject() == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         Ticket ticket = ticketRepository.findById(ticketId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        // someone else's ticket looks the same as a missing one
+        // vé của người khác trông giống vé không tồn tại
         if (!jwt.getSubject().equals(ticket.getOwnerId())) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         return OwnedTicketResponse.from(ticket);
     }
 
+    /**
+     * Cho biết vé có thể bán lại hay không. Chỉ chủ vé mới xem được (khác chủ trả 403); vé đủ điều kiện khi đang {@code VALID}.
+     * Giá gốc lấy từ vé, nếu thiếu thì lấy giá loại vé làm tròn.
+     */
     @GetMapping("/{ticketId}/resale-eligibility")
     @Transactional(readOnly = true)
     public ResaleEligibilityResponse resaleEligibility(@PathVariable String ticketId, @AuthenticationPrincipal Jwt jwt) {
@@ -70,11 +77,13 @@ public class TicketMarketplaceController {
                 ticket.getGiftTransferCount());
     }
 
+    /** Kết quả kiểm tra điều kiện bán lại: cờ đủ điều kiện, mã lý do, giá gốc và thông tin vé, loại vé, ghế, số lần tặng. */
     public record ResaleEligibilityResponse(String ticketId, String eventId, boolean eligible, String reasonCode,
                                              BigDecimal originalPrice, BigDecimal minPrice, BigDecimal maxPrice,
                                              Long policyVersion, Instant closesAt, String termsVersion,
                                              String ticketTypeName, String section, String row, String seat,
                                              String ticketTypeId, String showtimeId, int giftTransferCount) {
+        /** Constructor rút gọn không có {@code giftTransferCount}, đặt số lần tặng vé bằng 0. */
         public ResaleEligibilityResponse(String ticketId, String eventId, boolean eligible, String reasonCode,
                 BigDecimal originalPrice, BigDecimal minPrice, BigDecimal maxPrice, Long policyVersion,
                 Instant closesAt, String termsVersion, String ticketTypeName, String section, String row,

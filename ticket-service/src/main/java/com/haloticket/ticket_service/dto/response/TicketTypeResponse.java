@@ -5,6 +5,7 @@ import com.haloticket.ticket_service.enums.TicketTypeStatus;
 import lombok.Builder;
 import lombok.Data;
 
+/** Thông tin một loại vé trả về cho client: giá, các số lượng (tổng, còn lại, đang giữ, đã bán) và giới hạn mua mỗi đơn. */
 @Data
 @Builder
 public class TicketTypeResponse {

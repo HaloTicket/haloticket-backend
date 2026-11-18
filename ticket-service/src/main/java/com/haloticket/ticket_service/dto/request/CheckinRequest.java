@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.ToString;
 import lombok.NoArgsConstructor;
 
+/** Yêu cầu check-in: mã băm QR của vé, sự kiện, suất diễn, nhân viên quét và thông tin thiết bị. */
 @Data
 @Builder
 @NoArgsConstructor

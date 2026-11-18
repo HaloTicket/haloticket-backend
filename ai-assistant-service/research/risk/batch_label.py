@@ -1,13 +1,13 @@
-"""Labelling in batches without the interactive tool (used for the model's own pass).
+"""Gán nhãn theo lô, không dùng công cụ tương tác (dùng cho lượt gán của chính mô hình).
 
 python -m research.risk.batch_label show  --annotator A --start 31 --end 60
-python -m research.risk.batch_label put   --annotator A --start 31 --end 60 --out labels/_A_part31.jsonl   (reads stdin)
+python -m research.risk.batch_label put   --annotator A --start 31 --end 60 --out labels/_A_part31.jsonl   (đọc stdin)
 python -m research.risk.batch_label status --annotator A --start 31 --end 60 --out labels/_A_part31.jsonl
 python -m research.risk.batch_label merge --annotator A --parts labels/_A_part31.jsonl,labels/_A_part61.jsonl
 
-Positions are 1-based places in the annotator's own shuffled order (the same order label.py walks). `show` prints exactly
-the annotator screen (no group, no intended label, no score). `put` reads lines "position|entry|note", for example
-"37|2 r|short reason" where entry has the same syntax as in label.py; the note is required only with u.
+Vị trí tính từ 1 trong thứ tự xáo trộn riêng của người gán nhãn (cùng thứ tự mà label.py duyệt). `show` in đúng
+màn hình của người gán nhãn (không có nhóm, không có nhãn dự kiến, không có điểm). `put` đọc các dòng "position|entry|note", ví dụ
+"37|2 r|short reason" trong đó entry có cú pháp như trong label.py; ghi chú chỉ bắt buộc khi có u.
 """
 import argparse
 import os
@@ -21,6 +21,7 @@ BY = "claude-sonnet-5.5 (LLM), blind: saw only the annotator screen"
 
 
 def window(annotator: str, start: int, end: int) -> tuple:
+    """Kiểm tra khoảng vị trí start..end hợp lệ với thứ tự của người gán nhãn; trả ({id: ca}, thứ tự id). Thoát với lỗi nếu ngoài khoảng."""
     _, cases = load_cases()
     order = ordered_ids(cases, annotator)
     if not 1 <= start <= end <= len(order):
@@ -29,6 +30,7 @@ def window(annotator: str, start: int, end: int) -> tuple:
 
 
 def show(annotator: str, start: int, end: int, output=print) -> None:
+    """In màn hình gán nhãn của các ca ở vị trí start..end theo thứ tự của người gán nhãn."""
     by_id, order = window(annotator, start, end)
     for position in range(start, end + 1):
         cid = order[position - 1]
@@ -37,7 +39,7 @@ def show(annotator: str, start: int, end: int, output=print) -> None:
 
 
 def parse_line(line: str, start: int, end: int):
-    """(position, entry, note) or raises ValueError with the reason."""
+    """Phân tích một dòng "position|entry|note", trả (position, entry, note) hoặc ném ValueError kèm lý do."""
     parts = [p.strip() for p in line.split("|", 2)]
     if len(parts) < 2 or not parts[0].isdigit():
         raise ValueError("expected position|entry|note")
@@ -56,6 +58,7 @@ def parse_line(line: str, start: int, end: int):
 
 
 def put(annotator: str, start: int, end: int, out: str, lines, output=print) -> int:
+    """Đọc các dòng "position|entry|note" và ghi nhãn vào tệp `out`; dòng sai được báo lỗi và bỏ qua. Trả số dòng lỗi."""
     _, order = window(annotator, start, end)
     written, errors = 0, 0
     for raw in lines:
@@ -76,6 +79,7 @@ def put(annotator: str, start: int, end: int, out: str, lines, output=print) -> 
 
 
 def status(annotator: str, start: int, end: int, out: str, output=print) -> list:
+    """In số vị trí đã gán trong khoảng start..end và trả danh sách vị trí còn thiếu."""
     _, order = window(annotator, start, end)
     done = {r["order"] for r in read_jsonl(out)}
     missing = [p for p in range(start, end + 1) if p not in done]
@@ -84,7 +88,7 @@ def status(annotator: str, start: int, end: int, out: str, output=print) -> list
 
 
 def merge(annotator: str, parts: list, output=print) -> int:
-    """Appends the parts to labels/<annotator>.jsonl in position order. Refuses duplicates or a gap against the pilot."""
+    """Ghi nối các tệp phần vào labels/<annotator>.jsonl theo thứ tự vị trí. Từ chối ca trùng hoặc id sai vị trí. Trả tổng số nhãn."""
     _, cases = load_cases()
     order = ordered_ids(cases, annotator)
     existing = latest(read_jsonl(path_for(annotator)))
@@ -93,7 +97,7 @@ def merge(annotator: str, parts: list, output=print) -> int:
         for row in read_jsonl(part):
             if row["id"] != order[row["order"] - 1]:
                 raise SystemExit(f"{part}: id {row['id']} is not at position {row['order']} of the {annotator} order")
-            rows[row["order"]] = row  # a redo inside a part replaces the earlier line
+            rows[row["order"]] = row  # làm lại trong cùng một phần thì thay dòng trước đó
     clash = [r["id"] for r in rows.values() if r["id"] in existing]
     if clash:
         raise SystemExit(f"already labelled in {path_for(annotator)}: {clash[:5]}")
@@ -105,6 +109,7 @@ def merge(annotator: str, parts: list, output=print) -> int:
 
 
 def main() -> None:
+    """Điểm vào dòng lệnh: chạy lệnh con show, put, status hoặc merge."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("command", choices=("show", "put", "status", "merge"))
     parser.add_argument("--annotator", required=True)

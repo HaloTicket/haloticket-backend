@@ -30,18 +30,18 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Writes an administrator makes to other people's accounts: open one, lock or unlock one, change its roles. Every change leaves a
- * row in admin_audit. Errors are ResponseStatusException with a stable code as the reason (the web page turns codes into text).
+ * Các thao tác ghi của quản trị viên lên tài khoản người khác: mở tài khoản, khóa hoặc mở khóa, đổi vai trò. Mỗi thay đổi để lại
+ * một dòng trong bảng admin_audit. Lỗi là {@code ResponseStatusException} có mã ổn định làm lý do (trang web đổi mã thành văn bản).
  *
- * A new account is created in Keycloak with a random password nobody sees (the adapter's registerDormant), so the person signs in
- * by choosing a password through the password-reset flow, which sends a code to the mailbox. This service sends no mail itself.
- * Roles are stored in the user table; they are not written to Keycloak (as with the role editor that existed before).
+ * Tài khoản mới được tạo trong Keycloak với mật khẩu ngẫu nhiên không ai biết (hàm {@code registerDormant} của adapter), nên người
+ * dùng đăng nhập bằng cách đặt mật khẩu qua luồng đặt lại mật khẩu, luồng này gửi mã về hộp thư. Service này không tự gửi thư.
+ * Vai trò lưu trong bảng user, không ghi sang Keycloak (giống trình sửa vai trò trước đây).
  */
 @Service
 @RequiredArgsConstructor
 public class AdminUserManagementService {
 
-    /** Roles an administrator may give. GUEST is the anonymous visitor, not an account role. */
+    /** Các vai trò quản trị viên được phép cấp. {@code GUEST} là khách vãng lai, không phải vai trò của tài khoản. */
     public static final Set<Role> ASSIGNABLE_ROLES = EnumSet.of(Role.CUSTOMER, Role.ORGANIZER, Role.STAFF, Role.ADMIN);
 
     private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
@@ -52,6 +52,15 @@ public class AdminUserManagementService {
     private final KeycloakAuthPort keycloakAuthPort;
     private final AdminAuditRepository auditRepository;
 
+    /**
+     * Mở tài khoản cho người khác: kiểm tra email, họ tên, số điện thoại và vai trò, tạo tài khoản "ngủ" trong Keycloak rồi lưu
+     * thông tin vào bảng user ở trạng thái {@code ACTIVE} và ghi nhật ký.
+     *
+     * @param actor JWT của quản trị viên thực hiện
+     * @param request dữ liệu tài khoản cần tạo
+     * @return dòng người dùng vừa tạo
+     * @throws ResponseStatusException HTTP 400 khi dữ liệu sai, 409 khi trùng email hoặc số điện thoại, 502 hoặc 503 khi Keycloak lỗi
+     */
     public AdminUserListItem createUser(Jwt actor, AdminUserCreateRequest request) {
         if (request == null) {
             throw error(HttpStatus.BAD_REQUEST, "INVALID_BODY");
@@ -100,6 +109,16 @@ public class AdminUserManagementService {
         return toItem(user);
     }
 
+    /**
+     * Đổi trạng thái tài khoản và ghi nhật ký; không làm gì nếu trạng thái không đổi.
+     * Khi khóa hoặc ngừng tài khoản thì không cho tự khóa mình và không cho khóa quản trị viên hoạt động cuối cùng.
+     *
+     * @param actor JWT của quản trị viên thực hiện
+     * @param id mã người dùng cần đổi
+     * @param status trạng thái mới
+     * @param reason lý do (tùy chọn, tối đa 500 ký tự)
+     * @throws ResponseStatusException HTTP 400, 404 hoặc 409 theo từng lỗi kiểm tra
+     */
     @Transactional
     public void updateStatus(Jwt actor, String id, UserStatus status, String reason) {
         if (status == null) {
@@ -124,6 +143,15 @@ public class AdminUserManagementService {
         audit(actor, AdminAudit.CHANGE_STATUS, user, before == null ? null : before.name(), status.name(), cleanReason);
     }
 
+    /**
+     * Thay toàn bộ vai trò của người dùng và ghi nhật ký; không làm gì nếu tập vai trò không đổi.
+     * Không cho tự gỡ quyền {@code ADMIN} của mình và không cho gỡ quyền của quản trị viên hoạt động cuối cùng.
+     *
+     * @param actor JWT của quản trị viên thực hiện
+     * @param id mã người dùng cần đổi
+     * @param requested tập vai trò mới
+     * @throws ResponseStatusException HTTP 400, 404 hoặc 409 theo từng lỗi kiểm tra
+     */
     @Transactional
     public void updateRoles(Jwt actor, String id, Set<Role> requested) {
         Set<Role> roles = validatedRoles(requested);
@@ -147,6 +175,11 @@ public class AdminUserManagementService {
         audit(actor, AdminAudit.CHANGE_ROLES, user, oldValue, describeRoles(roles), null);
     }
 
+    /**
+     * Thống kê tổng số người dùng, số theo từng vai trò và theo từng trạng thái; mục không có người vẫn được trả với giá trị 0.
+     *
+     * @return số liệu thống kê
+     */
     @Transactional(readOnly = true)
     public AdminUserStatsResponse stats() {
         Map<String, Long> byRole = new LinkedHashMap<>();
@@ -168,6 +201,12 @@ public class AdminUserManagementService {
         return AdminUserStatsResponse.builder().total(userRepository.count()).byRole(byRole).byStatus(byStatus).build();
     }
 
+    /**
+     * Lấy nhật ký thao tác quản trị theo trang.
+     *
+     * @param pageable thông tin phân trang và sắp xếp
+     * @return trang nhật ký đã đổi sang DTO
+     */
     @Transactional(readOnly = true)
     public Page<AdminAuditItem> auditLog(Pageable pageable) {
         return auditRepository.findAll(pageable).map(row -> AdminAuditItem.builder()
@@ -179,21 +218,30 @@ public class AdminUserManagementService {
 
     // ---- helpers
 
+    /** Tìm người dùng theo id, báo HTTP 404 {@code USER_NOT_FOUND} nếu không có. */
     private User find(String id) {
         return userRepository.findById(id).orElseThrow(() -> error(HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
     }
 
+    /** Cho biết quản trị viên đang thao tác chính là tài khoản đích (so sánh subject với id Keycloak). */
     private static boolean isSelf(Jwt actor, User target) {
         return actor != null && actor.getSubject() != null && actor.getSubject().equals(target.getKeycloakId());
     }
 
-    /** True when taking this account out of service (or out of the admin role) would leave no active administrator. */
+    /** Đúng khi việc ngừng tài khoản này (hoặc gỡ vai trò admin của nó) sẽ làm hệ thống không còn quản trị viên nào đang hoạt động. */
     private boolean isLastActiveAdmin(User target) {
         boolean activeAdmin = target.getStatus() == UserStatus.ACTIVE
                 && target.getRoles() != null && target.getRoles().contains(Role.ADMIN);
         return activeAdmin && userRepository.countByRoleAndStatus(Role.ADMIN, UserStatus.ACTIVE) <= 1;
     }
 
+    /**
+     * Kiểm tra tập vai trò không rỗng và chỉ gồm vai trò được phép cấp.
+     *
+     * @param roles tập vai trò cần kiểm tra
+     * @return chính tập đã kiểm tra
+     * @throws ResponseStatusException HTTP 400 {@code ROLES_REQUIRED} hoặc {@code INVALID_ROLE}
+     */
     private static Set<Role> validatedRoles(Set<Role> roles) {
         if (roles == null || roles.isEmpty()) {
             throw error(HttpStatus.BAD_REQUEST, "ROLES_REQUIRED");
@@ -206,7 +254,13 @@ public class AdminUserManagementService {
         return roles;
     }
 
-    /** null when blank; the Vietnamese mobile form 0xxxxxxxxx otherwise (+84 and 84 prefixes are accepted). */
+    /**
+     * Chuẩn hóa số điện thoại di động Việt Nam về dạng 0xxxxxxxxx (chấp nhận tiền tố +84 và 84); trả về {@code null} nếu để trống.
+     *
+     * @param raw số điện thoại người dùng nhập
+     * @return số đã chuẩn hóa hoặc {@code null}
+     * @throws ResponseStatusException HTTP 400 {@code INVALID_PHONE} khi sai định dạng
+     */
     static String normalizePhone(String raw) {
         if (raw == null || raw.isBlank()) {
             return null;
@@ -223,6 +277,7 @@ public class AdminUserManagementService {
         return digits;
     }
 
+    /** Cắt khoảng trắng của lý do; trả về {@code null} nếu trống, báo HTTP 400 {@code REASON_TOO_LONG} nếu quá 500 ký tự. */
     private static String cleanReason(String reason) {
         if (reason == null || reason.isBlank()) {
             return null;
@@ -234,10 +289,12 @@ public class AdminUserManagementService {
         return value;
     }
 
+    /** Ghép tên các vai trò theo thứ tự bảng chữ cái, cách nhau dấu phẩy, để ghi vào nhật ký. */
     private static String describeRoles(Set<Role> roles) {
         return roles.stream().sorted(Comparator.comparing(Enum::name)).map(Enum::name).collect(Collectors.joining(","));
     }
 
+    /** Ghi một dòng nhật ký quản trị; nếu không xác định được người thực hiện thì dùng "unknown" làm id Keycloak. */
     private void audit(Jwt actor, String action, User target, String oldValue, String newValue, String reason) {
         auditRepository.save(AdminAudit.builder()
                 .actorKeycloakId(actor == null || actor.getSubject() == null ? "unknown" : actor.getSubject())
@@ -246,6 +303,7 @@ public class AdminUserManagementService {
                 .oldValue(oldValue).newValue(newValue).reason(reason).build());
     }
 
+    /** Đổi người dùng sang dòng danh sách của trang quản trị; chưa có hồ sơ eKYC thì trạng thái là {@code UNVERIFIED}. */
     private static AdminUserListItem toItem(User user) {
         EkycProfile ekyc = user.getEkycProfile();
         return AdminUserListItem.builder()
@@ -256,6 +314,7 @@ public class AdminUserManagementService {
                 .build();
     }
 
+    /** Tạo {@code ResponseStatusException} với mã lỗi ổn định làm lý do. */
     private static ResponseStatusException error(HttpStatus status, String code) {
         return new ResponseStatusException(status, code);
     }

@@ -6,6 +6,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** Sơ đồ ghế của một sự kiện (bảng {@code seat_layouts}): dữ liệu SVG, bản nháp JSON, ảnh nền, trạng thái và các khu vực ghế. */
 @Entity
 @Table(name = "seat_layouts")
 @Getter
@@ -42,6 +43,7 @@ public class SeatLayout {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Khi lưu: ghi thời điểm tạo và cập nhật, mặc định trạng thái {@code DRAFT}. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -49,6 +51,7 @@ public class SeatLayout {
         if (this.status == null) this.status = SeatLayoutStatus.DRAFT;
     }
 
+    /** Khi cập nhật: ghi lại thời điểm cập nhật. */
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

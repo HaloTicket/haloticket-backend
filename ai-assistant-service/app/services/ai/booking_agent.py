@@ -1,9 +1,9 @@
-"""Customer booking chatbot. No model, engine or embedding client exists at import: models are reached through
-ai_invoke('customer_chat', ...) and databases through the read-only chatbot engines, both at call time.
+"""Chatbot đặt vé cho khách hàng. Lúc import không tồn tại mô hình, engine hay client embedding nào: mô hình được gọi qua
+`ai_invoke('customer_chat', ...)` và cơ sở dữ liệu qua các engine chỉ đọc của chatbot, cả hai đều tại thời điểm gọi.
 
-Untrusted text (the user's message, the history, event / ticket text from the database) reaches the model only inside
-per-request random-delimiter data blocks (see prompt_safety). Failures are raised (AiError), never turned into a
-successful-looking answer.
+Văn bản không tin cậy (tin nhắn của khách, lịch sử, nội dung sự kiện / vé từ cơ sở dữ liệu) chỉ tới được mô hình bên trong
+các khối dữ liệu có ranh giới ngẫu nhiên theo từng yêu cầu (xem prompt_safety). Lỗi được ném ra (AiError), không bao giờ
+bị biến thành một câu trả lời trông như thành công.
 """
 import json
 import logging
@@ -26,26 +26,26 @@ from app.services.ai.tools import (
 
 log = logging.getLogger("ai.booking")
 
-# who is asking (hashed id from the rate limiter), for usage metering; set by the route
+# người đang hỏi (mã đã băm từ bộ giới hạn tần suất), dùng để đo mức sử dụng; do route đặt
 actor_var: ContextVar = ContextVar("booking_actor", default=None)
 
 MAX_HISTORY_ITEMS = 10
 MAX_HISTORY_ITEM_CHARS = 2000
 RAG_MIN_SCORE = 0.38
 
-# a pure greeting is one of these phrases after normalisation (lower case, punctuation removed): never a prefix match,
-# so "hiện nay có show nào" or "hiphop" are not greetings.
+# lời chào thuần là một trong các cụm này sau khi chuẩn hóa (chữ thường, bỏ dấu câu): không bao giờ khớp theo tiền tố,
+# nên "hiện nay có show nào" hay "hiphop" không phải lời chào.
 GREETING_PHRASES = frozenset({
     "xin chào", "chào", "chào bạn", "hello", "hi", "hey", "halo", "alo", "hi bạn", "hello bạn", "hey bạn",
     "chào ad", "ad ơi", "bạn ơi", "alo bạn", "có ai không", "bạn là ai", "trợ lý là ai", "test",
     "chào buổi sáng", "chào buổi tối", "chào buổi chiều", "xin chào bạn", "chào bạn ơi", "hi ad", "hello ad",
 })
 
-# event id after a marker word: UUIDs and slugs (e.g. nxnx37-hoc-vien-phep-thuat); the id is verified in the database.
+# mã sự kiện đứng sau một từ đánh dấu: UUID và slug (ví dụ nxnx37-hoc-vien-phep-thuat); mã được kiểm chứng trong cơ sở dữ liệu.
 EVENT_ID_RE = re.compile(r'\b(?:mã sự kiện|mã|event_id|id)\b[\s:=#]*([A-Za-z0-9][A-Za-z0-9_-]{2,63})', re.IGNORECASE)
 MAX_ID_CANDIDATES = 5
 
-# steps that really need the smart tier: assembling the confirmation JSON, extracting zone / seat counts
+# các bước thực sự cần tầng mô hình mạnh: dựng JSON xác nhận, trích khu vực / số ghế
 _SMART_HINTS = (
     "xác nhận", "đồng ý đặt", "đặt vé", "đặt luôn", "mua vé", "thanh toán", "liền kề", "cạnh nhau", "kế nhau",
     "tìm ghế", "tìm cho tôi", "chọn ghế",
@@ -84,15 +84,17 @@ QUY TẮC CỐT LÕI (NGHIÊM CẤM VI PHẠM):
 
 
 def _normalize_phrase(value: str) -> str:
+    """Chuẩn hóa câu: chữ thường, thay dấu câu bằng khoảng trắng và gộp khoảng trắng thừa."""
     return " ".join(re.sub(r"[^\w\s]", " ", (value or "").lower()).split())
 
 
 def is_greeting(message: str) -> bool:
+    """Cho biết tin nhắn có phải một lời chào thuần (khớp trọn một cụm trong `GREETING_PHRASES`) hay không."""
     return _normalize_phrase(message) in GREETING_PHRASES
 
 
 def extract_event_id_candidates(*texts) -> list:
-    """Ids that follow a marker word ('mã', 'mã sự kiện', 'event_id', 'id'), in order, without duplicates."""
+    """Các mã đứng sau từ đánh dấu ('mã', 'mã sự kiện', 'event_id', 'id'), theo thứ tự xuất hiện, không trùng, tối đa `MAX_ID_CANDIDATES`."""
     out = []
     for text_ in texts:
         if not isinstance(text_, str):
@@ -107,8 +109,8 @@ def extract_event_id_candidates(*texts) -> list:
 
 
 def clean_history(history) -> list:
-    """Only {'role': 'user'|'assistant', 'content': str} items, newest 10, content capped. Anything else (forged
-    system / tool turns, non-dict items, non-string content) is dropped."""
+    """Chỉ giữ các mục `{'role': 'user'|'assistant', 'content': str}`, 10 mục mới nhất, nội dung bị cắt độ dài. Mọi thứ khác (lượt
+    system / tool giả mạo, mục không phải dict, nội dung không phải chuỗi) đều bị bỏ."""
     if not isinstance(history, list):
         return []
     out = []
@@ -125,12 +127,14 @@ def clean_history(history) -> list:
 
 
 def _text_of(content) -> str:
+    """Văn bản của nội dung phản hồi; ghép các phần nếu nội dung là danh sách."""
     if isinstance(content, list):
         return "".join(part.get("text", "") if isinstance(part, dict) else str(part) for part in content)
     return "" if content is None else str(content)
 
 
 def _status_of(tool_result) -> str:
+    """Trường `status` trong kết quả JSON của công cụ; chuỗi rỗng nếu không đọc được."""
     try:
         obj = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
         return str(obj.get("status", "")) if isinstance(obj, dict) else ""
@@ -139,13 +143,16 @@ def _status_of(tool_result) -> str:
 
 
 def _db_failure(failure: Exception) -> AiError:
+    """Ghi log lỗi cơ sở dữ liệu (chỉ tên kiểu lỗi) và trả `AiError` `AI_UNAVAILABLE` để ném."""
     log.warning("booking chat database error: %s", type(failure).__name__)
     return ai_error(AI_UNAVAILABLE)
 
 
 class BookingAgent:
-    # tool name -> (tool, action name sent to the web app, results that are shown even when not 'success')
+    """Agent chatbot đặt vé: tìm sự kiện, cho mô hình gọi công cụ rồi trả lời kèm các hành động cho giao diện web."""
     def __init__(self):
+        """Khai báo các công cụ và bảng ánh xạ `tên công cụ -> (công cụ, tên hành động gửi cho web, các status được hiển thị)`."""
+        # ánh xạ tên công cụ -> (công cụ, tên hành động gửi cho web, kết quả vẫn được hiển thị dù không phải 'success')
         self.tools = [find_adjacent_seats, request_user_confirmation, show_event_cards, show_seatmap, show_ticket_types]
         self.dispatch = {
             "find_adjacent_seats": (find_adjacent_seats, "HIGHLIGHT_SEATS", None),
@@ -156,17 +163,19 @@ class BookingAgent:
         }
         self.system_prompt = SystemMessage(content=SYSTEM_PROMPT)
 
-    # model
+    # Mô hình
     def _invoke(self, messages, tier=None):
+        """Gọi mô hình profile `customer_chat` kèm các công cụ của agent, theo tầng mô hình tùy chọn."""
         return ai_invoke("customer_chat", messages, actor=actor_var.get(), tools=self.tools, tier=tier)
 
     @staticmethod
     def _needs_smart(message_lower: str) -> bool:
+        """Tin nhắn có thuộc bước cần mô hình mạnh (đặt vé, ghế liền kề, số lượng ghế/vé) hay không."""
         return any(h in message_lower for h in _SMART_HINTS) or bool(_SEAT_COUNT_RE.search(message_lower))
 
-    # database helpers (read-only engines)
+    # Hàm truy cập cơ sở dữ liệu (engine chỉ đọc)
     def existing_event_id(self, candidates):
-        """First candidate that is a valid event in the database, else None."""
+        """Mã ứng viên đầu tiên là sự kiện hợp lệ trong cơ sở dữ liệu, nếu không có thì `None`."""
         if not candidates:
             return None
         try:
@@ -185,12 +194,13 @@ class BookingAgent:
 
     @staticmethod
     def _topic_words(user_message_clean: str) -> list:
-        """The words of the message that name a topic: what is left after the filler words of "có sự kiện nào gần đây không"."""
+        """Các từ của tin nhắn nêu chủ đề: phần còn lại sau khi bỏ các từ đệm như trong "có sự kiện nào gần đây không" (tối đa 12 từ)."""
         stop_words = {"sự", "kiện", "nào", "không", "cho", "tôi", "vài", "gần", "đây", "sắp", "diễn", "ra", "liên", "quan", "đến", "có", "tìm", "thấy", "thế", "nào", "với", "ạ", "nhé", "nha", "muốn", "xem", "hỏi", "về", "các", "những"}
         raw_tokens = [w for w in re.split(r'[,.!?\s]+', user_message_clean) if len(w) >= 2]
         return [w for w in raw_tokens if w.lower() not in stop_words][:12]
 
     def _keyword_events(self, user_message_clean: str):
+        """Tìm tối đa 5 sự kiện còn hiệu lực có tiêu đề hoặc mô tả khớp cụm từ chủ đề, hoặc tiêu đề khớp từng từ khóa."""
         clean_words = self._topic_words(user_message_clean)
         if not clean_words:
             return []
@@ -224,8 +234,8 @@ class BookingAgent:
         } for r in rows]
 
     def _vector_events(self, user_message: str):
-        """Valid events near the question (threshold and validity are applied in SQL). An embedding problem only
-        removes this part of the search; a database problem is an error."""
+        """Sự kiện hợp lệ gần với câu hỏi (ngưỡng điểm và tính hợp lệ được áp dụng ngay trong SQL). Lỗi embedding chỉ làm mất
+        phần tìm kiếm này; lỗi cơ sở dữ liệu thì là lỗi thật."""
         try:
             with chat_tools.event_db().connect() as conn:
                 return rag_engine.search_events(conn, user_message, top_k=5, min_score=RAG_MIN_SCORE)
@@ -238,6 +248,7 @@ class BookingAgent:
             raise _db_failure(failure)
 
     def _latest_events(self):
+        """Năm sự kiện hợp lệ mới tạo nhất, dùng khi không tìm được sự kiện khớp."""
         try:
             with chat_tools.event_db().connect() as conn:
                 return conn.execute(text(
@@ -248,8 +259,9 @@ class BookingAgent:
         except SQLAlchemyError as failure:
             raise _db_failure(failure)
 
-    # context for the model
+    # Ngữ cảnh đưa cho mô hình
     def _search_context(self, user_message_clean: str, blocks: DataBlocks) -> str:
+        """Dựng đoạn ngữ cảnh gắn vào tin nhắn của khách: sự kiện khớp (từ khóa và vector), hoặc, nếu không có, các sự kiện mới nhất kèm lưu ý phù hợp."""
         sql_events = self._keyword_events(user_message_clean)
         vector_events = self._vector_events(user_message_clean)
 
@@ -278,7 +290,7 @@ class BookingAgent:
             "\n".join(f"- Mã sự kiện: {e.id} (Tên: {blocks.clean(e.title, 200)}, Địa điểm: {blocks.clean(e.city, 100)})" for e in latest),
             "dữ liệu sự kiện đang có", max_chars=2000)
         if not self._topic_words(user_message_clean):
-            # a general question ("có sự kiện nào gần đây không"): nothing was missed, the customer wants to browse
+            # câu hỏi chung ("có sự kiện nào gần đây không"): không bỏ sót gì, khách chỉ muốn xem tổng quát
             return ("\n\n[LƯU Ý TỪ HỆ THỐNG]:\nKhách hỏi chung về các sự kiện, chưa nêu chủ đề cụ thể. Hãy giới thiệu ngắn gọn các sự kiện "
                     f"mới nhất có thật sau đây rồi hỏi khách quan tâm loại sự kiện nào:\n{latest_text}\n"
                     f"Và gọi ngay `show_event_cards(event_ids={json.dumps(latest_ids)})`. TUYỆT ĐỐI KHÔNG BỊA ĐẶT THÊM SỰ KIỆN KHÁC.")
@@ -287,8 +299,9 @@ class BookingAgent:
                 f"và giới thiệu các sự kiện thực tế đang có sau đây:\n{latest_text}\n"
                 f"Và gọi `show_event_cards(event_ids={json.dumps(latest_ids)})`.")
 
-    # tools
+    # Công cụ
     def _run_tool(self, tool_obj, args):
+        """Chạy một công cụ với tham số do mô hình đưa ra; tham số sai thì trả JSON lỗi cố định thay vì lộ nội dung ngoại lệ."""
         if not isinstance(args, dict):
             args = {}
         try:
@@ -297,12 +310,15 @@ class BookingAgent:
             raise
         except SQLAlchemyError as failure:
             raise _db_failure(failure)
-        except Exception as failure:  # bad arguments from the model: tell the model, never echo the exception
+        except Exception as failure:  # tham số sai từ mô hình: báo cho mô hình biết, không bao giờ trả nguyên ngoại lệ
             log.warning("tool %s rejected its arguments: %s", getattr(tool_obj, "name", "?"), type(failure).__name__)
             return json.dumps({"status": "error", "message": "Tham số gọi công cụ không hợp lệ."}, ensure_ascii=False)
 
     def chat(self, user_message: str, history: list = None, db=None):
-        """`db` is accepted for compatibility with the route and ignored: every query uses the read-only chatbot engines."""
+        """Xử lý một lượt chat: nhận diện ý định, chèn ngữ cảnh tìm kiếm, cho mô hình gọi công cụ rồi viết câu trả lời cuối.
+
+        Trả về `{reply, system_actions}`. `db` được nhận để tương thích với route và bị bỏ qua: mọi truy vấn dùng engine chỉ đọc của chatbot.
+        """
         user_message_clean = (user_message or "").strip()
         user_message_lower = user_message_clean.lower()
         history = clean_history(history)
@@ -324,7 +340,7 @@ class BookingAgent:
 
         injected_context = ""
         if is_seatmap_intent:
-            # an id only counts when it is a valid event in the database
+            # mã chỉ được tính khi là sự kiện hợp lệ trong cơ sở dữ liệu
             candidates = extract_event_id_candidates(user_message_clean, *[h["content"] for h in reversed(history)])
             target_event_id = self.existing_event_id(candidates)
             if target_event_id:
@@ -338,12 +354,12 @@ class BookingAgent:
             if msg["role"] == "user":
                 messages.append(HumanMessage(content=blocks.wrap(msg["content"], "lịch sử hội thoại", MAX_HISTORY_ITEM_CHARS)))
             else:
-                # the assistant's own earlier answers stay plain text: wrapped in a block they taught the model to answer in blocks
+                # câu trả lời cũ của chính trợ lý giữ ở dạng văn bản thường: nếu bọc trong khối dữ liệu sẽ khiến mô hình học cách trả lời bằng khối
                 messages.append(AIMessage(content=blocks.clean(strip_markers(msg["content"]), MAX_HISTORY_ITEM_CHARS)))
         messages.append(HumanMessage(content=blocks.wrap(user_message_clean, "tin nhắn của khách", 2000) + injected_context))
 
-        # the call that decides which tool to use is the one that makes this an agent: it always gets the stronger model;
-        # wording the result afterwards uses it only for booking and seat requests
+        # lệnh gọi quyết định dùng công cụ nào là phần làm nên một agent: luôn dùng mô hình mạnh hơn;
+        # còn việc diễn đạt kết quả sau đó chỉ dùng mô hình mạnh cho yêu cầu đặt vé và chọn ghế
         ai_response = self._invoke(messages, tier="smart")
 
         tool_calls = getattr(ai_response, "tool_calls", None)
@@ -386,6 +402,7 @@ class BookingAgent:
 
     @staticmethod
     def _fallback_reply(results) -> str:
+        """Câu trả lời dự phòng (theo hành động đã thực hiện) khi mô hình trả về văn bản rỗng."""
         actions = {r["action"] for r in results}
         if "SHOW_EVENT_CARDS" in actions:
             return "Dưới đây là một số sự kiện nổi bật và phù hợp trên HaloTicket dành cho bạn. Bạn có thể nhấn 'Chi tiết' để xem nội dung hoặc nhấn 'Chọn sự kiện' để mình hỗ trợ xem bảng giá và sơ đồ ghế nhé!"

@@ -2,6 +2,7 @@ package com.haloticket.ticket_service.dto.request;
 
 import lombok.Data;
 
+/** Yêu cầu tạo hoặc đồng bộ một loại vé: sự kiện, suất diễn, giá, số lượng và giới hạn mua mỗi đơn. */
 @Data
 public class TicketTypeCreateRequest {
     private String id;

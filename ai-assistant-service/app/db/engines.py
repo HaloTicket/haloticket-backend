@@ -1,4 +1,4 @@
-"""Lazy, cached engines for the narrow read-only chatbot roles (event_db / ticket_db)."""
+"""Engine tạo lười và lưu đệm cho các role chỉ đọc hẹp quyền của chatbot (event_db / ticket_db)."""
 import threading
 
 from sqlalchemy.engine import Engine
@@ -14,6 +14,7 @@ _lock = threading.Lock()
 
 
 def _url_for(kind: str) -> str:
+    """Chuỗi kết nối cấu hình cho loại `event` hoặc `ticket`; ném `ValueError` với loại khác."""
     if kind == "event":
         return settings.chatbot_event_database_url
     if kind == "ticket":
@@ -22,6 +23,11 @@ def _url_for(kind: str) -> str:
 
 
 def get_chatbot_engine(kind: str) -> Engine:
+    """Engine chỉ đọc của chatbot theo loại; dùng lại engine đã tạo, tạo mới (và đóng engine cũ) khi URL đổi.
+
+    Raises:
+        AiError: `AI_DB_NOT_CONFIGURED` khi chưa cấu hình URL của loại đó.
+    """
     url = _url_for(kind)
     if not url:
         raise ai_error(AI_DB_NOT_CONFIGURED)
@@ -40,6 +46,7 @@ def get_chatbot_engine(kind: str) -> Engine:
 
 
 def dispose_all() -> None:
+    """Đóng mọi engine đã tạo và xóa bộ đệm (dùng khi tắt dịch vụ hoặc trong kiểm thử)."""
     with _lock:
         for _, engine in _engines.values():
             try:

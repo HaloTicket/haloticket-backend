@@ -1,7 +1,8 @@
-"""Blind labelling tool: python -m research.risk.label --annotator A
+"""Công cụ gán nhãn mù: python -m research.risk.label --annotator A
 
-Shows one case at a time (no score, no group, no intended label), in an order shuffled per annotator, and saves every
-decision at once to labels/<annotator>.jsonl. Run it again to continue. See LABELING_GUIDE.md."""
+Hiện từng ca một (không có điểm, không có nhóm, không có nhãn dự định), theo thứ tự xáo trộn riêng cho từng người gán, và
+lưu mọi quyết định ngay vào labels/<annotator>.jsonl. Chạy lại để tiếp tục. Xem LABELING_GUIDE.md.
+"""
 import argparse
 import hashlib
 import os
@@ -16,8 +17,9 @@ LEVEL_KEYS = {"1": "LOW", "2": "MEDIUM", "3": "HIGH"}
 
 
 def parse_entry(text: str):
-    """'2 o,s' -> {"level": "MEDIUM", "codes": [...], "unsure": False}. Returns None when the line is not a decision.
-    Tokens: 1/2/3 level; p o s v r x d t (or the full code name) codes; u unsure. A level is required."""
+    """Phân tích một dòng nhập, ví dụ '2 o,s' cho {"level": "MEDIUM", "codes": [...], "unsure": False}. Trả về None khi dòng không phải quyết định.
+    Các token: 1/2/3 là mức; p o s v r x d t (hoặc tên mã đầy đủ) là mã; u là chưa chắc. Bắt buộc có đúng một mức.
+    """
     tokens = [t for t in re.split(r"[\s,;]+", text.strip()) if t]
     level, codes, unsure = None, [], False
     for token in tokens:
@@ -40,12 +42,14 @@ def parse_entry(text: str):
 
 
 def _seed(annotator: str, salt: str) -> int:
+    """Hạt giống xáo trộn riêng của một người gán nhãn, suy ra từ băm SHA-256 của muối và tên."""
     return int(hashlib.sha256(f"{salt}:{annotator}".encode("utf-8")).hexdigest()[:12], 16)
 
 
 def ordered_ids(cases: list, annotator: str) -> list:
-    """The first PILOT_SIZE cases are the same set for every annotator (so the pilot can be compared and the guide fixed);
-    inside the pilot and after it the order is shuffled with the annotator id as the seed."""
+    """Thứ tự gán của một người: PILOT_SIZE ca đầu là cùng một tập cho mọi người (để so sánh giai đoạn thử và chỉnh hướng dẫn);
+    bên trong giai đoạn thử và sau đó, thứ tự được xáo trộn với hạt giống là mã người gán.
+    """
     ids = sorted(c["id"] for c in cases)
     random.Random(0).shuffle(ids)
     pilot, rest = ids[:PILOT_SIZE], ids[PILOT_SIZE:]
@@ -56,11 +60,12 @@ def ordered_ids(cases: list, annotator: str) -> list:
 
 
 def path_for(annotator: str) -> str:
+    """Đường dẫn tệp nhãn của một người gán."""
     return os.path.join(LABELS, f"{annotator}.jsonl")
 
 
 def latest(rows: list) -> dict:
-    """The last row per case id (a redo appends a new row)."""
+    """Giữ dòng cuối cùng của mỗi mã ca (gán lại thì thêm dòng mới)."""
     out = {}
     for row in rows:
         out[row["id"]] = row
@@ -68,11 +73,16 @@ def latest(rows: list) -> dict:
 
 
 def load_labels(annotator: str) -> dict:
+    """Đọc nhãn đã lưu của một người gán, mỗi ca một dòng mới nhất."""
     return latest(read_jsonl(path_for(annotator)))
 
 
 def ask_label(input_fn, output, allow_back: bool = True):
-    """Reads one decision. Returns "q", "b" (only when allow_back) or {"level", "codes", "unsure", "note"}."""
+    """Đọc một quyết định, hỏi lại tới khi hợp lệ: mức LOW không có mã, mức MEDIUM hoặc HIGH cần ít nhất một mã, chưa chắc thì hỏi thêm ghi chú.
+
+    Returns:
+        "q" (thoát), "b" (quay lại, chỉ khi allow_back) hoặc {"level", "codes", "unsure", "note"}.
+    """
     while True:
         raw = input_fn("Nhãn (vd '2 o,s'; " + ("b=quay lại, " if allow_back else "") + "q=thoát; thêm u nếu chưa chắc): ").strip()
         if raw.lower() == "q":
@@ -94,13 +104,25 @@ def ask_label(input_fn, output, allow_back: bool = True):
 
 
 def save_label(annotator: str, cid: str, entry: dict, order: int, pilot: bool) -> None:
+    """Ghi một nhãn vào cuối tệp nhãn của người gán, kèm thời điểm, thứ tự và cờ giai đoạn thử."""
     append_jsonl(path_for(annotator), {"id": cid, "annotator": annotator, "level": entry["level"], "codes": entry["codes"],
                                        "unsure": entry["unsure"], "note": entry["note"], "labelled_at": now_iso(), "order": order,
                                        "pilot": pilot})
 
 
 def run(annotator: str, cases_path=None, input_fn=input, output=print, redo=None) -> None:
-    """redo: a list of case ids to label again (the new label replaces the old one); otherwise the normal pass."""
+    """Vòng gán nhãn tương tác cho một người.
+
+    Args:
+        annotator: mã người gán.
+        cases_path: tệp ca; None thì dùng tệp mặc định.
+        input_fn: hàm đọc dòng nhập (thay được khi kiểm thử).
+        output: hàm in (thay được khi kiểm thử).
+        redo: danh sách mã ca cần gán lại (nhãn mới thay nhãn cũ); None thì chạy lượt gán bình thường.
+
+    Raises:
+        SystemExit: khi redo có mã chưa được người này gán.
+    """
     _, cases = load_cases(cases_path) if cases_path else load_cases()
     by_id = {c["id"]: c for c in cases}
     order = ordered_ids(cases, annotator)
@@ -126,6 +148,7 @@ def run(annotator: str, cases_path=None, input_fn=input, output=print, redo=None
         return
 
     def first_unlabelled(start: int, done: dict) -> int:
+        """Vị trí đầu tiên từ start trở đi mà ca chưa có nhãn; bằng độ dài danh sách nếu đã gán hết."""
         return next((i for i in range(start, len(order)) if order[i] not in done), len(order))
 
     position = first_unlabelled(0, load_labels(annotator))
@@ -156,6 +179,7 @@ def run(annotator: str, cases_path=None, input_fn=input, output=print, redo=None
 
 
 def main() -> None:
+    """Điểm vào dòng lệnh: kiểm tra mã người gán rồi chạy lượt gán (hoặc gán lại theo --redo)."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--annotator", required=True, help="a short id such as A or B; it also seeds the shuffled order")
     parser.add_argument("--redo", help="comma list of case ids to label again (the new label replaces the old one)")

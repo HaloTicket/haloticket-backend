@@ -13,10 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 /**
- * Stores a refused scan in its own transaction. A refused scan ends with a CheckinException, which rolls back the
- * check-in transaction; the attempt row would go with it. Here it commits on its own, and because the write is
- * flushed inside this transaction any database error (for example an outdated CHECK constraint) surfaces here, rolls
- * back only this small transaction, and reaches the caller, which decides how to degrade.
+ * Lưu lần quét bị từ chối trong một giao dịch riêng. Quét bị từ chối kết thúc bằng {@code CheckinException} làm hoàn tác
+ * giao dịch check-in, kéo theo cả dòng ghi nhận. Ở đây dòng ghi nhận được commit độc lập, và vì ghi được flush ngay trong
+ * giao dịch này nên mọi lỗi cơ sở dữ liệu (ví dụ ràng buộc CHECK cũ) lộ ra tại đây, chỉ hoàn tác giao dịch nhỏ này
+ * và tới nơi gọi để nơi đó quyết định cách xử lý nhẹ nhàng.
  */
 @Component
 @RequiredArgsConstructor
@@ -25,12 +25,20 @@ public class CheckinAttemptRecorder {
     private final CheckInAttemptRepository attempts;
     private final TicketRepository tickets;
 
+    /**
+     * Ghi một lần quét bị từ chối. Nhân viên hoặc thiết bị không có thông tin được ghi là {@code UNKNOWN_STAFF} và {@code UNKNOWN_DEVICE}.
+     *
+     * @param ticketId mã vé (null nếu mã quét không khớp vé nào)
+     * @param request yêu cầu check-in gốc, có thể null
+     * @param result kết quả của lần quét
+     * @param failureReason lý do từ chối
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void write(String ticketId, CheckinRequest request, CheckInAttemptResult result, String failureReason) {
         String staffId = request != null ? request.getStaffAssignmentId() : null;
         String device = request != null ? request.getDeviceInfo() : null;
         attempts.saveAndFlush(CheckInAttempt.builder()
-                // a reference by id, no extra query; null for a code that matches no ticket (the column is nullable).
+                // tham chiếu theo id, không tốn thêm truy vấn; null khi mã quét không khớp vé nào (cột cho phép null).
                 .ticket(ticketId == null ? null : tickets.getReferenceById(ticketId))
                 .staffAssignmentId(staffId == null || staffId.trim().isEmpty() ? "UNKNOWN_STAFF" : staffId)
                 .deviceInfo(device == null || device.trim().isEmpty() ? "UNKNOWN_DEVICE" : device)

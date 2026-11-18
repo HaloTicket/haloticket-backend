@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;
 
+/** Thực thể hộp thư đi (outbox) của thay đổi chính sách chuyển nhượng (bảng {@code transfer_policy_outbox}): thông điệp chờ phát lên Kafka kèm trạng thái, số lần thử lại và thời điểm thử kế tiếp. */
 @Entity @Table(name = "transfer_policy_outbox")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class TransferPolicyOutboxEvent {

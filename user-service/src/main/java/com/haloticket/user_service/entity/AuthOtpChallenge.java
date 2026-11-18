@@ -7,6 +7,7 @@ import com.haloticket.user_service.enums.OtpStatus;
 
 import java.time.Instant;
 
+/** Một lượt thử thách OTP (đăng ký hoặc đặt lại mật khẩu): lưu mã băm OTP, hạn dùng, số lần gửi và số lần nhập sai. */
 @Entity
 @Table(name = "auth_otp_challenges", indexes = {
         @Index(name = "idx_otp_subject_purpose", columnList = "subject,purpose"),
@@ -70,6 +71,7 @@ public class AuthOtpChallenge {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /** Gán thời điểm tạo và cập nhật trước khi lưu lần đầu. */
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();
@@ -77,6 +79,7 @@ public class AuthOtpChallenge {
         updatedAt = now;
     }
 
+    /** Làm mới thời điểm cập nhật mỗi khi bản ghi thay đổi. */
     @PreUpdate
     void onUpdate() {
         updatedAt = Instant.now();

@@ -1,8 +1,8 @@
-"""Report of the adversarial set (set adv). python -m research.risk.adv_report   (no RISK_SET needed)
+"""Báo cáo của bộ đối kháng (set adv). python -m research.risk.adv_report   (không cần RISK_SET)
 
-Detection of the disguised sale sentences by the rule layer (C0 with all of layer A, without decoding of veiled text, keywords only),
-by rules plus signals (C1) and by the production path (C5); false alarms on the controls; and what happened to the model's flags in the
-cases the rules missed. Labels follow from how a case is built (no annotators), so there is no kappa and no comparison with t2."""
+Việc lớp luật phát hiện các câu bán hàng được ngụy trang (C0 với toàn bộ lớp A, không giải mã chữ che, chỉ từ khóa),
+bởi luật cộng tín hiệu (C1) và bởi đường production (C5); báo động giả trên các ca đối chứng; và điều đã xảy ra với các cờ của mô hình
+trong những ca luật bỏ sót. Nhãn suy ra từ cách dựng ca (không có người gán nhãn), nên không có kappa và không so sánh với t2."""
 import glob
 import json
 import os
@@ -28,15 +28,18 @@ VARIANT_NAMES = {"soft_hyphen": "dấu gạch nối mềm", "zwnj": "ký tự kh
 
 
 def vn(value: float) -> str:
+    """Định dạng một tỷ lệ 0..1 thành phần trăm một chữ số thập phân, dùng dấu phẩy thập phân kiểu Việt Nam."""
     return f"{value * 100:.1f}".replace(".", ",")
 
 
 def cell(k: int, n: int) -> str:
+    """Định dạng k/n kèm phần trăm và khoảng tin cậy Wilson, ví dụ "3/10 (30,0%; [10,8; 60,3])"."""
     lo, hi = wilson(k, n)
     return f"{k}/{n} ({vn(k / n)}%; [{vn(lo)}; {vn(hi)}])"
 
 
 def run_rows(config: str, mode: str = "full") -> dict:
+    """Đọc kết quả mới nhất của một cấu hình ở chế độ lớp A đã cho (một lần chạy, repeats = 1); trả {id ca: dòng kết quả} chỉ gồm ca ok. Thoát với thông báo lỗi nếu không có."""
     for path in sorted(glob.glob(os.path.join(ADV_RESULTS, config, "*.jsonl")), reverse=True):
         with open(path, encoding="utf-8") as handle:
             lines = [json.loads(line) for line in handle if line.strip()]
@@ -46,6 +49,7 @@ def run_rows(config: str, mode: str = "full") -> dict:
 
 
 def load() -> dict:
+    """Nạp các ca và nhãn vàng của bộ adv, cùng kết quả của các cấu hình C0, C0 không giải mã, C0 chỉ từ khóa, C1 và C5."""
     cases = load_cases(os.path.join(ADV_DATA, "cases.jsonl"))[1]
     gold = {r["id"]: r["level"] for r in read_jsonl(os.path.join(ADV_DATA, "gold.jsonl"))}
     runs = {"C0": run_rows("C0"), "C0nd": run_rows("C0", "no_decode"), "C0bare": run_rows("C0", "bare"), "C1": run_rows("C1"), "C5": run_rows("C5")}
@@ -53,6 +57,7 @@ def load() -> dict:
 
 
 def tables(d: dict) -> str:
+    """Dựng các bảng Markdown: tỷ lệ phát hiện ca HIGH theo nhóm và biến thể, và tỷ lệ báo động nhầm trên ca đối chứng LOW."""
     cases, runs = d["cases"], d["runs"]
     hit = lambda run, ids: sum(run[i]["level"] == "HIGH" for i in ids)  # noqa: E731
     raised = lambda run, ids: sum(run[i]["level"] != "LOW" for i in ids)  # noqa: E731
@@ -78,7 +83,7 @@ def tables(d: dict) -> str:
 
 
 def flag_fate(d: dict) -> dict:
-    """What happened to the model's flags in the HIGH cases the rule layer missed, and the flags raised on LOW cases."""
+    """Điều đã xảy ra với cờ của mô hình trong các ca HIGH mà lớp luật bỏ sót (còn nguyên, bị loại ở lần đọc thứ hai hoặc trích dẫn không nguyên văn), và các cờ nâng lên trên ca LOW."""
     cases, gold, runs = d["cases"], d["gold"], d["runs"]
     items = fr.build_items(cases, fr.load_cache(TAG))
     by_case = defaultdict(list)
@@ -100,6 +105,7 @@ def flag_fate(d: dict) -> dict:
 
 
 def main() -> None:
+    """In các bảng kết quả và số liệu về số phận của các cờ mô hình."""
     d = load()
     print(tables(d))
     print()

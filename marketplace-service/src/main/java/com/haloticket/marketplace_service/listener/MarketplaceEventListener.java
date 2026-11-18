@@ -11,6 +11,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 
+/**
+ * Lắng nghe sự kiện Kafka từ {@code ticket-service} và {@code payment-service} để đẩy saga chuyển nhượng
+ * và giao dịch mua vé bán lại sang bước tiếp theo. Mỗi thông điệp được ghi nhận trong {@code ProcessedEvent} để không xử lý trùng.
+ */
 @Component
 @RequiredArgsConstructor
 public class MarketplaceEventListener {
@@ -19,6 +23,12 @@ public class MarketplaceEventListener {
     private final TicketListingService listingService;
     private final com.haloticket.marketplace_service.service.ResalePurchaseService purchaseService;
 
+    /**
+     * Xử lý kết quả khóa vé: báo cho service để saga tiếp tục (đã khóa) hoặc thất bại.
+     *
+     * @param message nội dung JSON của sự kiện khóa vé
+     * @throws IllegalStateException khi xử lý lỗi, để Kafka thử lại
+     */
     @KafkaListener(topics = "haloticket.ticket.locked.v1", groupId = "marketplace-service")
     @Transactional
     public void onTicketLocked(String message) {
@@ -33,6 +43,13 @@ public class MarketplaceEventListener {
         } catch (Exception exception) { throw new IllegalStateException("Failed to process TICKET_LOCKED", exception); }
     }
 
+    /**
+     * Xử lý kết quả chuyển quyền sở hữu vé: thành công thì hoàn tất giao dịch mua và saga,
+     * ngược lại báo giao dịch mua lỗi với mã {@code TICKET_TRANSFER_REJECTED}.
+     *
+     * @param message nội dung JSON của sự kiện chuyển quyền sở hữu
+     * @throws IllegalStateException khi xử lý lỗi, để Kafka thử lại
+     */
     @KafkaListener(topics = "haloticket.ticket.ownership.transferred.v1", groupId = "marketplace-service")
     @Transactional
     public void onOwnershipTransferred(String message) {
@@ -53,6 +70,12 @@ public class MarketplaceEventListener {
         } catch (Exception exception) { throw new IllegalStateException("Failed to process TICKET_OWNERSHIP_TRANSFERRED", exception); }
     }
 
+    /**
+     * Xử lý thanh toán thành công của giao dịch mua vé bán lại (mã giao dịch lấy từ {@code bookingId}).
+     *
+     * @param message nội dung JSON của sự kiện thanh toán hoàn tất
+     * @throws IllegalStateException khi xử lý lỗi, để Kafka thử lại
+     */
     @KafkaListener(topics = "haloticket.payment.completed.v1", groupId = "marketplace-service")
     @Transactional
     public void onPaymentCompleted(String message) {
@@ -67,6 +90,12 @@ public class MarketplaceEventListener {
         } catch (Exception exception) { throw new IllegalStateException("Failed to process resale payment completion", exception); }
     }
 
+    /**
+     * Xử lý thanh toán thất bại của giao dịch mua vé bán lại (mã giao dịch lấy từ {@code bookingId}).
+     *
+     * @param message nội dung JSON của sự kiện thanh toán thất bại
+     * @throws IllegalStateException khi xử lý lỗi, để Kafka thử lại
+     */
     @KafkaListener(topics = "haloticket.payment.failed.v1", groupId = "marketplace-service")
     @Transactional
     public void onPaymentFailed(String message) {
@@ -81,6 +110,12 @@ public class MarketplaceEventListener {
         } catch (Exception exception) { throw new IllegalStateException("Failed to process resale payment failure", exception); }
     }
 
+    /**
+     * Xử lý sự kiện vé đã được nhả khóa để saga hoàn tất bước bù trừ.
+     *
+     * @param message nội dung JSON của sự kiện nhả vé
+     * @throws IllegalStateException khi xử lý lỗi, để Kafka thử lại
+     */
     @KafkaListener(topics = "haloticket.ticket.released.v1", groupId = "marketplace-service")
     @Transactional
     public void onTicketReleased(String message) {

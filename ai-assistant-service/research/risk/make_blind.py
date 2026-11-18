@@ -1,6 +1,6 @@
-"""Writes the case file annotators receive: python -m research.risk.make_blind (RISK_SET=t2)
-Same cases and fixtures as cases.jsonl, minus everything that hints at the answer: the case group, the generator's intended
-label, the disguise style, the model flag and the source."""
+"""Ghi tệp ca gửi cho người gán nhãn: python -m research.risk.make_blind (RISK_SET=t2)
+Cùng ca và fixtures như cases.jsonl, nhưng bỏ mọi thứ gợi ý đáp án: nhóm ca, nhãn dự định của bộ sinh, kiểu ngụy trang, cờ của mô hình và nguồn.
+"""
 import os
 import sys
 
@@ -10,6 +10,7 @@ HIDDEN = ("group", "intended", "needs_model", "disguise", "source")
 
 
 def blind(rows: list) -> list:
+    """Tạo bản ẩn nhãn: bỏ khóa seed ở tiêu đề và các trường lộ đáp án (group, intended, needs_model, disguise, source) ở từng ca."""
     header, cases = dict(rows[0]), rows[1:]
     header.pop("seed", None)
     return [header] + [{k: v for k, v in case.items() if k not in HIDDEN} for case in cases]

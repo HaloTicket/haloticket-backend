@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Loại vé của một sự kiện hoặc suất diễn (bảng {@code ticket_types}): giá, số lượng, giới hạn mua mỗi đơn và trạng thái bán. */
 @Entity
 @Table(name = "ticket_types")
 @Getter
@@ -38,7 +39,7 @@ public class TicketType {
     @Column(name = "initial_quantity")
     private Integer initialQuantity;
 
-    // stock held by unpaid general-admission bookings. Available = totalQuantity - reservedQuantity.
+    // Số lượng đang bị các booking vé không chỗ ngồi chưa thanh toán giữ. Còn lại = totalQuantity - reservedQuantity.
     @Column(name = "reserved_quantity")
     @Builder.Default
     private Integer reservedQuantity = 0;
@@ -64,6 +65,7 @@ public class TicketType {
     @Version
     private Long version;
 
+    /** Khi lưu: ghi thời điểm tạo và cập nhật, mặc định trạng thái {@code ACTIVE}. */
     @PrePersist 
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -71,6 +73,7 @@ public class TicketType {
         if (this.ticketTypeStatus == null) this.ticketTypeStatus = TicketTypeStatus.ACTIVE;
     }
 
+    /** Khi cập nhật: ghi lại thời điểm cập nhật. */
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

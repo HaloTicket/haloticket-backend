@@ -19,6 +19,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Cấu hình bảo mật của payment-service: resource server JWT, callback và IPN của cổng thanh toán mở công khai,
+ * API chi trả theo vai trò.
+ */
 @Configuration
 public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
@@ -27,6 +31,11 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
     private String jwkSetUri;
 
+    /**
+     * Tạo bộ giải mã JWT: dùng {@code jwk-set-uri} nếu có, không thì dò từ issuer; luôn kiểm tra issuer.
+     *
+     * @return bộ giải mã JWT
+     */
     @Bean
     JwtDecoder jwtDecoder() {
         NimbusJwtDecoder decoder = StringUtils.hasText(jwkSetUri)
@@ -36,6 +45,15 @@ public class SecurityConfig {
         return decoder;
     }
 
+    /**
+     * Dựng chuỗi lọc bảo mật. Mở công khai: OPTIONS, actuator, callback và IPN của các cổng, tra cứu verify, tra cứu hàng loạt phương thức
+     * (sau đó interceptor kiểm tra thêm). Báo cáo và API chi trả admin cần {@code ADMIN}; chính sách chi trả cần một trong các vai trò tài chính;
+     * các API còn lại cần xác thực.
+     *
+     * @param http cấu hình HTTP security
+     * @return chuỗi lọc đã dựng
+     * @throws Exception khi cấu hình không hợp lệ
+     */
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
@@ -68,6 +86,11 @@ public class SecurityConfig {
                 .build();
     }
 
+    /**
+     * Chuyển claim {@code roles} và {@code realm_access.roles} của JWT thành authority dạng {@code ROLE_VIẾT_HOA}.
+     *
+     * @return bộ chuyển đổi xác thực JWT
+     */
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();

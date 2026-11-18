@@ -19,9 +19,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
- * Reads the dead-letter topic of haloticket.booking.confirmed.v1: a paid order whose tickets could not be issued after
- * every retry. Creates an ISSUANCE_FAILED payment exception (once per booking) and tells the admins. Its own consumer
- * group, so it never takes messages from the main listeners.
+ * Đọc topic dead-letter của {@code haloticket.booking.confirmed.v1}: đơn đã thanh toán nhưng không phát hành được vé sau mọi lần thử lại.
+ * Tạo ngoại lệ thanh toán {@code ISSUANCE_FAILED} (một lần cho mỗi đơn) và báo cho admin. Dùng consumer group riêng để không lấy thông điệp của các listener chính.
  */
 @Component
 @RequiredArgsConstructor
@@ -32,7 +31,7 @@ public class BookingConfirmedDltListener {
     // KafkaHeaders.DLT_EXCEPTION_MESSAGE
     static final String EXCEPTION_MESSAGE_HEADER = "kafka_dlt-exception-message";
     static final int MESSAGE_MAX = 400;
-    /** Spring wraps the real failure: "Listener method '...' threw exception; <what the listener said>". Only the second part is the reason. */
+    /** Spring bọc lỗi thật dưới dạng "Listener method '...' threw exception; <điều listener báo>". Chỉ phần sau mới là lý do. */
     private static final String LISTENER_PREFIX = "threw exception;";
 
     private final BookingRepository bookingRepository;
@@ -40,6 +39,11 @@ public class BookingConfirmedDltListener {
     private final PaymentExceptionService paymentExceptionService;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Xử lý một thông điệp dead-letter: ghi nhận ngoại lệ thanh toán {@code ISSUANCE_FAILED} kèm lý do lỗi, số tiền và cổng thanh toán của đơn.
+     * Bỏ qua thông điệp nếu không xác định được mã đơn.
+     * @param record bản ghi dead-letter từ Kafka
+     */
     @KafkaListener(topics = DLT_TOPIC, groupId = "booking-service-dlt")
     @Transactional
     public void handleDeadLetter(ConsumerRecord<String, String> record) {
@@ -58,6 +62,11 @@ public class BookingConfirmedDltListener {
                 PaymentExceptionKind.ISSUANCE_FAILED, amount, provider, detail);
     }
 
+    /**
+     * Lấy mã đơn từ trường {@code bookingId} của payload JSON; nếu không có thì dùng key của bản ghi.
+     * @param record bản ghi dead-letter
+     * @return mã đơn, hoặc null nếu không xác định được
+     */
     private String bookingIdOf(ConsumerRecord<String, String> record) {
         try {
             if (record.value() != null) {
@@ -71,6 +80,11 @@ public class BookingConfirmedDltListener {
         return record.key() != null && !record.key().isBlank() ? record.key() : null;
     }
 
+    /**
+     * Lấy lý do lỗi từ header của dead-letter: gộp khoảng trắng, bỏ phần Spring bọc phía trước và cắt tối đa {@code MESSAGE_MAX} ký tự.
+     * @param record bản ghi dead-letter
+     * @return lý do lỗi, chuỗi rỗng nếu không có header
+     */
     private String exceptionMessage(ConsumerRecord<String, String> record) {
         Header header = record.headers() == null ? null : record.headers().lastHeader(EXCEPTION_MESSAGE_HEADER);
         if (header == null || header.value() == null) return "";
@@ -80,6 +94,11 @@ public class BookingConfirmedDltListener {
         return text.length() <= MESSAGE_MAX ? text : text.substring(0, MESSAGE_MAX);
     }
 
+    /**
+     * Hỏi payment-service cổng thanh toán đã dùng cho đơn; lỗi kết nối chỉ làm thiếu thông tin này.
+     * @param bookingId mã đơn
+     * @return tên cổng thanh toán, hoặc null nếu không biết
+     */
     private String providerOf(String bookingId) {
         try {
             var methods = paymentServiceClient.getPaymentMethodsByBookingIds(List.of(bookingId));

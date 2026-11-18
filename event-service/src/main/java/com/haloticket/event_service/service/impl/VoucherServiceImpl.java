@@ -24,6 +24,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.Optional;
 
+/** Cài đặt nghiệp vụ voucher giảm giá của sự kiện: tạo (đơn lẻ hoặc hàng loạt), sửa, bật tắt, xóa, ghi nhận lượt dùng và tra cứu theo mã. */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -40,6 +41,12 @@ public class VoucherServiceImpl implements VoucherService {
             DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
     };
 
+    /**
+     * Lấy id sự kiện của voucher.
+     * @param voucherId id voucher
+     * @return id sự kiện, null nếu voucher không gắn với sự kiện
+     * @throws ResponseStatusException 404 {@code VOUCHER_NOT_FOUND}
+     */
     @Override
     @Transactional(readOnly = true)
     public String eventIdOf(String voucherId) {
@@ -48,9 +55,10 @@ public class VoucherServiceImpl implements VoucherService {
         return voucher.getEvent() == null ? null : voucher.getEvent().getId();
     }
 
-    /** One order never holds more tickets than this, so a larger count is a wrong call, not a big order. */
+    /** Một đơn không bao giờ chứa nhiều vé hơn mức này, nên số lượng lớn hơn là gọi sai chứ không phải đơn lớn. */
     static final int MAX_TICKETS_PER_USE = 100;
 
+    /** Tìm voucher đã phát hành (khác {@code DRAFT}) của sự kiện theo mã, không phân biệt hoa thường; mã rỗng thì trả rỗng. */
     @Override
     @Transactional(readOnly = true)
     public Optional<VoucherResponse> findReleasedByCode(String eventId, String code) {
@@ -61,6 +69,7 @@ public class VoucherServiceImpl implements VoucherService {
                 .findFirst().map(this::mapToVoucherResponse);
     }
 
+    /** Lấy các voucher của sự kiện, mới tạo nhất trước. */
     @Override
     @Transactional(readOnly = true)
     public List<VoucherResponse> getVouchersByEventId(String eventId) {
@@ -68,6 +77,13 @@ public class VoucherServiceImpl implements VoucherService {
         return vouchers.stream().map(this::mapToVoucherResponse).collect(Collectors.toList());
     }
 
+    /**
+     * Tạo voucher cho sự kiện. Chế độ {@code BULK} sinh {@code bulkCount} voucher (mặc định 5) với mã ngẫu nhiên có tiền tố (mặc định {@code PROMO}); chế độ đơn lẻ dùng mã được gửi lên (viết hoa) hoặc sinh ngẫu nhiên với tiền tố {@code HALO}. Các trường không gửi dùng giá trị mặc định.
+     * @param eventId id sự kiện
+     * @param request thông tin voucher
+     * @return các voucher vừa tạo
+     * @throws ResponseStatusException 404 {@code EVENT_NOT_FOUND}, 400 khi mã đơn lẻ đã tồn tại
+     */
     @Override
     public List<VoucherResponse> createVoucher(String eventId, VoucherCreateRequest request) {
         Event event = eventRepository.findById(eventId)
@@ -99,6 +115,13 @@ public class VoucherServiceImpl implements VoucherService {
         return createdVouchers.stream().map(this::mapToVoucherResponse).collect(Collectors.toList());
     }
 
+    /**
+     * Cập nhật các trường được gửi lên (trường null giữ nguyên). Đổi mã phải không trùng mã voucher khác.
+     * @param voucherId id voucher
+     * @param request các trường cần đổi
+     * @return voucher sau khi cập nhật
+     * @throws ResponseStatusException 404 {@code VOUCHER_NOT_FOUND}, 400 khi mã mới đã tồn tại
+     */
     @Override
     public VoucherResponse updateVoucher(String voucherId, VoucherUpdateRequest request) {
         Voucher voucher = voucherRepository.findById(voucherId)
@@ -139,6 +162,10 @@ public class VoucherServiceImpl implements VoucherService {
         return mapToVoucherResponse(updated);
     }
 
+    /**
+     * Đảo trạng thái voucher: đang {@code ACTIVE} thì thành {@code INACTIVE}, ngược lại thành {@code ACTIVE}.
+     * @throws ResponseStatusException 404 {@code VOUCHER_NOT_FOUND}
+     */
     @Override
     public VoucherResponse toggleVoucherStatus(String voucherId) {
         Voucher voucher = voucherRepository.findById(voucherId)
@@ -154,6 +181,13 @@ public class VoucherServiceImpl implements VoucherService {
         return mapToVoucherResponse(updated);
     }
 
+    /**
+     * Ghi nhận voucher được dùng cho {@code count} vé. Khóa dòng voucher khi đọc để các thanh toán đồng thời không đếm trùng; với voucher giới hạn, khi số đã dùng chạm giới hạn thì tự chuyển {@code INACTIVE}.
+     * @param voucherId id voucher
+     * @param count số vé áp dụng, từ 1 đến {@code MAX_TICKETS_PER_USE}
+     * @return voucher sau khi cập nhật số lượt dùng
+     * @throws ResponseStatusException 400 {@code INVALID_VOUCHER_USE_COUNT}, 404 {@code VOUCHER_NOT_FOUND}
+     */
     @Override
     @Transactional
     public VoucherResponse useVoucher(String voucherId, int count) {
@@ -167,7 +201,7 @@ public class VoucherServiceImpl implements VoucherService {
         int increment = count;
         voucher.setUsedCount(currentUsed + increment);
 
-        // check if ticket limit reached
+        // kiểm tra đã chạm giới hạn số vé hay chưa
         if ("LIMITED".equalsIgnoreCase(voucher.getApplyTicketLimitType()) && voucher.getTicketLimitCount() != null) {
             if (voucher.getUsedCount() >= voucher.getTicketLimitCount()) {
                 voucher.setStatus(VoucherStatus.INACTIVE);
@@ -178,6 +212,10 @@ public class VoucherServiceImpl implements VoucherService {
         return mapToVoucherResponse(updated);
     }
 
+    /**
+     * Xóa voucher.
+     * @throws ResponseStatusException 404 {@code VOUCHER_NOT_FOUND}
+     */
     @Override
     public void deleteVoucher(String voucherId) {
         if (!voucherRepository.existsById(voucherId)) {
@@ -186,6 +224,7 @@ public class VoucherServiceImpl implements VoucherService {
         voucherRepository.deleteById(voucherId);
     }
 
+    /** Dựng entity voucher từ request với mã đã chọn, điền giá trị mặc định cho trường thiếu (giới hạn 100 vé, tối đa 5 vé mỗi đơn, phạm vi {@code ALL}, trạng thái {@code ACTIVE}). */
     private Voucher buildVoucherEntity(Event event, VoucherCreateRequest request, String code) {
         String showtimesJson = "[]";
         if (request.getApplicableShowtimes() != null && !request.getApplicableShowtimes().isEmpty()) {
@@ -217,13 +256,14 @@ public class VoucherServiceImpl implements VoucherService {
                 .build();
     }
 
+    /** Chuyển voucher sang response: giải mã danh sách suất áp dụng từ JSON và định dạng ngày theo {@code dd/MM/yyyy HH:mm}. */
     private VoucherResponse mapToVoucherResponse(Voucher voucher) {
         List<String> showtimes = new ArrayList<>();
         if (voucher.getApplicableShowtimes() != null && !voucher.getApplicableShowtimes().isBlank()) {
             try {
                 showtimes = objectMapper.readValue(voucher.getApplicableShowtimes(), new TypeReference<List<String>>() {});
             } catch (Exception e) {
-                // ignore
+                // bỏ qua, coi như không có suất áp dụng
             }
         }
 
@@ -254,18 +294,20 @@ public class VoucherServiceImpl implements VoucherService {
                 .build();
     }
 
+    /** Đọc ngày giờ từ chuỗi theo các định dạng được hỗ trợ; chuỗi rỗng hoặc không đọc được thì trả thời điểm hiện tại. */
     private LocalDateTime parseDateTime(String input) {
         if (input == null || input.isBlank()) return LocalDateTime.now();
         for (DateTimeFormatter fmt : DATE_FORMATTERS) {
             try {
                 return LocalDateTime.parse(input, fmt);
             } catch (Exception e) {
-                // try next
+                // thử định dạng kế tiếp
             }
         }
         return LocalDateTime.now();
     }
 
+    /** Sinh mã gồm tiền tố và {@code randomLength} ký tự chữ hoa hoặc số ngẫu nhiên; trùng mã đã có thì sinh lại. */
     private String generateRandomCode(String prefix, int randomLength) {
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         StringBuilder sb = new StringBuilder(prefix.toUpperCase());

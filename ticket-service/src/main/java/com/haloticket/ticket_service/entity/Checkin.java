@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Bản ghi vé đã check-in thành công (bảng {@code checkins}); mỗi vé chỉ có một bản ghi. */
 @Entity
 @Table(name = "checkins")
 @Getter
@@ -33,6 +34,7 @@ public class Checkin {
     @Column(name = "checked_in_at")
     private LocalDateTime checkedInAt;
 
+    /** Tự đặt thời điểm check-in là lúc lưu nếu chưa có. */
     @PrePersist
     protected void onCreate() {
         if (this.checkedInAt == null) this.checkedInAt = LocalDateTime.now();

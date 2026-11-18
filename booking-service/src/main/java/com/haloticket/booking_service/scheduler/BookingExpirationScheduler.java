@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/** Bộ lập lịch hủy các đơn {@code PENDING} quá hạn thanh toán: nhả ghế và tồn kho, ghi sự kiện outbox {@code BOOKING_CANCELLED}. */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -35,7 +36,11 @@ public class BookingExpirationScheduler {
     private final ObjectMapper objectMapper;
     private final GaReservationService gaReservationService;
 
-    @Scheduled(fixedDelay = 30000) // Check every 30 seconds
+    /**
+     * Chạy định kỳ: tìm đơn {@code PENDING} đã quá {@code expiredAt}, chuyển sang {@code CANCELLED}, hủy ghế giữ (cả khóa Redis),
+     * nhả tồn kho vé vào cổng tự do và ghi sự kiện outbox để các service khác biết.
+     */
+    @Scheduled(fixedDelay = 30000) // kiểm tra mỗi 30 giây
     @Transactional
     public void cancelExpiredBookings() {
         LocalDateTime now = LocalDateTime.now();

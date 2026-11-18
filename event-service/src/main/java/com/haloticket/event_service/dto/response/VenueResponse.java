@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+/** Thông tin địa điểm tổ chức sự kiện trả về cho client. */
 @Data
 @Builder
 @NoArgsConstructor

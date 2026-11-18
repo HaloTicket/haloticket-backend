@@ -1,14 +1,14 @@
-"""Layer A: deterministic content rules (pure Python, no I/O at scoring time).
+"""Lớp A: các luật nội dung tất định (Python thuần, không I/O ở thời điểm chấm điểm).
 
-The rule set is a versioned JSON file. Matching runs on a normalised copy of each text (lower case, no Vietnamese marks,
-one character per original character) so every match maps back to a position in the ORIGINAL text; the evidence carries
-the original quote. A bad rule file does not stop the service: load_rules() reports it and the caller marks layer A as
-unavailable instead of silently scoring "no findings".
+Bộ luật là một tệp JSON có phiên bản. Việc so khớp chạy trên bản chuẩn hóa của mỗi văn bản (chữ thường, bỏ dấu tiếng Việt,
+mỗi ký tự gốc ứng với một ký tự) để mọi kết quả khớp đều quy về được vị trí trong văn bản GỐC; bằng chứng mang trích dẫn gốc.
+Tệp luật hỏng không làm dừng service: load_rules() báo lỗi và nơi gọi đánh dấu lớp A là không khả dụng, thay vì âm thầm
+chấm điểm "không có phát hiện".
 
-A keyword is not a violation by itself. An event page that lists what visitors may NOT bring ("Nghiêm cấm thuốc lá, vũ khí...")
-mentions the very same words as an advertisement for them. A match inside a prohibiting sentence, or inside a list introduced
-by one, is therefore not scored; it is reported once as an informational finding (weight 0) so the reviewer sees why.
-Contact details of the organiser (e-mail, phone, social links) are allowed and are not looked at.
+Một từ khóa tự nó chưa phải vi phạm. Trang sự kiện liệt kê những thứ khách KHÔNG được mang theo ("Nghiêm cấm thuốc lá, vũ khí...")
+nhắc đúng những từ mà một quảng cáo bán chúng cũng nhắc. Vì vậy, kết quả khớp nằm trong câu cấm, hoặc trong danh sách do một câu cấm
+dẫn nhập, không được tính điểm; nó chỉ được báo một lần như phát hiện mang tính thông tin (trọng số 0) để người duyệt thấy lý do.
+Thông tin liên hệ của ban tổ chức (e-mail, điện thoại, liên kết mạng xã hội) được phép và không bị xem xét.
 """
 import json
 import logging
@@ -25,15 +25,15 @@ SEVERITIES = ("MEDIUM", "HIGH", "BLOCK")
 KINDS = ("phrases", "alcohol")
 MAX_EVIDENCE_PER_RULE = 3
 MAX_TEXT_CHARS = 20000
-MAX_SCOPE_LOOKBACK = 30  # segments above a list item that are searched for the sentence that introduces the list
+MAX_SCOPE_LOOKBACK = 30  # số đoạn phía trên một mục danh sách được tìm để lấy câu dẫn nhập của danh sách
 
-# characters that print as nothing, and letters from other alphabets that look like Latin ones, used to dodge keyword lists
+# ký tự không hiển thị gì, và chữ cái của bảng chữ khác trông giống chữ Latin, được dùng để lách danh sách từ khóa
 _ZERO_WIDTH = frozenset("\u200b\u200c\u200d\u2060\ufeff\u00ad")
 _LOOKALIKE = {"а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "х": "x", "у": "y", "і": "i", "ѕ": "s", "ј": "j",
               "ο": "o", "α": "a", "ε": "e", "ι": "i", "ν": "v", "ρ": "p", "τ": "t"}
-_SPACED_RUN = re.compile(r"(?<![a-z0-9])[a-z0-9](?:[ .\-_*]+[a-z0-9]){2,}(?![a-z0-9])")  # "z a l o", "i.n.b.o.x"
+_SPACED_RUN = re.compile(r"(?<![a-z0-9])[a-z0-9](?:[ .\-_*]+[a-z0-9]){2,}(?![a-z0-9])")  # ví dụ "z a l o", "i.n.b.o.x"
 _PHRASE_SEPARATORS = re.compile(r"[ .\-_*/:]")
-MIN_COLLAPSED_PHRASE = 4  # shorter than this and a spaced-out run would match by accident
+MIN_COLLAPSED_PHRASE = 4  # ngắn hơn mức này thì dãy chữ tách rời có thể khớp nhầm
 _ALCOHOL = re.compile(r"ruou[^.\n]{0,40}?(\d{2})\s*(?:do\b|%)")
 _SEGMENT = re.compile(r"(?:[●•▪■◦]\s*)?[^\n●•▪■◦]+")
 _SENTENCE_END = ".;!?"
@@ -42,6 +42,7 @@ _BULLET_START = re.compile(r"^\s*(?:[●•▪■◦·\-+*]|\d{1,2}[.)])\s*")
 
 @dataclass(frozen=True)
 class Rule:
+    """Một luật nội dung: mã, loại (phrases hoặc alcohol), mức nghiêm trọng, trọng số, thông điệp và các cụm từ cần khớp."""
     code: str
     kind: str
     severity: str
@@ -50,11 +51,12 @@ class Rule:
     phrases: tuple = ()
     obfuscated: bool = False
     min_degrees: int = 15
-    min_level: str = "LOW"  # the lowest level this finding alone may produce (policy floor)
+    min_level: str = "LOW"  # mức thấp nhất mà riêng phát hiện này có thể tạo ra (sàn chính sách)
 
 
 @dataclass(frozen=True)
 class RuleSet:
+    """Bộ luật đã nạp: phiên bản, danh sách luật, bảng quy đổi ký tự che chữ, các dấu hiệu cấm mạnh (strong_ban) và dấu hiệu gỡ cấm (lift)."""
     version: str
     rules: tuple
     obfuscation: dict
@@ -63,13 +65,14 @@ class RuleSet:
 
 
 def _level(value, code: str) -> str:
+    """Kiểm tra min_level hợp lệ (LOW, MEDIUM, HIGH); ném ValueError nếu không."""
     if value not in ("LOW", "MEDIUM", "HIGH"):
         raise ValueError(f"bad min_level {code}")
     return value
 
 
 def load_rules(path: str = RULES_PATH) -> Optional[RuleSet]:
-    """The validated rule set, or None when the file is missing or invalid (the caller reports RULES_UNAVAILABLE)."""
+    """Bộ luật đã được kiểm tra hợp lệ, hoặc None khi tệp thiếu hoặc không hợp lệ (nơi gọi báo RULES_UNAVAILABLE)."""
     try:
         with open(path, "r", encoding="utf-8") as handle:
             data = json.load(handle)
@@ -99,20 +102,20 @@ def load_rules(path: str = RULES_PATH) -> Optional[RuleSet]:
 
 
 def normalise(text: str, obfuscation: Optional[dict] = None) -> tuple:
-    """(normalised, index) with len(normalised) == len(index); index[i] is the position in `text` of normalised[i]."""
+    """Trả (normalised, index) với len(normalised) == len(index); index[i] là vị trí trong `text` của normalised[i]. Bỏ dấu, quy ký tự giống chữ Latin và ký tự toàn chiều rộng về dạng thường."""
     out, index = [], []
     for position, char in enumerate(text):
         if char in _ZERO_WIDTH:
-            continue  # prints as nothing: "za<zero-width>lo" must read as "zalo"
+            continue  # không hiển thị gì: "za<zero-width>lo" phải đọc là "zalo"
         if char in ("đ", "Đ"):
             base = "d"
         elif char.lower() in _LOOKALIKE:
             base = _LOOKALIKE[char.lower()]
         else:
-            decomposed = unicodedata.normalize("NFKD", char)  # also folds full-width letters (ｆａｃｅ) to plain ones
+            decomposed = unicodedata.normalize("NFKD", char)  # đồng thời đưa chữ toàn chiều rộng (ｆａｃｅ) về chữ thường
             base = "".join(c for c in decomposed if not unicodedata.combining(c))
             if not base:
-                continue  # a loose combining mark
+                continue  # dấu kết hợp đứng lẻ
             base = base[0]
         base = base.lower()
         if obfuscation and base in obfuscation:
@@ -125,8 +128,8 @@ def normalise(text: str, obfuscation: Optional[dict] = None) -> tuple:
 
 
 def collapse_spaced_runs(norm: str, index: list) -> tuple:
-    """(collapsed, index, runs). Letters written one by one with separators between them ("z a l o", "i.n.b.o.x") are joined;
-    runs lists the [start, end) of every joined run in the collapsed text. Only such runs change, the rest is kept as is."""
+    """Trả (collapsed, index, runs). Các chữ cái viết rời từng ký tự có dấu ngăn ("z a l o", "i.n.b.o.x") được nối lại;
+    runs liệt kê [start, end) của mọi dãy đã nối trong văn bản thu gọn. Chỉ các dãy đó thay đổi, phần còn lại giữ nguyên."""
     out, idx, runs, last = [], [], [], 0
     size = 0
     for m in _SPACED_RUN.finditer(norm):
@@ -147,7 +150,7 @@ def collapse_spaced_runs(norm: str, index: list) -> tuple:
 
 
 def _spans_in_runs(collapsed: str, runs: list, phrase: str):
-    """Spans of the phrase (written without spaces and dots) that lie wholly inside one joined run."""
+    """Các khoảng của cụm từ (viết không có dấu cách và dấu chấm) nằm hoàn toàn trong một dãy đã nối."""
     needle = _PHRASE_SEPARATORS.sub("", phrase)
     if len(needle) < MIN_COLLAPSED_PHRASE:
         return
@@ -163,6 +166,7 @@ def _spans_in_runs(collapsed: str, runs: list, phrase: str):
 
 
 def _spans_for_phrase(norm: str, phrase: str):
+    """Các khoảng khớp của cụm từ trong văn bản chuẩn hóa, chỉ tính khi khớp trọn từ (hai đầu không dính ký tự chữ-số)."""
     start = 0
     needle = phrase.strip()
     while True:
@@ -178,11 +182,13 @@ def _spans_for_phrase(norm: str, phrase: str):
 
 
 def _evidence(field_name: str, original: str, index: list, start: int, end: int) -> dict:
+    """Dựng một bằng chứng {field, start, end, text} theo vị trí trong văn bản gốc; trích dẫn cắt tối đa 160 ký tự."""
     first, last = index[start], index[end - 1] + 1
     return {"field": field_name, "start": first, "end": last, "text": original[first:last][:160]}
 
 
 def _scan(rule: Rule, field_name: str, original: str, norm: str, index: list, norm_obf: str, collapsed=None) -> list:
+    """Quét một luật trên một trường: luật alcohol khớp độ cồn từ min_degrees trở lên, luật phrases khớp cụm từ (kể cả dạng che chữ và dạng viết rời). Trả danh sách bằng chứng."""
     found = []
     if rule.kind == "alcohol":
         for m in _ALCOHOL.finditer(norm):
@@ -209,9 +215,9 @@ def _scan(rule: Rule, field_name: str, original: str, norm: str, index: list, no
     return found
 
 
-# context: is a match part of a sentence or list that forbids it?
+# ngữ cảnh: kết quả khớp có nằm trong câu hoặc danh sách cấm nó không?
 def _segments(text: str) -> list:
-    """[(start, end, bullet_like)] for every line and every bullet item of the text."""
+    """[(start, end, bullet_like)] cho mỗi dòng và mỗi mục gạch đầu dòng của văn bản."""
     out = []
     for m in _SEGMENT.finditer(text):
         piece = m.group(0)
@@ -220,7 +226,7 @@ def _segments(text: str) -> list:
 
 
 def _clause_around(text: str, seg_start: int, seg_end: int, first: int, last: int) -> tuple:
-    """(clause, match_start, match_end): the sentence of the segment that holds the match, and where the match sits in it."""
+    """(clause, match_start, match_end): câu của đoạn chứa kết quả khớp, và vị trí của kết quả khớp trong câu đó."""
     left = seg_start
     for pos in range(first - 1, seg_start - 1, -1):
         if text[pos] in _SENTENCE_END:
@@ -235,8 +241,8 @@ def _clause_around(text: str, seg_start: int, seg_end: int, first: int, last: in
 
 
 def _marker_outside(clause: str, markers: tuple, skip_from: int = -1, skip_to: int = -1) -> bool:
-    """True when a marker occurs in the clause other than wholly inside the matched words (which are what is being judged).
-    "không bảo đảm lợi nhuận" therefore counts as a negation although "bảo đảm" itself is the match."""
+    """True khi có một dấu hiệu xuất hiện trong mệnh đề nhưng không nằm trọn trong chính những từ đã khớp (thứ đang được xét).
+    Vì vậy "không bảo đảm lợi nhuận" vẫn tính là phủ định dù chính "bảo đảm" là từ khớp."""
     low = clause.lower()
     for marker in markers:
         at = low.find(marker)
@@ -248,9 +254,9 @@ def _marker_outside(clause: str, markers: tuple, skip_from: int = -1, skip_to: i
 
 
 def is_prohibition_context(text: str, segments: list, first: int, last: int, ruleset: RuleSet) -> bool:
-    """True when the match at [first, last) sits in a sentence that forbids or warns ("Nghiêm cấm...", "Không mang...",
-    "ngăn chặn...") or in a list item whose introducing sentence or heading does. An advertisement such as "Bán vũ khí" stays a
-    violation, and so does a sentence that lifts the ban ("không cấm", "được phép bán")."""
+    """True khi kết quả khớp tại [first, last) nằm trong câu cấm hoặc cảnh báo ("Nghiêm cấm...", "Không mang...",
+    "ngăn chặn...") hoặc trong mục danh sách mà câu dẫn nhập hay tiêu đề của nó là câu cấm. Quảng cáo như "Bán vũ khí" vẫn
+    là vi phạm, và câu gỡ lệnh cấm ("không cấm", "được phép bán") cũng vậy."""
     position = next((i for i, (s, e, _b) in enumerate(segments) if s <= first < e), None)
     if position is None:
         return False
@@ -262,7 +268,7 @@ def is_prohibition_context(text: str, segments: list, first: int, last: int, rul
         return True
     if not bullet:
         return False
-    for upper in range(position - 1, max(-1, position - 1 - MAX_SCOPE_LOOKBACK), -1):  # a list item inherits the sentence above the list
+    for upper in range(position - 1, max(-1, position - 1 - MAX_SCOPE_LOOKBACK), -1):  # mục danh sách thừa hưởng câu nằm phía trên danh sách
         s, e, upper_bullet = segments[upper]
         piece = text[s:e]
         if not piece.strip() or upper_bullet:
@@ -272,8 +278,8 @@ def is_prohibition_context(text: str, segments: list, first: int, last: int, rul
 
 
 def evaluate(texts: dict, ruleset: RuleSet) -> list:
-    """Findings of layer A for {field: text}. Each rule fires at most once, with up to three distinct evidence items.
-    Matches inside a prohibiting sentence or list are collected into one informational finding (weight 0)."""
+    """Các phát hiện của lớp A cho {field: text}. Mỗi luật kích hoạt tối đa một lần, kèm tối đa ba bằng chứng khác nhau.
+    Các kết quả khớp nằm trong câu hoặc danh sách cấm được gom vào một phát hiện mang tính thông tin (trọng số 0)."""
     prepared = {}
     for field_name, raw in texts.items():
         original = (raw or "")[:MAX_TEXT_CHARS]

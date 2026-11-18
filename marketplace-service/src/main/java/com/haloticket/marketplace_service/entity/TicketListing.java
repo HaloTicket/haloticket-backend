@@ -8,6 +8,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Tin đăng bán lại vé: giá, giá gốc, phí dịch vụ, khoảng giá cho phép lúc đăng, thông tin kiểm duyệt, trạng thái,
+ * người đang giữ chỗ và danh sách vé trong tin. Có thể gồm nhiều vé; các trường {@code *Snapshot} giữ bản chụp thông tin vé.
+ */
 @Entity
 @Table(name = "ticket_listings", indexes = {
         @Index(name = "idx_listing_status_created", columnList = "status, created_at"),
@@ -54,12 +58,19 @@ public class TicketListing {
             uniqueConstraints = @UniqueConstraint(name = "uk_listing_member", columnNames = {"listing_id", "ticket_id"}))
     @Builder.Default private List<TicketMemberSnapshot> members = new ArrayList<>();
 
+    /**
+     * Lấy các vé còn bán của tin. Nếu tin không có danh sách thành viên (dữ liệu cũ) thì dựng một vé duy nhất từ các trường bản chụp.
+     *
+     * @return danh sách vé chưa bán
+     */
     public List<TicketMemberSnapshot> remainingMembers() {
         if (members == null || members.isEmpty()) return List.of(new TicketMemberSnapshot(ticketId, null, null,
                 ticketTypeNameSnapshot, sectionSnapshot, rowSnapshot, seatSnapshot, originalPrice, false));
         return members.stream().filter(member -> !member.isSold()).toList();
     }
 
+    /** Đặt thời điểm tạo, cập nhật và trạng thái mặc định {@code ACTIVE} nếu chưa có, trước khi lưu mới. */
     @PrePersist void onCreate() { createdAt = Instant.now(); updatedAt = createdAt; if (status == null) status = ListingStatus.ACTIVE; }
+    /** Cập nhật thời điểm sửa đổi trước mỗi lần lưu thay đổi. */
     @PreUpdate void onUpdate() { updatedAt = Instant.now(); }
 }

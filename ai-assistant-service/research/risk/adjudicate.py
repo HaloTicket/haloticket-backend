@@ -1,21 +1,21 @@
-"""Adjudicate inter-annotator disagreements and produce the gold label file.
+"""Phân xử bất đồng giữa các người gán nhãn và tạo tệp nhãn vàng (gold).
 
-Usage (from ai-assistant-service/):
-    # 1. Compute agreement and list disagreements
+Cách dùng (từ ai-assistant-service/):
+    # 1. Tính độ đồng thuận và liệt kê các bất đồng
     python -m research.risk.adjudicate --report
 
-    # 2. Interactive adjudication (cases where A and B differ on level or codes, or either marked unsure)
+    # 2. Phân xử tương tác (các ca mà A và B khác nhau về mức hoặc mã, hoặc một người đánh dấu chưa chắc)
     python -m research.risk.adjudicate --annotators A,B --adjudicator C --interactive
 
-    # 3. Build gold file from agreed + adjudicated labels (once all disagreements resolved)
+    # 3. Tạo tệp gold từ nhãn đã đồng thuận và đã phân xử (khi mọi bất đồng đã được giải quyết)
     python -m research.risk.adjudicate --annotators A,B --adjudicator C --build-gold
 
-Output
+Đầu ra
 ------
-research/risk/data/gold.jsonl     – one line per case: {id, level, codes, method, note}
-research/risk/data/agreement.json – kappa scores and disagreement list
-research/risk/data/split.json     – {"dev": [...ids], "test": [...ids]} 30/70, stratified by case group, written once
-                                    (refused when it exists: the test set is locked; --force-split to rebuild on purpose)
+research/risk/data/gold.jsonl     – mỗi ca một dòng: {id, level, codes, method, note}
+research/risk/data/agreement.json – điểm kappa và danh sách bất đồng
+research/risk/data/split.json     – {"dev": [...ids], "test": [...ids]} chia 30/70, phân tầng theo nhóm ca, chỉ ghi một lần
+                                    (bị từ chối khi đã tồn tại: tập test bị khóa; dùng --force-split để cố ý dựng lại)
 """
 from __future__ import annotations
 
@@ -40,11 +40,11 @@ from research.risk.view import render
 
 
 # ---------------------------------------------------------------------------
-# Load labels
+# Nạp nhãn
 # ---------------------------------------------------------------------------
 
 def _latest_labels(path: str) -> dict:
-    """id -> last row for that id (redo appends a new row)."""
+    """id -> dòng cuối cùng của id đó (làm lại sẽ thêm một dòng mới)."""
     rows = read_jsonl(path)
     out = {}
     for r in rows:
@@ -53,7 +53,7 @@ def _latest_labels(path: str) -> dict:
 
 
 def load_annotator_labels(annotators: list[str]) -> dict[str, dict]:
-    """annotator_id -> {case_id -> label_row}."""
+    """annotator_id -> {case_id -> dòng nhãn}. Người chưa có tệp nhãn được cảnh báo và coi như chưa gán ca nào."""
     result = {}
     for ann in annotators:
         path = os.path.join(LABELS, f"{ann}.jsonl")
@@ -66,16 +66,16 @@ def load_annotator_labels(annotators: list[str]) -> dict[str, dict]:
 
 
 # ---------------------------------------------------------------------------
-# Agreement computation
+# Tính độ đồng thuận
 # ---------------------------------------------------------------------------
 
 def compute_agreement(ann_labels: dict[str, dict]) -> dict:
-    """Return agreement stats for all annotator pairs on cases all have labelled."""
+    """Trả thống kê đồng thuận cho mọi cặp người gán nhãn trên các ca mà tất cả đều đã gán (kappa theo mức, kappa theo từng mã, danh sách bất đồng)."""
     ann_ids = list(ann_labels.keys())
     if len(ann_ids) < 2:
         return {"error": "need at least 2 annotators"}
 
-    # Find cases all annotators have labelled
+    # Tìm các ca mà mọi người đều đã gán nhãn
     common_ids = set.intersection(*[set(labels.keys()) for labels in ann_labels.values()])
     common_ids = sorted(common_ids)
     n = len(common_ids)
@@ -90,7 +90,7 @@ def compute_agreement(ann_labels: dict[str, dict]) -> dict:
             kappa = cohen_kappa(levels_a, levels_b, LEVELS)
             kappa_lin = cohen_kappa(levels_a, levels_b, LEVELS, weights="linear")
 
-            # Per-code kappa (binary: has code or not)
+            # Kappa theo từng mã (nhị phân: có mã hay không)
             code_kappas = {}
             for code in CODES:
                 a_has = [code in ann_labels[a][cid].get("codes", []) for cid in common_ids]
@@ -104,7 +104,7 @@ def compute_agreement(ann_labels: dict[str, dict]) -> dict:
                 except ValueError:
                     code_kappas[code] = None
 
-            # Disagreements
+            # Các bất đồng
             disagreements = []
             for cid in common_ids:
                 la, lb = ann_labels[a][cid], ann_labels[b][cid]
@@ -134,28 +134,28 @@ def compute_agreement(ann_labels: dict[str, dict]) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Build gold
+# Tạo gold
 # ---------------------------------------------------------------------------
 
 def needs_adjudication(la: dict, lb: dict) -> bool:
-    """Level or codes differ, or either person was unsure (an unsure case is always read again)."""
+    """Mức hoặc mã khác nhau, hoặc một trong hai người chưa chắc (ca chưa chắc luôn được đọc lại)."""
     return (la["level"] != lb["level"] or set(la.get("codes", [])) != set(lb.get("codes", []))
             or bool(la.get("unsure")) or bool(lb.get("unsure")))
 
 
 def build_gold(ann_labels: dict[str, dict], adjudicator_path: str | None = None) -> list:
-    """Build gold labels. For agreed cases: method=agreed. For adjudicated: method=adjudicated.
-    Returns list of gold rows."""
+    """Tạo nhãn gold. Ca đồng thuận: method=agreed. Ca đã phân xử: method=adjudicated. Ca bất đồng mà người phân xử chưa quyết thì bị bỏ.
+    Trả danh sách các dòng gold."""
     ann_ids = list(ann_labels.keys())
     if len(ann_ids) < 2:
         raise ValueError("Need at least 2 annotators to build gold.")
 
-    # Load adjudicator labels if provided
+    # Nạp nhãn của người phân xử nếu có
     adj_labels = {}
     if adjudicator_path and os.path.exists(adjudicator_path):
         adj_labels = _latest_labels(adjudicator_path)
 
-    # Find common cases
+    # Tìm các ca chung
     common_ids = sorted(set.intersection(*[set(labels.keys()) for labels in ann_labels.values()]))
 
     gold = []
@@ -175,18 +175,18 @@ def build_gold(ann_labels: dict[str, dict], adjudicator_path: str | None = None)
                 "method": "adjudicated", "note": adj.get("note", ""),
             })
         else:
-            # Unresolved: skip from gold (will be reported)
+            # Chưa giải quyết: bỏ khỏi gold (sẽ được báo cáo)
             pass
 
     return gold
 
 
 # ---------------------------------------------------------------------------
-# Split builder
+# Dựng phép chia dev/test
 # ---------------------------------------------------------------------------
 
 def build_split(gold_rows: list, groups: dict, dev_ratio: float = 0.30, seed: int = 42) -> dict:
-    """30% dev, 70% test, stratified by the generator's case group (so every group is in both)."""
+    """Chia 30% dev, 70% test, phân tầng theo nhóm ca của bộ sinh dữ liệu (để nhóm nào cũng có ở cả hai tập). Cố định theo seed."""
     by_group = {}
     for r in gold_rows:
         by_group.setdefault(groups.get(r["id"], "unknown"), []).append(r["id"])
@@ -202,8 +202,8 @@ def build_split(gold_rows: list, groups: dict, dev_ratio: float = 0.30, seed: in
 
 
 def adjudicate_interactively(ann_labels: dict, adjudicator: str, input_fn=input, output=print) -> int:
-    """Shows each case that needs a decision with both labels; the decision and a one-sentence reason go to
-    labels/<adjudicator>.jsonl. Returns the number decided. q stops (progress is kept)."""
+    """Hiển thị từng ca cần quyết định cùng hai nhãn; quyết định và lý do một câu được ghi vào
+    labels/<adjudicator>.jsonl. Trả số ca đã quyết. Nhập q để dừng (tiến độ được giữ)."""
     _, cases = load_cases()
     by_id = {c["id"]: c for c in cases}
     a, b = list(ann_labels)[:2]
@@ -243,6 +243,7 @@ def adjudicate_interactively(ann_labels: dict, adjudicator: str, input_fn=input,
 # ---------------------------------------------------------------------------
 
 def main():
+    """Điểm vào dòng lệnh: in báo cáo đồng thuận, nhắc bước phân xử, hoặc tạo gold.jsonl và split.json tùy các cờ."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--annotators", default="A,B",
                         help="Comma-separated annotator ids (default: A,B)")
@@ -264,7 +265,7 @@ def main():
     if args.report or not (args.build_gold or args.interactive):
         agreement = compute_agreement(ann_labels)
         print(json.dumps(agreement, ensure_ascii=False, indent=2))
-        # Save agreement report
+        # Lưu báo cáo đồng thuận
         report_path = os.path.join(DATA, "agreement.json")
         os.makedirs(DATA, exist_ok=True)
         with open(report_path, "w", encoding="utf-8") as f:

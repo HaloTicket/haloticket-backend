@@ -58,6 +58,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/** Cài đặt nghiệp vụ sự kiện: lưu sự kiện, đồng bộ vé sang ticket-service, duyệt hoặc từ chối của admin, ghép dữ liệu trả về cho client và phát thông báo qua Kafka hoặc notification-service. */
 @Service
 @RequiredArgsConstructor
 public class EventServiceImpl implements EventService {
@@ -78,7 +79,7 @@ public class EventServiceImpl implements EventService {
     @Autowired(required = false)
     private NotificationServiceClient notificationServiceClient;
 
-    /** Paid tickets of an event; asked before an approval is taken back. */
+    /** Client lấy số vé đã bán của sự kiện; được hỏi trước khi thu hồi phê duyệt. */
     @Autowired(required = false)
     private BookingInternalServiceClient bookingStatsClient;
 
@@ -88,8 +89,16 @@ public class EventServiceImpl implements EventService {
     private final ObjectMapper objectMapper;
 
     /**
-     * Not transactional on purpose: the event is saved in a short transaction by {@link EventCatalogWriter} (a separate bean),
-     * and ticket-service is called afterwards, outside any database transaction.
+     * Cố ý không dùng transaction: sự kiện được lưu trong một giao dịch ngắn bởi {@link EventCatalogWriter} (bean riêng), rồi
+     * mới gọi ticket-service bên ngoài mọi giao dịch cơ sở dữ liệu. Sau khi lưu, đồng bộ vé, đồng bộ tài khoản nhận tiền sang
+     * payment-service và thông báo admin khi sự kiện vừa gửi duyệt hoặc vừa cập nhật.
+     *
+     * @param request dữ liệu sự kiện; có {@code eventId} thì là cập nhật
+     * @param authorization header Authorization của nhà tổ chức
+     * @return sự kiện sau khi lưu, null nếu request null
+     * @throws ResponseStatusException 403 {@code EKYC_REQUIRED} khi chưa đủ điều kiện nhà tổ chức, 503 {@code EKYC_STATUS_UNAVAILABLE} khi không kiểm tra được
+     * @throws TicketSyncFailedException khi đồng bộ vé thất bại (sự kiện vẫn đã được lưu)
+     * @throws TicketSyncRejectedException khi ticket-service từ chối nội dung vé
      */
     @Override
     public EventResponse createEvent(EventCreateRequest request, String authorization) {
@@ -103,14 +112,14 @@ public class EventServiceImpl implements EventService {
         Event saved = result.event();
         EventApprovalStatus oldApprovalStatus = result.oldApprovalStatus();
 
-        // an event with showtimes is synced per showtime only; one without showtimes once, with showtimeId = null
+        // sự kiện có suất diễn chỉ đồng bộ theo từng suất; không có suất diễn thì đồng bộ một lần với showtimeId = null
         List<Batch> batches = TicketPayloads.batches(saved.getShowtimes(), request.getTickets(),
                 st -> ownTicketsOf(st, request));
         RuntimeException syncFailure = null;
         try {
             syncAndMark(saved, batches);
         } catch (TicketSyncFailedException | TicketSyncRejectedException e) {
-            syncFailure = e; // the event stays saved; the rest of the save still happens, the caller gets the error at the end
+            syncFailure = e; // sự kiện vẫn được lưu và phần còn lại vẫn chạy; lỗi chỉ được ném cho bên gọi ở cuối
         }
         syncPayoutAccountToPaymentService(uid, request, authorization);
 
@@ -131,6 +140,13 @@ public class EventServiceImpl implements EventService {
         return mapToEventResponse(saved);
     }
 
+    /**
+     * Cập nhật sự kiện có sẵn bằng cách gán {@code eventId} vào request rồi dùng lại luồng của {@link #createEvent}.
+     * @param id id sự kiện cần cập nhật
+     * @param request dữ liệu mới, null được coi như request rỗng
+     * @param authorization header Authorization của nhà tổ chức
+     * @return sự kiện sau khi lưu
+     */
     @Override
     public EventResponse updateEvent(String id, EventCreateRequest request, String authorization) {
         if (request == null) {
@@ -140,7 +156,7 @@ public class EventServiceImpl implements EventService {
         return createEvent(request, authorization);
     }
 
-    /** Sends the stored ticketsData snapshot to ticket-service again (an upsert there). Permission is checked by the caller. */
+    /** Gửi lại bản chụp {@code ticketsData} đã lưu sang ticket-service (ở đó là upsert). Quyền do nơi gọi kiểm tra. Ném 409 {@code NO_TICKETS_TO_SYNC} khi không có vé nào để gửi. */
     @Override
     public EventResponse resyncTickets(String eventId) {
         Event event = eventRepository.findById(eventId)
@@ -164,18 +180,20 @@ public class EventServiceImpl implements EventService {
         return mapToEventResponse(event);
     }
 
+    /** Đọc bản chụp vé lưu dạng JSON của sự kiện; JSON hỏng hoặc rỗng thì trả danh sách rỗng. */
     private List<EventCreateRequest.TicketCreateRequest> parseSnapshot(String json) {
         if (json == null || json.isBlank()) return new ArrayList<>();
         try {
             List<EventCreateRequest.TicketCreateRequest> parsed = objectMapper.readValue(json,
                     new com.fasterxml.jackson.core.type.TypeReference<List<EventCreateRequest.TicketCreateRequest>>() {});
-            // older snapshots can hold showtime-shaped rows (no ticket name): not tickets
+            // bản chụp cũ có thể chứa dòng giống suất diễn (không có tên vé): đó không phải vé
             return parsed.stream().filter(t -> t != null && t.getName() != null).collect(Collectors.toList());
         } catch (Exception e) {
             return new ArrayList<>();
         }
     }
 
+    /** Tìm vé riêng của một suất diễn trong request bằng cách so tên suất; trả null nếu suất không khai báo vé riêng. */
     private List<EventCreateRequest.TicketCreateRequest> ownTicketsOf(EventShowtime st, EventCreateRequest request) {
         if (request.getShowtimes() == null || st.getName() == null) return null;
         for (EventCreateRequest.EventShowtimeRequest stReq : request.getShowtimes()) {
@@ -184,7 +202,7 @@ public class EventServiceImpl implements EventService {
         return null;
     }
 
-    /** Syncs, then records SYNCED or FAILED on the event (in memory and in a short transaction). Nothing to send: no change. */
+    /** Đồng bộ rồi ghi {@code SYNCED} hoặc {@code FAILED} lên sự kiện (trong bộ nhớ và trong một giao dịch ngắn). Không có lô nào để gửi thì giữ nguyên trạng thái. */
     private void syncAndMark(Event event, List<Batch> batches) {
         if (batches.isEmpty()) return;
         try {
@@ -199,6 +217,7 @@ public class EventServiceImpl implements EventService {
         mark(event, TicketSyncStatus.SYNCED, null);
     }
 
+    /** Ghi trạng thái đồng bộ vé lên đối tượng sự kiện và lưu qua {@code catalogWriter}; lỗi khi lưu chỉ ghi log. */
     private void mark(Event event, TicketSyncStatus status, String error) {
         event.setTicketsSyncStatus(status);
         event.setTicketsSyncError(status == TicketSyncStatus.SYNCED ? null : error);
@@ -210,6 +229,10 @@ public class EventServiceImpl implements EventService {
         }
     }
 
+    /**
+     * Kiểm tra với user-service rằng người gọi đủ điều kiện làm nhà tổ chức.
+     * @throws ResponseStatusException 403 {@code EKYC_REQUIRED} khi chưa đủ điều kiện, 503 {@code EKYC_STATUS_UNAVAILABLE} khi không gọi được user-service
+     */
     private OrganizerEligibilityResponse requireEligibleOrganizer(String authorization) {
         try {
             OrganizerEligibilityResponse eligibility = userServiceClient.getOrganizerEligibility(authorization);
@@ -224,7 +247,7 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-    /** The person told about an approval or a rejection: the active OWNER of the event's staff assignments. */
+    /** Người được báo về kết quả duyệt: OWNER đang hoạt động trong phân công của sự kiện; không có thì dùng giá trị mặc định {@code user_default_id}. */
     private String recipientOf(Event event) {
         return staffAssignmentRepository.findByEventId(event.getId()).stream()
                 .filter(a -> a.getRole() == com.haloticket.event_service.enums.StaffRole.OWNER
@@ -233,6 +256,7 @@ public class EventServiceImpl implements EventService {
     }
 
 
+    /** Đồng bộ tài khoản nhận tiền của nhà tổ chức sang payment-service khi request có chủ tài khoản. Lỗi chỉ in cảnh báo, không làm hỏng việc lưu sự kiện. */
     private void syncPayoutAccountToPaymentService(String userId, EventCreateRequest request, String authorization) {
         if (userId == null || request.getAccountHolder() == null || request.getAccountHolder().trim().isEmpty())
             return;
@@ -255,6 +279,12 @@ public class EventServiceImpl implements EventService {
         }
     }
 
+    /**
+     * Lấy danh sách loại vé của sự kiện từ ticket-service (ưu tiên danh sách đầy đủ, nếu rỗng thì lấy danh sách đang bán).
+     * @param eventId id sự kiện
+     * @param unavailable mảng một phần tử, được đặt true khi không gọi được ticket-service
+     * @return danh sách vé hoặc null
+     */
     private Object fetchTicketsFromTicketService(String eventId, boolean[] unavailable) {
         if (eventId == null)
             return null;
@@ -270,6 +300,7 @@ public class EventServiceImpl implements EventService {
         }
     }
 
+    /** Lấy hồ sơ nhà tổ chức tạo gần nhất của người gọi. Mọi lỗi (chưa đủ điều kiện, không gọi được dịch vụ) đều trả null. */
     @Override
     public OrganizerDto getOrganizerProfile(String authorization) {
         try {
@@ -287,6 +318,7 @@ public class EventServiceImpl implements EventService {
         }
     }
 
+    /** Lấy toàn bộ sự kiện, mỗi sự kiện được ghép thêm vé từ ticket-service. */
     @Override
     public List<EventResponse> getAllEvents() {
         return eventRepository.findAll().stream()
@@ -294,6 +326,7 @@ public class EventServiceImpl implements EventService {
                 .collect(Collectors.toList());
     }
 
+    /** Lấy các sự kiện mà người gọi có phân công ACTIVE (mọi vai trò). Không xác định được người dùng thì trả danh sách rỗng. */
     @Override
     public List<EventResponse> getMyEvents(String authorization) {
         try {
@@ -309,6 +342,7 @@ public class EventServiceImpl implements EventService {
         return new ArrayList<>();
     }
 
+    /** Lấy chi tiết sự kiện theo id. Khi không tìm thấy id, trả về sự kiện đầu tiên trong cơ sở dữ liệu (hoặc null nếu không có sự kiện nào). */
     @Override
     public EventResponse getEventById(String id) {
         return eventRepository.findById(id)
@@ -318,6 +352,7 @@ public class EventServiceImpl implements EventService {
                         .orElse(null));
     }
 
+    /** Lấy các danh mục theo thứ tự hiển thị (vị trí rồi tên). */
     @Override
     public List<EventCategoryResponse> getAllCategories() {
         return eventCategoryRepository.findAllByOrderBySortOrderAscNameAsc().stream()
@@ -325,6 +360,10 @@ public class EventServiceImpl implements EventService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Lấy các từ khóa được tìm nhiều nhất. Khi chưa có dữ liệu thì trả một danh sách từ khóa gợi ý cố định.
+     * @param limit số từ khóa tối đa
+     */
     @Override
     public List<String> getTopSearchedKeywords(int limit) {
         Pageable pageable = PageRequest.of(0, limit);
@@ -335,6 +374,7 @@ public class EventServiceImpl implements EventService {
         return topKeywords;
     }
 
+    /** Ghi nhận lượt tìm kiếm: chuẩn hóa từ khóa về chữ thường, tạo dòng mới nếu chưa có và tăng bộ đếm. Từ khóa rỗng bị bỏ qua. */
     @Override
     public void logSearchQuery(String query) {
         if (query == null || query.trim().isEmpty())
@@ -349,6 +389,7 @@ public class EventServiceImpl implements EventService {
         searchLogRepository.save(searchLog);
     }
 
+    /** Dựng response đầy đủ của sự kiện: nhà tổ chức, suất diễn, câu hỏi tùy chỉnh, danh sách vé (ưu tiên ticket-service, dự phòng bản chụp cục bộ, bỏ vé ẩn), giá thấp nhất và trạng thái đồng bộ vé. Nếu giá thấp nhất tính được khác giá đang lưu thì cập nhật lại vào sự kiện. */
     private EventResponse mapToEventResponse(Event event) {
         if (event == null)
             return null;
@@ -368,7 +409,7 @@ public class EventServiceImpl implements EventService {
 
         String poster = event.getBannerUrl() != null ? event.getBannerUrl() : event.getThumbnailUrl();
 
-        // fetch tickets dynamically from ticket-service, fallback to local JSON
+        // lấy vé động từ ticket-service, nếu không được thì dùng JSON lưu cục bộ
         boolean[] ticketsUnavailable = new boolean[1];
         Object ticketsObj = fetchTicketsFromTicketService(event.getId(), ticketsUnavailable);
         if (ticketsObj instanceof List<?> list) {
@@ -495,7 +536,7 @@ public class EventServiceImpl implements EventService {
                 .customQuestions(customQuestionsObj)
                 .organizer(organizerDto)
                 .ticketsSync(ticketsUnavailable[0]
-                        // ticket-service could not be read: the list above (if any) is the local snapshot, not saved truth
+                        // không đọc được ticket-service: danh sách vé ở trên (nếu có) chỉ là bản chụp cục bộ, không phải dữ liệu đã lưu thật
                         ? TicketsSyncDto.builder().status("UNAVAILABLE").error("TICKET_SERVICE_UNAVAILABLE")
                                 .syncedAt(event.getTicketsSyncedAt()).build()
                         : TicketsSyncDto.builder()
@@ -513,6 +554,7 @@ public class EventServiceImpl implements EventService {
                 .build();
     }
 
+    /** Lấy sự kiện theo trạng thái duyệt (không phân biệt hoa thường, {@code ALL} hoặc null là tất cả), sắp mới nhất trước. */
     @Override
     public List<EventResponse> getApprovalEvents(String status) {
         List<Event> events = eventRepository.findAll();
@@ -533,6 +575,12 @@ public class EventServiceImpl implements EventService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Duyệt sự kiện: đặt trạng thái {@code APPROVED}, cấp vai trò ORGANIZER cho chủ sự kiện và gửi thông báo (khác nhau giữa duyệt lần đầu và duyệt bản cập nhật).
+     * @param id id sự kiện
+     * @return sự kiện sau khi duyệt
+     * @throws RuntimeException khi không tìm thấy sự kiện
+     */
     @Override
     public EventResponse approveEvent(String id) {
         Event event = eventRepository.findById(id)
@@ -565,6 +613,14 @@ public class EventServiceImpl implements EventService {
         return mapToEventResponse(saved);
     }
 
+    /**
+     * Từ chối sự kiện: đặt trạng thái {@code REJECTED}, lưu lý do và ghi chú, rồi thông báo cho chủ sự kiện kèm các mục cần sửa.
+     * @param id id sự kiện
+     * @param reason lý do từ chối
+     * @param notes ghi chú dạng JSON (các mục đánh dấu)
+     * @return sự kiện sau khi từ chối
+     * @throws RuntimeException khi không tìm thấy sự kiện
+     */
     @Override
     public EventResponse rejectEvent(String id, String reason, String notes) {
         Event event = eventRepository.findById(id)
@@ -589,6 +645,13 @@ public class EventServiceImpl implements EventService {
         return mapToEventResponse(saved);
     }
 
+    /**
+     * Thu hồi phê duyệt, đưa sự kiện về {@code PENDING}. Chỉ áp dụng cho sự kiện đã duyệt và chưa bán vé nào.
+     * @param id id sự kiện
+     * @param reason lý do thu hồi, có thể null
+     * @return sự kiện sau khi thu hồi
+     * @throws ResponseStatusException 400 khi sự kiện chưa được duyệt, 409 khi đã có vé bán ra, 503 khi không kiểm tra được số vé đã bán
+     */
     @Override
     public EventResponse revertApproval(String id, String reason) {
         Event event = eventRepository.findById(id)
@@ -612,6 +675,13 @@ public class EventServiceImpl implements EventService {
         return mapToEventResponse(saved);
     }
 
+    /**
+     * Chủ sự kiện rút yêu cầu duyệt đang chờ, đưa sự kiện về {@code DRAFT} và báo admin.
+     * @param id id sự kiện
+     * @param authorization header Authorization của người gọi
+     * @return sự kiện sau khi rút
+     * @throws ResponseStatusException 403 khi không phải chủ sự kiện, 409 khi đang ở trạng thái cập nhật chờ duyệt, 400 khi không ở trạng thái chờ duyệt
+     */
     @Override
     public EventResponse cancelApprovalRequest(String id, String authorization) {
         Event event = eventRepository.findById(id)
@@ -630,7 +700,7 @@ public class EventServiceImpl implements EventService {
         }
 
         if (event.getEventApprovalStatus() == EventApprovalStatus.UPDATE_PENDING) {
-            // the edits of an approved event are already live while they wait for review; cancelling would keep them without a review
+            // các chỉnh sửa của sự kiện đã duyệt đã có hiệu lực trong lúc chờ xem xét; nếu cho hủy thì chúng được giữ lại mà không qua duyệt
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Sự kiện đang mở bán với nội dung cập nhật chờ duyệt. Vui lòng chờ quản trị viên xử lý hoặc chỉnh sửa lại nội dung.");
         }
@@ -648,7 +718,7 @@ public class EventServiceImpl implements EventService {
         return mapToEventResponse(saved);
     }
 
-    /** Taking an approval back would leave buyers with tickets to an event that is no longer approved. */
+    /** Thu hồi phê duyệt sẽ để người mua giữ vé của một sự kiện không còn được duyệt, nên chỉ cho thu hồi khi chưa bán vé nào. */
     private void requireNoTicketsSold(String eventId) {
         if (bookingStatsClient == null) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Chưa kiểm tra được số vé đã bán, vui lòng thử lại.");
@@ -667,12 +737,12 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-    /** Items of the rejection form an admin can flag, with the label the organiser reads in the notification. */
+    /** Các mục trong biểu mẫu từ chối mà admin có thể đánh dấu, kèm nhãn mà nhà tổ chức đọc trong thông báo. */
     private static final Map<String, String> FLAG_LABELS = Map.of(
             "posterImage", "Poster & Banner", "title", "Tên & Mô tả", "dates", "Thời gian",
             "tickets", "Hạng vé", "location", "Địa điểm", "paymentInfo", "Thanh toán");
 
-    /** The flagged fields the admin ticked (rejection notes are JSON: flaggedFields, noteText, flaggedQuotes); unknown names are dropped. */
+    /** Các mục admin đã đánh dấu (ghi chú từ chối là JSON gồm flaggedFields, noteText, flaggedQuotes); tên không biết sẽ bị bỏ. */
     private List<String> flaggedFieldsOf(String notes) {
         if (notes == null || notes.isBlank()) return List.of();
         try {
@@ -688,7 +758,7 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-    /** What the web needs to open the right event from the notification: the event id, where to go, and what to fix. */
+    /** Dữ liệu để web mở đúng sự kiện từ thông báo: id sự kiện, đường dẫn cần tới và các mục cần sửa. */
     private static Map<String, Object> eventNotificationVariables(Event event, List<String> flaggedFields) {
         Map<String, Object> variables = new LinkedHashMap<>();
         variables.put("eventId", event.getId());
@@ -697,15 +767,25 @@ public class EventServiceImpl implements EventService {
         return variables;
     }
 
+    /** Rút gọn văn bản còn tối đa {@code max} ký tự, thêm dấu ba chấm khi bị cắt. */
     private static String shorten(String text, int max) {
         String value = text == null ? "" : text.strip();
         return value.length() <= max ? value : value.substring(0, max - 1) + "…";
     }
 
+    /** Gửi thông báo không kèm dữ liệu bổ sung. */
     private void publishNotification(String userId, String type, String title, String message) {
         publishNotification(userId, type, title, message, null);
     }
 
+    /**
+     * Gửi thông báo cho người dùng (hoặc nhóm như {@code ADMIN}) qua Kafka (topic {@code haloticket.direct.notification.v1}) và qua notification-service nếu có. Lỗi gửi bị bỏ qua để không ảnh hưởng nghiệp vụ chính.
+     * @param userId người nhận, rỗng thì không gửi
+     * @param type loại thông báo
+     * @param title tiêu đề
+     * @param message nội dung
+     * @param variables dữ liệu kèm theo (dạng JSON), có thể null
+     */
     private void publishNotification(String userId, String type, String title, String message, Map<String, Object> variables) {
         if (userId == null || userId.isBlank()) return;
 
@@ -720,7 +800,7 @@ public class EventServiceImpl implements EventService {
             try {
                 payload.put("variables", objectMapper.writeValueAsString(variables));
             } catch (Exception e) {
-                // the notification is still sent, without the extra data
+                // thông báo vẫn được gửi, chỉ thiếu dữ liệu kèm theo
             }
         }
 
@@ -729,7 +809,7 @@ public class EventServiceImpl implements EventService {
                 String json = objectMapper.writeValueAsString(payload);
                 kafkaTemplate.send("haloticket.direct.notification.v1", userId, json);
             } catch (Exception e) {
-                // silent catch
+                // bỏ qua lỗi, thông báo không được làm hỏng nghiệp vụ chính
             }
         }
 
@@ -737,11 +817,12 @@ public class EventServiceImpl implements EventService {
             try {
                 notificationServiceClient.publishNotification(new HashMap<>(payload));
             } catch (Exception e) {
-                // silent catch
+                // bỏ qua lỗi, thông báo không được làm hỏng nghiệp vụ chính
             }
         }
     }
 
+    /** Chuyển danh mục sang response; trạng thái trống được coi là {@code ACTIVE}. */
     private EventCategoryResponse mapToCategoryResponse(EventCategory category) {
         if (category == null)
             return null;

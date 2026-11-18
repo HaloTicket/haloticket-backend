@@ -21,10 +21,10 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Service-to-service endpoints (".../internal/...") and management paths must never be reachable through the
- * gateway. Spring's path patterns cannot express "an internal segment at any depth", so the request path is
- * normalised first (percent-decoding, repeated slashes, "." and "..", matrix parameters, backslashes, case) and
- * then checked. Runs before Spring Security and routing and answers 404, like an unknown path.
+ * Các endpoint giữa các service (".../internal/...") và đường dẫn quản trị tuyệt đối không được truy cập qua
+ * gateway. Mẫu đường dẫn của Spring không diễn đạt được "đoạn internal ở độ sâu bất kỳ", nên đường dẫn request
+ * được chuẩn hóa trước (giải mã phần trăm, dấu gạch chéo lặp, "." và "..", tham số matrix, dấu gạch ngược, chữ hoa)
+ * rồi mới kiểm tra. Chạy trước Spring Security và định tuyến, trả 404 như một đường dẫn không tồn tại.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -37,12 +37,19 @@ public class InternalPathBlockFilter implements WebFilter {
     private static final int MAX_DECODE_ROUNDS = 4;
 
     /**
-     * Actuator runs on its own port (management.server.port), which is not published: only containers in the compose network
-     * reach it. A request that really arrived on that port may read /actuator/**; everything on the public port stays blocked.
+     * Actuator chạy trên cổng riêng (management.server.port) và không được publish: chỉ các container trong mạng compose
+     * truy cập được. Request thật sự đến cổng này được đọc /actuator/**; mọi thứ trên cổng công khai vẫn bị chặn.
      */
     @Value("${management.server.port:0}")
     private int managementPort;
 
+    /**
+     * Chặn request tới đường dẫn nội bộ hoặc quản trị bằng HTTP 404; riêng {@code /actuator} trên cổng management thì cho qua.
+     *
+     * @param exchange request và response hiện tại
+     * @param chain phần còn lại của chuỗi bộ lọc
+     * @return {@code Mono} hoàn tất khi đã xử lý xong request
+     */
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String rawPath = exchange.getRequest().getURI().getRawPath();
@@ -57,16 +64,30 @@ public class InternalPathBlockFilter implements WebFilter {
         return chain.filter(exchange);
     }
 
+    /**
+     * Kiểm tra request có thật sự đến từ cổng management hay không.
+     *
+     * @param local địa chỉ cục bộ mà request đã kết nối vào, có thể null
+     * @param managementPort cổng management đã cấu hình, 0 nghĩa là không dùng
+     * @return {@code true} khi cổng khớp và lớn hơn 0
+     */
     static boolean arrivedOnManagementPort(java.net.InetSocketAddress local, int managementPort) {
         return local != null && managementPort > 0 && local.getPort() == managementPort;
     }
 
-    /** Only a plain /actuator or /actuator/... path: no encoded or dotted tricks (those still go through isBlocked). */
+    /** Chỉ nhận đường dẫn /actuator hoặc /actuator/... thuần túy, không có mã hóa hay dấu chấm lắt léo (các trường hợp đó vẫn đi qua isBlocked). */
     static boolean isActuatorPath(String rawPath) {
         return rawPath != null && (rawPath.equals("/actuator") || rawPath.startsWith("/actuator/")) && !rawPath.contains("%")
                 && !rawPath.contains("..") && !rawPath.contains("\\") && !rawPath.contains(";");
     }
 
+    /**
+     * Chuẩn hóa đường dẫn rồi quyết định có chặn hay không: chặn khi có đoạn {@code internal} ở bất kỳ độ sâu nào,
+     * khi đoạn đầu là {@code actuator} hoặc {@code eureka}, hoặc khi mã hóa phần trăm bị lỗi.
+     *
+     * @param rawPath đường dẫn thô, chưa giải mã
+     * @return {@code true} nếu phải chặn
+     */
     static boolean isBlocked(String rawPath) {
         if (rawPath == null || rawPath.isEmpty()) return false;
         String decoded;
@@ -82,6 +103,13 @@ public class InternalPathBlockFilter implements WebFilter {
         return !resolved.isEmpty() && BLOCKED_FIRST_SEGMENTS.contains(resolved.get(0));
     }
 
+    /**
+     * Giải mã phần trăm lặp lại (tối đa {@code MAX_DECODE_ROUNDS} lượt) để chặn kiểu mã hóa lồng nhau. Dấu cộng được giữ nguyên.
+     *
+     * @param path đường dẫn cần giải mã
+     * @return đường dẫn sau khi giải mã, dừng khi không còn thay đổi
+     * @throws IllegalArgumentException khi chuỗi mã hóa phần trăm sai định dạng
+     */
     private static String decodeFully(String path) {
         String current = path;
         for (int round = 0; round < MAX_DECODE_ROUNDS; round++) {
@@ -92,6 +120,12 @@ public class InternalPathBlockFilter implements WebFilter {
         return current;
     }
 
+    /**
+     * Tách đường dẫn thành các đoạn: đổi dấu gạch ngược thành gạch chéo, bỏ tham số matrix sau dấu chấm phẩy, cắt khoảng trắng, đưa về chữ thường và bỏ đoạn rỗng.
+     *
+     * @param path đường dẫn đã giải mã
+     * @return danh sách đoạn đã chuẩn hóa
+     */
     private static List<String> segments(String path) {
         return java.util.Arrays.stream(path.replace('\\', '/').split("/"))
                 .map(segment -> {
@@ -102,6 +136,12 @@ public class InternalPathBlockFilter implements WebFilter {
                 .toList();
     }
 
+    /**
+     * Xử lý các đoạn {@code .} (bỏ qua) và {@code ..} (lùi một cấp) như khi hệ thống tệp phân giải đường dẫn.
+     *
+     * @param segments các đoạn đã chuẩn hóa
+     * @return danh sách đoạn sau khi phân giải
+     */
     private static List<String> resolveDots(List<String> segments) {
         Deque<String> stack = new ArrayDeque<>();
         for (String segment : segments) {
@@ -115,6 +155,12 @@ public class InternalPathBlockFilter implements WebFilter {
         return List.copyOf(stack);
     }
 
+    /**
+     * Làm sạch chuỗi trước khi ghi log: thay ký tự điều khiển bằng dấu hỏi và cắt còn tối đa 200 ký tự.
+     *
+     * @param value chuỗi cần ghi log
+     * @return chuỗi an toàn để ghi log
+     */
     private static String printable(String value) {
         String cleaned = value.replaceAll("[\\p{Cntrl}]", "?");
         return cleaned.length() > 200 ? cleaned.substring(0, 200) + "..." : cleaned;

@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/** API chính của sự kiện: tạo và sửa sự kiện, hồ sơ nhà tổ chức, danh sách, duyệt sự kiện và nhật ký tìm kiếm. */
 @RestController
 @RequestMapping("/api/events")
 @RequiredArgsConstructor
@@ -29,6 +30,11 @@ public class EventController {
     private final EventService eventService;
     private final EventAccessService eventAccessService;
 
+    /**
+     * Endpoint thử nghiệm: trả về chuỗi JSON của danh sách câu hỏi tùy chỉnh trong yêu cầu; lỗi được trả dưới dạng chuỗi {@code Error: ...} với mã 200.
+     * @param request yêu cầu tạo sự kiện cần kiểm tra
+     * @return chuỗi JSON hoặc thông báo lỗi
+     */
     @PostMapping("/test-questions")
     public ResponseEntity<String> testQuestions(@RequestBody EventCreateRequest request) {
         try {
@@ -38,6 +44,12 @@ public class EventController {
         }
     }
 
+    /**
+     * Tạo sự kiện mới (hoặc hoàn thiện bản nháp, tùy dữ liệu gửi lên).
+     * @param authorization header {@code Authorization} của người tổ chức
+     * @param request dữ liệu sự kiện
+     * @return sự kiện đã tạo với mã 201
+     */
     @PostMapping
     public ResponseEntity<EventResponse> createEvent(
             @RequestHeader("Authorization") String authorization,
@@ -46,6 +58,13 @@ public class EventController {
         return new ResponseEntity<>(eventService.createEvent(request, authorization), HttpStatus.CREATED);
     }
 
+    /**
+     * Cập nhật sự kiện đã có.
+     * @param id mã sự kiện
+     * @param authorization header {@code Authorization} của người gọi
+     * @param request dữ liệu sự kiện mới
+     * @return sự kiện sau khi cập nhật
+     */
     @PutMapping("/{id}")
     public ResponseEntity<EventResponse> updateEvent(
             @PathVariable String id,
@@ -55,7 +74,12 @@ public class EventController {
         return ResponseEntity.ok(eventService.updateEvent(id, request, authorization));
     }
 
-    /** Re-sends the stored ticket snapshot to ticket-service. Same permission as editing the event (EVENT_EDIT; ROLE_ADMIN passes). */
+    /**
+     * Gửi lại cho ticket-service bản chụp vé đã lưu. Cần cùng quyền với sửa sự kiện ({@code EVENT_EDIT}; {@code ROLE_ADMIN} được qua).
+     * @param id mã sự kiện
+     * @param authorization header {@code Authorization} của người gọi
+     * @return sự kiện sau khi đồng bộ lại
+     */
     @PostMapping("/{id}/tickets/resync")
     public ResponseEntity<EventResponse> resyncTickets(
             @PathVariable String id,
@@ -65,16 +89,26 @@ public class EventController {
         return ResponseEntity.ok(eventService.resyncTickets(id));
     }
 
+    /**
+     * Chuyển việc ticket-service từ chối đồng bộ thành phản hồi 422 gồm mã lỗi, mã sự kiện và chi tiết loại vé.
+     * @param exception ngoại lệ từ chối đồng bộ
+     * @return phản hồi 422 dạng JSON
+     */
     @ExceptionHandler(TicketSyncRejectedException.class)
     public ResponseEntity<Map<String, Object>> ticketSyncRejected(TicketSyncRejectedException exception) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("code", exception.getCode());
         body.put("eventId", exception.getEventId());
         body.put("message", exception.getCode());
-        body.putAll(exception.getDetails()); // ticketTypeId, name, sold, held, minAllowed
+        body.putAll(exception.getDetails()); // gồm ticketTypeId, name, sold, held, minAllowed
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(body);
     }
 
+    /**
+     * Chuyển lỗi đồng bộ vé (sự kiện đã lưu nhưng vé chưa đồng bộ được) thành phản hồi 502 kèm gợi ý gọi lại bằng resync.
+     * @param exception ngoại lệ lỗi đồng bộ
+     * @return phản hồi 502 dạng JSON
+     */
     @ExceptionHandler(TicketSyncFailedException.class)
     public ResponseEntity<Map<String, Object>> ticketSyncFailed(TicketSyncFailedException exception) {
         Map<String, Object> body = new LinkedHashMap<>();
@@ -84,6 +118,12 @@ public class EventController {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(body);
     }
 
+    /**
+     * Lấy hồ sơ nhà tổ chức của người đang đăng nhập.
+     * @param authorization header {@code Authorization} của người gọi
+     * @param jwt JWT của người gọi
+     * @return hồ sơ nhà tổ chức, hoặc 204 nếu chưa có
+     */
     @GetMapping("/organizer-profile")
     public ResponseEntity<OrganizerDto> getOrganizerProfile(
             @RequestHeader("Authorization") String authorization,
@@ -96,17 +136,33 @@ public class EventController {
         return ResponseEntity.ok(dto);
     }
 
+    /**
+     * Lấy danh sách tất cả sự kiện.
+     * @return danh sách sự kiện
+     */
     @GetMapping
     public ResponseEntity<List<EventResponse>> getAllEvents() {
         return ResponseEntity.ok(eventService.getAllEvents());
     }
 
+    /**
+     * Endpoint thử nghiệm xác thực: cho biết JWT có hợp lệ hay không.
+     * @param jwt JWT của người gọi
+     * @return 401 nếu không có JWT, ngược lại chuỗi xác nhận kèm chủ thể
+     */
     @GetMapping("/test-auth")
     public ResponseEntity<String> testAuth(@AuthenticationPrincipal Jwt jwt) {
         if (jwt == null) return ResponseEntity.status(401).body("JWT is NULL");
         return ResponseEntity.ok("JWT is VALID: " + jwt.getSubject());
     }
 
+    /**
+     * Lấy các sự kiện của người đang đăng nhập.
+     * @param authorization header {@code Authorization} của người gọi
+     * @param jwt JWT của người gọi
+     * @param auth thông tin xác thực hiện tại, chỉ dùng để ghi log gỡ lỗi
+     * @return danh sách sự kiện, hoặc 401 nếu không có JWT
+     */
     @GetMapping("/my-events")
     public ResponseEntity<List<EventResponse>> getMyEvents(@RequestHeader("Authorization") String authorization, @AuthenticationPrincipal Jwt jwt, Authentication auth) {
         System.out.println("DEBUG: getMyEvents called. auth=" + auth);
@@ -118,21 +174,41 @@ public class EventController {
         return ResponseEntity.ok(res);
     }
 
+    /**
+     * Lấy danh sách danh mục sự kiện (công khai).
+     * @return danh sách danh mục
+     */
     @GetMapping("/categories")
     public ResponseEntity<List<EventCategoryResponse>> getAllCategories() {
         return ResponseEntity.ok(eventService.getAllCategories());
     }
 
+    /**
+     * Lấy các sự kiện cần duyệt, có thể lọc theo trạng thái duyệt.
+     * @param status trạng thái duyệt cần lọc; bỏ trống thì lấy theo mặc định của service
+     * @return danh sách sự kiện
+     */
     @GetMapping("/approvals")
     public ResponseEntity<List<EventResponse>> getApprovalEvents(@RequestParam(required = false) String status) {
         return ResponseEntity.ok(eventService.getApprovalEvents(status));
     }
 
+    /**
+     * Phê duyệt sự kiện (chỉ quản trị viên).
+     * @param id mã sự kiện
+     * @return sự kiện sau khi duyệt
+     */
     @PatchMapping("/{id}/approve")
     public ResponseEntity<EventResponse> approveEvent(@PathVariable String id) {
         return ResponseEntity.ok(eventService.approveEvent(id));
     }
 
+    /**
+     * Hoàn tác việc phê duyệt sự kiện (chỉ quản trị viên).
+     * @param id mã sự kiện
+     * @param body có thể chứa {@code reason}; không gửi thân thì dùng lý do mặc định
+     * @return sự kiện sau khi hoàn tác
+     */
     @PatchMapping("/{id}/revert-approval")
     public ResponseEntity<EventResponse> revertApproval(
             @PathVariable String id,
@@ -141,6 +217,12 @@ public class EventController {
         return ResponseEntity.ok(eventService.revertApproval(id, reason));
     }
 
+    /**
+     * Nhà tổ chức rút lại yêu cầu duyệt sự kiện.
+     * @param id mã sự kiện
+     * @param authorization header {@code Authorization} của người gọi
+     * @return sự kiện sau khi hủy yêu cầu
+     */
     @PatchMapping("/{id}/cancel-approval-request")
     public ResponseEntity<EventResponse> cancelApprovalRequest(
             @PathVariable String id,
@@ -148,6 +230,12 @@ public class EventController {
         return ResponseEntity.ok(eventService.cancelApprovalRequest(id, authorization));
     }
 
+    /**
+     * Từ chối sự kiện (chỉ quản trị viên).
+     * @param id mã sự kiện
+     * @param body có thể chứa {@code reason} và {@code notes}; không gửi thân thì dùng lý do mặc định
+     * @return sự kiện sau khi bị từ chối
+     */
     @PatchMapping("/{id}/reject")
     public ResponseEntity<EventResponse> rejectEvent(
             @PathVariable String id,
@@ -157,17 +245,32 @@ public class EventController {
         return ResponseEntity.ok(eventService.rejectEvent(id, reason, notes));
     }
 
+    /**
+     * Lấy các từ khóa được tìm nhiều nhất.
+     * @param limit số từ khóa tối đa, mặc định 3
+     * @return danh sách từ khóa
+     */
     @GetMapping("/trending-searches")
     public ResponseEntity<List<String>> getTrendingSearches(@RequestParam(defaultValue = "3") int limit) {
         return ResponseEntity.ok(eventService.getTopSearchedKeywords(limit));
     }
 
+    /**
+     * Ghi lại một từ khóa tìm kiếm để thống kê (chấp nhận cả POST và GET).
+     * @param query từ khóa người dùng tìm
+     * @return 200 không có thân
+     */
     @RequestMapping(value = "/search-log", method = {RequestMethod.POST, RequestMethod.GET})
     public ResponseEntity<Void> logSearchQuery(@RequestParam String query) {
         eventService.logSearchQuery(query);
         return ResponseEntity.ok().build();
     }
 
+    /**
+     * Lấy chi tiết sự kiện (công khai).
+     * @param id mã sự kiện
+     * @return sự kiện, hoặc 404 nếu không tồn tại
+     */
     @GetMapping("/{id}")
     public ResponseEntity<EventResponse> getEventById(@PathVariable String id) {
         EventResponse response = eventService.getEventById(id);

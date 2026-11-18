@@ -22,6 +22,9 @@ import reactor.core.publisher.Mono;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
+/**
+ * Cấu hình bảo mật WebFlux của gateway: xác thực JWT, CORS và phân quyền theo từng nhóm đường dẫn API.
+ */
 @Configuration
 @EnableWebFluxSecurity
 public class SecurityConfig {
@@ -32,6 +35,11 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
     private String jwkSetUri;
 
+    /**
+     * Tạo bộ giải mã JWT: dùng {@code jwk-set-uri} nếu được cấu hình, nếu không thì tra cứu theo issuer. Token phải đúng issuer.
+     *
+     * @return bộ giải mã JWT dạng reactive
+     */
     @Bean("reactiveJwtDecoder")
     ReactiveJwtDecoder jwtDecoder() {
         NimbusReactiveJwtDecoder decoder = org.springframework.util.StringUtils.hasText(jwkSetUri)
@@ -47,6 +55,11 @@ public class SecurityConfig {
     @Value("${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://localhost:5174,https://haloticket-web.pages.dev}")
     private String allowedOrigins;
 
+    /**
+     * Nguồn cấu hình CORS cho Spring Security, cùng nội dung với {@code CorsConfig}: origin cấu hình cộng thêm các domain pages.dev, cho phép credentials.
+     *
+     * @return cấu hình CORS áp dụng cho mọi đường dẫn
+     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration corsConfig = new CorsConfiguration();
@@ -63,7 +76,7 @@ public class SecurityConfig {
         corsConfig.setMaxAge(3600L);
         corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         corsConfig.setAllowedHeaders(Collections.singletonList("*"));
-        // the web reads how long to wait from a 429
+        // cho phép web đọc header Retry-After để biết phải chờ bao lâu khi nhận HTTP 429
         corsConfig.setExposedHeaders(Arrays.asList("Retry-After"));
         corsConfig.setAllowCredentials(true);
 
@@ -72,6 +85,13 @@ public class SecurityConfig {
         return source;
     }
 
+    /**
+     * Dựng chuỗi phân quyền theo thứ tự quy tắc: chặn đường dẫn nội bộ, cho phép webhook thanh toán và các lượt đọc công khai,
+     * giới hạn khu vực admin cho ROLE_ADMIN, các đường dẫn còn lại yêu cầu đăng nhập. Tắt CSRF vì dùng token Bearer.
+     *
+     * @param http cấu hình bảo mật HTTP
+     * @return chuỗi bộ lọc bảo mật
+     */
     @Bean
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         http
@@ -79,34 +99,34 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchange -> {
                     exchange
-                            // actuator on the management port (not published) is for the other containers; on the public port
-                            // the next rule still refuses /actuator/**
+                            // actuator trên cổng management (không publish) dành cho các container khác; trên cổng công khai
+                            // quy tắc kế tiếp vẫn từ chối /actuator/**
                             .matchers(request -> InternalPathBlockFilter.arrivedOnManagementPort(request.getRequest().getLocalAddress(), managementPort)
                                     && InternalPathBlockFilter.isActuatorPath(request.getRequest().getURI().getRawPath())
                                     ? org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher.MatchResult.match()
                                     : org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher.MatchResult.notMatch())
                             .permitAll()
-                            // second layer behind InternalPathBlockFilter
+                            // lớp chặn thứ hai, phía sau InternalPathBlockFilter
                             .pathMatchers("/api/internal/**", "/*/api/internal/**", "/actuator/**", "/eureka/**").denyAll()
                             .pathMatchers(HttpMethod.OPTIONS).permitAll()
                             .pathMatchers("/ws/**", "/api/payments/vnpay/ipn", "/api/payments/momo/ipn", "/api/payments/zalopay/ipn", "/api/payments/sepay/webhook").permitAll()
                             .pathMatchers("/api/events/admin/reports", "/api/events/admin/reports/**",
                                     "/api/payments/admin/report-payments")
                             .access(SecurityConfig::adminOnly);
-                    // before the generic /api/organizer/** rule further down, which only asks for a login. The AI analysis
-                    // routes (data-analysis, voucher-strategy) only need a login: ai-assistant limits an organizer to the
-                    // events they manage. The organizer agent is not scoped and needs ROLE_ADMIN.
+                    // đặt trước quy tắc chung /api/organizer/** ở dưới (chỉ yêu cầu đăng nhập). Các route phân tích AI
+                    // (data-analysis, voucher-strategy) chỉ cần đăng nhập: ai-assistant giới hạn organizer trong các
+                    // sự kiện họ quản lý. Organizer agent không bị giới hạn phạm vi nên cần ROLE_ADMIN.
                     exchange.pathMatchers("/api/organizer/agent-chat").access(SecurityConfig::adminOnly);
                     exchange.pathMatchers("/api/admin/**", "/api/payouts/admin/**", "/api/users/admin", "/api/users/admin/**",
-                            // before the generic /api/bookings/** rule below, which only asks for a login
+                            // đặt trước quy tắc chung /api/bookings/** ở dưới (chỉ yêu cầu đăng nhập)
                             "/api/bookings/admin/**",
-                            // read-only admin counters; marketplace has no role mapping, so the gateway rule is the first lock
+                            // bộ đếm admin chỉ đọc; marketplace không có ánh xạ vai trò nên quy tắc ở gateway là lớp khóa đầu tiên
                             "/api/marketplace/admin/**")
                             .access(SecurityConfig::adminOnly);
-                    // open to anonymous visitors: event, ticket-type and seat-map reads, the view and search counters,
-                    // the homepage configuration. Everything else that writes needs a login.
-                    // changing the homepage configuration, categories and venues is for the platform admin (event-service checks it
-                    // too); the reads below stay open, the homepage needs them
+                    // mở cho khách ẩn danh: đọc sự kiện, loại vé và sơ đồ ghế, bộ đếm lượt xem và tìm kiếm,
+                    // cấu hình trang chủ. Mọi thao tác ghi khác đều cần đăng nhập.
+                    // sửa cấu hình trang chủ, danh mục và địa điểm chỉ dành cho admin nền tảng (event-service cũng kiểm tra);
+                    // các lượt đọc bên dưới vẫn mở vì trang chủ cần chúng
                     for (HttpMethod write : Arrays.asList(HttpMethod.POST, HttpMethod.PUT, HttpMethod.PATCH, HttpMethod.DELETE)) {
                         exchange.pathMatchers(write, "/api/events/admin/config/**", "/api/events/categories", "/api/events/categories/**",
                                 "/api/events/venues", "/api/events/venues/**").access(SecurityConfig::adminOnly);
@@ -133,7 +153,7 @@ public class SecurityConfig {
                             .authenticated();
                     exchange
                             .pathMatchers("/api/seats/**", "/api/gifts/**", "/api/payouts/**", "/api/organizer/**").authenticated()
-                            // anonymous visitors use the chatbot widget and sign in, register and reset their password.
+                            // khách ẩn danh dùng widget chatbot, đăng nhập, đăng ký và đặt lại mật khẩu.
                             .pathMatchers("/api/customer/**", "/api/auth/**").permitAll()
                             .anyExchange().authenticated();
                 })
@@ -142,12 +162,25 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Quy tắc truy cập chỉ cho quản trị viên; không có xác thực thì từ chối.
+     *
+     * @param authentication thông tin xác thực của người gọi
+     * @param context ngữ cảnh phân quyền
+     * @return quyết định cho phép hoặc từ chối
+     */
     static Mono<AuthorizationDecision> adminOnly(Mono<Authentication> authentication, AuthorizationContext context) {
         return authentication
                 .map(auth -> new AuthorizationDecision(isReportAdmin(auth)))
                 .defaultIfEmpty(new AuthorizationDecision(false));
     }
 
+    /**
+     * Kiểm tra người gọi đã đăng nhập bằng JWT và có vai trò ADMIN trong claim {@code roles} hoặc {@code realm_access.roles}.
+     *
+     * @param authentication thông tin xác thực
+     * @return {@code true} nếu là quản trị viên
+     */
     static boolean isReportAdmin(Authentication authentication) {
         if (!(authentication instanceof JwtAuthenticationToken token) || !authentication.isAuthenticated()) return false;
         Object direct = token.getToken().getClaim("roles");
@@ -155,6 +188,12 @@ public class SecurityConfig {
         return hasAdminRole(direct) || (realm instanceof java.util.Map<?, ?> map && hasAdminRole(map.get("roles")));
     }
 
+    /**
+     * Kiểm tra tập vai trò có chứa {@code ADMIN} hoặc {@code ROLE_ADMIN} (không phân biệt hoa thường).
+     *
+     * @param roles giá trị claim vai trò, có thể không phải tập hợp
+     * @return {@code true} nếu có vai trò admin
+     */
     private static boolean hasAdminRole(Object roles) {
         return roles instanceof java.util.Collection<?> values && values.stream()
                 .anyMatch(value -> "ADMIN".equalsIgnoreCase(String.valueOf(value))

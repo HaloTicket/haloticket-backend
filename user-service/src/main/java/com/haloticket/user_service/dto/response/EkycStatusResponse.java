@@ -5,6 +5,7 @@ import com.haloticket.user_service.enums.EkycVerificationStatus;
 import java.time.Instant;
 import java.time.LocalDate;
 
+/** Trạng thái eKYC của người dùng cùng thông tin giấy tờ đã xác minh. */
 public record EkycStatusResponse(
         EkycVerificationStatus status,
         String legalName,
@@ -16,6 +17,9 @@ public record EkycStatusResponse(
         String address,
         LocalDate documentExpiresOn
 ) {
+    /**
+     * Dựng phản hồi rút gọn không có ngày sinh, địa chỉ và ngày hết hạn giấy tờ (các trường đó là {@code null}).
+     */
     public EkycStatusResponse(
             EkycVerificationStatus status,
             String legalName,

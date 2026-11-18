@@ -31,9 +31,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Asks ticket-service to issue the tickets of a paid order again. Issuance is idempotent (one issue key per ticket), so asking
- * twice never makes duplicates. Used by the order owner ("Tải lại" on the order page) and by the scheduler that re-drives paid
- * orders still missing tickets; the admin button has its own endpoint.
+ * Yêu cầu ticket-service phát hành lại vé của một đơn đã thanh toán. Việc phát hành là idempotent (mỗi vé một khóa phát hành) nên
+ * yêu cầu hai lần không tạo vé trùng. Dùng cho chủ đơn (nút "Tải lại" ở trang đơn hàng) và cho bộ lập lịch kích lại các đơn đã thanh toán
+ * mà vẫn thiếu vé; nút của admin có endpoint riêng.
  */
 @Service
 @RequiredArgsConstructor
@@ -41,12 +41,15 @@ import java.util.Optional;
 public class BookingReissueService {
 
     public static final String TOPIC = "haloticket.booking.confirmed.v1";
-    /** Asking again sooner than this answers TOO_SOON: an order already being re-issued is not flooded with messages. */
+    /** Hỏi lại sớm hơn mức này sẽ nhận TOO_SOON: đơn đang được phát hành lại không bị dồn thêm thông điệp. */
     public static final int MIN_SECONDS_BETWEEN_REQUESTS = 30;
 
+    /** Kết quả yêu cầu: đã gửi, đã đủ vé, quá sớm, hoặc đơn chưa thanh toán. */
     public enum Result { REQUESTED, ALREADY_ISSUED, TOO_SOON, NOT_PAID }
 
+    /** Kết quả kèm số giây nên chờ trước khi thử lại (chỉ có khi {@code TOO_SOON}). */
     public record Outcome(Result result, Long retryAfterSeconds) {
+        /** Tạo kết quả không kèm thời gian chờ. */
         static Outcome of(Result result) {
             return new Outcome(result, null);
         }
@@ -61,7 +64,7 @@ public class BookingReissueService {
     private final KafkaTemplate<String, String> kafka;
     private final ObjectMapper objectMapper;
 
-    /** The order owner's request. Someone else's order answers 404, like the order page, so codes cannot be probed. */
+    /** Yêu cầu của chủ đơn. Đơn của người khác trả 404 như trang đơn hàng, để không dò được mã đơn. */
     @Transactional
     public Outcome reissueForCustomer(String bookingCode, String customerId) {
         Booking booking = bookings.findByBookingCode(bookingCode)
@@ -75,6 +78,13 @@ public class BookingReissueService {
         return reissue(booking);
     }
 
+    /**
+     * Phát hành lại vé: nếu đơn đã thanh toán và còn thiếu vé (và đã qua {@code MIN_SECONDS_BETWEEN_REQUESTS} giây từ lần trước) thì gửi lại
+     * thông điệp xác nhận lên Kafka và ghi nhận lần yêu cầu.
+     * @param booking đơn cần phát hành lại vé
+     * @return kết quả {@code Outcome}
+     * @throws IllegalStateException khi không gửi được thông điệp lên Kafka
+     */
     @Transactional
     public Outcome reissue(Booking booking) {
         if (booking.getStatus() != BookingStatus.PAID && booking.getStatus() != BookingStatus.CONFIRMED) {
@@ -103,12 +113,13 @@ public class BookingReissueService {
         return Outcome.of(Result.REQUESTED);
     }
 
+    /** Tổng số vé đáng lẽ có của đơn: cộng số lượng các dòng vé. */
     static long expectedTickets(Booking booking) {
         if (booking.getItems() == null) return 0;
         return booking.getItems().stream().mapToLong(i -> i.getQuantity() == null ? 0 : i.getQuantity()).sum();
     }
 
-    /** Tickets issued for the booking, or null when ticket-service cannot answer (then the request goes out anyway). */
+    /** Số vé đã phát hành cho đơn, hoặc null khi ticket-service không trả lời (khi đó yêu cầu vẫn được gửi đi). */
     private Long issuedCount(String bookingId) {
         String token = ticketProperties.getInternalToken();
         if (token == null || token.isBlank()) return null;
@@ -123,7 +134,7 @@ public class BookingReissueService {
         }
     }
 
-    /** The confirmation message as it was first published, else rebuilt from the booking. */
+    /** Thông điệp xác nhận như lúc phát hành lần đầu (lấy từ outbox), nếu không có thì dựng lại từ đơn. */
     Map<String, Object> payloadFor(Booking booking) {
         Optional<OutboxEvent> original = outbox.findFirstByAggregateIdAndEventTypeOrderByCreatedAtDesc(booking.getId(), "BOOKING_CONFIRMED");
         if (original.isPresent() && original.get().getPayload() != null) {
@@ -136,6 +147,7 @@ public class BookingReissueService {
         return rebuild(booking);
     }
 
+    /** Dựng lại payload xác nhận từ đơn, ghế đã giữ và thông tin sự kiện (nếu lấy được). */
     private Map<String, Object> rebuild(Booking booking) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("bookingId", booking.getId());

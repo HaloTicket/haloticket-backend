@@ -10,14 +10,19 @@ import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+/** Cấu hình MVC gắn interceptor kiểm tra quyền quản trị nền tảng cho các thao tác ghi vào cấu hình trang chủ, danh mục và địa điểm. */
 @Configuration
 @RequiredArgsConstructor
 public class EventScopeWebConfig implements WebMvcConfigurer {
 
-    // looked up on first use: the access service needs the Feign client for user-service, and Feign needs the MVC configuration
-    // this class belongs to, so a direct dependency would be a cycle
+    // tra cứu ở lần dùng đầu tiên: dịch vụ phân quyền cần Feign client của user-service, mà Feign lại cần cấu hình MVC
+    // của chính lớp này, nên phụ thuộc trực tiếp sẽ tạo vòng lặp
     private final ObjectProvider<EventAccessService> access;
 
+    /**
+     * Đăng ký interceptor: với các đường dẫn quản trị, mọi yêu cầu không phải GET, HEAD hay OPTIONS đều đòi quyền quản trị nền tảng.
+     * @param registry nơi đăng ký interceptor
+     */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new HandlerInterceptor() {

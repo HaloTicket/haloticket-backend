@@ -28,6 +28,11 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Cài đặt nghiệp vụ thanh toán: lưu thanh toán, quản lý tài khoản nhận tiền của organizer và xử lý IPN/webhook
+ * của VNPay, SePay, MoMo, ZaloPay, ShopeePay. Khi xác nhận hoặc từ chối thanh toán, dịch vụ ghi sự kiện outbox
+ * ({@code PAYMENT_COMPLETED}, {@code PAYMENT_FAILED}) trong cùng transaction để các dịch vụ khác nhận qua Kafka.
+ */
 @Service
 @Slf4j
 public class PaymentServiceImpl implements PaymentService {
@@ -42,6 +47,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final ShopeePayService shopeePayService;
     private final ObjectMapper objectMapper;
 
+    /** Khởi tạo dịch vụ với các repository, các dịch vụ cổng thanh toán và {@code ObjectMapper} để tạo payload outbox. */
     public PaymentServiceImpl(PaymentRepository paymentRepository,
                                OrganizerPayoutAccountRepository organizerPayoutAccountRepository,
                                OutboxEventRepository outboxEventRepository,
@@ -62,6 +68,12 @@ public class PaymentServiceImpl implements PaymentService {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * Tạo bản ghi thanh toán mới ở trạng thái {@code PENDING}.
+     *
+     * @param request thông tin booking, số tiền, phương thức và nhà cung cấp
+     * @return thanh toán vừa lưu; {@code null} nếu {@code request} rỗng
+     */
     @Override
     @Transactional
     public PaymentResponse createPayment(PaymentCreateRequest request) {
@@ -82,6 +94,14 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
     }
 
+    /**
+     * Tạo hoặc cập nhật tài khoản nhận tiền của organizer, khóa bản ghi khi cập nhật để tránh ghi đồng thời.
+     * Chỉ cập nhật trường nào được gửi lên. Nếu thông tin ngân hàng hoặc phiên bản định danh thay đổi thì tài khoản
+     * bị đặt lại về chưa xác minh và tăng {@code accountVersion}.
+     *
+     * @param request thông tin tài khoản, bắt buộc có {@code organizerUserId}
+     * @return tài khoản sau khi lưu; {@code null} nếu thiếu yêu cầu hoặc mã organizer
+     */
     @Override
     @Transactional
     public OrganizerPayoutAccountResponse saveOrUpdatePayoutAccount(OrganizerPayoutAccountRequest request) {
@@ -138,6 +158,12 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
     }
 
+    /**
+     * Lấy tài khoản nhận tiền của organizer.
+     *
+     * @param userId mã người dùng organizer
+     * @return tài khoản; {@code null} nếu mã rỗng hoặc chưa có tài khoản
+     */
     @Override
     public OrganizerPayoutAccountResponse getPayoutAccountByUserId(String userId) {
         if (userId == null || userId.isBlank()) return null;
@@ -161,6 +187,14 @@ public class PaymentServiceImpl implements PaymentService {
                 .orElse(null);
     }
 
+    /**
+     * Xử lý IPN của VNPay. Sai checksum trả mã 97. Thanh toán đã thành công thì trả 00 (idempotent). Mã phản hồi
+     * {@code 00} chuyển thanh toán sang {@code SUCCESS} và ghi outbox {@code PAYMENT_COMPLETED}; mã khác chuyển
+     * sang {@code FAILED} và ghi outbox {@code PAYMENT_FAILED}. Số tiền VNPay gửi được chia 100.
+     *
+     * @param allParams tham số IPN VNPay gửi về
+     * @return map {@code RspCode} và {@code Message} trả lại cho VNPay
+     */
     @Override
     @Transactional
     public Map<String, String> processVnPayIpn(Map<String, String> allParams) {
@@ -201,7 +235,7 @@ public class PaymentServiceImpl implements PaymentService {
             payment.setStatus(PaymentStatus.SUCCESS);
             paymentRepository.save(payment);
 
-            // outbox event: PAYMENT_COMPLETED
+            // ghi sự kiện outbox PAYMENT_COMPLETED
             publishPaymentCompletedOutbox(payment, "VNPAY");
 
             response.put("RspCode", "00");
@@ -219,12 +253,21 @@ public class PaymentServiceImpl implements PaymentService {
         return response;
     }
 
+    /**
+     * Sinh thông tin VietQR qua SePay và tạo bản ghi thanh toán {@code PENDING} cho booking nếu chưa có,
+     * bổ sung mã đặt chỗ vào bản ghi cũ khi còn thiếu.
+     *
+     * @param amount số tiền cần chuyển (VND)
+     * @param bookingCode mã đặt chỗ
+     * @param bookingId mã booking
+     * @return thông tin QR và chuyển khoản
+     */
     @Override
     @Transactional
     public Map<String, Object> createVietQrPayload(long amount, String bookingCode, String bookingId) {
         Map<String, Object> payload = sePayService.createVietQrPayload(amount, bookingCode, bookingId);
 
-        // track pending payment in DB
+        // ghi nhận thanh toán đang chờ trong DB
         Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId)
                 .orElseGet(() -> Payment.builder()
                         .bookingId(bookingId)
@@ -243,6 +286,14 @@ public class PaymentServiceImpl implements PaymentService {
         return payload;
     }
 
+    /**
+     * Xử lý webhook SePay. Tìm thanh toán theo trường {@code code} (bỏ tiền tố HALO), nếu không thấy thì tìm theo
+     * mẫu {@code HALO-<số>} trong nội dung chuyển khoản. Chỉ xác nhận khi thanh toán còn {@code PENDING} và số tiền
+     * chuyển đúng bằng số tiền cần trả, rồi ghi outbox {@code PAYMENT_COMPLETED}.
+     *
+     * @param webhookData dữ liệu webhook SePay gửi về
+     * @return map {@code status}: {@code success}, {@code invalid_amount}, {@code received} hoặc {@code error}
+     */
     @Override
     @Transactional
     public Map<String, String> processSepayWebhook(Map<String, Object> webhookData) {
@@ -259,14 +310,14 @@ public class PaymentServiceImpl implements PaymentService {
 
         Payment payment = null;
 
-        // 1. try finding by 'code' field if provided by SePay VA
+        // 1. thử tìm theo trường 'code' nếu SePay VA có gửi
         if (code != null && !code.isBlank()) {
             String cleanCode = code.toUpperCase().startsWith("HALO") ? code.substring(4).trim() : code;
             payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(cleanCode)
                     .orElseGet(() -> paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(code).orElse(null));
         }
 
-        // 2. try finding by content substring if HALO prefix is present
+        // 2. thử tìm theo đoạn nội dung nếu có tiền tố HALO
         if (payment == null && content != null && !content.isBlank()) {
             Matcher matcher = Pattern.compile("HALO[- ]?(\\d+)").matcher(content.toUpperCase());
             if (matcher.find()) {
@@ -304,6 +355,14 @@ public class PaymentServiceImpl implements PaymentService {
         return res;
     }
 
+    /**
+     * Tạo liên kết thanh toán MoMo rồi ghi nhận thanh toán {@code PENDING} cho booking nếu chưa có.
+     *
+     * @param amount số tiền (VND)
+     * @param orderInfo nội dung đơn hàng
+     * @param bookingId mã booking
+     * @return kết quả từ MoMo, gồm {@code paymentUrl}
+     */
     @Override
     @Transactional
     public Map<String, String> createMoMoPaymentUrl(long amount, String orderInfo, String bookingId) {
@@ -322,6 +381,13 @@ public class PaymentServiceImpl implements PaymentService {
         return result;
     }
 
+    /**
+     * Xử lý IPN của MoMo. Chỉ xác nhận thanh toán khi đang {@code PENDING}, chữ ký hợp lệ, {@code resultCode} bằng 0
+     * và số tiền khớp; khi đó chuyển {@code SUCCESS} và ghi outbox {@code PAYMENT_COMPLETED}.
+     *
+     * @param allParams tham số IPN MoMo gửi về
+     * @return map {@code status} là {@code success} hoặc {@code failed}
+     */
     @Override
     @Transactional
     public Map<String, String> processMoMoIpn(Map<String, String> allParams) {
@@ -349,6 +415,14 @@ public class PaymentServiceImpl implements PaymentService {
         return res;
     }
 
+    /**
+     * Tạo liên kết thanh toán ZaloPay rồi ghi nhận thanh toán {@code PENDING} cho booking nếu chưa có.
+     *
+     * @param amount số tiền (VND)
+     * @param orderInfo nội dung đơn hàng
+     * @param bookingId mã booking
+     * @return kết quả từ ZaloPay, gồm {@code paymentUrl}
+     */
     @Override
     @Transactional
     public Map<String, String> createZaloPayPaymentUrl(long amount, String orderInfo, String bookingId) {
@@ -367,6 +441,13 @@ public class PaymentServiceImpl implements PaymentService {
         return result;
     }
 
+    /**
+     * Xử lý callback ZaloPay. Nếu mac hợp lệ, lấy mã booking từ {@code app_trans_id} (phần sau dấu gạch dưới) và xác nhận
+     * thanh toán đang {@code PENDING} có số tiền khớp. Luôn trả {@code return_code = 1} để ZaloPay không gửi lại.
+     *
+     * @param callbackData dữ liệu callback gồm {@code data} và {@code mac}
+     * @return map {@code return_code} và {@code return_message}; {@code return_code = 2} khi callback rỗng
+     */
     @Override
     @Transactional
     public Map<String, String> processZaloPayIpn(Map<String, Object> callbackData) {
@@ -407,6 +488,14 @@ public class PaymentServiceImpl implements PaymentService {
         return res;
     }
 
+    /**
+     * Tạo liên kết thanh toán ShopeePay rồi ghi nhận thanh toán {@code PENDING} cho booking nếu chưa có.
+     *
+     * @param amount số tiền (VND)
+     * @param orderInfo nội dung đơn hàng
+     * @param bookingId mã booking
+     * @return kết quả từ ShopeePay
+     */
     @Override
     @Transactional
     public Map<String, String> createShopeePayPaymentUrl(long amount, String orderInfo, String bookingId) {
@@ -425,12 +514,25 @@ public class PaymentServiceImpl implements PaymentService {
         return result;
     }
 
+    /**
+     * Callback ShopeePay chưa được hỗ trợ: luôn trả {@code err_code = 1} kèm thông báo chưa cấu hình xác minh.
+     *
+     * @param callbackData dữ liệu callback (không dùng)
+     * @return map {@code err_code} và {@code err_msg}
+     */
     @Override
     @Transactional
     public Map<String, String> processShopeePayIpn(Map<String, Object> callbackData) {
         return Map.of("err_code", "1", "err_msg", "ShopeePay callback verification is not configured");
     }
 
+    /**
+     * Lấy trạng thái thanh toán mới nhất của booking. Với VietQR còn {@code PENDING}, hàm chủ động hỏi SePay;
+     * nếu đã nhận tiền thì chuyển {@code SUCCESS} và ghi outbox {@code PAYMENT_COMPLETED}.
+     *
+     * @param bookingId mã booking
+     * @return thông tin thanh toán; {@code null} nếu mã rỗng hoặc chưa có thanh toán
+     */
     @Override
     public PaymentResponse getPaymentStatusByBookingId(String bookingId) {
         if (bookingId == null || bookingId.isBlank()) return null;
@@ -454,6 +556,12 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
     }
 
+    /**
+     * Lấy phương thức thanh toán của từng booking.
+     *
+     * @param bookingIds danh sách mã booking
+     * @return map {@code bookingId -> tên phương thức}; map rỗng nếu danh sách rỗng
+     */
     @Override
     public Map<String, String> getPaymentMethodsByBookingIds(List<String> bookingIds) {
         if (bookingIds == null || bookingIds.isEmpty()) return new HashMap<>();
@@ -465,6 +573,14 @@ public class PaymentServiceImpl implements PaymentService {
         return result;
     }
 
+    /**
+     * Xác nhận thanh toán thành công khi người dùng quay về từ cổng ở môi trường sandbox. Nếu chưa {@code SUCCESS}
+     * thì chuyển {@code SUCCESS} và ghi outbox {@code PAYMENT_COMPLETED}.
+     *
+     * @param bookingId mã booking
+     * @param provider tên cổng; {@code null} thì ghi là {@code SANDBOX}
+     * @return thông tin thanh toán; {@code null} nếu mã rỗng hoặc chưa có thanh toán
+     */
     @Override
     @Transactional
     public PaymentResponse confirmSandboxReturn(String bookingId, String provider) {
@@ -485,6 +601,13 @@ public class PaymentServiceImpl implements PaymentService {
                 .build();
     }
 
+    /**
+     * Ghi sự kiện outbox {@code PAYMENT_COMPLETED} (topic {@code haloticket.payment.completed.v1}) ở trạng thái
+     * {@code PENDING} để {@code OutboxPublisher} gửi đi. Lỗi khi ghi chỉ được log, không làm hỏng giao dịch gọi.
+     *
+     * @param payment thanh toán vừa thành công
+     * @param provider tên cổng thanh toán ghi vào payload
+     */
     private void publishPaymentCompletedOutbox(Payment payment, String provider) {
         try {
             Map<String, Object> payloadMap = new HashMap<>();
@@ -509,6 +632,14 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
+    /**
+     * Ghi sự kiện outbox {@code PAYMENT_FAILED} (topic {@code haloticket.payment.failed.v1}) kèm lý do thất bại.
+     * Lỗi khi ghi chỉ được log.
+     *
+     * @param payment thanh toán thất bại
+     * @param bookingId mã booking
+     * @param reason lý do thất bại
+     */
     private void publishPaymentFailedOutbox(Payment payment, String bookingId, String reason) {
         try {
             Map<String, Object> payloadMap = new HashMap<>();
@@ -532,6 +663,14 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
+    /**
+     * Cho biết giá trị gửi lên có khác giá trị đang lưu hay không, so sánh sau khi cắt khoảng trắng.
+     * Giá trị gửi lên là {@code null} nghĩa là không thay đổi.
+     *
+     * @param incoming giá trị mới
+     * @param existing giá trị hiện có
+     * @return {@code true} nếu có thay đổi
+     */
     private boolean differs(String incoming, String existing) {
         return incoming != null && !Objects.equals(incoming.trim(), existing == null ? null : existing.trim());
     }

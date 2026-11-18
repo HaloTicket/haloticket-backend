@@ -6,6 +6,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** Đơn đặt vé (bảng {@code bookings}): người mua, sự kiện, suất chiếu, voucher, số tiền, trạng thái, các dòng vé và ghế giữ. */
 @Entity
 @Table(name = "bookings")
 @Getter
@@ -50,7 +51,7 @@ public class Booking {
     @Enumerated(EnumType.STRING)
     private BookingStatus status;
 
-    // true when general-admission stock was held for this booking at creation.
+    // true khi tồn kho vé vào cổng tự do đã được giữ cho đơn này lúc tạo đơn.
     @Column(name = "ga_reserved")
     private Boolean gaReserved;
 
@@ -63,7 +64,7 @@ public class Booking {
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<SeatReservation> seatReservations;
 
-    // when ticket issuance was last asked for again, and how many times (customer button, admin button or the scheduler)
+    // thời điểm yêu cầu phát hành lại vé gần nhất và số lần đã yêu cầu (nút của khách, nút của admin hoặc bộ lập lịch)
     @Column(name = "last_reissue_at")
     private LocalDateTime lastReissueAt;
 
@@ -76,6 +77,7 @@ public class Booking {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Trước khi lưu lần đầu: gán thời gian tạo, cập nhật và đặt trạng thái mặc định {@code PENDING}. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -83,6 +85,7 @@ public class Booking {
         if (this.status == null) this.status = BookingStatus.PENDING;
     }
 
+    /** Trước mỗi lần cập nhật: làm mới thời gian cập nhật. */
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

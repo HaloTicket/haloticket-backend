@@ -1,8 +1,8 @@
-"""Readers for the data the admin intelligence features need. Everything goes through the gateway with the admin's OWN
-Authorization header (no extra token, no extra database grant): the services decide what an admin may read.
+"""Các hàm đọc dữ liệu mà tính năng thông minh cho quản trị cần. Mọi thứ đi qua gateway với CHÍNH header Authorization của admin
+(không thêm token, không thêm quyền cơ sở dữ liệu): các dịch vụ tự quyết định admin được đọc gì.
 
-Each reader raises on any failure; callers turn that into "not assessed" / null (never into a made-up value).
-Small in-process caches keep the heavy, unpaged reads from being repeated on every page open.
+Mỗi hàm đọc ném ngoại lệ khi có lỗi; nơi gọi chuyển thành "chưa đánh giá" / null (không bao giờ thành giá trị bịa).
+Các bộ đệm nhỏ trong tiến trình giúp các lần đọc nặng, không phân trang không bị lặp lại mỗi lần mở trang.
 """
 import logging
 import threading
@@ -25,11 +25,13 @@ _cache: dict = {}
 
 
 def reset_for_tests() -> None:
+    """Xóa toàn bộ bộ đệm; chỉ dùng trong kiểm thử."""
     with _lock:
         _cache.clear()
 
 
 def _cached(key: str, ttl: int, loader):
+    """Trả giá trị trong bộ đệm nếu còn trong `ttl` giây, ngược lại gọi `loader` rồi lưu; bộ đệm quá 2000 mục thì xóa 500 mục cũ nhất."""
     now = time.time()
     with _lock:
         hit = _cache.get(key)
@@ -44,15 +46,16 @@ def _cached(key: str, ttl: int, loader):
     return value
 
 
-cached = _cached  # public name for the other admin_intel modules
+cached = _cached  # tên công khai cho các module khác của admin_intel
 
 
 def token_of(request) -> str:
-    """The raw Authorization header of the request (already verified by require_admin)."""
+    """Header Authorization nguyên bản của yêu cầu (đã được `require_admin` xác thực)."""
     return request.headers.get("Authorization", "")
 
 
 def get_json(authorization: str, path: str, params: Optional[dict] = None) -> Any:
+    """GET một đường dẫn của gateway nội bộ bằng token của admin và trả JSON; mã khác 200 thì ném `RuntimeError`."""
     url = settings.internal_api_base_url.rstrip("/") + path
     response = httpx.get(url, params=params, headers={"Authorization": authorization, "Accept": "application/json"},
                          timeout=settings.internal_api_timeout_seconds)
@@ -62,13 +65,14 @@ def get_json(authorization: str, path: str, params: Optional[dict] = None) -> An
 
 
 def approvals(authorization: str, fresh: bool = False) -> list:
-    """Every event with its approval status (EventResponse-shaped dicts). The endpoint is not paged."""
+    """Mọi sự kiện kèm trạng thái duyệt (dict dạng EventResponse). Endpoint này không phân trang. `fresh=True` bỏ bộ đệm."""
     key = "approvals"
     if fresh:
         with _lock:
             _cache.pop(key, None)
 
     def load():
+        """Tải danh sách sự kiện và kiểm tra là một danh sách."""
         data = get_json(authorization, "/api/events/approvals", {"status": "ALL"})
         if not isinstance(data, list):
             raise RuntimeError("approvals is not a list")
@@ -78,6 +82,7 @@ def approvals(authorization: str, fresh: bool = False) -> list:
 
 
 def user(authorization: str, user_id: str) -> dict:
+    """Hồ sơ người dùng (do admin xem) theo mã, lưu đệm 5 phút."""
     data = _cached("user:" + user_id, USER_TTL, lambda: get_json(authorization, f"/api/users/admin/{user_id}"))
     if not isinstance(data, dict):
         raise RuntimeError("user is not an object")
@@ -85,10 +90,11 @@ def user(authorization: str, user_id: str) -> dict:
 
 
 def category_prices(category: str) -> list:
-    """min_price of the APPROVED events of a category, read through the analysis role from ai_analytics.v_events."""
-    from app.services.ai import analysis_service  # lazy: needs the analysis account configured
+    """Giá vé thấp nhất (`min_price`) của các sự kiện APPROVED trong một danh mục, đọc bằng role phân tích từ `ai_analytics.v_events`."""
+    from app.services.ai import analysis_service  # nạp lười: cần tài khoản phân tích đã được cấu hình
 
     def load():
+        """Truy vấn chỉ đọc, có giới hạn thời gian, lấy tối đa 500 mức giá."""
         engine = analysis_service.engine_for("analysis")
         engine.require_account()
         with engine.engine.connect() as conn:
@@ -106,21 +112,26 @@ def category_prices(category: str) -> list:
 
 
 def reconciliation_summary(authorization: str) -> dict:
+    """Tổng quan đối soát thanh toán từ booking-service."""
     return get_json(authorization, "/api/bookings/admin/reconciliation/summary")
 
 
 def reconciliation_exceptions(authorization: str) -> dict:
+    """Tối đa 100 ngoại lệ đối soát đang mở (OPEN)."""
     return get_json(authorization, "/api/bookings/admin/reconciliation/exceptions", {"status": "OPEN", "page": 0, "size": 100})
 
 
 def paid_without_tickets(authorization: str) -> dict:
+    """Các đơn đã thanh toán nhưng chưa phát hành đủ vé."""
     return get_json(authorization, "/api/bookings/admin/reconciliation/paid-without-tickets")
 
 
 def sales_timeline(authorization: str, date_from: str, date_to: str) -> dict:
-    # the report accepts only page sizes 10, 20 and 50 (any other value is a 400); only its daily timeline is used here
+    """Báo cáo doanh số của event-service trong khoảng ngày, dùng để lấy đường thời gian đơn hàng và doanh thu theo ngày."""
+    # báo cáo chỉ nhận kích thước trang 10, 20 và 50 (giá trị khác trả 400); ở đây chỉ dùng phần dòng thời gian theo ngày
     return get_json(authorization, "/api/events/admin/reports", {"from": date_from, "to": date_to, "page": 1, "size": 10})
 
 
 def resale_summary(authorization: str) -> dict:
+    """Tổng quan tin bán lại vé đang chờ duyệt từ marketplace."""
     return get_json(authorization, "/api/marketplace/admin/listings/summary")

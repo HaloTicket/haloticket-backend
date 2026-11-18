@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/** Thực thể cấu hình một mục sự kiện trên trang chủ (bảng {@code event_section_configs}): tiêu đề, loại, số lượng hiển thị và nội dung quảng cáo đi kèm. */
 @Entity
 @Table(name = "event_section_configs")
 @Getter

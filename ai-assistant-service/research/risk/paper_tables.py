@@ -1,8 +1,9 @@
-"""Tables of the paper's section F from the result files. RISK_SET=t2 python -m research.risk.paper_tables [--csv PATH]
+"""Các bảng của mục F trong bài báo, lập từ tệp kết quả. RISK_SET=t2 python -m research.risk.paper_tables [--csv PATH]
 
-Prints (1) the data table and (2) the per-case result table of C5 for ten cases, (3) C5 errors by group, and writes a CSV with
-all 500 cases for the appendix. The ten cases: one per group, for the ten largest groups, picked with a fixed seed; the choice
-never looks at any result."""
+In (1) bảng dữ liệu và (2) bảng kết quả từng ca của C5 cho mười ca, (3) lỗi của C5 theo nhóm, và ghi một tệp CSV có
+đủ 500 ca cho phụ lục. Mười ca: mỗi nhóm một ca, lấy từ mười nhóm lớn nhất, chọn bằng hạt giống cố định; việc chọn
+không bao giờ nhìn vào kết quả nào.
+"""
 import argparse
 import csv
 import glob
@@ -27,6 +28,14 @@ SEED = "paper-table-cases"
 
 
 def c5_rows() -> dict:
+    """Đọc kết quả C5 đầy đủ mới nhất có một lần lặp và chạy bằng mô hình thật.
+
+    Returns:
+        từ điển {mã ca: dòng kết quả}.
+
+    Raises:
+        SystemExit: khi không có lần chạy C5 k=1.
+    """
     for path in sorted(glob.glob(os.path.join(RESULTS, "C5", "*_full.jsonl")), reverse=True):
         with open(path, encoding="utf-8") as handle:
             lines = [json.loads(line) for line in handle if line.strip()]
@@ -36,6 +45,15 @@ def c5_rows() -> dict:
 
 
 def pick_cases(cases: list, count: int = 10) -> list:
+    """Chọn mỗi nhóm lớn nhất một ca (theo hạt giống cố định, không phụ thuộc kết quả) để đưa vào bảng bài báo.
+
+    Args:
+        cases: danh sách ca.
+        count: số nhóm lớn nhất cần lấy.
+
+    Returns:
+        danh sách mã ca đã chọn.
+    """
     sizes = Counter(c["group"] for c in cases)
     groups = [g for g, _ in sorted(sizes.items(), key=lambda x: (-x[1], x[0]))[:count]]
     rng = random.Random(int(hashlib.sha256(SEED.encode("utf-8")).hexdigest()[:12], 16))
@@ -48,16 +66,23 @@ def pick_cases(cases: list, count: int = 10) -> list:
 
 
 def fmt_codes(codes: list) -> str:
+    """Nối các mã bằng dấu phẩy; trả về '-' khi danh sách rỗng."""
     return ", ".join(codes) if codes else "-"
 
 
 def main() -> None:
+    """Điểm vào dòng lệnh: đọc tùy chọn --csv rồi chạy run."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--csv", default=os.path.join(RESULTS, "per_case_C5.csv"))
     run(parser.parse_args().csv)
 
 
 def run(csv_path: str) -> None:
+    """Ghi CSV 500 ca của C5 cho phụ lục, rồi in ba bảng Markdown: dữ liệu mười ca, kết quả C5 của mười ca đó, và tỷ lệ sai theo nhóm.
+
+    Args:
+        csv_path: đường dẫn tệp CSV sẽ ghi.
+    """
     cases = load_cases()[1]
     by = {c["id"]: c for c in cases}
     gold = {r["id"]: r for r in read_jsonl(GOLD_PATH)}

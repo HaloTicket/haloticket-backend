@@ -36,6 +36,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Nghiệp vụ check-in tại cửa: xử lý quét mã QR (kiểm tra sự kiện, suất diễn, khung giờ, trạng thái vé), ghi nhận lượt vào
+ * và các lần quét bị từ chối, cùng danh sách, thống kê và tìm vé cho nhân viên soát vé.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -48,6 +52,10 @@ public class CheckinService {
     private final CheckinWindowProperties checkinWindowProperties;
     private final CheckinAttemptRecorder attemptRecorder;
 
+    /**
+     * Ghi một lần quét vào cùng giao dịch hiện tại. Nhân viên hoặc thiết bị thiếu thông tin được ghi là {@code UNKNOWN_STAFF}
+     * và {@code UNKNOWN_DEVICE}.
+     */
     private void recordAttempt(Ticket ticket, CheckinRequest request, CheckInAttemptResult result, String failureReason) {
         String staffId = request != null ? request.getStaffAssignmentId() : null;
         if (staffId == null || staffId.trim().isEmpty()) {
@@ -71,10 +79,9 @@ public class CheckinService {
     }
 
     /**
-     * Stores the attempt of a scan that is refused with a CheckinException (or answered as locked). It must outlive
-     * the exception, so it is written in its own transaction. It never throws: if the row cannot be stored (for
-     * example a CHECK constraint that does not know the value yet) it is logged and the app still gets the business
-     * answer it always got.
+     * Lưu lần quét bị từ chối bằng {@code CheckinException} (hoặc trả lời là vé bị khóa). Dòng này phải tồn tại sau khi ngoại lệ
+     * làm hoàn tác giao dịch nên được ghi trong giao dịch riêng. Hàm không ném lỗi: nếu không lưu được (ví dụ ràng buộc CHECK
+     * chưa biết giá trị mới) thì chỉ ghi log và ứng dụng vẫn nhận câu trả lời nghiệp vụ như mọi khi.
      */
     private void recordRefusedScan(String ticketId, CheckinRequest request, CheckInAttemptResult result, String failureReason) {
         try {
@@ -85,13 +92,20 @@ public class CheckinService {
         }
     }
 
-    /** Text taken from the request is stored in a log-like column: cut it short and drop control characters. */
+    /** Văn bản lấy từ yêu cầu được lưu vào cột kiểu nhật ký: cắt ngắn tối đa 60 ký tự và thay ký tự điều khiển bằng dấu hỏi. */
     private static String requested(String value) {
         if (value == null) return "-";
         String clean = value.replaceAll("[\\p{Cntrl}]", "?");
         return clean.length() > 60 ? clean.substring(0, 60) + "..." : clean;
     }
 
+    /**
+     * Kiểm tra thời điểm quét nằm trong khung check-in: từ trước giờ bắt đầu một khoảng cấu hình tới sau giờ kết thúc một khoảng
+     * cấu hình (mặc định kết thúc là bắt đầu cộng 4 giờ). Ưu tiên giờ của suất diễn nếu vé thuộc suất. Khi không lấy được lịch
+     * sự kiện, tùy cấu hình fail-open mà cho qua hoặc từ chối.
+     *
+     * @throws CheckinException với mã {@code OUTSIDE_CHECKIN_WINDOW} khi ngoài khung giờ hoặc không xác minh được và fail-open tắt
+     */
     private void validateCheckinWindow(Ticket ticket, CheckinRequest request) {
         try {
             EventServiceClient.EventDetailsResponse eventDetails = eventScheduleService.getEventSchedule(ticket.getEventId());
@@ -136,6 +150,15 @@ public class CheckinService {
         }
     }
 
+    /**
+     * Xử lý một lần quét mã QR. Từ chối khi không thấy vé, sai sự kiện, sai suất diễn hoặc ngoài khung giờ. Vé đã dùng hoặc
+     * đã có lượt vào trả về kết quả {@code DUPLICATED}; vé không ở trạng thái {@code VALID} trả {@code INVALID}. Vé hợp lệ được
+     * đổi sang {@code USED} bằng một câu lệnh có điều kiện để hai lần quét đồng thời chỉ có một lần thành công.
+     *
+     * @param request yêu cầu quét gồm mã QR, sự kiện, suất diễn, nhân viên và thiết bị
+     * @return kết quả check-in cho ứng dụng soát vé
+     * @throws CheckinException khi lần quét bị từ chối vì lý do nghiệp vụ
+     */
     @Transactional
     public TicketCheckinDTO processCheckin(CheckinRequest request) {
         Ticket ticket = ticketRepository.findByQrCodeHash(request.getQrCodeHash())
@@ -178,28 +201,28 @@ public class CheckinService {
 
         if (ticket.getStatus() != TicketStatus.VALID) {
             recordRefusedScan(ticket.getId(), request, CheckInAttemptResult.TICKET_LOCKED, "Ticket status is not VALID: " + ticket.getStatus());
-            // CRITICAL: Do NOT insert into checkins when status is INVALID!
+            // QUAN TRỌNG: KHÔNG thêm dòng vào checkins khi vé không hợp lệ!
             return buildFallbackDTO(infoOf(ticket), CheckInStatus.INVALID, refusalCode(ticket.getStatus()));
         }
 
-        // A VALID ticket that already has a check-in row must not get a second one (checkins.ticket_id is unique).
-        // Looking first keeps this a normal answer: a unique-key error raised at commit time would be a 500.
+        // Vé VALID đã có dòng check-in thì không được thêm dòng thứ hai (checkins.ticket_id là duy nhất).
+        // Kiểm tra trước để đây vẫn là một câu trả lời bình thường: lỗi trùng khóa nổ lúc commit sẽ thành lỗi 500.
         Checkin alreadyCheckedIn = checkinRepository.findByTicketId(ticket.getId()).orElse(null);
         if (alreadyCheckedIn != null) {
             recordAttempt(ticket, request, CheckInAttemptResult.FAILED_ALREADY_IN, "Ticket already has a check-in record");
             return mapToCheckinDTO(alreadyCheckedIn, infoOf(ticket), CheckInStatus.DUPLICATED, "ALREADY_USED");
         }
 
-        // Read everything the response needs now: the bulk UPDATE below clears the persistence context, which detaches
-        // the ticket together with its not yet loaded ticket type and seat.
+        // Đọc ngay mọi thứ phản hồi cần: câu UPDATE hàng loạt bên dưới làm sạch persistence context, khiến vé bị tách
+        // cùng loại vé và ghế chưa kịp nạp.
         TicketInfo info = infoOf(ticket);
 
-        // Ticket status is VALID -> perform atomic conditional update
+        // Vé đang VALID nên cập nhật có điều kiện một cách nguyên tử
         LocalDateTime now = LocalDateTime.now();
         int rowsUpdated = ticketRepository.markTicketUsedIfValid(ticket.getId(), now);
 
         if (rowsUpdated == 1) {
-            // Re-attach the ticket (it now reads USED) so the new rows below reference a managed entity.
+            // Nạp lại vé (lúc này đã là USED) để các dòng mới bên dưới tham chiếu tới một entity được quản lý.
             Ticket current = ticketRepository.findById(ticket.getId()).orElse(ticket);
             try {
                 Checkin checkin = Checkin.builder()
@@ -222,7 +245,7 @@ public class CheckinService {
                 return buildFallbackDTO(info, CheckInStatus.DUPLICATED, "ALREADY_USED");
             }
         } else {
-            // rowsUpdated == 0: Ticket status changed between our read and update (concurrent scan/transfer)
+            // rowsUpdated == 0: trạng thái vé đã đổi giữa lúc đọc và lúc cập nhật (quét đồng thời hoặc chuyển nhượng)
             Ticket refreshedTicket = ticketRepository.findById(ticket.getId()).orElse(ticket);
             TicketInfo refreshed = refreshedTicket == ticket ? info : infoOf(refreshedTicket);
             if (refreshedTicket.getStatus() == TicketStatus.USED) {
@@ -239,6 +262,13 @@ public class CheckinService {
         }
     }
 
+    /**
+     * Danh sách đầy đủ những người đã vào của sự kiện, mới nhất trước.
+     *
+     * @param eventId mã sự kiện
+     * @param showtimeId mã suất diễn; null hoặc rỗng nghĩa là mọi suất
+     * @return danh sách lượt check-in
+     */
     @Transactional(readOnly = true)
     public List<TicketCheckinDTO> getCheckinsByEvent(String eventId, String showtimeId) {
         return checkinRepository.listByEvent(eventId, showtimeParam(showtimeId)).stream()
@@ -246,7 +276,15 @@ public class CheckinService {
                 .collect(Collectors.toList());
     }
 
-    /** One page of the people who entered, newest first; size is kept between 1 and 100. */
+    /**
+     * Một trang những người đã vào, mới nhất trước. Kích thước trang được giữ trong khoảng 1 đến 100, số trang âm coi như 0.
+     *
+     * @param eventId mã sự kiện
+     * @param showtimeId mã suất diễn; null hoặc rỗng nghĩa là mọi suất
+     * @param page số thứ tự trang, bắt đầu từ 0
+     * @param size số dòng mỗi trang
+     * @return trang lượt check-in
+     */
     @Transactional(readOnly = true)
     public CheckinPageDTO getCheckinPage(String eventId, String showtimeId, int page, int size) {
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
@@ -255,14 +293,19 @@ public class CheckinService {
         return new CheckinPageDTO(content, found.getNumber(), found.getSize(), found.getTotalElements(), found.getTotalPages());
     }
 
-    /** Tickets that still count towards the door: the holder's own tickets, whether they are free to enter or locked for now. */
+    /** Các trạng thái vé còn tính vào cửa: vé của chủ vé, dù đang được vào tự do hay tạm bị khóa. */
     private static final List<TicketStatus> DOOR_STATUSES = List.of(TicketStatus.VALID, TicketStatus.USED,
             TicketStatus.LOCKED_FOR_RESALE, TicketStatus.LOCKED_FOR_TRANSFER);
     private static final int MAX_PAGE_SIZE = 100;
     private static final int MAX_SEARCH_RESULTS = 30;
     private static final int MIN_SEARCH_LENGTH = 2;
 
-    /** How many tickets the event has for the door and how many entered, in total, per showtime and per ticket type. */
+    /**
+     * Thống kê số vé của sự kiện dành cho cửa và số người đã vào, tổng cộng, theo từng suất diễn và theo từng loại vé.
+     *
+     * @param eventId mã sự kiện
+     * @return bản thống kê, loại vé sắp theo tên
+     */
     @Transactional(readOnly = true)
     public CheckinSummaryDTO getSummary(String eventId) {
         Map<String, long[]> showtimes = new LinkedHashMap<>();
@@ -294,9 +337,16 @@ public class CheckinService {
     }
 
     /**
-     * Door-staff search by a fragment of the ticket code, the order (booking) id, the seat reference or the ticket type name.
-     * The ticket knows its owner only by id, so a name, an email or a phone cannot be searched here. The owner is masked,
-     * and the QR hash is returned only for a ticket that can still enter, to a caller who may scan.
+     * Tìm vé cho nhân viên soát vé theo một mảnh của mã vé, mã đơn (booking), mã ghế hoặc tên loại vé. Vé chỉ biết chủ qua id
+     * nên không tìm theo tên, email hay số điện thoại ở đây. Chủ vé được che bớt; mã QR chỉ trả cho vé còn vào được và
+     * người gọi có quyền quét.
+     *
+     * @param eventId mã sự kiện
+     * @param text chuỗi tìm kiếm, ít nhất 2 ký tự sau khi bỏ ký tự đại diện
+     * @param showtimeId mã suất diễn; null hoặc rỗng nghĩa là mọi suất
+     * @param limit số kết quả tối đa, giữ trong khoảng 1 đến 30
+     * @param maySeeHash true nếu người gọi được xem mã QR
+     * @return danh sách vé khớp
      */
     @Transactional(readOnly = true)
     public List<CheckinTicketLookupDTO> search(String eventId, String text, String showtimeId, int limit, boolean maySeeHash) {
@@ -318,29 +368,34 @@ public class CheckinService {
         return out;
     }
 
+    /** Đổi suất diễn null hoặc trống thành chuỗi rỗng, vì tham số null không có kiểu với cơ sở dữ liệu. */
     private static String showtimeParam(String showtimeId) {
         return showtimeId == null || showtimeId.isBlank() ? "" : showtimeId;
     }
 
+    /** Mã vé rút gọn để hiển thị: phần đầu của UUID, viết hoa. */
     private static String shortCode(String ticketId) {
         return ticketId == null ? "" : ticketId.split("-")[0].toUpperCase();
     }
 
+    /** Che mã chủ vé, chỉ giữ 4 ký tự đầu; mã quá ngắn hoặc null thành {@code ***}. */
     private static String maskOwner(String ownerId) {
         return ownerId == null || ownerId.length() <= 6 ? "***" : ownerId.substring(0, 4) + "***";
     }
 
-    /** Why a ticket cannot enter: a revoked (refunded or cancelled) or an already transferred ticket says so, the rest are "locked". */
+    /** Lý do vé không vào được: vé bị thu hồi (hoàn tiền hoặc hủy) hay đã chuyển nhượng thì nói rõ, còn lại coi là đang bị khóa. */
     private static String refusalCode(TicketStatus status) {
         if (status == TicketStatus.REVOKED) return "TICKET_REVOKED";
         if (status == TicketStatus.TRANSFERED) return "TICKET_TRANSFERRED";
         return "TICKET_LOCKED";
     }
 
+    /** Đổi một lượt check-in thành dòng hiển thị trong danh sách. */
     private TicketCheckinDTO toListItem(Checkin c) {
         return mapToCheckinDTO(c, infoOf(c.getTicket()), null, c.getStatus() == CheckInStatus.VALID ? "SUCCESS" : c.getStatus().name());
     }
 
+    /** Tên ghế hiển thị cho nhân viên soát vé, dạng khu, hàng, ghế; vé không gắn ghế hiển thị mã vé rút gọn. */
     private String formatSeatName(Ticket ticket) {
         if (ticket.getSeat() != null) {
             Seat seat = ticket.getSeat();
@@ -365,11 +420,11 @@ public class CheckinService {
         }
     }
 
-    /** What the responses show about a ticket, read while the ticket is still attached to the persistence context. */
+    /** Thông tin về vé mà các phản hồi hiển thị, đọc khi vé còn gắn với persistence context. */
     private record TicketInfo(String id, String qrCodeHash, String ownerId, String ticketTypeName, String seatName,
                               String showtimeId, LocalDateTime usedAt, String ticketKind, String zone, String row, String seat) {}
 
-    /** The seat as separate parts: kind (SEATED, STANDING, GENERAL), zone, row, seat. A ticket without a seat is GENERAL. */
+    /** Tách vị trí thành các phần: loại ({@code SEATED}, {@code STANDING}, {@code GENERAL}), khu, hàng, ghế. Vé không có ghế là {@code GENERAL}. */
     private static String[] seatParts(Ticket ticket) {
         if (ticket.getSeat() != null) {
             Seat seat = ticket.getSeat();
@@ -388,6 +443,7 @@ public class CheckinService {
         return new String[]{"GENERAL", null, null, null};
     }
 
+    /** Đọc thông tin hiển thị của vé (tên loại vé, ghế, suất diễn, vị trí) trước khi persistence context bị làm sạch. */
     private TicketInfo infoOf(Ticket ticket) {
         String ticketTypeName = ticket.getTicketType() != null ? ticket.getTicketType().getName() : null;
         String showtimeId = ticket.getShowtimeId() != null ? ticket.getShowtimeId()
@@ -397,6 +453,7 @@ public class CheckinService {
                 formatSeatName(ticket), showtimeId, ticket.getUsedAt(), parts[0], parts[1], parts[2], parts[3]);
     }
 
+    /** Dựng phản hồi khi không có dòng check-in để dựa vào (vé không hợp lệ hoặc đã dùng mà không có bản ghi). */
     private TicketCheckinDTO buildFallbackDTO(TicketInfo ticket, CheckInStatus status, String code) {
         return TicketCheckinDTO.builder()
                 .ticketId(ticket.id())
@@ -412,6 +469,7 @@ public class CheckinService {
                 .build();
     }
 
+    /** Dựng phản hồi từ một dòng check-in; trạng thái và mã có thể bị ghi đè bởi {@code overrideStatus} và {@code code}. */
     private TicketCheckinDTO mapToCheckinDTO(Checkin checkin, TicketInfo ticket, CheckInStatus overrideStatus, String code) {
         return TicketCheckinDTO.builder()
                 .checkinId(checkin.getId())

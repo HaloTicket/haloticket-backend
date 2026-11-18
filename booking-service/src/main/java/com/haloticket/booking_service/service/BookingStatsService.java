@@ -14,8 +14,8 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * Sales figures of one event for a period. Only orders that count as sold (PAID, CONFIRMED) are included; revenue is whole
- * VND. The period is half open, [from, to), in the same local time the order timestamps are stored in.
+ * Số liệu bán vé của một sự kiện trong một khoảng thời gian. Chỉ tính đơn được coi là đã bán (PAID, CONFIRMED); doanh thu là số VND nguyên.
+ * Khoảng thời gian nửa mở [from, to), theo giờ địa phương mà thời gian của đơn được lưu.
  */
 @Service
 @RequiredArgsConstructor
@@ -27,11 +27,19 @@ public class BookingStatsService {
 
     private final BookingRepository bookingRepository;
 
+    /** Số vé bán và doanh thu của một ngày. */
     public record DailySales(LocalDate date, long ticketsSold, long revenue) {}
 
+    /** Số liệu tổng hợp: số người mua, số vé bán, doanh thu và số liệu theo ngày. */
     public record Stats(long buyers, long ticketsSold, long revenue, List<DailySales> daily) {}
 
-    /** from or to null means unbounded on that side. */
+    /**
+     * Tính số liệu bán vé của sự kiện; from hoặc to là null nghĩa là không giới hạn phía đó.
+     * @param eventId mã sự kiện
+     * @param from đầu khoảng (bao gồm)
+     * @param to cuối khoảng (không bao gồm)
+     * @return số liệu tổng hợp, rỗng nếu khoảng thời gian không hợp lệ
+     */
     @Transactional(readOnly = true)
     public Stats statsFor(String eventId, LocalDateTime from, LocalDateTime to) {
         LocalDateTime start = from == null ? EARLIEST : from;
@@ -40,6 +48,11 @@ public class BookingStatsService {
         return summarise(bookingRepository.findPaidOrderRows(eventId, SOLD, start, end));
     }
 
+    /**
+     * Gộp các dòng đơn đã thanh toán thành tổng số người mua, vé, doanh thu và số liệu theo ngày (sắp xếp theo ngày).
+     * @param rows các đơn đã thanh toán
+     * @return số liệu tổng hợp
+     */
     static Stats summarise(List<BookingRepository.PaidOrderRow> rows) {
         Set<String> buyers = new HashSet<>();
         TreeMap<LocalDate, long[]> byDay = new TreeMap<>();

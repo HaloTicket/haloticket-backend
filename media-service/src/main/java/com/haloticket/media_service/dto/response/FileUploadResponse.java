@@ -5,6 +5,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * Kết quả tải tệp lên S3: URL truy cập công khai, khóa đối tượng (lưu trong {@code fileName}), kích thước và loại nội dung.
+ */
 @Data
 @Builder
 @NoArgsConstructor

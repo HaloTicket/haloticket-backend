@@ -10,9 +10,20 @@ import org.springframework.context.annotation.Configuration;
 import java.io.InputStream;
 import java.lang.reflect.Type;
 
+/**
+ * Cấu hình Feign dùng chung cho {@code marketplace-service}.
+ */
 @Configuration
 public class FeignConfig {
 
+    /**
+     * Tạo {@code Decoder} tùy chỉnh cho Feign. Trả {@code null} khi phản hồi không có thân hoặc là HTTP 204,
+     * hoặc kiểu trả về là {@code void}; với {@code String} thì bỏ cặp dấu nháy kép bao ngoài (nếu có);
+     * các kiểu còn lại được đọc bằng {@code ObjectMapper}.
+     *
+     * @param objectMapper bộ ánh xạ JSON dùng để đọc thân phản hồi
+     * @return decoder dùng cho mọi Feign client
+     */
     @Bean
     public Decoder feignDecoder(ObjectMapper objectMapper) {
         return (Response response, Type type) -> {

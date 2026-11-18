@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Tin đăng bán lại một vé trên chợ vé (bảng {@code resale_listings}): giá gốc, giá bán lại và trạng thái tin đăng. */
 @Entity
 @Table(name = "resale_listings")
 @Getter
@@ -39,6 +40,7 @@ public class ResaleListing {
     @Column(name = "sold_at")
     private LocalDateTime soldAt;
 
+    /** Khi lưu: ghi thời điểm đăng và mặc định trạng thái {@code LISTED}. */
     @PrePersist
     protected void onCreate() {
         this.listedAt = LocalDateTime.now();

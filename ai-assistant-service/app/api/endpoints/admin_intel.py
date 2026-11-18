@@ -1,5 +1,5 @@
-"""Admin intelligence routes, mounted under /api/admin by admin.py (so require_admin and the gateway adminOnly rule apply):
-multi-layer risk scoring, approval decisions, dashboard KPIs and summary, attention feed, pinned reports, assistant with tools.
+"""Các route thông minh cho quản trị, gắn dưới `/api/admin` bởi admin.py (nên áp dụng `require_admin` và quy tắc adminOnly của gateway):
+chấm điểm rủi ro nhiều lớp, quyết định duyệt, KPI và tóm tắt bảng điều khiển, danh sách cần chú ý, báo cáo đã ghim, trợ lý có công cụ.
 """
 import asyncio
 import logging
@@ -26,10 +26,12 @@ KPI_CACHE_FACTOR = 2
 
 
 def _actor(request: Request) -> str:
+    """Định danh người gọi (từ claims của token) dùng cho giới hạn tần suất và nhật ký."""
     return actor_of(request, getattr(request.state, "claims", None))
 
 
 def _admin_sub(request: Request) -> str:
+    """Lấy `sub` của quản trị viên từ claims; ném lỗi `AI_INPUT_INVALID` nếu thiếu."""
     sub = str((getattr(request.state, "claims", None) or {}).get("sub") or "")
     if not sub:
         raise ai_error(AI_INPUT_INVALID)
@@ -37,6 +39,7 @@ def _admin_sub(request: Request) -> str:
 
 
 def _event_id(value: str) -> str:
+    """Chuẩn hóa mã sự kiện (cắt khoảng trắng); ném lỗi `AI_INPUT_INVALID` nếu rỗng hoặc quá dài."""
     value = (value or "").strip()
     if not value or len(value) > MAX_EVENT_ID:
         raise ai_error(AI_INPUT_INVALID)
@@ -44,6 +47,7 @@ def _event_id(value: str) -> str:
 
 
 async def _health() -> list:
+    """Lấy sức khỏe hệ thống cho bảng điều khiển; lỗi thì trả danh sách rỗng thay vì làm hỏng cả trang."""
     from app.api.endpoints import admin
     try:
         return await admin.get_system_health()
@@ -52,8 +56,9 @@ async def _health() -> list:
         return []
 
 
-# risk scoring
+# Chấm điểm rủi ro
 class RiskScoringRequest(BaseModel):
+    """Yêu cầu chấm điểm rủi ro một sự kiện; các trường nội dung chỉ dùng khi không đọc được sự kiện từ event service."""
     event_id: str
     title: str = ""
     description: str = ""
@@ -62,6 +67,7 @@ class RiskScoringRequest(BaseModel):
 
 
 def _risk_response(result: dict) -> dict:
+    """Chọn đúng các trường kết quả rủi ro được phép trả cho client."""
     return {k: result.get(k) for k in (
         "risk_score", "risk_level", "reasons", "reason_items", "ruleset_version", "assessed_at", "content_hash", "coverage",
         "complete", "cached", "stored", "assessment_id", "ai_layer", "event_id")}
@@ -69,8 +75,8 @@ def _risk_response(result: dict) -> dict:
 
 @router.post("/risk-scoring")
 def analyze_risk_score(body: RiskScoringRequest, http: Request):
-    """Three-layer score. The event is read from the event service; title/description/organizer_name are used only when it
-    cannot be read. A stored score for the same content is returned without calling the model unless refresh=true."""
+    """Chấm điểm ba lớp. Sự kiện được đọc từ event service; `title`, `description`, `organizer_name` chỉ dùng khi không đọc được.
+    Điểm đã lưu cho cùng nội dung được trả về mà không gọi mô hình, trừ khi `refresh=true`."""
     event_id = _event_id(body.event_id)
     actor = _actor(http)
     result = risk_service.assess(
@@ -83,12 +89,13 @@ def analyze_risk_score(body: RiskScoringRequest, http: Request):
 
 
 class RiskBatchRequest(BaseModel):
+    """Danh sách mã sự kiện cần chấm điểm hàng loạt cho hàng đợi duyệt."""
     event_ids: list[str] = Field(default_factory=list)
 
 
 @router.post("/risk/batch")
 def risk_batch(body: RiskBatchRequest, http: Request):
-    """Layer A+B scores (no model call) for the review queue. Unknown or unreadable events are listed in `missing`."""
+    """Điểm lớp A+B (không gọi mô hình) cho hàng đợi duyệt. Sự kiện không tồn tại hoặc không đọc được được liệt kê trong `missing`."""
     ids = list(dict.fromkeys(_event_id(i) for i in body.event_ids))[:MAX_BATCH]
     authorization = upstream.token_of(http)
     try:
@@ -103,6 +110,7 @@ def risk_batch(body: RiskBatchRequest, http: Request):
 
 
 class DecisionRequest(BaseModel):
+    """Quyết định duyệt (`APPROVED` hoặc `REJECTED`) kèm lý do mà web gửi sau khi đã duyệt hoặc từ chối sự kiện."""
     event_id: str
     decision: str
     reason: str = ""
@@ -110,8 +118,8 @@ class DecisionRequest(BaseModel):
 
 @router.post("/risk/decisions")
 def record_decision(body: DecisionRequest, http: Request):
-    """Called by the web after an approve/reject succeeded. The event's real status must match, so a decision that did not
-    happen cannot be recorded. The approver is the token subject."""
+    """Web gọi sau khi duyệt hoặc từ chối thành công. Trạng thái thật của sự kiện phải khớp, nên không thể ghi một quyết định chưa xảy ra.
+    Người duyệt là chủ thể (`sub`) của token."""
     event_id = _event_id(body.event_id)
     decision = body.decision.strip().upper()
     if decision not in ("APPROVED", "REJECTED"):
@@ -130,8 +138,8 @@ def record_decision(body: DecisionRequest, http: Request):
 
 @router.get("/risk/agreement")
 def risk_agreement(http: Request, days: int = 30):
-    """How often the suggestion matched the decision. HIGH expects REJECTED, LOW expects APPROVED, MEDIUM is neutral.
-    A decision with no web record is derived from the event's current status (no approver, no exact time)."""
+    """Mức độ gợi ý khớp với quyết định thực tế. HIGH kỳ vọng REJECTED, LOW kỳ vọng APPROVED, MEDIUM là trung lập.
+    Quyết định không có bản ghi từ web được suy ra từ trạng thái hiện tại của sự kiện (không có người duyệt, không có thời điểm chính xác)."""
     days = max(1, min(365, days))
     store.require_engine()
     assessed = store.assessed_since(days)
@@ -162,9 +170,10 @@ def risk_agreement(http: Request, days: int = 30):
     return out
 
 
-# dashboard
+# Bảng điều khiển
 @router.get("/dashboard/kpis")
 async def dashboard_kpis(http: Request):
+    """Trả các chỉ số KPI của bảng điều khiển, lưu đệm theo cấu hình (gấp `KPI_CACHE_FACTOR` lần thời gian đệm chung)."""
     authorization, actor = upstream.token_of(http), _actor(http)
     health = await _health()
     return await asyncio.to_thread(
@@ -174,6 +183,7 @@ async def dashboard_kpis(http: Request):
 
 @router.get("/attention")
 async def attention(http: Request):
+    """Trả danh sách các mục quản trị viên cần chú ý, lưu đệm theo cấu hình."""
     authorization, actor = upstream.token_of(http), _actor(http)
     health = await _health()
     return await asyncio.to_thread(
@@ -182,13 +192,14 @@ async def attention(http: Request):
 
 
 class SummaryRequest(BaseModel):
+    """Yêu cầu tóm tắt bảng điều khiển: ngôn ngữ và cờ bỏ qua bản đã lưu đệm."""
     lang: str = "vi"
     refresh: bool = False
 
 
 @router.post("/dashboard/summary")
 async def dashboard_summary(body: SummaryRequest, http: Request):
-    """The only place the model is used on the dashboard, and only when the admin asks. Cached per day and language."""
+    """Nơi duy nhất dùng mô hình trên bảng điều khiển, và chỉ khi quản trị viên yêu cầu. Lưu đệm theo ngày và ngôn ngữ."""
     lang = body.lang if body.lang in summary.LANGS else "vi"
     actor = _actor(http)
     if not body.refresh:
@@ -208,8 +219,9 @@ async def dashboard_summary(body: SummaryRequest, http: Request):
     return {**result, "cached": False, "created_at": data["generated_at"]}
 
 
-# pinned reports
+# Báo cáo đã ghim
 class PinRequest(BaseModel):
+    """Dữ liệu để ghim một báo cáo: tiêu đề, câu hỏi, câu SQL, loại biểu đồ và ảnh chụp kết quả (tùy chọn)."""
     title: str = Field(..., max_length=200)
     question: str = Field("", max_length=1000)
     sql: str = Field(..., max_length=MAX_PIN_SQL)
@@ -218,6 +230,7 @@ class PinRequest(BaseModel):
 
 
 def _engine_and_guard(sql: str):
+    """Kiểm tra câu SQL bằng bộ bảo vệ rồi trả về cặp (engine phân tích, SQL đã được bảo vệ); SQL không hợp lệ thì ném `AI_INPUT_INVALID`."""
     from app.services.ai import analysis_service
     from app.services.ai.sql_guard import SqlGuardError, validate_sql
     engine = analysis_service.engine_for("analysis")
@@ -231,13 +244,15 @@ def _engine_and_guard(sql: str):
 
 @router.get("/pins")
 def list_pins(http: Request):
+    """Liệt kê các báo cáo đã ghim của quản trị viên hiện tại cùng số lượng ghim tối đa."""
     return {"pins": store.list_pins(_admin_sub(http)), "max": settings.ai_pins_max_per_admin}
 
 
 @router.post("/pins")
 def create_pin(body: PinRequest, http: Request):
+    """Ghim một báo cáo mới; trả lỗi 409 nếu quản trị viên đã đạt giới hạn số ghim. Ảnh chụp bị cắt còn `MAX_SNAPSHOT_ROWS` dòng."""
     admin = _admin_sub(http)
-    _engine_and_guard(body.sql)  # the SQL is checked again here and again each time it runs; the client is never trusted
+    _engine_and_guard(body.sql)  # SQL được kiểm tra lại ở đây và mỗi lần chạy; không bao giờ tin client
     if store.count_pins(admin) >= settings.ai_pins_max_per_admin:
         raise HTTPException(status_code=409, detail={"code": "PIN_LIMIT", "message": f"Mỗi quản trị viên chỉ ghim tối đa {settings.ai_pins_max_per_admin} báo cáo."})
     snapshot = (body.snapshot or [])[:MAX_SNAPSHOT_ROWS]
@@ -246,7 +261,7 @@ def create_pin(body: PinRequest, http: Request):
 
 @router.get("/pins/{pin_id}/data")
 def pin_data(pin_id: str, http: Request):
-    """Runs the pinned query again (no model). When that fails the stored snapshot is returned and marked as old."""
+    """Chạy lại truy vấn đã ghim (không dùng mô hình). Nếu lỗi thì trả ảnh chụp đã lưu và đánh dấu là dữ liệu cũ."""
     admin = _admin_sub(http)
     pin = store.get_pin(admin, pin_id)
     if pin is None:
@@ -267,21 +282,24 @@ def pin_data(pin_id: str, http: Request):
 
 @router.delete("/pins/{pin_id}")
 def delete_pin(pin_id: str, http: Request):
+    """Xóa một báo cáo đã ghim của quản trị viên hiện tại; trả 404 nếu không tìm thấy."""
     if not store.delete_pin(_admin_sub(http), pin_id):
         raise HTTPException(status_code=404, detail={"code": "PIN_NOT_FOUND", "message": "Không tìm thấy báo cáo đã ghim."})
     return {"deleted": True}
 
 
-# assistant
+# Trợ lý
 MAX_CHAT_MESSAGE_CHARS = 4000
 
 
 class AdminChatRequest(BaseModel):
+    """Tin nhắn mới và lịch sử hội thoại gửi cho trợ lý quản trị."""
     message: str
     history: list[dict] = []
 
 
 class AdminChatResponse(BaseModel):
+    """Câu trả lời của trợ lý, danh sách công cụ đã dùng và cờ cho biết câu trả lời có dựa trên dữ liệu thật hay không."""
     reply: str
     tools_used: list[str] = []
     grounded: bool = True
@@ -289,7 +307,7 @@ class AdminChatResponse(BaseModel):
 
 @router.post("/assistant-chat", response_model=AdminChatResponse)
 def chat_admin_assistant(request: AdminChatRequest, http: Request, _limit: None = Depends(rate_limit("admin_assistant"))):
-    """Assistant with read-only tools. Same path and {reply} field as before; tools_used and grounded are new."""
+    """Trợ lý có công cụ chỉ đọc. Giữ nguyên đường dẫn và trường `reply` như trước; `tools_used` và `grounded` là trường mới."""
     if not request.message.strip() or len(request.message) > MAX_CHAT_MESSAGE_CHARS:
         raise ai_error(AI_INPUT_INVALID)
     ctx = assistant.AssistantContext(authorization=upstream.token_of(http), actor=_actor(http), health=assistant.default_health)

@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/** Yêu cầu cập nhật một voucher đã có: tiêu đề, mã, điều khoản, mức giảm, giới hạn sử dụng và thời gian hiệu lực. */
 @Data
 @Builder
 @NoArgsConstructor

@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+/** Dữ liệu một suất diễn: tên, thời gian diễn và thời gian mở bán. */
 @Data
 @Builder
 @NoArgsConstructor

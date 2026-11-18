@@ -1,9 +1,9 @@
-"""Case study (paper section IV.G): the production path (C5) on one event, with the trace of every step and its time.
+"""Nghiên cứu tình huống (bài báo mục IV.G): đường production (C5) trên một sự kiện, kèm vết của từng bước và thời gian.
     python -m research.risk.case_study --file event.txt [--organizer "Tên ban tổ chức"] [--llm live|fake]
 
-event.txt is UTF-8; the first line is the title, the rest is the description. The signals that need other data (organiser
-account, price of the category, similar events) are reported as not assessed, because a text file does not carry that data.
-Model answers are cached in cache/case-study.jsonl (a rerun costs nothing and gives the same trace)."""
+event.txt là UTF-8; dòng đầu là tên, phần còn lại là mô tả. Các tín hiệu cần dữ liệu khác (tài khoản ban tổ chức,
+giá của thể loại, sự kiện tương tự) được báo là không đánh giá, vì tệp văn bản không mang dữ liệu đó.
+Câu trả lời của mô hình được lưu trong cache/case-study.jsonl (chạy lại không tốn gì và cho cùng một vết)."""
 import argparse
 import hashlib
 import json
@@ -15,10 +15,12 @@ from research.risk.run_configs import ACTOR, Gateway, layer_a_mode
 
 
 def _unavailable(*_args):
+    """Thay thế cho bộ đọc dữ liệu: luôn ném LookupError vì tệp văn bản không có dữ liệu đó."""
     raise LookupError("not available from a text file")
 
 
 def trace(title: str, description: str, organizer: str, llm: str) -> dict:
+    """Chạy lớp luật, lớp tín hiệu, lớp mô hình và bước kết hợp trên một sự kiện, đo thời gian từng bước; trả vết gồm điểm, mức, cờ, lý do và thời gian."""
     event = {"id": "case-study", "title": title, "description": description, "organizerName": organizer}
     built = content.build(event)
     texts = built["texts"]
@@ -32,13 +34,13 @@ def trace(title: str, description: str, organizer: str, llm: str) -> dict:
         t = time.perf_counter()
         source = signals.SignalSource(user=_unavailable, approvals=lambda: [], category_prices=_unavailable)
         results = signals.evaluate(event, texts, source, FIXED_NOW)
-        # A text file has no dates, no similar events and no organiser data, so a signal that "assessed" it would only be reading
-        # the gaps (no start time reads as a schedule anomaly). Every signal is reported as not assessed.
+        # Tệp văn bản không có ngày, không có sự kiện tương tự và không có dữ liệu ban tổ chức, nên tín hiệu nào "đánh giá" được cũng chỉ đang đọc
+        # các chỗ trống (không có giờ bắt đầu bị đọc là lịch bất thường). Mọi tín hiệu đều được báo là không đánh giá.
         results = [{"name": r["name"], "status": "not_assessed"} for r in results]
         steps["signals_ms"] = round((time.perf_counter() - t) * 1000, 1)
 
         gateway = Gateway(llm, "case-study")
-        # the cache key carries a hash of the text: another text (or an edited one) must never reuse an old answer
+        # khóa cache chứa mã băm của văn bản: văn bản khác (hoặc đã sửa) không bao giờ được dùng lại câu trả lời cũ
         case_id = "case-" + hashlib.sha256((texts["title"] + "\n" + texts["description"]).encode("utf-8")).hexdigest()[:12]
         invoke = gateway.invoker(case_id, 0, texts)
         from app.services.admin_intel import risk_service
@@ -64,6 +66,7 @@ def trace(title: str, description: str, organizer: str, llm: str) -> dict:
 
 
 def main() -> None:
+    """Điểm vào dòng lệnh: đọc tệp sự kiện, chạy vết và in JSON (ghi thêm ra --json nếu có)."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--file", required=True)
     parser.add_argument("--organizer", default="")

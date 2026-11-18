@@ -4,7 +4,7 @@ import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-/** booking.ga.reservation.*: stock holds for general-admission orders. */
+/** Cấu hình {@code booking.ga.reservation}: giữ tồn kho cho đơn vé phổ thông (token nội bộ và thời gian dự phòng). */
 @Data
 @Component
 @ConfigurationProperties(prefix = "booking.ga.reservation")

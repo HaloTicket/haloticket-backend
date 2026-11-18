@@ -4,6 +4,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** Dữ liệu sự kiện lấy từ event-service, chỉ gồm các trường booking-service cần. */
 @Data
 public class EventResponse {
     private String id;

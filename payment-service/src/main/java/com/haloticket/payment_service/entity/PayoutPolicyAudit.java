@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Nhật ký thay đổi chính sách chi trả (bảng {@code payout_policy_audit}): giá trị cũ và mới, người thay đổi, lý do. */
 @Entity @Table(name="payout_policy_audit") @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class PayoutPolicyAudit {
     @Id @GeneratedValue(strategy=GenerationType.UUID) private String id;

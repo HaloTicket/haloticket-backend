@@ -16,6 +16,10 @@ import java.io.InputStream;
 import java.util.Base64;
 import java.util.UUID;
 
+/**
+ * Lưu và xóa ảnh trên AWS S3 (hoặc dịch vụ tương thích), trả về URL công khai của tệp.
+ * Tên bucket và vùng có thể bị ghi đè bởi system property {@code AWS_S3_BUCKET} và {@code AWS_REGION}.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -32,6 +36,15 @@ public class S3StorageService {
     @Value("${aws.s3.endpoint:}")
     private String endpoint;
 
+    /**
+     * Tải tệp ảnh multipart lên S3 với tên ngẫu nhiên (UUID) giữ phần mở rộng gốc, đặt trong thư mục chỉ định.
+     *
+     * @param file tệp ảnh; phải không rỗng và có loại nội dung bắt đầu bằng {@code image/}
+     * @param folder thư mục đích; trống thì dùng {@code media}
+     * @return thông tin tệp đã tải lên
+     * @throws IllegalArgumentException khi tệp rỗng hoặc không phải ảnh
+     * @throws RuntimeException khi tải lên S3 thất bại
+     */
     public FileUploadResponse uploadImage(MultipartFile file, String folder) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("File upload cannot be empty");
@@ -79,6 +92,15 @@ public class S3StorageService {
         }
     }
 
+    /**
+     * Giải mã ảnh Base64 dạng data URL và tải lên S3 với tên ngẫu nhiên; phần mở rộng suy từ loại nội dung (mặc định {@code .jpg}).
+     *
+     * @param base64Data chuỗi {@code data:image/...;base64,...}
+     * @param folder thư mục đích; trống thì dùng {@code media}
+     * @return thông tin tệp đã tải lên
+     * @throws IllegalArgumentException khi dữ liệu không phải data URL ảnh
+     * @throws RuntimeException khi giải mã hoặc tải lên thất bại
+     */
     public FileUploadResponse uploadBase64Image(String base64Data, String folder) {
         if (base64Data == null || !base64Data.startsWith("data:image/")) {
             throw new IllegalArgumentException("Invalid Base64 image data");
@@ -126,6 +148,12 @@ public class S3StorageService {
         }
     }
 
+    /**
+     * Xóa một đối tượng trên S3; bỏ qua nếu khóa rỗng.
+     *
+     * @param fileKey khóa đối tượng trong bucket
+     * @throws RuntimeException khi xóa thất bại
+     */
     public void deleteFile(String fileKey) {
         if (fileKey == null || fileKey.trim().isEmpty()) return;
 
@@ -145,6 +173,14 @@ public class S3StorageService {
         }
     }
 
+    /**
+     * Dựng URL công khai của đối tượng: dạng {@code endpoint/bucket/key} khi có endpoint tùy chỉnh,
+     * ngược lại dạng {@code https://bucket.s3.vùng.amazonaws.com/key}.
+     *
+     * @param bucket tên bucket
+     * @param key khóa đối tượng
+     * @return URL của tệp
+     */
     private String buildPublicUrl(String bucket, String key) {
         String actualRegion = System.getProperty("AWS_REGION", region);
         if (endpoint != null && !endpoint.trim().isEmpty()) {

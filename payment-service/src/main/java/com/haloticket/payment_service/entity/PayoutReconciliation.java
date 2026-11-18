@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Đối soát tài chính của một sự kiện (bảng {@code payout_reconciliations}): tổng thu, phí nền tảng, hoàn tiền, số tiền đang giữ và thông tin xác nhận. */
 @Entity
 @Table(name = "payout_reconciliations")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
@@ -19,5 +20,6 @@ public class PayoutReconciliation {
     @Column(columnDefinition = "TEXT") private String reason;
     @Version private Long version;
     @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
+    /** Trước khi lưu hoặc cập nhật: làm mới thời điểm cập nhật. */
     @PrePersist @PreUpdate void updateTimestamp() { updatedAt = LocalDateTime.now(); }
 }

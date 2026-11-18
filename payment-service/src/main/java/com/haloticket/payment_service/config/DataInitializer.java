@@ -8,6 +8,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+/** Chạy khi khởi động: gỡ các ràng buộc check cũ của bảng {@code payments} (phương thức và nhà cung cấp) để cho phép giá trị mới. */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -16,6 +17,11 @@ public class DataInitializer implements CommandLineRunner {
     @PersistenceContext
     private final EntityManager entityManager;
 
+    /**
+     * Gỡ ràng buộc {@code payments_method_check} và {@code payments_provider_check} nếu còn; lỗi chỉ ghi cảnh báo, không chặn khởi động.
+     *
+     * @param args tham số dòng lệnh (không dùng)
+     */
     @Override
     @Transactional
     public void run(String... args) {

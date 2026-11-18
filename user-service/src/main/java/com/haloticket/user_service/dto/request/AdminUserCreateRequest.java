@@ -5,7 +5,7 @@ import lombok.Data;
 
 import java.util.Set;
 
-/** What an administrator supplies to open an account for somebody else. No password: the person sets one through the reset flow. */
+/** Dữ liệu quản trị viên nhập để mở tài khoản cho người khác. Không có mật khẩu: người dùng tự đặt qua luồng đặt lại mật khẩu. */
 @Data
 public class AdminUserCreateRequest {
     private String email;

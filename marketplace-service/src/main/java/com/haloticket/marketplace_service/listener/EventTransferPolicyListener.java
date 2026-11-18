@@ -11,12 +11,24 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 
+/**
+ * Lắng nghe sự kiện đổi chính sách chuyển nhượng từ {@code event-service} và cập nhật bản sao chính sách trong
+ * {@code EventTransferPolicyState}. Khi bán lại bị tắt thì tạm dừng các tin đang bán; khi bật lại thì khôi phục.
+ */
 @Component @RequiredArgsConstructor @Slf4j
 public class EventTransferPolicyListener {
     private final EventTransferPolicyStateRepository repo;
     private final com.haloticket.marketplace_service.repository.TicketListingRepository listingRepository;
     private final ObjectMapper mapper;
 
+    /**
+     * Xử lý một thông điệp đổi chính sách (bán lại hoặc tặng). Bỏ qua thông điệp có phiên bản cũ hơn hoặc bằng phiên bản
+     * đã áp dụng. Với {@code RESALE} bị tắt, chuyển các tin {@code ACTIVE} sang {@code PAUSED_BY_EVENT}; khi bật lại, các tin bị
+     * tạm dừng bởi ban tổ chức được chuyển về {@code ACTIVE} hoặc {@code EXPIRED} nếu đã quá hạn.
+     *
+     * @param message nội dung JSON của sự kiện (eventId, feature, version, rules)
+     * @throws RuntimeException khi xử lý lỗi, để Kafka thử lại thông điệp
+     */
     @KafkaListener(topics = "haloticket.event.transfer-policy.changed.v1", groupId = "marketplace-transfer-policy")
     @Transactional
     public void onPolicyChanged(String message) {
@@ -84,10 +96,17 @@ public class EventTransferPolicyListener {
             }
         } catch (Exception e) {
             log.error("Failed to process transfer policy message: {}", message, e);
-            throw new RuntimeException(e); // trigger Kafka retry
+            throw new RuntimeException(e); // ném lại để Kafka thử xử lý lại thông điệp
         }
     }
 
+    /**
+     * Đọc một trường thời gian dạng ISO-8601 từ JSON.
+     *
+     * @param node nút JSON chứa trường
+     * @param field tên trường
+     * @return thời điểm đã phân tích, hoặc {@code null} nếu trường vắng hoặc null
+     */
     private Instant parseInstant(JsonNode node, String field) {
         JsonNode f = node.path(field);
         return (f.isNull() || f.isMissingNode()) ? null : Instant.parse(f.asText());

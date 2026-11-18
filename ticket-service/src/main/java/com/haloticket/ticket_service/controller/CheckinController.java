@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/** API check-in tại cửa soát vé: quét vé, xem danh sách đã vào, thống kê và tìm vé. Quyền được kiểm tra qua event-service cho từng sự kiện. */
 @Slf4j
 @RestController
 @RequestMapping("/api/tickets/checkin")
@@ -24,6 +25,14 @@ public class CheckinController {
     private final CheckinService checkinService;
     private final EventAccessClient eventAccess;
 
+    /**
+     * Xử lý một lần quét vé. Yêu cầu quyền {@code CHECKIN_SCAN}; mã nhân viên trong yêu cầu luôn bị thay bằng mã đã xác minh
+     * từ quyền của người gọi để không thể giả mạo.
+     *
+     * @param request thông tin vé quét và sự kiện
+     * @param authorization header {@code Authorization} của người gọi
+     * @return kết quả check-in
+     */
     @PostMapping
     public ResponseEntity<TicketCheckinDTO> processCheckin(@RequestBody CheckinRequest request,
                                                            @RequestHeader(value = "Authorization", required = false) String authorization) {
@@ -37,6 +46,7 @@ public class CheckinController {
         return ResponseEntity.ok(result);
     }
 
+    /** Liệt kê các lượt check-in của sự kiện (có thể lọc theo suất diễn). Yêu cầu quyền {@code CHECKIN_VIEW}. */
     @GetMapping("/events/{eventId}")
     public ResponseEntity<List<TicketCheckinDTO>> getCheckinsByEvent(
             @PathVariable("eventId") String eventId,
@@ -47,7 +57,7 @@ public class CheckinController {
         return ResponseEntity.ok(results);
     }
 
-    /** The people who entered, one page at a time (page counts from 0), newest first; showtimeId narrows it to one showtime. */
+    /** Danh sách người đã vào theo từng trang (trang đếm từ 0), mới nhất trước; {@code showtimeId} giới hạn trong một suất diễn. */
     @GetMapping("/events/{eventId}/page")
     public ResponseEntity<CheckinPageDTO> getCheckinPage(
             @PathVariable("eventId") String eventId,
@@ -59,7 +69,7 @@ public class CheckinController {
         return ResponseEntity.ok(checkinService.getCheckinPage(eventId, showtimeId, page, size));
     }
 
-    /** Entered / total for the door, per showtime and per ticket type. Door staff may read it (same permission as the list). */
+    /** Số đã vào trên tổng số vé cho cửa soát, theo từng suất diễn và từng loại vé. Nhân viên cửa được đọc (cùng quyền với danh sách). */
     @GetMapping("/events/{eventId}/summary")
     public ResponseEntity<CheckinSummaryDTO> getSummary(
             @PathVariable("eventId") String eventId,
@@ -68,7 +78,7 @@ public class CheckinController {
         return ResponseEntity.ok(checkinService.getSummary(eventId));
     }
 
-    /** Finds tickets by a fragment of the ticket code, order id, seat reference or ticket type name (at least two characters). */
+    /** Tìm vé theo một đoạn mã vé, mã đơn, vị trí ghế hoặc tên loại vé (ít nhất hai ký tự). */
     @GetMapping("/events/{eventId}/search")
     public ResponseEntity<List<CheckinTicketLookupDTO>> search(
             @PathVariable("eventId") String eventId,
@@ -80,6 +90,7 @@ public class CheckinController {
         return ResponseEntity.ok(checkinService.search(eventId, q, showtimeId, limit, access.has("CHECKIN_SCAN")));
     }
 
+    /** Tạo mã nhân viên check-in từ quyền: dùng {@code assignmentId} nếu có, ngược lại ghép tiền tố vai trò với tám ký tự đầu của mã người dùng. */
     private static String staffIdOf(EventAccessView access) {
         if (access.assignmentId() != null && !access.assignmentId().isBlank()) return access.assignmentId();
         String who = access.userId() != null ? access.userId() : "unknown";

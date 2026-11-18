@@ -6,6 +6,7 @@ import lombok.*;
 
 import java.time.Instant;
 
+/** Bản ghi giữ chỗ tồn kho của một booking cho một loại vé (bảng {@code ticket_stock_reservations}); mỗi cặp booking và loại vé chỉ có một bản ghi. */
 @Entity
 @Table(name = "ticket_stock_reservations",
         uniqueConstraints = @UniqueConstraint(name = "uk_stock_reservation_booking_type", columnNames = {"booking_id", "ticket_type_id"}),
@@ -42,12 +43,14 @@ public class TicketStockReservation {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /** Khi lưu: ghi thời điểm tạo và cập nhật. */
     @PrePersist
     void onCreate() {
         createdAt = Instant.now();
         updatedAt = createdAt;
     }
 
+    /** Khi cập nhật: ghi lại thời điểm cập nhật. */
     @PreUpdate
     void onUpdate() {
         updatedAt = Instant.now();

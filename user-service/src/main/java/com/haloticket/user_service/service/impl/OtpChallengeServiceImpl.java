@@ -18,6 +18,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 
+/** Cài đặt vòng đời OTP: hạn dùng 5 phút, chờ 60 giây giữa hai lần gửi, tối đa 5 lần gửi mỗi 15 phút và 5 lần nhập sai. */
 @Service
 public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
     static final Duration TTL = Duration.ofMinutes(5);
@@ -32,6 +33,7 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
     private final Clock clock;
     private final OtpChallengePersistence persistence;
 
+    /** Tạo service với đầy đủ thành phần phụ thuộc, dùng cho Spring. */
     @org.springframework.beans.factory.annotation.Autowired
     public OtpChallengeServiceImpl(AuthOtpChallengeRepository repository, OtpGenerator generator,
                                    OtpHasher hasher, Clock clock, OtpChallengePersistence persistence) {
@@ -42,11 +44,18 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
         this.persistence = persistence;
     }
 
+    /** Tạo service với {@link OtpChallengePersistence} mặc định dựng từ kho lưu, tiện cho kiểm thử. */
     public OtpChallengeServiceImpl(AuthOtpChallengeRepository repository, OtpGenerator generator,
                                    OtpHasher hasher, Clock clock) {
         this(repository, generator, hasher, clock, new OtpChallengePersistence(repository));
     }
 
+    /**
+     * Tạo thử thách mới và sinh OTP. Nếu cùng khóa idempotency đã có thử thách còn hạn thì trả lại thử thách đó (không có mã chữ rõ);
+     * nếu thử thách cũ đã hết hạn hoặc không còn chờ thì báo dùng lại khóa.
+     *
+     * @throws AuthOtpChallengeService.IdempotencyKeyReuseException khi khóa idempotency không thể dùng lại
+     */
     @Override
     public CreateResult create(OtpChallengeCommand command) {
         Instant now = clock.instant();
@@ -68,6 +77,7 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
                 .orElseGet(() -> createNew(command, now));
     }
 
+    /** Lưu thử thách mới; nếu hai yêu cầu cùng tạo một lúc thì dùng thử thách của yêu cầu thắng cuộc. */
     private CreateResult createNew(OtpChallengeCommand command, Instant now) {
         String otp = generator.generate();
         AuthOtpChallenge challenge = AuthOtpChallenge.builder()
@@ -79,7 +89,7 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
         try {
             return new CreateResult(persistence.insert(challenge), otp);
         } catch (DataIntegrityViolationException exception) {
-            // The failed insert has already rolled back in its REQUIRES_NEW transaction.
+            // Lần chèn thất bại đã được rollback trong giao dịch REQUIRES_NEW của nó.
             AuthOtpChallenge winner = repository.findByIdempotencyKeyAndPurposeAndSubject(
                             command.idempotencyKey(), command.purpose(), command.subject())
                     .orElseThrow(() -> exception);
@@ -91,6 +101,13 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
         }
     }
 
+    /**
+     * Gửi lại OTP: chỉ khi thử thách còn chờ và đã qua thời gian chờ, đặt lại cửa sổ đếm khi cửa sổ cũ hết, sinh mã mới và gia hạn.
+     *
+     * @throws AuthOtpChallengeService.InvalidStateException khi thử thách không còn chờ
+     * @throws AuthOtpChallengeService.CooldownException khi gửi lại quá sớm
+     * @throws AuthOtpChallengeService.RateLimitException khi đã đủ số lần gửi trong cửa sổ
+     */
     @Override
     @Transactional
     public CreateResult resend(String challengeId, Instant requestedAt) {
@@ -118,6 +135,11 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
         return new CreateResult(challenge, otp);
     }
 
+    /**
+     * Kiểm tra OTP: sai thì tăng số lần nhập sai và khóa thử thách khi đủ 5 lần; quá hạn thì đánh dấu hết hạn; đúng thì chuyển sang đã xác minh.
+     *
+     * @return kết quả xác minh, {@code accepted} true khi mã đúng
+     */
     @Override
     @Transactional
     public VerifyResult verify(String challengeId, String otp, Instant requestedAt) {
@@ -145,6 +167,11 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
         return new VerifyResult(true);
     }
 
+    /**
+     * Đánh dấu thử thách đã xác minh là đã dùng.
+     *
+     * @throws AuthOtpChallengeService.InvalidStateException khi thử thách chưa được xác minh
+     */
     @Override
     @Transactional
     public void consume(String challengeId, Instant requestedAt) {
@@ -157,15 +184,18 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
         saveSafely(challenge);
     }
 
+    /** Tìm thử thách theo id, ném {@code ChallengeNotFoundException} nếu không có. */
     private AuthOtpChallenge find(String challengeId) {
         return repository.findById(challengeId).orElseThrow(AuthOtpChallengeService.ChallengeNotFoundException::new);
     }
 
+    /** Tìm thử thách và khóa bản ghi để ghi, ném {@code ChallengeNotFoundException} nếu không có. */
     private AuthOtpChallenge findForUpdate(String challengeId) {
         return repository.findByIdForUpdate(challengeId)
                 .orElseThrow(AuthOtpChallengeService.ChallengeNotFoundException::new);
     }
 
+    /** Lưu và ghi ngay; xung đột khóa lạc quan được đổi thành {@code ConflictException}. */
     private void saveSafely(AuthOtpChallenge challenge) {
         try {
             repository.saveAndFlush(challenge);

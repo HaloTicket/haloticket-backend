@@ -13,8 +13,14 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Cấu hình Kafka producer của event-service: khóa dạng chuỗi, giá trị tuần tự hóa JSON. */
 @Configuration
 public class EventKafkaConfiguration {
+    /**
+     * Tạo producer factory với khóa {@code StringSerializer} và giá trị {@code JsonSerializer}.
+     * @param bootstrapServers địa chỉ Kafka broker, mặc định {@code localhost:9092}
+     * @return producer factory dùng chung cho template
+     */
     @Bean
     ProducerFactory<String, Object> eventKafkaProducerFactory(
             @Value("${spring.kafka.bootstrap-servers:localhost:9092}") String bootstrapServers) {
@@ -25,6 +31,11 @@ public class EventKafkaConfiguration {
         return new DefaultKafkaProducerFactory<>(properties);
     }
 
+    /**
+     * Tạo {@code KafkaTemplate} để phát sự kiện lên Kafka.
+     * @param factory producer factory đã cấu hình
+     * @return template gửi thông điệp
+     */
     @Bean
     KafkaTemplate<String, Object> eventKafkaTemplate(ProducerFactory<String, Object> factory) {
         return new KafkaTemplate<>(factory);

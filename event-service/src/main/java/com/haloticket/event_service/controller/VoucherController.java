@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/** API voucher của sự kiện: người mua xem và tra mã, người quản lý voucher tạo, sửa, bật tắt, xóa; booking-service ghi nhận lượt dùng bằng token nội bộ. */
 @RestController
 @RequestMapping("/api/events")
 @RequiredArgsConstructor
@@ -25,16 +26,21 @@ public class VoucherController {
     private final VoucherService voucherService;
     private final EventAccessService access;
 
-    /** Shared secret of the other services (env AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN); blank means no internal caller is accepted. */
+    /** Bí mật dùng chung của các service khác (biến môi trường {@code AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN}); để trống nghĩa là không chấp nhận lời gọi nội bộ nào. */
     @Value("${authz.event-scope.internal-token:}")
     private String internalToken = "";
 
+    /**
+     * Lấy voucher của sự kiện. Người không có quyền quản lý chỉ thấy voucher đã phát hành và không thấy mã.
+     * @param eventId mã sự kiện
+     * @return danh sách voucher
+     */
     @GetMapping("/{eventId}/vouchers")
     public ResponseEntity<List<VoucherResponse>> getVouchersByEventId(@PathVariable("eventId") String eventId) {
         List<VoucherResponse> vouchers = voucherService.getVouchersByEventId(eventId);
         if (!mayManageVouchers(eventId)) {
-            // the list stays public (checkout shows the offers) but the codes are for the people who run them,
-            // and a voucher that is still a draft has not been released, so it is not shown at all
+            // danh sách vẫn công khai (trang thanh toán hiển thị các ưu đãi) nhưng mã chỉ dành cho người vận hành,
+            // còn voucher đang ở dạng nháp thì chưa phát hành nên không hiển thị
             vouchers = vouchers.stream()
                     .filter(voucher -> !"DRAFT".equalsIgnoreCase(String.valueOf(voucher.getStatus())))
                     .collect(Collectors.toList());
@@ -43,7 +49,12 @@ public class VoucherController {
         return ResponseEntity.ok(vouchers);
     }
 
-    /** The buyer typed a code: return that voucher (and only that one) when it has been released. */
+    /**
+     * Người mua nhập mã: trả đúng voucher đó (và chỉ voucher đó) nếu đã được phát hành.
+     * @param eventId mã sự kiện
+     * @param code mã voucher người mua nhập
+     * @return voucher tìm được, hoặc 404 nếu không có
+     */
     @GetMapping("/{eventId}/vouchers/lookup")
     public ResponseEntity<VoucherResponse> lookupVoucher(
             @PathVariable("eventId") String eventId,
@@ -53,6 +64,11 @@ public class VoucherController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    /**
+     * Kiểm tra người gọi có quyền quản lý voucher của sự kiện hay không.
+     * @param eventId mã sự kiện
+     * @return {@code true} nếu có quyền {@code VOUCHER_MANAGE}
+     */
     private boolean mayManageVouchers(String eventId) {
         try {
             access.requireForRequest(eventId, Permission.VOUCHER_MANAGE);
@@ -62,6 +78,12 @@ public class VoucherController {
         }
     }
 
+    /**
+     * Tạo voucher cho sự kiện; cần quyền {@code VOUCHER_MANAGE}.
+     * @param eventId mã sự kiện
+     * @param request dữ liệu voucher
+     * @return danh sách voucher đã tạo với mã 201
+     */
     @PostMapping("/{eventId}/vouchers")
     public ResponseEntity<List<VoucherResponse>> createVoucher(
             @PathVariable("eventId") String eventId,
@@ -70,6 +92,12 @@ public class VoucherController {
         return new ResponseEntity<>(voucherService.createVoucher(eventId, request), HttpStatus.CREATED);
     }
 
+    /**
+     * Cập nhật voucher; cần quyền quản lý voucher của sự kiện chứa voucher đó.
+     * @param voucherId mã voucher
+     * @param request dữ liệu mới
+     * @return voucher sau khi sửa
+     */
     @PutMapping("/vouchers/{voucherId}")
     public ResponseEntity<VoucherResponse> updateVoucher(
             @PathVariable("voucherId") String voucherId,
@@ -78,12 +106,25 @@ public class VoucherController {
         return ResponseEntity.ok(voucherService.updateVoucher(voucherId, request));
     }
 
+    /**
+     * Bật hoặc tắt voucher; cần quyền quản lý voucher của sự kiện chứa voucher đó.
+     * @param voucherId mã voucher
+     * @return voucher sau khi đổi trạng thái
+     */
     @PatchMapping("/vouchers/{voucherId}/status")
     public ResponseEntity<VoucherResponse> toggleVoucherStatus(@PathVariable("voucherId") String voucherId) {
         requireVoucherManager(voucherId);
         return ResponseEntity.ok(voucherService.toggleVoucherStatus(voucherId));
     }
 
+    /**
+     * Ghi nhận lượt dùng voucher; chỉ nhận lời gọi nội bộ mang token đúng.
+     * @param voucherId mã voucher
+     * @param count số lượt dùng, mặc định 1
+     * @param token giá trị header {@code X-Internal-Token}
+     * @return voucher sau khi cập nhật số lượt dùng
+     * @throws ResponseStatusException 403 {@code INTERNAL_CALLER_ONLY} khi token thiếu hoặc sai
+     */
     @PostMapping("/vouchers/{voucherId}/use")
     public ResponseEntity<VoucherResponse> useVoucher(
             @PathVariable("voucherId") String voucherId,
@@ -95,6 +136,11 @@ public class VoucherController {
         return ResponseEntity.ok(voucherService.useVoucher(voucherId, count));
     }
 
+    /**
+     * So sánh token nội bộ bằng phép so sánh thời gian không đổi.
+     * @param token token do người gọi gửi lên
+     * @return {@code true} nếu token đã cấu hình, không rỗng và trùng khớp
+     */
     private boolean isInternalCaller(String token) {
         if (internalToken == null || internalToken.isBlank() || token == null) return false;
         return java.security.MessageDigest.isEqual(
@@ -102,6 +148,11 @@ public class VoucherController {
                 token.getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * Xóa voucher; cần quyền quản lý voucher của sự kiện chứa voucher đó.
+     * @param voucherId mã voucher
+     * @return 204 không có thân
+     */
     @DeleteMapping("/vouchers/{voucherId}")
     public ResponseEntity<Void> deleteVoucher(@PathVariable("voucherId") String voucherId) {
         requireVoucherManager(voucherId);
@@ -109,7 +160,10 @@ public class VoucherController {
         return ResponseEntity.noContent().build();
     }
 
-    /** The voucher's own event decides (a voucher id of another event is not enough): 404 for an unknown voucher, 403 otherwise. */
+    /**
+     * Sự kiện của chính voucher quyết định quyền (mã voucher của sự kiện khác không đủ): 404 nếu voucher không tồn tại, 403 nếu không có quyền.
+     * @param voucherId mã voucher cần kiểm tra
+     */
     private void requireVoucherManager(String voucherId) {
         access.requireForRequest(voucherService.eventIdOf(voucherId), Permission.VOUCHER_MANAGE);
     }

@@ -8,6 +8,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.Set;
 
+/** Một dòng trong danh sách người dùng của trang quản trị. */
 @Data
 @Builder
 public class AdminUserListItem {

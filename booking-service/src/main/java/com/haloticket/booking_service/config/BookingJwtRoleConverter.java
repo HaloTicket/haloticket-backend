@@ -8,8 +8,16 @@ import org.springframework.stereotype.Component;
 
 import java.util.*;
 
+/**
+ * Chuyển JWT thành {@code JwtAuthenticationToken}: gom vai trò từ claim {@code roles} và {@code realm_access.roles},
+ * thêm tiền tố {@code ROLE_} và viết hoa nếu chưa có.
+ */
 @Component
 public class BookingJwtRoleConverter implements Converter<Jwt, JwtAuthenticationToken> {
+    /**
+     * @param jwt token đã được xác thực chữ ký
+     * @return token xác thực kèm các quyền {@code ROLE_*}, tên chủ thể là {@code sub}
+     */
     @Override
     public JwtAuthenticationToken convert(Jwt jwt) {
         Set<String> roles = new HashSet<>();

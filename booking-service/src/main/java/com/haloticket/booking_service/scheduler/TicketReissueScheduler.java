@@ -18,9 +18,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A paid order whose tickets did not appear (a transient failure in ticket-service, a restart, a lost message) is re-driven
- * without anyone clicking: every few minutes the orders paid more than GRACE minutes ago that still have fewer tickets than
- * purchased get the confirmation sent again, at most MAX_ATTEMPTS times each. Issuance is idempotent.
+ * Đơn đã thanh toán nhưng vé chưa xuất hiện (lỗi tạm thời ở ticket-service, khởi động lại, mất thông điệp) được tự kích lại
+ * mà không cần ai bấm: vài phút một lần, các đơn thanh toán quá GRACE phút mà số vé ít hơn số đã mua sẽ được gửi lại xác nhận,
+ * tối đa MAX_ATTEMPTS lần mỗi đơn. Việc phát hành vé là idempotent.
  */
 @Component
 @RequiredArgsConstructor
@@ -41,10 +41,14 @@ public class TicketReissueScheduler {
     @Value("${booking.reissue.batch-size:50}")
     private int batchSize;
 
+    /**
+     * Quét các đơn đã thanh toán thiếu vé (hỏi số vé đã phát hành ở ticket-service), rồi yêu cầu phát hành lại,
+     * có giãn cách giữa các lần thử và giới hạn số lần. Bỏ qua cả lượt khi chưa cấu hình token nội bộ hoặc ticket-service không trả lời.
+     */
     @Scheduled(fixedDelayString = "${booking.reissue.interval-ms:120000}", initialDelayString = "${booking.reissue.initial-delay-ms:90000}")
     public void redrivePaidOrdersWithoutTickets() {
         String token = ticketProperties.getInternalToken();
-        if (token == null || token.isBlank()) return; // ticket-service would refuse the count anyway
+        if (token == null || token.isBlank()) return; // ticket-service vẫn sẽ từ chối yêu cầu đếm
         LocalDateTime now = LocalDateTime.now();
         List<BookingRepository.PaidCandidate> candidates = bookings.findPaidCandidates(
                 now.minusHours(lookbackHours), now.minusMinutes(graceMinutes), PageRequest.of(0, Math.max(1, Math.min(batchSize, 200))));
@@ -68,7 +72,7 @@ public class TicketReissueScheduler {
             if (booking == null) continue;
             int attempts = booking.getReissueAttempts() == null ? 0 : booking.getReissueAttempts();
             if (attempts >= maxAttempts) continue;
-            // back off: the n-th automatic request waits n x 2 minutes after the previous one
+            // giãn cách: lần tự động thứ n chờ n x 2 phút sau lần trước
             if (booking.getLastReissueAt() != null && booking.getLastReissueAt().plusMinutes(2L * (attempts + 1)).isAfter(now)) continue;
             try {
                 if (reissue.reissue(booking).result() == BookingReissueService.Result.REQUESTED) requested++;

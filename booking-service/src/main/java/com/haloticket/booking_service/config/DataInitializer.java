@@ -16,6 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+/**
+ * Nạp dữ liệu mẫu (một đơn đã thanh toán và một đơn đang chờ) khi cơ sở dữ liệu booking còn trống.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -26,6 +29,11 @@ public class DataInitializer implements CommandLineRunner {
     @PersistenceContext
     private final EntityManager entityManager;
 
+    /**
+     * Chạy lúc khởi động: bỏ qua nếu đã có đơn, ngược lại tạo hai đơn mẫu cùng các mục vé và ghế giữ.
+     *
+     * @param args tham số dòng lệnh
+     */
     @Override
     @Transactional
     public void run(String... args) {
@@ -36,10 +44,10 @@ public class DataInitializer implements CommandLineRunner {
 
         log.info("Initializing sample data for Booking Service...");
 
-        // 1. Confirmed Booking
+        // 1. Đơn đã xác nhận
         Booking confirmedBooking = Booking.builder()
                 .bookingCode("HT-20260829-001")
-                .customerId("44444444-4444-4444-4444-444444444444") // Customer User
+                .customerId("44444444-4444-4444-4444-444444444444") // người dùng khách hàng
                 .eventId("event-001")
                 .voucherId("voucher-01")
                 .subtotal(3000000.0)
@@ -75,7 +83,7 @@ public class DataInitializer implements CommandLineRunner {
                 .build();
         entityManager.persist(res2);
 
-        // 2. Pending Booking
+        // 2. Đơn đang chờ
         Booking pendingBooking = Booking.builder()
                 .bookingCode("HT-20260829-002")
                 .customerId("44444444-4444-4444-4444-444444444444")

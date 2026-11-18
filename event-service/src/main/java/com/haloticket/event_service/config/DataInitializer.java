@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** Nạp dữ liệu mẫu (địa điểm, danh mục, nhà tổ chức, sự kiện) khi khởi động nếu cơ sở dữ liệu sự kiện còn trống. */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -24,6 +25,10 @@ public class DataInitializer implements CommandLineRunner {
     @PersistenceContext
     private final EntityManager entityManager;
 
+    /**
+     * Tạo dữ liệu mẫu nếu chưa có sự kiện nào; nếu đã có dữ liệu thì bỏ qua.
+     * @param args tham số dòng lệnh, không dùng
+     */
     @Override
     @Transactional
     public void run(String... args) {
@@ -34,7 +39,7 @@ public class DataInitializer implements CommandLineRunner {
 
         log.info("Initializing sample data for Event Service...");
 
-        // 0. Preset Venues
+        // 0. Địa điểm dựng sẵn
         Venue myDinh = Venue.builder()
                 .name("Sân vận động Quốc gia Mỹ Đình")
                 .address("Đường Lê Đức Thọ, Phường Mỹ Đình 1, Quận Nam Từ Liêm")
@@ -107,7 +112,7 @@ public class DataInitializer implements CommandLineRunner {
                 .build();
         entityManager.merge(gemCenter);
 
-        // 1. Categories
+        // 1. Danh mục
         EventCategory musicCat = EventCategory.builder()
                 .id("cat-001")
                 .name("Âm Nhạc & Concert")
@@ -140,17 +145,17 @@ public class DataInitializer implements CommandLineRunner {
                 .build();
         entityManager.merge(techCat);
 
-        // 2. Organizer Profile
+        // 2. Hồ sơ nhà tổ chức
         EventOrganizer organizer = EventOrganizer.builder()
                 .id("org-001")
-                .userId("22222222-2222-2222-2222-222222222222") // Links to Organizer User
+                .userId("22222222-2222-2222-2222-222222222222") // Liên kết với tài khoản người dùng của nhà tổ chức
                 .description("Halo Entertainment Inc. - Đơn vị tổ chức sự kiện âm nhạc và văn hóa hàng đầu.")
                 .role(EventOrganizerRole.OWNER)
                 .status(EventOrganizerStatus.ACTIVE)
                 .build();
         entityManager.merge(organizer);
 
-        // 3. Events
+        // 3. Sự kiện
         Event musicEvent = Event.builder()
                 .id("event-001")
                 .title("Đêm Nhạc Halo Concert 2026: Vũ Điệu Âm Thanh")
@@ -211,7 +216,13 @@ public class DataInitializer implements CommandLineRunner {
         log.info("Event Service sample data initialized successfully!");
     }
 
-    /** The seeded event's owner: an OWNER ACTIVE staff assignment for the seed organizer's user (what authorization reads). */
+    /**
+     * Gán chủ sở hữu cho sự kiện mẫu: một phân công nhân sự vai trò {@code OWNER}, trạng thái {@code ACTIVE} cho người dùng của nhà tổ chức mẫu (dữ liệu mà phần phân quyền đọc).
+     * @param event sự kiện cần gán chủ sở hữu
+     * @param organizer nhà tổ chức mẫu
+     * @param assignmentId mã của phân công nhân sự
+     * @return chính sự kiện đã nhận vào, sau khi gán
+     */
     private static Event withOwner(Event event, EventOrganizer organizer, String assignmentId) {
         event.setStaffAssignments(new java.util.ArrayList<>(List.of(StaffAssignment.builder()
                 .id(assignmentId)

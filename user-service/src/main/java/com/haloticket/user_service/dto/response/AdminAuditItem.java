@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/** Một dòng nhật ký thao tác quản trị trả về cho màn hình quản trị. */
 @Data
 @Builder
 public class AdminAuditItem {

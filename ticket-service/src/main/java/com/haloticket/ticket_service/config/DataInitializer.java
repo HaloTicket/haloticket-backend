@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+/** Nạp dữ liệu mẫu (loại vé, sơ đồ ghế, vé, lịch sử check-in) khi khởi động nếu bảng loại vé còn trống. */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -23,6 +24,7 @@ public class DataInitializer implements CommandLineRunner {
     @PersistenceContext
     private final EntityManager entityManager;
 
+    /** Nếu đã có loại vé thì bỏ qua; ngược lại tạo toàn bộ dữ liệu mẫu trong một transaction. */
     @Override
     @Transactional
     public void run(String... args) {
@@ -33,7 +35,7 @@ public class DataInitializer implements CommandLineRunner {
 
         log.info("Initializing sample data for Ticket Service...");
 
-        // 1. Ticket Types for Event 001
+        // 1. Loại vé cho sự kiện 001
         TicketType vipType = TicketType.builder()
                 .eventId("event-001")
                 .name("Vé VIP Fan Zone")
@@ -61,7 +63,7 @@ public class DataInitializer implements CommandLineRunner {
                 .build();
         entityManager.persist(ecoType);
 
-        // Ticket Types for Event 002 (Sports)
+        // Loại vé cho sự kiện 002 (thể thao)
         TicketType marathonType = TicketType.builder()
                 .eventId("event-002")
                 .name("Vé Tham Gia Marathon 21KM")
@@ -71,7 +73,7 @@ public class DataInitializer implements CommandLineRunner {
                 .build();
         entityManager.persist(marathonType);
 
-        // 2. Seat Layout
+        // 2. Sơ đồ ghế
         SeatLayout layout = SeatLayout.builder()
                 .eventId("event-001")
                 .svgData("<svg viewBox='0 0 800 600'><rect width='800' height='100' fill='#333'/><text x='350' y='60' fill='#fff'>SÂN SÂN KHẤU CHÍNH</text></svg>")
@@ -79,7 +81,7 @@ public class DataInitializer implements CommandLineRunner {
                 .build();
         entityManager.persist(layout);
 
-        // 3. Seat Zones
+        // 3. Khu vực ghế
         SeatZone vipZone = SeatZone.builder()
                 .seatLayout(layout)
                 .name("Khu VIP (Sát sân khấu)")
@@ -96,7 +98,7 @@ public class DataInitializer implements CommandLineRunner {
                 .build();
         entityManager.persist(stdZone);
 
-        // 4. Seat Rows
+        // 4. Hàng ghế
         SeatRow rowA = SeatRow.builder()
                 .seatZone(vipZone)
                 .label("Hàng A")
@@ -115,7 +117,7 @@ public class DataInitializer implements CommandLineRunner {
                 .build();
         entityManager.persist(rowC);
 
-        // 5. Seats
+        // 5. Ghế
         Seat seatA1 = Seat.builder()
                 .seatRow(rowA)
                 .seatNumber("A1")
@@ -156,13 +158,13 @@ public class DataInitializer implements CommandLineRunner {
                 .build();
         entityManager.persist(seatC1);
 
-        // 6. Tickets (Issued for Customer User)
+        // 6. Vé (đã phát hành cho người dùng khách hàng)
         Ticket ticket1 = Ticket.builder()
                 .ticketType(vipType)
                 .seat(seatA1)
                 .eventId("event-001")
                 .bookingId("booking-001")
-                .ownerId("44444444-4444-4444-4444-444444444444") // Customer User
+                .ownerId("44444444-4444-4444-4444-444444444444") // người dùng khách hàng
                 .qrCodeHash("QR_HALO_001_VIP_A1")
                 .qrVersion(1)
                 .status(TicketStatus.VALID)
@@ -175,7 +177,7 @@ public class DataInitializer implements CommandLineRunner {
                 .seat(seatA2)
                 .eventId("event-001")
                 .bookingId("booking-001")
-                .ownerId("44444444-4444-4444-4444-444444444444") // Customer User
+                .ownerId("44444444-4444-4444-4444-444444444444") // người dùng khách hàng
                 .qrCodeHash("QR_HALO_002_VIP_A2")
                 .qrVersion(1)
                 .status(TicketStatus.USED)
@@ -184,7 +186,7 @@ public class DataInitializer implements CommandLineRunner {
                 .build();
         entityManager.persist(ticket2);
 
-        // 7. Checkins & CheckInAttempt
+        // 7. Lượt check-in và lần quét thử
         Checkin checkin = Checkin.builder()
                 .ticket(ticket2)
                 .eventId("event-001")

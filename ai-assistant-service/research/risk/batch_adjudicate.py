@@ -1,14 +1,14 @@
-"""Adjudication in batches for a reader who must not know whose label is whose.
+"""Phân xử theo lô cho người đọc không được biết nhãn nào của ai.
 
-python -m research.risk.batch_adjudicate list                       how many cases need a decision
-python -m research.risk.batch_adjudicate show --start 1 --end 20    the cases, with the two earlier labels shuffled as "Lượt 1" and "Lượt 2"
-python -m research.risk.batch_adjudicate put  --start 1 --end 20 --out research/risk/labels/_C_part1.jsonl   (reads stdin)
+python -m research.risk.batch_adjudicate list                       có bao nhiêu ca cần quyết định
+python -m research.risk.batch_adjudicate show --start 1 --end 20    các ca, kèm hai nhãn trước đó được xáo trộn thành "Lượt 1" và "Lượt 2"
+python -m research.risk.batch_adjudicate put  --start 1 --end 20 --out research/risk/labels/_C_part1.jsonl   (đọc stdin)
 python -m research.risk.batch_adjudicate status --start 1 --end 20 --out research/risk/labels/_C_part1.jsonl
-python -m research.risk.batch_adjudicate merge --parts a.jsonl,b.jsonl                      appends to labels/C.jsonl
+python -m research.risk.batch_adjudicate merge --parts a.jsonl,b.jsonl                      ghi nối vào labels/C.jsonl
 
-Position n is the n-th case (sorted by id) among those that need adjudication. Which annotator is "Lượt 1" is decided per
-case by a hash of the id, and is never printed. `put` lines: "n|entry|reason" (the reason is required: one sentence that
-names the rule in the guide or the words of the text that decide it).
+Vị trí n là ca thứ n (xếp theo id) trong các ca cần phân xử. Người gán nhãn nào là "Lượt 1" được quyết định theo từng
+ca bằng mã băm của id, và không bao giờ được in ra. Các dòng của `put`: "n|entry|reason" (bắt buộc có lý do: một câu
+nêu luật trong hướng dẫn hoặc những từ trong văn bản quyết định kết quả).
 """
 import argparse
 import hashlib
@@ -25,18 +25,19 @@ FIRST, SECOND = "A", "B"
 
 
 def cases_to_decide() -> list:
-    """Cases the two annotators did not settle and that the adjudicator has not decided yet."""
+    """Các ca mà hai người gán nhãn chưa thống nhất và người phân xử chưa quyết định."""
     a, b, done = load_labels(FIRST), load_labels(SECOND), load_labels("C")
     return sorted(cid for cid in a if cid in b and needs_adjudication(a[cid], b[cid]) and cid not in done)
 
 
 def shuffled_pair(cid: str) -> tuple:
-    """(label of "Lượt 1", label of "Lượt 2"); the assignment depends only on the id."""
+    """(nhãn của "Lượt 1", nhãn của "Lượt 2"); việc gán chỉ phụ thuộc vào id."""
     a, b = load_labels(FIRST)[cid], load_labels(SECOND)[cid]
     return (a, b) if int(hashlib.sha256(cid.encode()).hexdigest(), 16) % 2 == 0 else (b, a)
 
 
 def describe(label: dict) -> str:
+    """Mô tả một nhãn thành một dòng: mức, mã, kèm cảnh báo chưa chắc và ghi chú nếu có."""
     text = f"{label['level']} {','.join(label['codes']) or '-'}"
     if label.get("unsure"):
         text += "  (người gán chưa chắc)"
@@ -46,6 +47,7 @@ def describe(label: dict) -> str:
 
 
 def window(start: int, end: int) -> list:
+    """Danh sách ca cần quyết định; thoát với lỗi nếu khoảng vị trí start..end nằm ngoài danh sách."""
     todo = cases_to_decide()
     if not 1 <= start <= end <= len(todo):
         raise SystemExit(f"positions must satisfy 1 <= start <= end <= {len(todo)}")
@@ -53,6 +55,7 @@ def window(start: int, end: int) -> list:
 
 
 def show(start: int, end: int, output=print) -> None:
+    """In các ca ở vị trí start..end cùng hai nhãn trước đó (đã xáo trộn thành Lượt 1 và Lượt 2)."""
     todo = window(start, end)
     _, cases = load_cases()
     by_id = {c["id"]: c for c in cases}
@@ -65,6 +68,7 @@ def show(start: int, end: int, output=print) -> None:
 
 
 def put(start: int, end: int, out: str, lines, output=print) -> int:
+    """Đọc các dòng "n|entry|reason" và ghi nhãn phân xử vào tệp `out`; dòng sai được báo lỗi và bỏ qua. Trả số dòng lỗi."""
     todo = window(start, end)
     written = errors = 0
     for raw in lines:
@@ -86,6 +90,7 @@ def put(start: int, end: int, out: str, lines, output=print) -> int:
 
 
 def status(start: int, end: int, out: str, output=print) -> list:
+    """In số vị trí đã quyết trong khoảng start..end và trả danh sách vị trí còn thiếu."""
     window(start, end)
     done = {r["position"] for r in read_jsonl(out)}
     missing = [n for n in range(start, end + 1) if n not in done]
@@ -94,6 +99,7 @@ def status(start: int, end: int, out: str, output=print) -> list:
 
 
 def merge(parts: list, output=print) -> int:
+    """Gộp các tệp phần vào labels/C.jsonl (kiểm tra vị trí khớp id, từ chối ca đã có). Trả số ca còn chưa quyết."""
     todo = cases_to_decide()
     path = f"{LABELS}/C.jsonl"
     existing = latest(read_jsonl(path))
@@ -114,6 +120,7 @@ def merge(parts: list, output=print) -> int:
 
 
 def main() -> None:
+    """Điểm vào dòng lệnh: chạy lệnh con list, show, put, status hoặc merge."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("command", choices=("list", "show", "put", "status", "merge"))
     parser.add_argument("--start", type=int)

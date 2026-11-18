@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.util.List;
 
+/** Một hàng ghế thuộc một khu vực (bảng {@code seat_rows}), chứa danh sách ghế. */
 @Entity
 @Table(name = "seat_rows")
 @Getter

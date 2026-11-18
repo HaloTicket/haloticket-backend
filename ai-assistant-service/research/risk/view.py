@@ -1,5 +1,6 @@
-"""What an annotator sees for a case: the event and the facts a reviewer would have. Never the score, the group, the
-generator's intention or any system output."""
+"""Những gì người gán nhãn thấy ở một ca: sự kiện và các dữ kiện mà người duyệt sẽ có. Không bao giờ có điểm, nhóm,
+ý định của bộ sinh hay bất kỳ đầu ra nào của hệ thống.
+"""
 import statistics
 from datetime import datetime
 
@@ -8,11 +9,13 @@ from research.risk.common import FIXED_NOW
 
 
 def _days_ago(iso: str) -> int:
+    """Số ngày từ một mốc ISO tới thời điểm cố định FIXED_NOW (không âm)."""
     parsed = datetime.fromisoformat(iso.replace("Z", "+00:00"))
     return max(0, (FIXED_NOW - parsed).days)
 
 
 def organiser_facts(case: dict) -> dict:
+    """Dữ kiện về nhà tổ chức của ca: tuổi tài khoản (ngày), trạng thái eKYC, số sự kiện đã duyệt và bị từ chối của họ trong lịch sử."""
     uid = (case["event"].get("organizer") or {}).get("userId")
     others = [e for e in case["fixtures"]["approvals"]
               if isinstance(e.get("organizer"), dict) and e["organizer"].get("userId") == uid]
@@ -25,7 +28,11 @@ def organiser_facts(case: dict) -> dict:
 
 
 def most_similar(case: dict) -> tuple:
-    """(event, similarity) of the existing event whose title and text are closest, or (None, 0.0)."""
+    """Tìm sự kiện đã có giống nhất (theo tiêu đề và mô tả).
+
+    Returns:
+        (sự kiện, độ giống), hoặc (None, 0.0) nếu không có.
+    """
     event = case["event"]
     mine = f"{event.get('title', '')} {event.get('description', '')}"
     best, best_score = None, 0.0
@@ -37,8 +44,12 @@ def most_similar(case: dict) -> tuple:
 
 
 def render(case: dict, full_similar: bool = False) -> str:
-    """full_similar: print the whole description of the most similar event instead of its first 220 characters
-    (used when adjudicating, so a DUPLICATE decision can check that the text is really contained)."""
+    """Dựng văn bản một ca cho người gán nhãn: tiêu đề, thể loại, hạng vé, giá trung vị thể loại, địa điểm, thời gian, hồ sơ nhà tổ chức, sự kiện giống nhất và mô tả.
+
+    Args:
+        case: ca cần hiện.
+        full_similar: True thì in toàn bộ mô tả của sự kiện giống nhất thay vì 220 ký tự đầu (dùng khi phân xử, để quyết định DUPLICATE kiểm tra được văn bản có thật sự nằm trong đó).
+    """
     event = case["event"]
     prices = [p for p in case["fixtures"]["category_prices"] if p]
     facts = organiser_facts(case)

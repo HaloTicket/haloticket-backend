@@ -5,6 +5,10 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/**
+ * Tài khoản ngân hàng nhận tiền của ban tổ chức (bảng {@code organizer_payout_accounts}), kèm thông tin thuế, trạng thái xác minh
+ * và phiên bản để chống thay đổi tài khoản giữa lúc báo giá và lúc chi trả.
+ */
 @Entity
 @Table(name = "organizer_payout_accounts")
 @Getter
@@ -72,6 +76,7 @@ public class OrganizerPayoutAccount {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Trước khi lưu: gán thời điểm tạo, cập nhật; mặc định chưa xác minh ({@code UNVERIFIED}) và phiên bản tài khoản là 1. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -81,6 +86,7 @@ public class OrganizerPayoutAccount {
         if (this.accountVersion == null) this.accountVersion = 1L;
     }
 
+    /** Trước khi cập nhật: làm mới thời điểm cập nhật. */
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

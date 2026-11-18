@@ -5,6 +5,10 @@ import jakarta.persistence.Embeddable;
 import lombok.*;
 import java.math.BigDecimal;
 
+/**
+ * Bản chụp thông tin một vé trong tin bán lại hoặc lượt chuyển nhượng (loại vé, chỗ ngồi, giá gốc)
+ * và cờ đã bán. Được nhúng vào bảng của entity chứa nó.
+ */
 @Embeddable
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor
 public class TicketMemberSnapshot {

@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/** Yêu cầu tạo voucher cho sự kiện, ở chế độ một mã ({@code SINGLE}) hoặc tạo hàng loạt ({@code BULK}). */
 @Data
 @Builder
 @NoArgsConstructor
@@ -17,9 +18,9 @@ import java.util.List;
 public class VoucherCreateRequest {
     private String creationMode; // "SINGLE" or "BULK"
     private String title;
-    private String code; // Custom code for SINGLE mode
-    private String codePrefix; // Prefix for BULK mode
-    private Integer bulkCount; // Quantity of vouchers for BULK mode
+    private String code; // mã tự đặt, dùng cho chế độ SINGLE
+    private String codePrefix; // tiền tố mã, dùng cho chế độ BULK
+    private Integer bulkCount; // số voucher cần tạo, dùng cho chế độ BULK
     private String terms;
     private DiscountType discountType;
     private Double discountValue;

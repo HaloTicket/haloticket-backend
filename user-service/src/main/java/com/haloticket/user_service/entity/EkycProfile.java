@@ -9,6 +9,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
 
+/** Hồ sơ eKYC của một người dùng: giấy tờ đã xác minh, thông tin ngân hàng và thuế, trạng thái và phiên bản định danh. */
 @Entity
 @Table(name = "ekyc_profiles")
 @Getter
@@ -22,7 +23,7 @@ public class EkycProfile {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    // foreign key linking back to User
+    // khóa ngoại trỏ về User
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User user;
@@ -100,6 +101,7 @@ public class EkycProfile {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Gán thời điểm tạo, trạng thái mặc định {@code PENDING} và phiên bản định danh 1 trước khi lưu lần đầu. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -112,6 +114,7 @@ public class EkycProfile {
         }
     }
 
+    /** Làm mới thời điểm cập nhật mỗi khi bản ghi thay đổi. */
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

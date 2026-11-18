@@ -14,6 +14,9 @@ import java.util.Objects;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+/**
+ * API nội bộ giữa các service (không mở cho người dùng cuối): dữ liệu báo cáo và thống kê đặt vé của sự kiện.
+ */
 @RestController
 @RequestMapping("/api/internal/bookings")
 @RequiredArgsConstructor
@@ -22,6 +25,12 @@ public class BookingInternalController {
     private final BookingRepository bookingRepository;
     private final BookingStatsService statsService;
 
+    /**
+     * Trả dữ kiện báo cáo (sự kiện, số vé, trạng thái) cho danh sách mã đơn, đọc theo từng lô 5000 mã.
+     * @param bookingIds danh sách mã đơn, tối đa 100000; phần tử null và trùng bị bỏ
+     * @return danh sách dữ kiện, rỗng nếu không có mã hợp lệ
+     * @throws ResponseStatusException HTTP 400 khi vượt quá 100000 mã
+     */
     @PostMapping("/report-facts")
     public ResponseEntity<List<BookingReportFact>> getReportFacts(@RequestBody List<String> bookingIds) {
         if (bookingIds == null || bookingIds.size() > 100_000) {
@@ -41,9 +50,10 @@ public class BookingInternalController {
         return ResponseEntity.ok(facts);
     }
 
+    /** Dữ kiện báo cáo của một đơn: mã đơn, sự kiện, tổng số vé và trạng thái. */
     public record BookingReportFact(String bookingId, String eventId, long tickets, String status) {}
 
-    /** from and to (ISO local date-time, to excluded) are optional: without them the figures cover the whole life of the event. */
+    /** from và to (ISO local date-time, to không bao gồm) là tùy chọn: bỏ trống thì số liệu tính trên toàn bộ vòng đời sự kiện. */
     @GetMapping("/events/{eventId}/stats")
     public ResponseEntity<BookingStatsResponse> getEventBookingStats(
             @PathVariable String eventId,
@@ -64,6 +74,7 @@ public class BookingInternalController {
         return ResponseEntity.ok(response);
     }
 
+    /** Kết quả thống kê đặt vé của một sự kiện: số người mua, số vé bán, doanh thu và số liệu theo ngày. */
     @Data
     public static class BookingStatsResponse {
         private long buyersCount;
@@ -71,6 +82,7 @@ public class BookingInternalController {
         private long totalRevenue;
         private java.util.List<DailyStat> dailyStats;
 
+        /** Số liệu một ngày: số vé bán và doanh thu. */
         @Data
         public static class DailyStat {
             private String date;

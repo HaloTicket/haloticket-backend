@@ -2,6 +2,10 @@ package com.haloticket.payment_service.dto.request;
 
 import lombok.Data;
 
+/**
+ * Yêu cầu lưu tài khoản nhận tiền của ban tổ chức: thông tin ngân hàng, loại hình kinh doanh và thông tin thuế.
+ * Mã người dùng và phiên bản định danh được controller ghi đè từ eKYC.
+ */
 @Data
 public class OrganizerPayoutAccountRequest {
     private String organizerUserId;

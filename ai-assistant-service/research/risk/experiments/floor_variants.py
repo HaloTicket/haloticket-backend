@@ -1,3 +1,6 @@
+"""Thử trên tập dev các biến thể của sàn chính sách (engine.policy_floor): khi nào tín hiệu nội dung kết hợp với tín hiệu hồ sơ
+nhà tổ chức hoặc bất thường thì ép mức lên HIGH. In F1, độ chính xác, tỷ lệ bỏ sót và báo sai HIGH cho C1, C4, C5.
+"""
 import json, sys
 from collections import Counter
 from research.risk import common, run_configs as rc
@@ -11,7 +14,9 @@ PROFILE={"organizer_account_new","organizer_account_young","organizer_ekyc_not_a
 ANOM={"price_outlier","near_duplicate","schedule_anomaly"}
 orig=engine.policy_floor
 def variant(kind):
+    """Tạo bản thay cho engine.policy_floor theo biến thể: V1, V2, V3 ép HIGH trong các điều kiện khác nhau, V0 giữ nguyên."""
     def f(findings):
+        """Chạy sàn gốc rồi nâng mức lên HIGH nếu thỏa điều kiện của biến thể; trả về (mức, lý do)."""
         level,because=orig(findings)
         pos=[x for x in findings if x.get("weight",0)>0]
         content=[x for x in pos if x["layer"] in ("RULE","AI")]

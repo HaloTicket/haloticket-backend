@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Thao tác khóa hoặc chuyển quyền sở hữu một vé (bảng {@code ticket_operations}), định danh duy nhất bằng {@code operationId}, dùng cho saga bán lại và chuyển nhượng. */
 @Entity
 @Table(name = "ticket_operations", uniqueConstraints = @UniqueConstraint(name = "uk_ticket_operation_id", columnNames = "operation_id"))
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
@@ -21,6 +22,8 @@ public class TicketOperation {
     @Column(name = "created_at", nullable = false, updatable = false) private LocalDateTime createdAt;
     @Column(name = "updated_at", nullable = false) private LocalDateTime updatedAt;
     @Version private Long version;
+    /** Khi lưu: ghi thời điểm tạo và cập nhật. */
     @PrePersist void onCreate() { createdAt = LocalDateTime.now(); updatedAt = createdAt; }
+    /** Khi cập nhật: ghi lại thời điểm cập nhật. */
     @PreUpdate void onUpdate() { updatedAt = LocalDateTime.now(); }
 }

@@ -1,3 +1,4 @@
+"""Động cơ phân tích dữ liệu bằng Text-to-SQL: LLM viết một câu SELECT, sql_guard kiểm tra, rồi chạy chỉ đọc trên tài khoản cơ sở dữ liệu riêng."""
 import json
 import logging
 import time
@@ -17,9 +18,10 @@ log = logging.getLogger("ai.sql_engine")
 
 
 class AnalysisDbNotConfigured(HTTPException):
-    """AI_DB_USER / AI_DB_PASSWORD are not set: the analysis never falls back to the general database account."""
+    """Chưa đặt AI_DB_USER / AI_DB_PASSWORD: phân tích dữ liệu không bao giờ quay về dùng tài khoản cơ sở dữ liệu chung. Trả HTTP 503 AI_DB_NOT_CONFIGURED."""
 
     def __init__(self):
+        """Dựng lỗi HTTP 503 với mã AI_DB_NOT_CONFIGURED và thông báo tiếng Việt."""
         super().__init__(status_code=503, detail={
             "code": "AI_DB_NOT_CONFIGURED",
             "message": "Chức năng phân tích dữ liệu chưa được cấu hình tài khoản cơ sở dữ liệu chỉ đọc (AI_DB_USER / AI_DB_PASSWORD).",
@@ -27,33 +29,38 @@ class AnalysisDbNotConfigured(HTTPException):
 
 
 class SQLEngine:
-    """Answers a data question by letting the model write ONE query, checking it, and running it read-only.
+    """Trả lời một câu hỏi về dữ liệu bằng cách để mô hình viết MỘT câu truy vấn, kiểm tra nó rồi chạy chỉ đọc.
 
-    What can be reached is decided twice: by the database account (settings.ai_db_user, a role that can only read the
-    analysis views) and by sql_guard (allow-list of relations, one SELECT, no dangerous functions, LIMIT, no comments).
-    The query runs in a read-only transaction with a statement timeout and its result is capped.
+    Phạm vi truy cập được quyết định hai lần: bởi tài khoản cơ sở dữ liệu (settings.ai_db_user, role chỉ đọc các view
+    phân tích) và bởi sql_guard (danh sách relation cho phép, một SELECT, không hàm nguy hiểm, có LIMIT, không chú thích).
+    Truy vấn chạy trong giao dịch chỉ đọc có giới hạn thời gian và kết quả bị giới hạn kích thước.
     """
 
     def __init__(self, llm=None):
+        """Nhận LLM tùy chọn (mặc định get_fast_llm); engine kết nối được tạo lười ở lần dùng đầu."""
         self.llm = llm if llm is not None else get_fast_llm()
         self._engine = None
-        self._schema_texts = {}  # allowed relations -> (text, loaded at)
+        self._schema_texts = {}  # tập relation cho phép -> (mô tả, thời điểm nạp)
 
-    # configuration 
+    # cấu hình
     @property
     def allowed_relations(self) -> frozenset:
+        """Tập relation (view) được phép truy vấn theo cấu hình ai_sql_allowed_relations."""
         return parse_allowed(settings.ai_sql_allowed_relations)
 
     @property
     def schema(self) -> str:
+        """Tên schema phân tích theo cấu hình (rỗng nếu không đặt)."""
         return (settings.ai_analysis_schema or "").strip()
 
     def _analysis_url(self):
+        """Dựng URL kết nối của tài khoản chỉ đọc (user và mật khẩu AI_DB_*) từ database_url. Ném AnalysisDbNotConfigured khi thiếu tài khoản."""
         self.require_account()
         return make_url(settings.database_url).set(username=settings.ai_db_user, password=settings.ai_db_password)
 
     @staticmethod
     def require_account() -> None:
+        """Bảo đảm đã cấu hình tài khoản chỉ đọc; nếu thiếu thì ghi log lỗi và ném AnalysisDbNotConfigured."""
         if not settings.ai_db_user or not settings.ai_db_password:
             log.error("AI_DB_USER / AI_DB_PASSWORD are not set: data analysis is refused. "
                       "Create the read-only role (see postgres/ai-readonly) and set both.")
@@ -61,21 +68,22 @@ class SQLEngine:
 
     @property
     def engine(self):
+        """Engine của tài khoản chỉ đọc, tạo lười và đặt search_path theo schema phân tích nếu có."""
         if self._engine is None:
             options = {"connect_args": {"options": f"-c search_path={self.schema}"}} if self.schema else {}
             self._engine = make_engine(self._analysis_url(), **options)
         return self._engine
 
-    # what the model is told about the data 
+    # những gì mô hình được cho biết về dữ liệu
     def relations_for(self, scope: AnalysisScope) -> frozenset:
-        """What this caller may query: the configured views, and for an organizer only those that can be limited to events."""
+        """Các relation người gọi được truy vấn: các view đã cấu hình, và với ban tổ chức chỉ những view có thể giới hạn theo sự kiện."""
         spec = scope.spec()
         if spec is None:
             return self.allowed_relations
         return self.allowed_relations & (frozenset(spec.columns) | spec.public)
 
     def schema_description(self, relations=None) -> str:
-        """Only the allowed views, with the comments written on them. Cached for ten minutes."""
+        """Mô tả các view được phép (cột, kiểu, chú thích ghi trên đó) để đưa vào prompt. Cache 10 phút theo tập relation."""
         relations = frozenset(relations) if relations is not None else self.allowed_relations
         cached = self._schema_texts.get(relations)
         if cached and time.time() - cached[1] < 600:
@@ -100,11 +108,12 @@ class SQLEngine:
         self._schema_texts[relations] = (described, time.time())
         return described
 
-    # running a checked query 
+    # chạy một câu truy vấn đã được kiểm tra
 
     def run_readonly(self, guarded: GuardedSql, event_scope: str = "*") -> list:
-        """event_scope goes into app.allowed_event_ids for the views that filter by it ("*" = all events)."""
-        # a colon is escaped so SQLAlchemy does not read "'a:b'" as a bind parameter
+        """Chạy câu truy vấn đã qua sql_guard trong giao dịch chỉ đọc, có statement_timeout, và cắt kết quả theo ai_sql_max_result_chars.
+        event_scope được đặt vào app.allowed_event_ids cho các view lọc theo nó ("*" = mọi sự kiện). Không bao giờ commit."""
+        # dấu hai chấm được escape để SQLAlchemy không hiểu "'a:b'" là tham số bind
         statement = text(guarded.sql.replace(":", "\\:"))
         max_chars = settings.ai_sql_max_result_chars
         data, size = [], 0
@@ -123,14 +132,14 @@ class SQLEngine:
                         break
                     data.append(record)
             finally:
-                conn.rollback()  # nothing is ever committed
+                conn.rollback()  # không bao giờ commit
         return data
 
-    # the question
+    # câu hỏi của người dùng
     def analyze_data(self, question: str, scope: AnalysisScope = None):
         """Dịch câu hỏi của người dùng thành một câu SELECT an toàn, chạy chỉ-đọc và trả về kết quả kèm insight.
-        scope: which events the caller may see (None or an admin scope = all)."""
-        self.require_account()  # raises 503 AI_DB_NOT_CONFIGURED before anything else happens
+        scope: các sự kiện người gọi được xem (None hoặc phạm vi admin = tất cả). Lỗi được trả thành dict có khóa error và reply, không ném ra ngoài (trừ HTTP 503 khi thiếu tài khoản)."""
+        self.require_account()  # ném 503 AI_DB_NOT_CONFIGURED trước mọi việc khác
         scope = scope or AnalysisScope.admin()
         relations = self.relations_for(scope)
         if not relations:
@@ -215,7 +224,7 @@ class SQLEngine:
                 "reply": str(analysis_text).strip()
             }
         except Exception as failure:
-            # the details (driver messages, table names) stay in the log, not in the response
+            # chi tiết (thông báo driver, tên bảng) chỉ nằm trong log, không đưa vào phản hồi
             log.error("Data analysis failed: %s", type(failure).__name__)
             return {
                 "question": question,

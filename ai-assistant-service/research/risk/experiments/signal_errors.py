@@ -1,4 +1,4 @@
-"""Dev-split error listing for one signal: python -m research.risk.experiments.signal_errors C1 DUPLICATE (dev only, never the test split)."""
+"""Liệt kê lỗi trên tập dev cho một tín hiệu: python -m research.risk.experiments.signal_errors C1 DUPLICATE (chỉ dev, không bao giờ dùng tập test)."""
 import json, os, sys
 from research.risk import common, run_configs as rc
 from app.services.risk import content, rules
@@ -10,6 +10,11 @@ BY = {c["id"]: c for c in CASES}
 
 
 def dev_rows(config: str) -> dict:
+    """Lấy các dòng kết quả mới nhất của một cấu hình chạy trên tập dev (lần lặp 0, trạng thái ok, không giới hạn, không dùng mô hình giả).
+
+    Raises:
+        SystemExit: khi không có lần chạy dev nào phù hợp.
+    """
     folder = os.path.join(common.RESULTS, config)
     for name in sorted(os.listdir(folder), reverse=True):
         rows = common.read_jsonl(os.path.join(folder, name))

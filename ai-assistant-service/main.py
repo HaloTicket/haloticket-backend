@@ -1,3 +1,4 @@
+"""Điểm vào của ai-assistant-service (FastAPI): khởi tạo cơ sở dữ liệu, đăng ký Eureka, gắn các router customer, organizer và admin."""
 import asyncio
 import logging
 
@@ -17,7 +18,7 @@ log = logging.getLogger("ai.main")
 
 
 def _init_database():
-    """pgvector extension + tables. Best effort and bounded (the engine has a 5 s connect timeout); never fatal."""
+    """Bật extension pgvector và tạo bảng. Cố gắng hết sức và có giới hạn thời gian (engine có connect timeout 5 giây); không bao giờ làm dừng service."""
     engine = db_session.engine
     if engine is None:
         log.warning("DATABASE_URL is not set: skipping database initialisation")
@@ -35,7 +36,7 @@ def _init_database():
 
 
 async def _register_with_eureka():
-    """Runs in the background so a slow or absent Eureka never delays serving."""
+    """Chạy nền để Eureka chậm hoặc vắng mặt không làm trễ việc phục vụ. Thử đăng ký tối đa 10 lần, cách nhau 3 giây."""
     for attempt in range(1, 11):
         try:
             await eureka_client.init_async(
@@ -54,6 +55,7 @@ async def _register_with_eureka():
 
 
 async def _startup_tasks():
+    """Tác vụ khởi động chạy nền: khởi tạo cơ sở dữ liệu (trong luồng riêng) rồi đăng ký Eureka; lỗi chỉ ghi log."""
     try:
         await asyncio.to_thread(_init_database)
     except Exception as e:
@@ -63,6 +65,7 @@ async def _startup_tasks():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Vòng đời ứng dụng: khi khởi động chạy tác vụ nền; khi tắt thì hủy tác vụ đó và gỡ đăng ký Eureka."""
     task = asyncio.create_task(_startup_tasks())
     yield
     task.cancel()
@@ -80,6 +83,7 @@ install_error_handlers(app)
 
 @app.get("/health")
 async def health_check():
+    """Endpoint kiểm tra sức khỏe cho gateway và Eureka: trả trạng thái UP và tên service."""
     return {"status": "UP", "service": settings.app_name}
 
 app.include_router(

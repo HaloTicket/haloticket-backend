@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.Optional;
 import javax.imageio.ImageIO;
 
+/** Cài đặt nghiệp vụ eKYC: quản lý phiên, gọi VNPT xác minh, lưu hồ sơ định danh và cấp vai trò nhà tổ chức khi đạt. */
 @Service
 public class EkycServiceImpl implements EkycService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(EkycServiceImpl.class);
@@ -46,6 +47,7 @@ public class EkycServiceImpl implements EkycService {
     private final IdentityFingerprint identityFingerprint;
     private final Clock clock;
 
+    /** Tạo service với các kho lưu, máy khách VNPT, chính sách quyết định, bộ tạo dấu vân tay giấy tờ và đồng hồ. */
     public EkycServiceImpl(
             UserRepository userRepository,
             EkycAttemptRepository attemptRepository,
@@ -64,6 +66,13 @@ public class EkycServiceImpl implements EkycService {
         this.clock = clock;
     }
 
+    /**
+     * Mở phiên eKYC. Từ chối nếu đã được xác minh, chưa đồng ý điều khoản (phiên bản hiện hành {@code 2026.1}) hoặc khóa idempotency sai
+     * định dạng. Trả lại phiên cũ khi trùng khóa idempotency hoặc phiên mới nhất còn hạn; giới hạn 50 lần thử trong 24 giờ.
+     * Phiên mới có hiệu lực 15 phút.
+     *
+     * @throws ResponseStatusException HTTP 400, 404, 403, 409 hoặc 429 theo từng điều kiện kiểm tra
+     */
     @Override
     @Transactional
     public EkycSessionResponse startSession(
@@ -109,6 +118,10 @@ public class EkycServiceImpl implements EkycService {
         return toSession(attemptRepository.save(attempt));
     }
 
+    /**
+     * Suy ra trạng thái eKYC từ hồ sơ; nếu chưa có hồ sơ thì dựa vào lần thử gần nhất (chờ duyệt tay thành {@code PENDING}, thất bại thành
+     * {@code REJECTED}); không có gì thì là {@code NOT_STARTED}.
+     */
     @Override
     @Transactional(readOnly = true)
     public EkycStatusResponse getStatus(String keycloakId) {
@@ -128,6 +141,13 @@ public class EkycServiceImpl implements EkycService {
                 .orElse(new EkycStatusResponse(EkycVerificationStatus.NOT_STARTED, null, null, null, null, "EKYC_NOT_STARTED"));
     }
 
+    /**
+     * Xác minh một phiên: kiểm tra phiên và ảnh, gọi VNPT, áp dụng chính sách quyết định, loại giấy tờ hết hạn hoặc đã dùng cho tài khoản khác,
+     * rồi lưu hồ sơ (số giấy tờ được che, chỉ giữ mã băm) và cấp vai trò {@code ORGANIZER}. Kết quả bị từ chối được ghi vào lần thử
+     * và trả về trong phản hồi, không rollback giao dịch.
+     *
+     * @throws ResponseStatusException HTTP 404 khi không thấy phiên, 409 khi đã xử lý, 410 khi hết hạn, 400 khi ảnh hoặc đối soát lỗi
+     */
     @Override
     @Transactional(noRollbackFor = ResponseStatusException.class)
     public EkycStatusResponse verify(
@@ -250,6 +270,7 @@ public class EkycServiceImpl implements EkycService {
         return toStatus(profile, null);
     }
 
+    /** Đổi mã lỗi IDG của VNPT trong nội dung phản hồi thành mã lý do nội bộ; không nhận ra thì trả về {@code PROVIDER_REJECTED}. */
     private String providerRejectionReason(HttpStatusCodeException exception) {
         String body = exception.getResponseBodyAsString();
         if (body != null) {
@@ -261,6 +282,7 @@ public class EkycServiceImpl implements EkycService {
         return "PROVIDER_REJECTED";
     }
 
+    /** Cho biết hồ sơ eKYC của người dùng còn hiệu lực hay không; chưa có hồ sơ hợp lệ thì trả về lý do tương ứng. */
     @Override
     @Transactional(readOnly = true)
     public EkycOrganizerEligibilityResponse getOrganizerEligibility(String keycloakId) {
@@ -279,11 +301,13 @@ public class EkycServiceImpl implements EkycService {
                 .orElse(new EkycOrganizerEligibilityResponse(false, null, null, "USER_NOT_FOUND"));
     }
 
+    /** Tìm người dùng theo id Keycloak, báo HTTP 404 {@code USER_NOT_FOUND} nếu không có. */
     private User requireUser(String keycloakId) {
         return userRepository.findByKeycloakId(keycloakId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
     }
 
+    /** Tìm và khóa bản ghi người dùng để cập nhật; báo HTTP 404 nếu không có, HTTP 403 {@code USER_INACTIVE} nếu tài khoản không hoạt động. */
     private User requireUserForUpdate(String keycloakId) {
         User user = userRepository.findForEkycUpdateByKeycloakId(keycloakId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
@@ -293,6 +317,7 @@ public class EkycServiceImpl implements EkycService {
         return user;
     }
 
+    /** Hồ sơ được coi là đã xác minh khi người dùng đang hoạt động, hồ sơ đã duyệt qua lần thử đạt, có mã băm giấy tờ và giấy tờ chưa hết hạn. */
     private boolean isVerified(EkycProfile profile) {
         return profile.getUser().getStatus() == UserStatus.ACTIVE
                 && profile.getStatus() == EkycVerificationStatus.APPROVED
@@ -302,6 +327,7 @@ public class EkycServiceImpl implements EkycService {
                 && profile.getDocumentExpiresOn() != null && !profile.getDocumentExpiresOn().isBefore(LocalDate.now(clock));
     }
 
+    /** Kiểm tra ảnh là JPEG hoặc PNG, không rỗng, không quá 10 MB, đọc được và kích thước từ 100 px trở lên, tối đa 25 triệu điểm ảnh; sai thì báo HTTP 400 với mã {@code reason}. */
     private void validateImage(MultipartFile file, String reason) {
         if (file == null || file.isEmpty() || file.getSize() > MAX_IMAGE_SIZE
                 || !("image/jpeg".equals(file.getContentType()) || "image/png".equals(file.getContentType()))) {
@@ -323,16 +349,19 @@ public class EkycServiceImpl implements EkycService {
         }
     }
 
+    /** Che số giấy tờ, chỉ giữ tối đa 4 ký tự cuối. */
     private String mask(String number) {
         String normalized = number.replaceAll("\\s+", "");
         int visible = Math.min(4, normalized.length());
         return "*".repeat(Math.max(0, normalized.length() - visible)) + normalized.substring(normalized.length() - visible);
     }
 
+    /** Đổi lần thử sang phản hồi phiên. */
     private EkycSessionResponse toSession(EkycAttempt attempt) {
         return new EkycSessionResponse(attempt.getId(), attempt.getStatus(), attempt.getExpiresAt());
     }
 
+    /** Đổi hồ sơ sang phản hồi trạng thái; hồ sơ đã duyệt nhưng không còn hợp lệ được báo là {@code REQUIRES_UPDATE}, địa chỉ thiếu thì lấy địa chỉ thuế. */
     private EkycStatusResponse toStatus(EkycProfile profile, String reason) {
         Instant verifiedAt = profile.getApprovedAt() == null
                 ? null

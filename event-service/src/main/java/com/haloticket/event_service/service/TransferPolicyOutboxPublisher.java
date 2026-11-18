@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 
+/** Bộ phát outbox: định kỳ lấy các thay đổi chính sách chuyển nhượng đang chờ và gửi lên Kafka, bảo đảm sự kiện chỉ được phát sau khi giao dịch ghi chính sách đã commit. */
 @Component @RequiredArgsConstructor @Slf4j
 public class TransferPolicyOutboxPublisher {
     public static final String TOPIC = "haloticket.event.transfer-policy.changed.v1";
@@ -18,6 +19,7 @@ public class TransferPolicyOutboxPublisher {
     private final KafkaTemplate<String, Object> kafka;
     private final ObjectMapper mapper;
 
+    /** Gửi các bản ghi outbox đến hạn lên topic {@link #TOPIC} (chờ tối đa 10 giây mỗi bản). Thành công thì đánh dấu {@code PUBLISHED}; thất bại thì tăng số lần thử và hẹn thử lại sau {@code 2^n} giây, tối đa 300 giây. */
     @Scheduled(fixedDelayString = "${event.transfer-policy.outbox-poll-ms:1000}")
     @Transactional
     public void publish() {

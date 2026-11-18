@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/** Thực thể banner trang chủ (bảng {@code homepage_banners}): ảnh, tiêu đề, liên kết và cờ bật tắt. */
 @Entity
 @Table(name = "homepage_banners")
 @Getter

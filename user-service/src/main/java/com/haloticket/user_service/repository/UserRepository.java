@@ -16,22 +16,64 @@ import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
+/** Kho lưu người dùng, hỗ trợ thêm truy vấn động bằng Specification cho trang quản trị. */
 @Repository
 public interface UserRepository extends JpaRepository<User, String>, JpaSpecificationExecutor<User> {
+    /**
+     * Tìm người dùng theo id Keycloak và khóa bản ghi để ghi, tránh hai luồng eKYC cập nhật cùng lúc.
+     *
+     * @param keycloakId id Keycloak
+     * @return người dùng nếu có
+     */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.keycloakId = :keycloakId")
     Optional<User> findForEkycUpdateByKeycloakId(@Param("keycloakId") String keycloakId);
+    /**
+     * Tìm người dùng theo email.
+     *
+     * @param email email cần tìm
+     * @return người dùng nếu có
+     */
     Optional<User> findByEmail(String email);
+    /**
+     * Tìm một người dùng bất kỳ đang dùng số điện thoại này, để kiểm tra trùng số.
+     *
+     * @param phoneNumber số điện thoại
+     * @return người dùng nếu có
+     */
     Optional<User> findFirstByPhoneNumber(String phoneNumber);
+    /**
+     * Tìm người dùng theo id Keycloak.
+     *
+     * @param keycloakId id Keycloak
+     * @return người dùng nếu có
+     */
     Optional<User> findByKeycloakId(String keycloakId);
 
-    // role and status travel as parameters, never as text inside the query
+    // vai trò và trạng thái được truyền bằng tham số, không bao giờ nối thành chuỗi trong truy vấn
+    /**
+     * Đếm người dùng giữ một vai trò và đang ở một trạng thái.
+     *
+     * @param role vai trò cần đếm
+     * @param status trạng thái tài khoản
+     * @return số người dùng
+     */
     @Query("select count(u) from User u join u.roles r where r = :role and u.status = :status")
     long countByRoleAndStatus(@Param("role") Role role, @Param("status") UserStatus status);
 
+    /**
+     * Đếm số người dùng theo từng vai trò (người có hai vai trò được tính ở cả hai).
+     *
+     * @return danh sách cặp {@code [vai trò, số lượng]}
+     */
     @Query("select r, count(u) from User u join u.roles r group by r")
     List<Object[]> countGroupedByRole();
 
+    /**
+     * Đếm số người dùng theo từng trạng thái tài khoản.
+     *
+     * @return danh sách cặp {@code [trạng thái, số lượng]}
+     */
     @Query("select u.status, count(u) from User u group by u.status")
     List<Object[]> countGroupedByStatus();
 }

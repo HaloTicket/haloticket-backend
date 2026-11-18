@@ -20,6 +20,9 @@ import org.springframework.security.oauth2.server.resource.web.DefaultBearerToke
 
 import jakarta.servlet.http.HttpServletRequest;
 
+/**
+ * Cấu hình bảo mật của booking-service: route báo cáo và route admin cần vai trò ADMIN, các route còn lại đi qua chuỗi mặc định.
+ */
 @Configuration
 @EnableMethodSecurity
 public class InternalReportSecurityConfig {
@@ -29,6 +32,11 @@ public class InternalReportSecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
     private String jwkSetUri;
 
+    /**
+     * Tạo bộ giải mã JWT: dùng {@code jwk-set-uri} nếu có, nếu không thì tra cứu theo issuer. Token phải đúng issuer.
+     *
+     * @return bộ giải mã JWT
+     */
     @Bean
     JwtDecoder jwtDecoder() {
         NimbusJwtDecoder decoder = StringUtils.hasText(jwkSetUri)
@@ -38,6 +46,14 @@ public class InternalReportSecurityConfig {
         return decoder;
     }
 
+    /**
+     * Chuỗi bảo mật thứ nhất ({@code @Order(1)}): chỉ áp dụng cho route báo cáo và {@code /api/bookings/admin/**}, bắt buộc vai trò ADMIN.
+     *
+     * @param http cấu hình bảo mật HTTP
+     * @param roleConverter bộ chuyển JWT thành quyền
+     * @return chuỗi bộ lọc bảo mật
+     * @throws Exception khi dựng cấu hình thất bại
+     */
     @Bean
     @Order(1)
     SecurityFilterChain securityFilterChain(HttpSecurity http, BookingJwtRoleConverter roleConverter) throws Exception {
@@ -54,6 +70,14 @@ public class InternalReportSecurityConfig {
                 .build();
     }
 
+    /**
+     * Chuỗi bảo mật mặc định ({@code @Order(2)}): một số route cần đăng nhập, phần còn lại mở. Không đọc token ở route nội bộ.
+     *
+     * @param http cấu hình bảo mật HTTP
+     * @param roleConverter bộ chuyển JWT thành quyền
+     * @return chuỗi bộ lọc bảo mật
+     * @throws Exception khi dựng cấu hình thất bại
+     */
     @Bean
     @Order(2)
     SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http, BookingJwtRoleConverter roleConverter) throws Exception {
@@ -67,13 +91,17 @@ public class InternalReportSecurityConfig {
                         .anyRequest().permitAll())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        // The internal routes left on this chain (service-to-service reads) are public and use no identity.
-                        // A stale or malformed Authorization header must not turn one of them into a 401, so the token is not read.
+                        // Các route nội bộ còn lại trên chuỗi này (đọc giữa các service) là công khai và không dùng danh tính.
+                        // Header Authorization cũ hoặc sai định dạng không được làm route đó trả 401, nên không đọc token.
                         .bearerTokenResolver(request -> isInternalRoute(request) ? null : defaultResolver.resolve(request))
                         .jwt(jwt -> jwt.decoder(jwtDecoder()).jwtAuthenticationConverter(roleConverter)))
                 .build();
     }
 
+    /**
+     * @param request request đang xử lý
+     * @return {@code true} nếu đường dẫn (bỏ context path) bắt đầu bằng {@code /api/internal/}
+     */
     private static boolean isInternalRoute(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         return path.startsWith("/api/internal/");

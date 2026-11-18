@@ -4,6 +4,7 @@ import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
+/** Cấu hình VNPay: URL thanh toán, URL trả về, mã website, khóa băm và URL API truy vấn giao dịch. */
 @Configuration
 @Getter
 public class VNPayConfig {

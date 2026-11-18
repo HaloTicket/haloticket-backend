@@ -14,8 +14,8 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The single function that answers "what may this person do with this event", from staff_assignments, ACTIVE rows only.
- * userId is the user-service id (what staff_assignments holds), never the Keycloak subject.
+ * Hàm duy nhất trả lời "người này được làm gì với sự kiện này", dựa trên staff_assignments, chỉ tính các dòng ACTIVE.
+ * userId là id của user-service (cái staff_assignments lưu), không bao giờ là subject của Keycloak.
  */
 @Service
 @RequiredArgsConstructor
@@ -24,6 +24,15 @@ public class EventPermissions {
     private final StaffAssignmentRepository assignments;
     private final EventRepository events;
 
+    /**
+     * Tính quyền của một người với một sự kiện. Admin nền tảng có đủ quyền (vai trò OWNER); người có dòng phân công ACTIVE nhận quyền theo vai trò;
+     * phân công không còn ACTIVE hoặc không có phân công thì không có quyền nào.
+     * @param userId id người dùng trong user-service, có thể null
+     * @param eventId mã sự kiện
+     * @param platformAdmin người gọi có ROLE_ADMIN hay không
+     * @return quyền của người đó với sự kiện
+     * @throws ResponseStatusException HTTP 404 {@code EVENT_NOT_FOUND} khi không có sự kiện
+     */
     public EventAccess forUser(String userId, String eventId, boolean platformAdmin) {
         events.findById(eventId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "EVENT_NOT_FOUND"));

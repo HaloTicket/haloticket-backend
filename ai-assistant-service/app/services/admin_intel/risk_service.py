@@ -1,7 +1,7 @@
-"""Orchestrates one risk assessment: read the event, run layer A and B, optionally C, combine, store.
+"""Điều phối một lần đánh giá rủi ro: đọc sự kiện, chạy lớp A và B, tùy chọn lớp C, kết hợp rồi lưu.
 
-Layers A and B are cheap and run every time a score is built; layer C (the model) runs only when asked for and is never
-needed to get a score. A stored assessment with the same content hash and rule version is returned as is.
+Lớp A và B rẻ và chạy mỗi lần dựng điểm; lớp C (mô hình) chỉ chạy khi được yêu cầu và không bao giờ
+là điều kiện để có điểm. Bản đánh giá đã lưu có cùng mã băm nội dung và phiên bản luật được trả về nguyên trạng.
 """
 import logging
 from datetime import datetime, timezone
@@ -20,6 +20,7 @@ MAX_QUEUE_EVENTS = 30
 
 
 def _source(authorization: str) -> signals.SignalSource:
+    """Dựng nguồn dữ liệu cho các tín hiệu (người dùng, danh sách duyệt, giá theo danh mục) dùng token của admin."""
     return signals.SignalSource(
         user=lambda user_id: upstream.user(authorization, user_id),
         approvals=lambda: upstream.approvals(authorization),
@@ -28,7 +29,7 @@ def _source(authorization: str) -> signals.SignalSource:
 
 
 def find_event(authorization: str, event_id: str) -> Optional[dict]:
-    """The event as the event service reports it, or None when it cannot be read or does not exist."""
+    """Sự kiện theo báo cáo của event service, hoặc `None` khi không đọc được hoặc không tồn tại."""
     try:
         for event in upstream.approvals(authorization):
             if str(event.get("id")) == str(event_id):
@@ -39,6 +40,7 @@ def find_event(authorization: str, event_id: str) -> Optional[dict]:
 
 
 def _compute(event: dict, built: dict, authorization: str, ai_state: str, ai_flags: list, ai_meta: Optional[dict] = None) -> dict:
+    """Chạy luật (lớp A) và tín hiệu (lớp B) rồi kết hợp với kết quả lớp AI thành một điểm rủi ro."""
     ruleset = rules.load_rules()
     findings = rules.evaluate(built["texts"], ruleset) if ruleset else None
     results = signals.evaluate(event, built["texts"], _source(authorization))
@@ -46,9 +48,9 @@ def _compute(event: dict, built: dict, authorization: str, ai_state: str, ai_fla
 
 
 def _run_ai(built: dict, actor: str, invoke: Callable, check_limit: Optional[Callable]) -> tuple:
-    """(state, valid_flags, meta). A rate-limit refusal propagates (the caller gets 429); every other failure is 'failed'.
-    Flags that pass the quote check get a second reading (semantic.verify) that can only remove them. When that reading itself
-    fails the flags are kept and meta says so: losing a real finding to an outage would be the worse error."""
+    """Trả `(state, valid_flags, meta)`. Lỗi bị giới hạn tần suất được ném tiếp (client nhận 429); mọi lỗi khác thành 'failed'.
+    Cờ qua bước kiểm tra trích dẫn được đọc lần hai (`semantic.verify`), lần đọc này chỉ có thể loại bớt cờ. Nếu chính lần đọc đó
+    lỗi thì cờ được giữ lại và `meta` ghi rõ: mất một phát hiện thật vì sự cố còn tệ hơn."""
     if check_limit:
         check_limit()
     try:
@@ -61,7 +63,7 @@ def _run_ai(built: dict, actor: str, invoke: Callable, check_limit: Optional[Cal
                 confirmed = semantic.verify(invoke, built["texts"], flags, actor)
                 meta["verify"] = "ran"
                 meta["verify_removed"] = [f["code"] for f in flags if f["code"] not in confirmed]
-                # a flag that survived the second reading is marked: only such a flag may carry the HIGH minimum (engine.ai_findings)
+                # cờ qua lần đọc thứ hai được đánh dấu: chỉ cờ như vậy mới được mang mức HIGH tối thiểu (engine.ai_findings)
                 flags = [{**f, "verified": True} for f in flags if f["code"] in confirmed]
             except Exception as failure:
                 meta["verify"] = "failed"
@@ -76,6 +78,7 @@ def _run_ai(built: dict, actor: str, invoke: Callable, check_limit: Optional[Cal
 
 
 def _finish(result: dict, event_id: str, built: dict, trigger: str, created_by: str, cached: bool = False) -> dict:
+    """Bổ sung mã sự kiện, mã băm nội dung, thời điểm đánh giá và lưu kết quả (trừ khi lấy từ bộ nhớ đã lưu); lỗi lưu chỉ ghi log."""
     result = dict(result)
     result.update(event_id=event_id, content_hash=built["hash"], cached=cached, stored=False,
                   assessed_at=result.get("assessed_at") or datetime.now(timezone.utc).isoformat())
@@ -92,6 +95,7 @@ def _finish(result: dict, event_id: str, built: dict, trigger: str, created_by: 
 
 
 def _from_stored(stored: dict) -> dict:
+    """Chuyển bản ghi đánh giá đã lưu về cùng dạng kết quả như khi vừa tính."""
     items = stored["reason_items"]
     return {
         "risk_score": stored["risk_score"], "risk_level": stored["risk_level"], "reason_items": items,
@@ -104,6 +108,11 @@ def _from_stored(stored: dict) -> dict:
 def assess(authorization: str, actor: str, event_id: str, *, fallback: Optional[dict] = None, refresh: bool = False,
            run_ai: bool = True, trigger: str = "auto", invoke: Optional[Callable] = None,
            check_limit: Optional[Callable] = None, event: Optional[dict] = None) -> dict:
+    """Đánh giá rủi ro một sự kiện.
+
+    Đọc sự kiện từ event service (không đọc được thì dùng `fallback` từ client và đánh dấu chưa đầy đủ). Trừ khi `refresh`, nếu đã có bản
+    lưu cùng mã băm nội dung và phiên bản luật (và đã chạy lớp AI khi cần) thì trả bản đó. Lớp AI chỉ chạy khi `run_ai` là True.
+    """
     event = event or find_event(authorization, event_id)
     from_event = event is not None
     if event is None:
@@ -127,7 +136,7 @@ def assess(authorization: str, actor: str, event_id: str, *, fallback: Optional[
     if run_ai:
         ai_state, flags, ai_meta = _run_ai(built, actor, invoke or ai_invoke, check_limit)
     result = _compute(event, built, authorization, ai_state, flags, ai_meta)
-    if not from_event:  # the content came from the client: say so, it is not a verified reading of the event
+    if not from_event:  # nội dung do client gửi: ghi rõ, đây không phải bản đọc đã xác minh của sự kiện
         result["reason_items"].append({"layer": "SIGNAL", "code": "UNAVAILABLE:event_fetch", "severity": "INFO", "weight": 0,
                                        "status": "not_assessed", "evidence": [],
                                        "message": "Không đọc được sự kiện từ máy chủ; nội dung do trình duyệt gửi lên."})
@@ -137,8 +146,8 @@ def assess(authorization: str, actor: str, event_id: str, *, fallback: Optional[
 
 
 def ensure_assessments(authorization: str, actor: str, events: list) -> dict:
-    """Layer A+B assessments (no model call) for up to MAX_QUEUE_EVENTS events; stored ones are reused when the content is
-    unchanged. Returns {event_id: assessment}. Events beyond the cap are simply absent."""
+    """Đánh giá lớp A+B (không gọi mô hình) cho tối đa `MAX_QUEUE_EVENTS` sự kiện; bản đã lưu được dùng lại khi nội dung không đổi.
+    Trả `{event_id: đánh giá}`. Sự kiện vượt giới hạn hoặc bị lỗi sẽ không có trong kết quả."""
     out = {}
     for event in events[:MAX_QUEUE_EVENTS]:
         event_id = str(event.get("id"))
@@ -150,4 +159,5 @@ def ensure_assessments(authorization: str, actor: str, events: list) -> dict:
 
 
 def ai_limit_checker(actor: str) -> Callable:
+    """Tạo hàm kiểm tra giới hạn tần suất chấm điểm rủi ro cho `actor`, ném `AI_RATE_LIMITED` khi vượt."""
     return lambda: ratelimit.check("risk_scoring", actor, True)

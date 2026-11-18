@@ -4,12 +4,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * How many tickets of an event can enter and how many already did. "total" counts tickets that are still the holder's
- * (VALID, USED, or locked for a resale or a transfer); revoked and transferred tickets are not counted.
+ * Số vé của một sự kiện có thể vào cửa và số đã vào. {@code total} chỉ tính vé vẫn thuộc người giữ
+ * (VALID, USED, hoặc đang khóa vì bán lại hoặc chuyển nhượng); vé đã thu hồi hoặc đã chuyển đi không được tính.
  */
 public record CheckinSummaryDTO(String eventId, long total, long checkedIn, List<Group> byShowtime, List<Group> byTicketType,
                                 LocalDateTime generatedAt) {
 
-    /** One slice of the count: a showtime or a ticket type (id and name are null for the other kind). */
+    /** Một nhóm trong thống kê: một suất diễn hoặc một loại vé ({@code id} và {@code name} là {@code null} với loại còn lại). */
     public record Group(String id, String name, long total, long checkedIn) {}
 }

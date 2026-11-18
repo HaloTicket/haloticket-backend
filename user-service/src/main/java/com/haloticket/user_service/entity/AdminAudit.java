@@ -16,7 +16,7 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-/** One row per admin action on a user account: who did what to whom, what it was before and what it is now. */
+/** Mỗi dòng ghi một thao tác quản trị trên tài khoản: ai làm gì với ai, giá trị trước và sau khi đổi. */
 @Entity
 @Table(name = "admin_audit", indexes = {
         @Index(name = "idx_admin_audit_created_at", columnList = "created_at"),
@@ -62,6 +62,7 @@ public class AdminAudit {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** Gán thời điểm tạo trước khi lưu lần đầu. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

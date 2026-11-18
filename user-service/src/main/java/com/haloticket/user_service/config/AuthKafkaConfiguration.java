@@ -13,8 +13,15 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Cấu hình Kafka producer dùng để gửi sự kiện OTP xác thực, mã hóa giá trị bằng JSON. */
 @Configuration
 public class AuthKafkaConfiguration {
+    /**
+     * Tạo nhà máy producer với khóa dạng chuỗi và giá trị dạng JSON.
+     *
+     * @param bootstrapServers địa chỉ Kafka, mặc định {@code localhost:9092}
+     * @return nhà máy producer
+     */
     @Bean
     ProducerFactory<String, Object> authOtpProducerFactory(
             @Value("${spring.kafka.bootstrap-servers:localhost:9092}") String bootstrapServers) {
@@ -25,6 +32,7 @@ public class AuthKafkaConfiguration {
         return new DefaultKafkaProducerFactory<>(properties);
     }
 
+    /** Tạo {@code KafkaTemplate} để gửi sự kiện OTP từ nhà máy producer ở trên. */
     @Bean
     KafkaTemplate<String, Object> authOtpKafkaTemplate(ProducerFactory<String, Object> factory) {
         return new KafkaTemplate<>(factory);

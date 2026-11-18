@@ -11,10 +11,15 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.util.StringUtils;
 
+/** Cấu hình bảo mật resource server của event-service: xác thực JWT và quy tắc truy cập cho từng nhóm đường dẫn. */
 @Configuration
 public class SecurityConfig {
     private final JwtRoleConverter jwtRoleConverter;
 
+    /**
+     * Nhận bộ chuyển đổi JWT dùng để lấy vai trò khi xác thực.
+     * @param jwtRoleConverter bộ chuyển đổi JWT thành token xác thực có quyền
+     */
     public SecurityConfig(JwtRoleConverter jwtRoleConverter) { this.jwtRoleConverter = jwtRoleConverter; }
     @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
     private String issuerUri;
@@ -22,6 +27,10 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
     private String jwkSetUri;
 
+    /**
+     * Tạo bộ giải mã JWT: dùng {@code jwk-set-uri} nếu có, nếu không thì dò theo {@code issuer-uri}; luôn kiểm tra issuer.
+     * @return bộ giải mã JWT
+     */
     @Bean
     JwtDecoder jwtDecoder() {
         NimbusJwtDecoder decoder = StringUtils.hasText(jwkSetUri)
@@ -34,6 +43,14 @@ public class SecurityConfig {
     private static final String[] ADMIN_WRITE_PATHS = {"/api/events/admin/config/**", "/api/events/categories", "/api/events/categories/**",
             "/api/events/venues", "/api/events/venues/**"};
 
+    /**
+     * Dựng chuỗi bộ lọc bảo mật: tắt CSRF (API dùng token), cho phép công khai các yêu cầu đọc sự kiện, lượt xem và voucher nội bộ,
+     * yêu cầu vai trò ADMIN cho báo cáo, duyệt sự kiện và mọi thao tác ghi vào cấu hình, danh mục, địa điểm, còn lại bắt buộc đăng nhập.
+     * Token JWT được giải mã bằng {@link #jwtDecoder()} và chuyển thành quyền bằng bộ chuyển đổi vai trò.
+     * @param http đối tượng cấu hình bảo mật HTTP của Spring Security
+     * @return chuỗi bộ lọc bảo mật đã dựng
+     * @throws Exception khi cấu hình bảo mật không hợp lệ
+     */
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
@@ -45,15 +62,15 @@ public class SecurityConfig {
                         .requestMatchers("/api/events/my-events").authenticated()
                         .requestMatchers("/api/events/admin/reports/**").hasRole("ADMIN")
                         .requestMatchers("/api/events/approvals", "/api/events/*/approve", "/api/events/*/reject", "/api/events/*/revert-approval").hasRole("ADMIN")
-                        // homepage configuration, categories and venues: reads are public, every write is for the platform admin
-                        // (EventScopeWebConfig checks the same again inside the service)
+                        // cấu hình trang chủ, danh mục và địa điểm: đọc công khai, mọi thao tác ghi dành cho quản trị viên nền tảng
+                        // (EventScopeWebConfig kiểm tra lại lần nữa bên trong service)
                         .requestMatchers(HttpMethod.POST, ADMIN_WRITE_PATHS).hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, ADMIN_WRITE_PATHS).hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, ADMIN_WRITE_PATHS).hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, ADMIN_WRITE_PATHS).hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/events/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/events/*/view").permitAll()
-                        // booking-service counts a voucher use with the shared internal token; the controller checks it
+                        // booking-service ghi nhận lượt dùng voucher bằng token nội bộ dùng chung; controller sẽ kiểm tra token đó
                         .requestMatchers(HttpMethod.POST, "/api/events/vouchers/*/use").permitAll()
                         .requestMatchers("/api/events/test-questions").permitAll()
                         .requestMatchers("/api/events/**").authenticated()

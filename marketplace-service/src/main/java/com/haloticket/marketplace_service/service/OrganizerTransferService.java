@@ -21,6 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 
+/**
+ * Nghiệp vụ cho ban tổ chức: xem thống kê, danh sách tin bán lại và lượt tặng của sự kiện, kiểm duyệt hoặc hủy.
+ * Mọi thao tác đều kiểm tra quyền qua {@code event-service} và chỉ cho truy cập dữ liệu thuộc đúng sự kiện.
+ */
 @Service
 @RequiredArgsConstructor
 public class OrganizerTransferService {
@@ -30,30 +34,79 @@ public class OrganizerTransferService {
     private final TicketListingService ticketListingService;
     private final EventAccessClient eventAccess;
 
+    /**
+     * Yêu cầu quyền xem chuyển nhượng ({@code MARKETPLACE_VIEW}) của sự kiện.
+     *
+     * @param authorization header {@code Authorization} của người gọi
+     * @param eventId mã sự kiện
+     * @throws ResponseStatusException HTTP 401 khi thiếu token, hoặc lỗi từ kiểm tra quyền khi không đủ quyền
+     */
     public void requireOrganizerAccess(String authorization, String eventId) {
         requireOrganizerRole(authorization, eventId, false);
     }
 
+    /**
+     * Kiểm tra quyền của người gọi với sự kiện: quyền ghi cần {@code MARKETPLACE_MODERATE}, quyền đọc cần {@code MARKETPLACE_VIEW}.
+     *
+     * @param authorization header {@code Authorization} của người gọi
+     * @param eventId mã sự kiện
+     * @param write {@code true} nếu thao tác làm thay đổi dữ liệu
+     * @throws ResponseStatusException HTTP 401 khi thiếu token
+     */
     private void requireOrganizerRole(String authorization, String eventId, boolean write) {
         if (authorization == null || authorization.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED");
         }
-        // one permission table in event-service: viewing needs MARKETPLACE_VIEW, changes need MARKETPLACE_MODERATE
+        // dùng chung một bảng quyền trong event-service: xem cần MARKETPLACE_VIEW, thay đổi cần MARKETPLACE_MODERATE
         eventAccess.require(eventId, write ? "MARKETPLACE_MODERATE" : "MARKETPLACE_VIEW", authorization);
     }
 
+    /**
+     * Duyệt hoặc từ chối tin bán lại của sự kiện sau khi kiểm tra quyền kiểm duyệt.
+     *
+     * @param authorization header {@code Authorization} của ban tổ chức
+     * @param actorId mã người thực hiện
+     * @param eventId mã sự kiện
+     * @param listingId mã tin bán lại
+     * @param approved {@code true} để duyệt, {@code false} để từ chối
+     * @param reason lý do (có thể bỏ trống)
+     * @return trạng thái saga sau khi xử lý
+     * @throws ResponseStatusException HTTP 404 {@code LISTING_NOT_FOUND} khi tin không tồn tại hoặc không thuộc sự kiện
+     */
     public SagaResponse moderateListing(String authorization, String actorId, String eventId, String listingId, boolean approved, String reason) {
         requireOrganizerRole(authorization, eventId, true);
         requireListingInEvent(eventId, listingId);
         return ticketListingService.moderateListingAsOrganizer(actorId, eventId, listingId, approved, reason);
     }
 
+    /**
+     * Hủy tin bán lại của sự kiện sau khi kiểm tra quyền kiểm duyệt.
+     *
+     * @param authorization header {@code Authorization} của ban tổ chức
+     * @param actorId mã người thực hiện
+     * @param eventId mã sự kiện
+     * @param listingId mã tin bán lại
+     * @param reason lý do hủy
+     * @return trạng thái saga sau khi hủy
+     * @throws ResponseStatusException HTTP 404 {@code LISTING_NOT_FOUND} khi tin không tồn tại hoặc không thuộc sự kiện
+     */
     public SagaResponse cancelListing(String authorization, String actorId, String eventId, String listingId, String reason) {
         requireOrganizerRole(authorization, eventId, true);
         requireListingInEvent(eventId, listingId);
         return ticketListingService.cancelListingAsOrganizer(actorId, eventId, listingId, reason);
     }
 
+    /**
+     * Hủy lượt tặng vé của sự kiện sau khi kiểm tra quyền kiểm duyệt.
+     *
+     * @param authorization header {@code Authorization} của ban tổ chức
+     * @param actorId mã người thực hiện
+     * @param eventId mã sự kiện
+     * @param sagaId mã saga của lượt tặng
+     * @param reason lý do hủy
+     * @return trạng thái saga sau khi hủy
+     * @throws ResponseStatusException HTTP 404 {@code GIFT_NOT_FOUND} khi lượt tặng không tồn tại hoặc không thuộc sự kiện
+     */
     public SagaResponse cancelGift(String authorization, String actorId, String eventId, String sagaId, String reason) {
         requireOrganizerRole(authorization, eventId, true);
         TicketTransfer transfer = transferRepository.findBySagaId(sagaId)
@@ -62,12 +115,26 @@ public class OrganizerTransferService {
         return ticketListingService.cancelGiftAsOrganizer(actorId, eventId, sagaId, reason);
     }
 
+    /**
+     * Bảo đảm tin bán lại tồn tại và thuộc đúng sự kiện.
+     *
+     * @param eventId mã sự kiện
+     * @param listingId mã tin bán lại
+     * @throws ResponseStatusException HTTP 404 {@code LISTING_NOT_FOUND} khi không thỏa
+     */
     private void requireListingInEvent(String eventId, String listingId) {
         TicketListing listing = listingRepository.findById(listingId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "LISTING_NOT_FOUND"));
         if (!eventId.equals(listing.getEventId())) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "LISTING_NOT_FOUND");
     }
 
+    /**
+     * Tổng hợp số tin bán lại theo trạng thái, số lượt tặng đang chờ hoặc hoàn tất và phiên bản chính sách đã áp dụng của sự kiện.
+     *
+     * @param authorization header {@code Authorization} của ban tổ chức
+     * @param eventId mã sự kiện
+     * @return số liệu tổng hợp
+     */
     @Transactional(readOnly = true)
     public OrganizerTransferSummaryResponse getSummary(String authorization, String eventId) {
         requireOrganizerAccess(authorization, eventId);
@@ -91,6 +158,16 @@ public class OrganizerTransferService {
         );
     }
 
+    /**
+     * Liệt kê tin bán lại của sự kiện (có thể lọc theo trạng thái), chuyển sang dạng hiển thị cho ban tổ chức:
+     * mã tham chiếu {@code LST-...}, mã chỗ ngồi, email người bán đã che, giá gốc và khoảng giá.
+     *
+     * @param authorization header {@code Authorization} của ban tổ chức
+     * @param eventId mã sự kiện
+     * @param pageable thông tin phân trang
+     * @param status trạng thái cần lọc, có thể {@code null}
+     * @return trang tin bán lại
+     */
     @Transactional(readOnly = true)
     public Page<OrganizerListingResponse> getListings(String authorization, String eventId, Pageable pageable, ListingStatus status) {
         requireOrganizerAccess(authorization, eventId);
@@ -127,6 +204,15 @@ public class OrganizerTransferService {
         });
     }
 
+    /**
+     * Liệt kê các lượt tặng vé của sự kiện (có thể lọc theo trạng thái) với email người tặng và người nhận đã che.
+     *
+     * @param authorization header {@code Authorization} của ban tổ chức
+     * @param eventId mã sự kiện
+     * @param pageable thông tin phân trang
+     * @param status trạng thái cần lọc, có thể {@code null}
+     * @return trang lượt tặng
+     */
     @Transactional(readOnly = true)
     public Page<OrganizerGiftResponse> getGifts(String authorization, String eventId, Pageable pageable, TransferStatus status) {
         requireOrganizerAccess(authorization, eventId);
@@ -152,6 +238,15 @@ public class OrganizerTransferService {
         });
     }
 
+    /**
+     * Xem chi tiết một tin bán lại của sự kiện.
+     *
+     * @param authorization header {@code Authorization} của ban tổ chức
+     * @param eventId mã sự kiện
+     * @param listingId mã tin bán lại
+     * @return chi tiết tin
+     * @throws ResponseStatusException HTTP 404 {@code LISTING_NOT_FOUND} khi tin không tồn tại hoặc không thuộc sự kiện
+     */
     @Transactional(readOnly = true)
     public OrganizerListingResponse getListingDetail(String authorization, String eventId, String listingId) {
         requireOrganizerAccess(authorization, eventId);
@@ -186,6 +281,15 @@ public class OrganizerTransferService {
         );
     }
 
+    /**
+     * Xem chi tiết một lượt tặng vé của sự kiện.
+     *
+     * @param authorization header {@code Authorization} của ban tổ chức
+     * @param eventId mã sự kiện
+     * @param sagaId mã saga của lượt tặng
+     * @return chi tiết lượt tặng
+     * @throws ResponseStatusException HTTP 404 {@code GIFT_NOT_FOUND} khi lượt tặng không tồn tại hoặc không thuộc sự kiện
+     */
     @Transactional(readOnly = true)
     public OrganizerGiftResponse getGiftDetail(String authorization, String eventId, String sagaId) {
         requireOrganizerAccess(authorization, eventId);
@@ -208,6 +312,13 @@ public class OrganizerTransferService {
         );
     }
 
+    /**
+     * Che bớt email để bảo vệ dữ liệu cá nhân, ví dụ {@code a***z@domain}. Giá trị không phải email thì giữ vài ký tự đầu và cuối;
+     * giá trị rỗng hoặc quá ngắn trả {@code ***}.
+     *
+     * @param val email hoặc mã người dùng
+     * @return chuỗi đã che
+     */
     public static String maskEmail(String val) {
         if (val == null || val.isBlank()) return "***";
         int at = val.indexOf('@');
@@ -223,6 +334,14 @@ public class OrganizerTransferService {
         return "***";
     }
 
+    /**
+     * Ghép mã chỗ ngồi từ khu, hàng và ghế, bỏ qua phần trống.
+     *
+     * @param sec tên khu
+     * @param row tên hàng
+     * @param seat tên ghế
+     * @return chuỗi mã chỗ ngồi, hoặc {@code null} nếu cả ba đều trống
+     */
     private String buildSeatCode(String sec, String row, String seat) {
         StringBuilder sb = new StringBuilder();
         if (sec != null && !sec.isBlank()) sb.append(sec);

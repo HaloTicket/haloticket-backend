@@ -1,8 +1,8 @@
-"""Storage in the ai_ops database through the role ai_admin_rw (haloticket-infrastructure/postgres/ai-admin).
+"""Lưu trữ trong cơ sở dữ liệu ai_ops qua role ai_admin_rw (haloticket-infrastructure/postgres/ai-admin).
 
-Tables: event_risk_assessments (append only), event_risk_decisions, ai_admin_pins, ai_dashboard_summaries.
-Without AI_ADMIN_DATABASE_URL, configured() is False and require_engine() raises AI_DB_NOT_CONFIGURED; callers that can
-work without storage (risk scoring) check configured() first and answer with stored=false.
+Các bảng: event_risk_assessments (chỉ thêm), event_risk_decisions, ai_admin_pins, ai_dashboard_summaries.
+Khi thiếu AI_ADMIN_DATABASE_URL, `configured()` trả False và `require_engine()` ném AI_DB_NOT_CONFIGURED; những nơi có thể
+chạy không cần lưu trữ (chấm điểm rủi ro) kiểm tra `configured()` trước và trả lời với `stored=false`.
 """
 import json
 import logging
@@ -27,10 +27,12 @@ _cached = {"url": None, "engine": None}
 
 
 def configured() -> bool:
+    """Cho biết đã cấu hình cơ sở dữ liệu quản trị AI hay chưa."""
     return bool(settings.ai_admin_database_url)
 
 
 def require_engine():
+    """Engine dùng chung tới ai_ops (tạo lười, tạo lại khi URL đổi); ném `AI_DB_NOT_CONFIGURED` nếu chưa cấu hình."""
     url = settings.ai_admin_database_url
     if not url:
         raise ai_error(AI_DB_NOT_CONFIGURED)
@@ -44,6 +46,7 @@ def require_engine():
 
 
 def reset_for_tests() -> None:
+    """Đóng engine đang lưu đệm và xóa trạng thái; chỉ dùng trong kiểm thử."""
     with _lock:
         if _cached["engine"] is not None:
             _cached["engine"].dispose()
@@ -51,17 +54,19 @@ def reset_for_tests() -> None:
 
 
 def _iso(value) -> Optional[str]:
+    """Chuỗi ISO-8601 của một `datetime` (thiếu múi giờ thì coi là UTC); giá trị khác trả `None`."""
     if isinstance(value, datetime):
         return (value if value.tzinfo else value.replace(tzinfo=timezone.utc)).isoformat()
     return None
 
 
-# assessments
+# Đánh giá rủi ro
 _ASSESSMENT_COLUMNS = ("id, event_id, content_hash, ruleset_version, score, level, complete, reasons, coverage, ai_layer, "
                        "trigger, created_by, created_at")
 
 
 def _assessment_row(row) -> dict:
+    """Chuyển một dòng bảng đánh giá thành dict theo tên trường của API."""
     return {
         "assessment_id": row.id, "event_id": row.event_id, "content_hash": row.content_hash,
         "ruleset_version": row.ruleset_version, "risk_score": row.score, "risk_level": row.level, "complete": row.complete,
@@ -71,6 +76,7 @@ def _assessment_row(row) -> dict:
 
 
 def latest_assessment(event_id: str) -> Optional[dict]:
+    """Bản đánh giá mới nhất của một sự kiện, hoặc `None` nếu chưa có."""
     with require_engine().connect() as conn:
         row = conn.execute(text(f"SELECT {_ASSESSMENT_COLUMNS} FROM event_risk_assessments WHERE event_id = :e "
                                 "ORDER BY created_at DESC, id DESC LIMIT 1"), {"e": event_id}).fetchone()
@@ -79,6 +85,7 @@ def latest_assessment(event_id: str) -> Optional[dict]:
 
 
 def latest_assessments(event_ids: list) -> dict:
+    """Bản đánh giá mới nhất của từng sự kiện trong danh sách, trả về dạng `{event_id: đánh giá}`."""
     if not event_ids:
         return {}
     with require_engine().connect() as conn:
@@ -90,6 +97,7 @@ def latest_assessments(event_ids: list) -> dict:
 
 
 def assessment_history(event_id: str, limit: int = 10) -> list:
+    """Tối đa `limit` bản đánh giá gần nhất của một sự kiện, mới nhất trước."""
     with require_engine().connect() as conn:
         rows = conn.execute(text(f"SELECT {_ASSESSMENT_COLUMNS} FROM event_risk_assessments WHERE event_id = :e "
                                  "ORDER BY created_at DESC, id DESC LIMIT :n"), {"e": event_id, "n": limit}).fetchall()
@@ -98,6 +106,7 @@ def assessment_history(event_id: str, limit: int = 10) -> list:
 
 
 def save_assessment(event_id: str, result: dict, content_hash: str, trigger: str, created_by: str) -> int:
+    """Thêm một bản đánh giá mới (bảng chỉ thêm, không sửa bản cũ) và trả về mã của bản ghi."""
     with require_engine().begin() as conn:
         row = conn.execute(text(
             "INSERT INTO event_risk_assessments (event_id, content_hash, ruleset_version, score, level, complete, reasons, coverage, "
@@ -108,8 +117,12 @@ def save_assessment(event_id: str, result: dict, content_hash: str, trigger: str
     return int(row.id)
 
 
-# decisions
+# Quyết định duyệt
 def save_decision(event_id: str, decision: str, reason: str, decided_by: Optional[str], source: str) -> dict:
+    """Ghi quyết định duyệt gắn với bản đánh giá mới nhất. Cùng sự kiện, quyết định và nguồn trong 10 phút qua thì coi là trùng và không ghi thêm.
+
+    Trả về `{id, duplicate}`.
+    """
     with require_engine().begin() as conn:
         assessment = conn.execute(text("SELECT id FROM event_risk_assessments WHERE event_id = :e ORDER BY created_at DESC, id DESC LIMIT 1"),
                                   {"e": event_id}).fetchone()
@@ -125,6 +138,7 @@ def save_decision(event_id: str, decision: str, reason: str, decided_by: Optiona
 
 
 def decisions_since(days: int) -> list:
+    """Quyết định gần nhất của mỗi sự kiện trong `days` ngày qua."""
     since = datetime.now(timezone.utc) - timedelta(days=days)
     with require_engine().connect() as conn:
         rows = conn.execute(text("SELECT DISTINCT ON (event_id) event_id, decision, source FROM event_risk_decisions "
@@ -134,7 +148,7 @@ def decisions_since(days: int) -> list:
 
 
 def assessed_since(days: int) -> list:
-    """Latest assessment (level, id) per event assessed in the window."""
+    """Bản đánh giá mới nhất (mức rủi ro, đầy đủ hay không) của mỗi sự kiện được đánh giá trong `days` ngày qua."""
     since = datetime.now(timezone.utc) - timedelta(days=days)
     with require_engine().connect() as conn:
         rows = conn.execute(text("SELECT DISTINCT ON (event_id) event_id, level, complete FROM event_risk_assessments "
@@ -143,8 +157,9 @@ def assessed_since(days: int) -> list:
     return [{"event_id": r.event_id, "level": r.level, "complete": r.complete} for r in rows]
 
 
-# pins
+# Báo cáo đã ghim
 def count_pins(admin: str) -> int:
+    """Số báo cáo quản trị viên đã ghim."""
     with require_engine().connect() as conn:
         n = conn.execute(text("SELECT count(*) FROM ai_admin_pins WHERE admin_sub = :a"), {"a": admin}).scalar()
         conn.rollback()
@@ -152,6 +167,7 @@ def count_pins(admin: str) -> int:
 
 
 def list_pins(admin: str) -> list:
+    """Các báo cáo đã ghim của một quản trị viên, mới nhất trước."""
     with require_engine().connect() as conn:
         rows = conn.execute(text("SELECT pin_id, title, question, sql_text, chart_type, snapshot, created_at FROM ai_admin_pins "
                                  "WHERE admin_sub = :a ORDER BY created_at DESC"), {"a": admin}).fetchall()
@@ -161,6 +177,7 @@ def list_pins(admin: str) -> list:
 
 
 def create_pin(admin: str, title: str, question: str, sql_text: str, chart_type: str, snapshot) -> str:
+    """Lưu một báo cáo ghim mới (cắt tiêu đề, câu hỏi, loại biểu đồ theo độ dài cột) và trả về mã ghim."""
     pin_id = uuid.uuid4().hex
     with require_engine().begin() as conn:
         conn.execute(text("INSERT INTO ai_admin_pins (pin_id, admin_sub, title, question, sql_text, chart_type, snapshot) "
@@ -171,23 +188,27 @@ def create_pin(admin: str, title: str, question: str, sql_text: str, chart_type:
 
 
 def update_pin_snapshot(admin: str, pin_id: str, snapshot) -> None:
+    """Cập nhật ảnh chụp kết quả của một ghim thuộc quản trị viên."""
     with require_engine().begin() as conn:
         conn.execute(text("UPDATE ai_admin_pins SET snapshot = CAST(:snap AS jsonb) WHERE pin_id = :p AND admin_sub = :a"),
                      {"snap": json.dumps(snapshot, ensure_ascii=False, default=str), "p": pin_id, "a": admin})
 
 
 def get_pin(admin: str, pin_id: str) -> Optional[dict]:
+    """Một ghim của quản trị viên theo mã, hoặc `None` nếu không có."""
     return next((p for p in list_pins(admin) if p["pin_id"] == pin_id), None)
 
 
 def delete_pin(admin: str, pin_id: str) -> bool:
+    """Xóa ghim của quản trị viên; trả True nếu có dòng bị xóa."""
     with require_engine().begin() as conn:
         result = conn.execute(text("DELETE FROM ai_admin_pins WHERE pin_id = :p AND admin_sub = :a"), {"p": pin_id, "a": admin})
     return result.rowcount > 0
 
 
-# dashboard summaries
+# Tóm tắt bảng điều khiển
 def get_summary(day: str, lang: str) -> Optional[dict]:
+    """Bản tóm tắt đã lưu của một ngày và ngôn ngữ, hoặc `None` nếu chưa có."""
     with require_engine().connect() as conn:
         row = conn.execute(text("SELECT summary, kpi_hash, created_at FROM ai_dashboard_summaries WHERE day = :d AND lang = :l"),
                            {"d": day, "l": lang}).fetchone()
@@ -196,6 +217,7 @@ def get_summary(day: str, lang: str) -> Optional[dict]:
 
 
 def put_summary(day: str, lang: str, summary: str, kpi_hash: str) -> None:
+    """Lưu (hoặc ghi đè) bản tóm tắt của một ngày và ngôn ngữ kèm mã băm KPI tương ứng."""
     with require_engine().begin() as conn:
         conn.execute(text("INSERT INTO ai_dashboard_summaries (day, lang, summary, kpi_hash) VALUES (:d, :l, :s, :h) "
                           "ON CONFLICT (day, lang) DO UPDATE SET summary = EXCLUDED.summary, kpi_hash = EXCLUDED.kpi_hash, created_at = now()"),
@@ -203,10 +225,11 @@ def put_summary(day: str, lang: str, summary: str, kpi_hash: str) -> None:
 
 
 def _guarded(function):
-    """A database failure (tables not created, wrong password, server down) becomes a flat 503 AI_DB_UNAVAILABLE instead of a 500.
-    The log names the driver's first line (for example: relation "ai_admin_pins" does not exist); it never holds the URL."""
+    """Lỗi cơ sở dữ liệu (chưa tạo bảng, sai mật khẩu, máy chủ tắt) được đổi thành 503 AI_DB_UNAVAILABLE phẳng thay vì 500.
+    Nhật ký chỉ ghi dòng đầu của thông báo từ driver (ví dụ: relation "ai_admin_pins" does not exist) và không bao giờ chứa URL."""
     @functools.wraps(function)
     def wrapper(*args, **kwargs):
+        """Gọi hàm gốc và chuyển `SQLAlchemyError` thành `AI_DB_UNAVAILABLE`; `AiError` được ném tiếp nguyên trạng."""
         try:
             return function(*args, **kwargs)
         except AiError:

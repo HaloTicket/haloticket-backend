@@ -13,6 +13,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Tích hợp cổng thanh toán MoMo: tạo liên kết thanh toán {@code captureWallet} và kiểm tra chữ ký
+ * HMAC SHA-256 của thông báo IPN.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -22,6 +26,17 @@ public class MoMoService {
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * Gọi API MoMo để tạo đơn thanh toán ví và lấy liên kết thanh toán.
+     * Mã đơn là {@code bookingId}, nếu thiếu thì sinh mã tạm theo thời gian. Liên kết trả về ưu tiên {@code payUrl},
+     * không có thì dùng {@code deeplink}.
+     *
+     * @param amount số tiền (VND)
+     * @param orderInfo nội dung đơn hàng; {@code null} thì dùng nội dung mặc định
+     * @param bookingId mã booking, dùng làm mã đơn gửi MoMo
+     * @return map gồm {@code paymentUrl} và {@code orderId}
+     * @throws IllegalStateException khi MoMo lỗi hoặc không trả về liên kết thanh toán
+     */
     public Map<String, String> createPaymentUrl(long amount, String orderInfo, String bookingId) {
         String requestId = UUID.randomUUID().toString();
         String orderId = bookingId != null ? bookingId : "ORDER_" + System.currentTimeMillis();
@@ -91,6 +106,13 @@ public class MoMoService {
         throw new IllegalStateException("MoMo did not create a payment URL");
     }
 
+    /**
+     * Kiểm tra chữ ký của thông báo IPN MoMo bằng cách ký lại chuỗi tham số với secret key và so sánh
+     * không phân biệt hoa thường.
+     *
+     * @param params tham số MoMo gửi về, gồm cả {@code signature}
+     * @return {@code true} nếu chữ ký khớp; {@code false} nếu thiếu hoặc sai chữ ký
+     */
     public boolean verifySignature(Map<String, String> params) {
         String signature = params.get("signature");
         if (signature == null) return false;

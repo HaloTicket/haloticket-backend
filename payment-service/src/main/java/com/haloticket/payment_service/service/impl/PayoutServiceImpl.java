@@ -34,6 +34,11 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.stream.Collectors;
 
+/**
+ * Cài đặt nghiệp vụ rút tiền của organizer. Chỉ hỗ trợ loại {@code FINAL_SETTLEMENT}: sau khi sự kiện kết thúc,
+ * organizer rút toàn bộ số tiền khả dụng = thu - phí nền tảng (5%) - hoàn tiền - tiền giữ - đã chi - đang xử lý.
+ * Dữ liệu sự kiện lấy từ event-service, booking từ booking-service, danh tính organizer từ user-service.
+ */
 @Service
 @RequiredArgsConstructor
 public class PayoutServiceImpl implements PayoutService {
@@ -50,6 +55,7 @@ public class PayoutServiceImpl implements PayoutService {
     private final OutboxEventRepository outboxEventRepository;
     private final PayoutQuoteRepository quoteRepository;
 
+    /** Lấy mã người dùng organizer từ token; ném 403 nếu không xác định được danh tính. */
     @Override
     public String resolveOrganizerId(String authorization) {
         var identity = organizerIdentity(authorization);
@@ -58,6 +64,7 @@ public class PayoutServiceImpl implements PayoutService {
         return identity.userId();
     }
 
+    /** Gọi user-service lấy thông tin organizer. Danh tính rỗng thì ném 403, lỗi gọi dịch vụ thì ném 503. */
     private com.haloticket.payment_service.dto.response.OrganizerEligibilityResponse organizerIdentity(String authorization) {
         try {
             var identity = userServiceClient.getOrganizerEligibility(authorization);
@@ -69,16 +76,30 @@ public class PayoutServiceImpl implements PayoutService {
                 org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "Organizer identity lookup unavailable"); }
     }
 
+    /** Kiểm tra organizer đã được xác minh (KYC) và đúng là người đang đăng nhập. */
     private boolean isVerifiedOrganizer(String organizerId, String authorization) {
         var identity = organizerIdentity(authorization);
         return identity.eligible() && organizerId.equals(identity.userId());
     }
 
+    /** Ném 403 {@code KYC_REQUIRED} nếu organizer chưa được xác minh. */
     private void requireVerifiedOrganizer(String organizerId, String authorization) {
         if (!isVerifiedOrganizer(organizerId, authorization)) throw new org.springframework.web.server.ResponseStatusException(
                 org.springframework.http.HttpStatus.FORBIDDEN, "KYC_REQUIRED");
     }
 
+    /**
+     * Tạo yêu cầu rút tiền. Kiểm tra đầu vào và khóa idempotency (cùng khóa và cùng nội dung thì trả yêu cầu cũ,
+     * khác nội dung thì 409), khóa báo giá và tài khoản nhận tiền, đối chiếu báo giá với số liệu tài chính hiện tại,
+     * rồi lưu yêu cầu {@code PENDING} cùng ảnh chụp các thông số và đánh dấu báo giá đã dùng.
+     *
+     * @param organizerId mã organizer
+     * @param authorization header xác thực để gọi các dịch vụ khác
+     * @param request thông tin yêu cầu gồm sự kiện, loại, báo giá, phiên bản tài khoản và số tiền
+     * @param idempotencyKey khóa chống gửi trùng, bắt buộc
+     * @return yêu cầu rút tiền vừa tạo hoặc yêu cầu đã tạo trước đó
+     * @throws org.springframework.web.server.ResponseStatusException 400 khi đầu vào sai, 403 khi chưa KYC, 409 khi báo giá hoặc tài khoản không còn khớp hoặc số tiền khả dụng đã đổi
+     */
     @Override
     @Transactional
     public PayoutResponse requestPayout(String organizerId, String authorization, PayoutCreateRequest request, String idempotencyKey) {
@@ -112,7 +133,7 @@ public class PayoutServiceImpl implements PayoutService {
         if (!Boolean.TRUE.equals(account.getIsVerified()) || account.getAccountVersion() == null ||
                 !account.getAccountVersion().equals(quote.getAccountVersion()))
             throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT, "Payout account changed or is unverified");
-        // The organizer account lock serializes withdrawals, including events with no historical reconciliation row.
+        // Khóa tài khoản organizer giúp tuần tự hóa các lần rút, kể cả sự kiện chưa có dòng đối soát lịch sử.
         OrganizerFinanceResponse.EventFinanceItem current = getOrganizerFinance(organizerId, authorization).getItems().stream()
                 .filter(i -> request.getEventId().equals(i.getEventId())).findFirst().orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND));
@@ -137,6 +158,15 @@ public class PayoutServiceImpl implements PayoutService {
         return mapToResponse(saved);
     }
 
+    /**
+     * Tính tài chính của organizer cho từng sự kiện mình sở hữu: tiền thu, phí nền tảng, hoàn tiền, tiền giữ,
+     * đã chi và đang xử lý. Số khả dụng chỉ khác 0 khi sự kiện đã kết thúc, không bị hủy và số thu khớp với booking.
+     * Kèm các mã lý do khi chưa đủ điều kiện rút.
+     *
+     * @param organizerId mã organizer
+     * @param authorization header xác thực
+     * @return tổng hợp và danh sách từng sự kiện
+     */
     @Override
     public OrganizerFinanceResponse getOrganizerFinance(String organizerId, String authorization) {
         List<EventFinanceSource> events = eventServiceClient.getMyEvents(authorization);
@@ -199,11 +229,25 @@ public class PayoutServiceImpl implements PayoutService {
                 .paidAmount(Long.toString(paid)).processingAmount(Long.toString(processing)).build();
     }
 
+    /** Thống kê dòng tiền theo ngày cho mọi sự kiện của organizer. */
     @Override
     public OrganizerCashFlowResponse getOrganizerAnalytics(String organizerId, String authorization, LocalDate from, LocalDate to) {
         return getOrganizerAnalytics(organizerId, authorization, from, to, null);
     }
 
+    /**
+     * Thống kê dòng tiền theo ngày trong khoảng {@code from} đến {@code to} (tối đa 366 ngày), có thể giới hạn theo một sự kiện.
+     * Tiền thu tính theo ngày xác nhận thanh toán, tiền hoàn theo ngày cập nhật hoàn tiền đã hoàn tất.
+     * Nguồn dữ liệu lỗi hoặc không nhất quán thì trả 503, quá 100000 booking thì trả 422.
+     *
+     * @param organizerId mã organizer
+     * @param authorization header xác thực
+     * @param from ngày bắt đầu
+     * @param to ngày kết thúc (bao gồm)
+     * @param eventId mã sự kiện cần lọc; {@code null} hoặc rỗng là tất cả
+     * @return chuỗi dòng tiền theo ngày và tổng hợp
+     * @throws org.springframework.web.server.ResponseStatusException 400, 404, 422 hoặc 503 tùy nguyên nhân
+     */
     @Override
     public OrganizerCashFlowResponse getOrganizerAnalytics(String organizerId, String authorization, LocalDate from, LocalDate to, String eventId) {
         if (from == null || to == null || to.isBefore(from)) throw new org.springframework.web.server.ResponseStatusException(
@@ -303,6 +347,17 @@ public class PayoutServiceImpl implements PayoutService {
                 .build();
     }
 
+    /**
+     * Tạo báo giá rút tiền cho một sự kiện. Chỉ loại {@code FINAL_SETTLEMENT}, và số tiền phải bằng đúng số khả dụng;
+     * sai thì thêm mã lý do vào kết quả.
+     *
+     * @param organizerId mã organizer
+     * @param authorization header xác thực
+     * @param eventId mã sự kiện
+     * @param type loại rút tiền
+     * @param requestedAmount số tiền muốn rút; {@code null} nghĩa là toàn bộ số khả dụng
+     * @return báo giá, kèm mã lý do nếu chưa đủ điều kiện
+     */
     @Override
     public PayoutQuoteResponse quotePayout(String organizerId, String authorization, String eventId, String type, Long requestedAmount) {
         requireWithdrawalType(type);
@@ -318,11 +373,16 @@ public class PayoutServiceImpl implements PayoutService {
         return persistQuote(organizerId, eventId, type, requested, available, account, item, reasons, "Theo chính sách vận hành");
     }
 
+    /** Ném 400 nếu loại rút tiền không phải {@code FINAL_SETTLEMENT}. */
     private void requireWithdrawalType(String type) {
         if (!WITHDRAWAL_TYPE.equals(type)) throw new org.springframework.web.server.ResponseStatusException(
                 org.springframework.http.HttpStatus.BAD_REQUEST, "Unsupported payout type");
     }
 
+    /**
+     * Dựng báo giá và chỉ lưu bản ghi {@code PayoutQuote} (hiệu lực 10 phút) khi không còn lý do chặn.
+     * Tài khoản chưa xác minh sẽ bị thêm mã {@code PAYOUT_ACCOUNT_UNVERIFIED}.
+     */
     private PayoutQuoteResponse persistQuote(String userId, String eventId, String type, long requested, long maximum,
             com.haloticket.payment_service.entity.OrganizerPayoutAccount account,
             OrganizerFinanceResponse.EventFinanceItem item, List<String> reasons, String processingTime) {
@@ -349,6 +409,15 @@ public class PayoutServiceImpl implements PayoutService {
                         .bankName(account.getBankName()).build()).build();
     }
 
+    /**
+     * Tính số liệu tài chính nguồn của sự kiện: lấy danh sách booking đã thanh toán từ booking-service, rồi cộng
+     * tiền thu, tiền hoàn và tiền đang hoàn từ các sự kiện thanh toán đã xác nhận. Không có booking thì trả 0.
+     * Dữ liệu không nhất quán thì 409, quá 100000 booking thì 422, lỗi dịch vụ thì 503.
+     *
+     * @param eventId mã sự kiện
+     * @param authorization header xác thực
+     * @return số liệu nguồn của sự kiện
+     */
     @Override
     public PayoutService.FinanceSource getFinanceSource(String eventId, String authorization) {
         try {
@@ -369,17 +438,21 @@ public class PayoutServiceImpl implements PayoutService {
                 "Payment source unavailable"); }
     }
 
+    /** Che số tài khoản, chỉ giữ 4 chữ số cuối. */
     private String mask(String accountNumber) {
         if (accountNumber == null || accountNumber.length() < 4) return "••••";
         return "••••" + accountNumber.substring(accountNumber.length() - 4);
     }
 
+    /** Lấy số tiền yêu cầu (VND) của lệnh rút; lệnh cũ chưa có thì lấy từ số tiền net làm tròn. */
     private long requestedAmount(Payout payout) {
         if (payout.getRequestedAmountVnd() != null) return payout.getRequestedAmountVnd();
         return payout.getNetAmount() == null ? 0L : Math.round(payout.getNetAmount());
     }
+    /** Đổi số nguyên sang chuỗi, giữ {@code null}. */
     private String asString(Long amount) { return amount == null ? null : Long.toString(amount); }
 
+    /** Lấy một lệnh rút của organizer; không tồn tại hoặc không thuộc organizer thì 404. */
     @Override
     public PayoutResponse getOrganizerPayout(String organizerId, String payoutId) {
         Payout payout = payoutRepository.findById(payoutId).orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
@@ -389,6 +462,7 @@ public class PayoutServiceImpl implements PayoutService {
         return mapToResponse(payout);
     }
 
+    /** Tìm lệnh rút của organizer theo khóa idempotency; không thấy hoặc không thuộc organizer thì 404. */
     @Override
     public PayoutResponse getByIdempotencyKey(String organizerId, String key) {
         Payout payout = payoutRepository.findByIdempotencyKey(key).orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
@@ -398,6 +472,7 @@ public class PayoutServiceImpl implements PayoutService {
         return mapToResponse(payout);
     }
 
+    /** Organizer hủy lệnh rút; chỉ hủy được khi đang {@code PENDING}. */
     @Override
     @Transactional
     public PayoutResponse cancelPayout(String organizerId, String payoutId) {
@@ -410,6 +485,7 @@ public class PayoutServiceImpl implements PayoutService {
         return mapToResponse(payoutRepository.save(payout));
     }
 
+    /** Bắt đầu giải ngân: lệnh phải đang {@code APPROVED}, chuyển sang {@code PROCESSING} và ghi thời điểm xử lý. */
     @Override
     @Transactional
     public PayoutResponse startDisbursement(String payoutId) {
@@ -421,6 +497,10 @@ public class PayoutServiceImpl implements PayoutService {
         return mapToResponse(payoutRepository.save(payout));
     }
 
+    /**
+     * Hoàn tất giải ngân: lệnh phải ở {@code APPROVED} hoặc {@code PROCESSING}; bắt buộc có mã tham chiếu và thời điểm
+     * chuyển không nằm trong tương lai. Lưu tham chiếu, biên lai và chuyển sang {@code COMPLETED}.
+     */
     @Override
     @Transactional
     public PayoutResponse completeDisbursement(String payoutId, String reference, java.time.LocalDateTime transferredAt, String receiptUrl) {
@@ -437,6 +517,7 @@ public class PayoutServiceImpl implements PayoutService {
         return mapToResponse(payoutRepository.save(payout));
     }
 
+    /** Admin duyệt lệnh rút đang {@code PENDING}, chuyển sang {@code APPROVED} và ghi thời điểm duyệt. */
     @Override
     @Transactional
     public PayoutResponse approvePayout(String payoutId) {
@@ -450,6 +531,7 @@ public class PayoutServiceImpl implements PayoutService {
         return mapToResponse(saved);
     }
 
+    /** Chuyển lệnh {@code PENDING} sang {@code DISPUTE}; bắt buộc có lý do, lý do được lưu làm thông báo công khai. */
     @Override
     @Transactional
     public PayoutResponse disputePayout(String payoutId, String reason) {
@@ -465,6 +547,7 @@ public class PayoutServiceImpl implements PayoutService {
         return mapToResponse(saved);
     }
 
+    /** Mở lại lệnh đang {@code DISPUTE}, đưa về {@code PENDING}. */
     @Override
     @Transactional
     public PayoutResponse reopenPayout(String payoutId) {
@@ -477,6 +560,7 @@ public class PayoutServiceImpl implements PayoutService {
         return mapToResponse(saved);
     }
 
+    /** Từ chối lệnh {@code PENDING}, chuyển sang {@code REJECTED}; bắt buộc có lý do. */
     @Override
     @Transactional
     public PayoutResponse rejectPayout(String payoutId, String reason) {
@@ -492,12 +576,14 @@ public class PayoutServiceImpl implements PayoutService {
         return mapToResponse(saved);
     }
 
+    /** Liệt kê các lệnh rút đang {@code PENDING}. */
     @Override
     public List<PayoutResponse> getPendingPayouts() {
         return payoutRepository.findByStatus(PayoutStatus.PENDING)
                 .stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    /** Liệt kê mọi lệnh rút cho admin, gắn tên sự kiện; lỗi khi gọi event-service thì bỏ qua tên sự kiện. */
     @Override
     public List<PayoutResponse> getAllAdminPayouts() {
         Map<String, String> eventNames;
@@ -517,12 +603,14 @@ public class PayoutServiceImpl implements PayoutService {
                 }).collect(Collectors.toList());
     }
 
+    /** Liệt kê các lệnh rút của một organizer. */
     @Override
     public List<PayoutResponse> getOrganizerPayouts(String organizerId) {
         return payoutRepository.findByOrganizerUserId(organizerId)
                 .stream().map(this::mapToResponse).collect(Collectors.toList());
     }
 
+    /** Chuyển entity {@code Payout} sang DTO, che số tài khoản, thêm cờ {@code canCancel} và dòng thời gian. */
     private PayoutResponse mapToResponse(Payout p) {
         return PayoutResponse.builder()
                 .id(p.getId())
@@ -559,6 +647,7 @@ public class PayoutServiceImpl implements PayoutService {
                 .build();
     }
 
+    /** Dựng dòng thời gian trạng thái của lệnh rút từ các mốc thời gian đã có. */
     private List<PayoutResponse.TimelineEntry> timeline(Payout payout) {
         List<PayoutResponse.TimelineEntry> entries = new ArrayList<>();
         if (payout.getCreatedAt() != null) entries.add(timelineEntry("PENDING", payout.getCreatedAt(), null));
@@ -573,11 +662,13 @@ public class PayoutServiceImpl implements PayoutService {
         return entries;
     }
 
+    /** Tạo một mục trong dòng thời gian trạng thái. */
     private PayoutResponse.TimelineEntry timelineEntry(String status, LocalDateTime at, String reason) {
         return PayoutResponse.TimelineEntry.builder().status(status).at(at).reason(reason)
                 .occurredAt(at).publicMessage(reason).build();
     }
 
+    /** Ném 409 nếu lệnh rút không còn ở trạng thái mong đợi (đã bị thay đổi bởi thao tác khác). */
     private void requireStatus(Payout payout, PayoutStatus expected) {
         if (payout.getStatus() != expected) {
             throw new org.springframework.web.server.ResponseStatusException(

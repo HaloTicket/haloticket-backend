@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
+/** Thực thể suất diễn của sự kiện (bảng {@code event_showtimes}): thời gian diễn và thời gian mở bán. */
 @Entity
 @Table(name = "event_showtimes")
 @Getter
@@ -41,12 +42,14 @@ public class EventShowtime {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    /** Trước khi lưu lần đầu: đặt thời điểm tạo và cập nhật. */
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
 
+    /** Trước mỗi lần cập nhật: làm mới thời điểm cập nhật. */
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
