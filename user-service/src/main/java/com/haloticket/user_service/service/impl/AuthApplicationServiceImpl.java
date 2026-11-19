@@ -67,8 +67,18 @@ public class AuthApplicationServiceImpl implements AuthApplicationService {
         if (!result.accepted()) {
             throw new AuthException("OTP_INVALID", "OTP is invalid or expired", 410);
         }
+        // OTP chỉ chứng minh quyền sở hữu email mà nó được gửi tới: phải đúng mục đích đăng ký và đúng email sắp tạo tài khoản,
+        // nếu không ai cũng có thể dùng OTP của email mình để đăng ký email của người khác
+        if (result.purpose() != OtpPurpose.REGISTRATION || !sameEmail(result.subject(), request.email())) {
+            throw new AuthException("OTP_INVALID", "OTP is invalid or expired", 410);
+        }
         keycloak.register(request.email(), request.password());
         otpService.consume(request.challengeId(), clock.instant());
+    }
+
+    /** So hai email không phân biệt hoa thường và bỏ khoảng trắng hai đầu; thiếu một bên thì không khớp. */
+    private static boolean sameEmail(String left, String right) {
+        return left != null && right != null && left.trim().equalsIgnoreCase(right.trim());
     }
 
     /** Sinh lại OTP cho thử thách đăng ký và gửi tới email của thử thách. */

@@ -66,16 +66,16 @@ public class SecurityConfig {
                         .hasAnyRole("ADMIN", "FINANCE_ADMIN", "FINANCE_CONFIG", "SUPER_ADMIN")
                         .requestMatchers("/api/payouts/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/payouts/organizer/**").authenticated()
+                        // chỉ các cuộc gọi do cổng thanh toán hoặc dịch vụ khác khởi tạo (IPN, webhook, tra cứu) được mở công khai;
+                        // các đường tạo thanh toán (create-url, create-payload, POST /api/payments) bắt buộc đăng nhập
                         .requestMatchers(
-                                "/api/payments/vnpay/**",
-                                "/api/payments/vietqr/**",
-                                "/api/payments/sepay/**",
-                                "/api/payments/momo/**",
-                                "/api/payments/zalopay/**",
-                                "/api/payments/shopeepay/**",
+                                "/api/payments/vnpay/ipn",
+                                "/api/payments/sepay/webhook",
+                                "/api/payments/momo/ipn",
+                                "/api/payments/zalopay/ipn",
+                                "/api/payments/shopeepay/ipn",
                                 "/api/payments/verify/**",
-                                "/api/payments/methods/bulk",
-                                "/api/payments"
+                                "/api/payments/methods/bulk"
                         ).permitAll()
                         .requestMatchers("/api/payments/organizer-payout-account/**").authenticated()
                         .requestMatchers("/api/payments/**").authenticated()

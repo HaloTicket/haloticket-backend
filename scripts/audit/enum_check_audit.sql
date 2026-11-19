@@ -188,6 +188,7 @@ WITH expected(tbl, col, val) AS (VALUES
   ('payment_exceptions', 'kind', 'LATE_PAYMENT_SEATS_UNAVAILABLE'),
   ('payment_exceptions', 'kind', 'LATE_PAYMENT_UNEXPECTED_STATUS'),
   ('payment_exceptions', 'kind', 'ISSUANCE_FAILED'),
+  ('payment_exceptions', 'kind', 'AMOUNT_MISMATCH'),
   ('payment_exceptions', 'status', 'OPEN'),
   ('payment_exceptions', 'status', 'RESOLVED'),
   ('payment_exceptions', 'status', 'REFUNDED_MANUALLY'),

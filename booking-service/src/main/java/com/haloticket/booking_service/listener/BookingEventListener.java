@@ -41,6 +41,9 @@ import java.util.Objects;
 @Slf4j
 public class BookingEventListener {
 
+    /** Sai số cho phép (VND) khi so số tiền đã thanh toán với tổng tiền của đơn. */
+    static final double AMOUNT_TOLERANCE_VND = 1.0;
+
     private final BookingRepository bookingRepository;
     private final SeatReservationRepository seatReservationRepository;
     private final OutboxEventRepository outboxEventRepository;
@@ -75,6 +78,10 @@ public class BookingEventListener {
                 log.warn("Booking not found for payment completed event: {}", bookingId);
                 return;
             }
+            if (isAmountMismatch(booking, node)) {
+                recordAmountMismatch(booking, node);
+                return;
+            }
             if (booking.getStatus() != BookingStatus.PENDING) {
                 handlePaymentForClosedBooking(booking, node);
                 return;
@@ -89,6 +96,38 @@ public class BookingEventListener {
             if (e instanceof RuntimeException runtimeException) throw runtimeException;
             throw new IllegalStateException("Error processing PAYMENT_COMPLETED event", e);
         }
+    }
+
+    /**
+     * Kiểm tra số tiền trong sự kiện thanh toán có lệch tổng tiền của đơn không. Số tiền do khách gửi lên khi tạo thanh toán nên
+     * không được tin: chỉ khi số đã thanh toán khớp {@code totalAmount} (sai số tối đa {@value #AMOUNT_TOLERANCE_VND} đồng) mới được xác nhận đơn.
+     * Sự kiện không có số tiền (phiên bản cũ) hoặc đơn không có tổng tiền thì không kiểm tra được và coi là khớp.
+     *
+     * @param booking đơn đặt chỗ
+     * @param node payload JSON của sự kiện thanh toán
+     * @return true nếu có số tiền và nó lệch tổng tiền của đơn
+     */
+    private boolean isAmountMismatch(Booking booking, JsonNode node) {
+        if (booking.getTotalAmount() == null || !node.hasNonNull("amount") || !node.get("amount").isNumber()) return false;
+        return Math.abs(node.get("amount").asDouble() - booking.getTotalAmount()) > AMOUNT_TOLERANCE_VND;
+    }
+
+    /**
+     * Ghi nhận ngoại lệ thanh toán {@code AMOUNT_MISMATCH} cho quản trị viên và không xác nhận đơn.
+     * Đơn giữ nguyên trạng thái nên vẫn hết hạn bình thường và nhả ghế, vé.
+     *
+     * @param booking đơn đặt chỗ
+     * @param node payload JSON của sự kiện thanh toán
+     */
+    private void recordAmountMismatch(Booking booking, JsonNode node) {
+        double paid = node.get("amount").asDouble();
+        String paymentId = node.path("paymentId").asText("");
+        String provider = node.path("provider").asText("");
+        log.warn("[AMOUNT_MISMATCH] bookingId={} paymentId={} paid={} expected={} provider={}: booking not confirmed, recorded for an admin",
+                booking.getId(), paymentId, paid, booking.getTotalAmount(), provider);
+        paymentExceptionService.record(booking.getId(), booking.getBookingCode(), paymentId,
+                PaymentExceptionKind.AMOUNT_MISMATCH, paid, provider,
+                "Paid " + paid + " but the booking total is " + booking.getTotalAmount());
     }
 
     /**

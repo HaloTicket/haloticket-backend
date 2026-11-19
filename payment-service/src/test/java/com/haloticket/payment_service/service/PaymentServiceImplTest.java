@@ -56,6 +56,46 @@ class PaymentServiceImplTest {
     }
 
     @Test
+    void moMoIpnWithoutAStoredAmountFailsInsteadOfThrowing() {
+        PaymentServiceImpl service = createService();
+        com.haloticket.payment_service.entity.Payment payment = new com.haloticket.payment_service.entity.Payment();
+        payment.setBookingId("b-1");
+        payment.setStatus(com.haloticket.payment_service.enums.PaymentStatus.PENDING);
+        payment.setAmount(null);
+        when(moMoService.verifySignature(any())).thenReturn(true);
+        when(paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc("b-1")).thenReturn(Optional.of(payment));
+
+        var result = service.processMoMoIpn(java.util.Map.of("orderId", "b-1", "resultCode", "0", "amount", "1000"));
+
+        assertThat(result.get("status")).isEqualTo("failed");
+        assertThat(payment.getStatus()).isEqualTo(com.haloticket.payment_service.enums.PaymentStatus.PENDING);
+    }
+
+    @Test
+    void zaloPayIpnWithABadSignatureReturnsMinusOneSoTheGatewayCanRetry() {
+        PaymentServiceImpl service = createService();
+        when(zaloPayService.verifyCallback("{}", "bad")).thenReturn(false);
+
+        var result = service.processZaloPayIpn(java.util.Map.of("data", "{}", "mac", "bad"));
+
+        assertThat(result.get("return_code")).isEqualTo("-1");
+        org.mockito.Mockito.verifyNoInteractions(paymentRepository);
+    }
+
+    @Test
+    void zaloPayIpnProcessingErrorReturnsMinusOneButAValidOneReturnsOne() throws Exception {
+        PaymentServiceImpl service = createService();
+        when(zaloPayService.verifyCallback("not-json", "ok")).thenReturn(true);
+        when(objectMapper.readValue("not-json", java.util.Map.class)).thenThrow(new com.fasterxml.jackson.core.JsonParseException(null, "bad"));
+
+        assertThat(service.processZaloPayIpn(java.util.Map.of("data", "not-json", "mac", "ok")).get("return_code")).isEqualTo("-1");
+
+        when(zaloPayService.verifyCallback("{}", "ok")).thenReturn(true);
+        when(objectMapper.readValue("{}", java.util.Map.class)).thenReturn(new java.util.HashMap<>());
+        assertThat(service.processZaloPayIpn(java.util.Map.of("data", "{}", "mac", "ok")).get("return_code")).isEqualTo("1");
+    }
+
+    @Test
     void newPayoutAccountStartsUnverified() {
         PaymentServiceImpl service = createService();
         OrganizerPayoutAccountRequest request = request("123456789", "NGUYEN VAN A");

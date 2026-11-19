@@ -17,8 +17,16 @@ public interface AuthOtpChallengeService {
 
     /** Kết quả tạo hoặc gửi lại: thử thách đã lưu và mã OTP dạng chữ rõ để gửi đi (không lưu chữ rõ). */
     record CreateResult(AuthOtpChallenge challenge, String plaintextOtp) {}
-    /** Kết quả xác minh OTP: {@code accepted} là true khi mã đúng. */
-    record VerifyResult(boolean accepted) {}
+    /**
+     * Kết quả xác minh OTP: {@code accepted} là true khi mã đúng. Khi đúng, {@code subject} (email hoặc định danh mà mã đã gửi tới)
+     * và {@code purpose} cho phép người gọi kiểm tra mã này đúng cho yêu cầu đang xử lý; khi sai cả hai là {@code null}.
+     */
+    record VerifyResult(boolean accepted, String subject, com.haloticket.user_service.enums.OtpPurpose purpose) {
+        /** Kết quả không kèm thông tin thử thách (mã sai hoặc không dùng tới). */
+        public VerifyResult(boolean accepted) {
+            this(accepted, null, null);
+        }
+    }
 
     /** Báo yêu cầu gửi lại quá sớm, còn trong thời gian chờ. */
     class CooldownException extends RuntimeException {}

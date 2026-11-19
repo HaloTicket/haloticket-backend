@@ -342,14 +342,12 @@ public class EventServiceImpl implements EventService {
         return new ArrayList<>();
     }
 
-    /** Lấy chi tiết sự kiện theo id. Khi không tìm thấy id, trả về sự kiện đầu tiên trong cơ sở dữ liệu (hoặc null nếu không có sự kiện nào). */
+    /** Lấy chi tiết sự kiện theo id; trả về null khi không có sự kiện đó (controller trả 404). Không được thay bằng sự kiện khác. */
     @Override
     public EventResponse getEventById(String id) {
         return eventRepository.findById(id)
                 .map(this::mapToEventResponse)
-                .orElseGet(() -> eventRepository.findAll().stream().findFirst()
-                        .map(this::mapToEventResponse)
-                        .orElse(null));
+                .orElse(null);
     }
 
     /** Lấy các danh mục theo thứ tự hiển thị (vị trí rồi tên). */

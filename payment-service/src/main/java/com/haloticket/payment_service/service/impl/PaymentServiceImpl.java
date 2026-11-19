@@ -399,6 +399,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId).orElse(null);
         if (payment != null && payment.getStatus() == PaymentStatus.PENDING
+                && payment.getAmount() != null
                 && "0".equals(resultCode) && isValid
                 && String.valueOf(payment.getAmount().longValue()).equals(allParams.get("amount"))) {
             payment.setStatus(PaymentStatus.SUCCESS);
@@ -443,10 +444,11 @@ public class PaymentServiceImpl implements PaymentService {
 
     /**
      * Xử lý callback ZaloPay. Nếu mac hợp lệ, lấy mã booking từ {@code app_trans_id} (phần sau dấu gạch dưới) và xác nhận
-     * thanh toán đang {@code PENDING} có số tiền khớp. Luôn trả {@code return_code = 1} để ZaloPay không gửi lại.
+     * thanh toán đang {@code PENDING} có số tiền khớp. Trả {@code return_code = 1} khi đã nhận hợp lệ (kể cả khi không khớp đơn nào, để
+     * ZaloPay không gửi lại), {@code -1} khi chữ ký sai hoặc xử lý lỗi (ZaloPay có thể gửi lại).
      *
      * @param callbackData dữ liệu callback gồm {@code data} và {@code mac}
-     * @return map {@code return_code} và {@code return_message}; {@code return_code = 2} khi callback rỗng
+     * @return map {@code return_code} và {@code return_message}; {@code return_code = 2} khi callback rỗng, {@code -1} khi chữ ký sai hoặc lỗi xử lý
      */
     @Override
     @Transactional
@@ -462,25 +464,35 @@ public class PaymentServiceImpl implements PaymentService {
         String mac = (String) callbackData.get("mac");
 
         boolean isValid = zaloPayService.verifyCallback(data, mac);
-        if (isValid) {
-            try {
-                Map<String, Object> dataMap = objectMapper.readValue(data, Map.class);
-                String appTransId = (String) dataMap.get("app_trans_id");
-                String bookingId = appTransId != null && appTransId.contains("_") 
-                        ? appTransId.substring(appTransId.indexOf("_") + 1) 
-                        : appTransId;
+        if (!isValid) {
+            // theo quy ước ZaloPay: -1 là chữ ký sai (không xử lý, ZaloPay có thể gửi lại), khác với 1 là đã nhận và xử lý
+            res.put("return_code", "-1");
+            res.put("return_message", "mac not equal");
+            return res;
+        }
 
-                Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId).orElse(null);
-                if (payment != null && payment.getStatus() == PaymentStatus.PENDING
-                        && String.valueOf(payment.getAmount().longValue()).equals(String.valueOf(dataMap.get("amount")))) {
-                    payment.setStatus(PaymentStatus.SUCCESS);
-                    paymentRepository.save(payment);
+        try {
+            Map<String, Object> dataMap = objectMapper.readValue(data, Map.class);
+            String appTransId = (String) dataMap.get("app_trans_id");
+            String bookingId = appTransId != null && appTransId.contains("_")
+                    ? appTransId.substring(appTransId.indexOf("_") + 1)
+                    : appTransId;
 
-                    publishPaymentCompletedOutbox(payment, "ZALOPAY");
-                }
-            } catch (Exception e) {
-                log.error("Failed parsing ZaloPay callback data", e);
+            Payment payment = paymentRepository.findFirstByBookingIdOrderByCreatedAtDesc(bookingId).orElse(null);
+            if (payment != null && payment.getStatus() == PaymentStatus.PENDING
+                    && payment.getAmount() != null
+                    && String.valueOf(payment.getAmount().longValue()).equals(String.valueOf(dataMap.get("amount")))) {
+                payment.setStatus(PaymentStatus.SUCCESS);
+                paymentRepository.save(payment);
+
+                publishPaymentCompletedOutbox(payment, "ZALOPAY");
             }
+        } catch (Exception e) {
+            log.error("Failed parsing ZaloPay callback data", e);
+            // lỗi khi xử lý: báo -1 để ZaloPay gửi lại thay vì coi như đã xử lý xong
+            res.put("return_code", "-1");
+            res.put("return_message", "processing error");
+            return res;
         }
 
         res.put("return_code", "1");

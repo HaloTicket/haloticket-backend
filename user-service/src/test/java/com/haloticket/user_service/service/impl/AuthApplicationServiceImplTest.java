@@ -46,6 +46,53 @@ class AuthApplicationServiceImplTest {
                 org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
+    private AuthApplicationServiceImpl serviceWith(AuthOtpChallengeService otpService, KeycloakAuthPort keycloak) {
+        return new AuthApplicationServiceImpl(otpService, mock(OtpRateLimiter.class), mock(OtpDeliveryPort.class), keycloak,
+                Clock.fixed(Instant.parse("2026-09-05T00:00:00Z"), ZoneOffset.UTC));
+    }
+
+    @Test
+    void otpOfOneEmailCannotRegisterAnotherEmail() {
+        AuthOtpChallengeService otpService = mock(AuthOtpChallengeService.class);
+        KeycloakAuthPort keycloak = mock(KeycloakAuthPort.class);
+        when(otpService.verify("c-1", "123456", Instant.parse("2026-09-05T00:00:00Z")))
+                .thenReturn(new AuthOtpChallengeService.VerifyResult(true, "attacker@example.com", OtpPurpose.REGISTRATION));
+
+        assertThatThrownBy(() -> serviceWith(otpService, keycloak).verifyRegistration(
+                new AuthRequests.RegisterVerify("c-1", "victim@example.com", "Password1!", "123456")))
+                .isInstanceOf(AuthApplicationService.AuthException.class)
+                .hasMessage("OTP is invalid or expired");
+        verify(keycloak, never()).register(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        verify(otpService, never()).consume(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void passwordResetOtpCannotBeUsedToRegister() {
+        AuthOtpChallengeService otpService = mock(AuthOtpChallengeService.class);
+        KeycloakAuthPort keycloak = mock(KeycloakAuthPort.class);
+        when(otpService.verify("c-1", "123456", Instant.parse("2026-09-05T00:00:00Z")))
+                .thenReturn(new AuthOtpChallengeService.VerifyResult(true, "user@example.com", OtpPurpose.PASSWORD_RESET));
+
+        assertThatThrownBy(() -> serviceWith(otpService, keycloak).verifyRegistration(
+                new AuthRequests.RegisterVerify("c-1", "user@example.com", "Password1!", "123456")))
+                .isInstanceOf(AuthApplicationService.AuthException.class);
+        verify(keycloak, never()).register(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void matchingEmailIgnoringCaseAndSpacesRegistersAndConsumesTheChallenge() {
+        AuthOtpChallengeService otpService = mock(AuthOtpChallengeService.class);
+        KeycloakAuthPort keycloak = mock(KeycloakAuthPort.class);
+        when(otpService.verify("c-1", "123456", Instant.parse("2026-09-05T00:00:00Z")))
+                .thenReturn(new AuthOtpChallengeService.VerifyResult(true, "User@Example.com", OtpPurpose.REGISTRATION));
+
+        serviceWith(otpService, keycloak).verifyRegistration(
+                new AuthRequests.RegisterVerify("c-1", " user@example.com ", "Password1!", "123456"));
+
+        verify(keycloak).register(" user@example.com ", "Password1!");
+        verify(otpService).consume("c-1", Instant.parse("2026-09-05T00:00:00Z"));
+    }
+
     @Test
     void passwordResetByPhoneSendsOtpToResolvedAccountEmail() {
         AuthOtpChallengeService otpService = mock(AuthOtpChallengeService.class);

@@ -458,4 +458,12 @@ class EventTicketSyncTest {
         assertThat(response.getTicketsSync().getStatus()).isEqualTo("FAILED");
         assertThat(response.getTicketsSync().getError()).isEqualTo("HTTP_503");
     }
+
+    @Test
+    void unknownEventIdReturnsNullInsteadOfAnotherEvent() {
+        when(eventRepository.findById("missing")).thenReturn(Optional.empty());
+
+        assertThat(service.getEventById("missing")).isNull();
+        verify(eventRepository, never()).findAll();
+    }
 }

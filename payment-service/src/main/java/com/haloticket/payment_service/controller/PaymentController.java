@@ -114,7 +114,12 @@ public class PaymentController {
     public ResponseEntity<Map<String, String>> sepayWebhook(
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody Map<String, Object> webhookData) {
-        String expected = "Apikey " + sePayConfig.getApiKey();
+        String configuredKey = sePayConfig.getApiKey();
+        // chưa cấu hình khóa thì từ chối hẳn: nếu không, header "Apikey " (rỗng) sẽ khớp và ai cũng giả được webhook
+        if (configuredKey == null || configuredKey.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+        String expected = "Apikey " + configuredKey;
         if (authorization == null || !MessageDigest.isEqual(
                 authorization.getBytes(StandardCharsets.UTF_8),
                 expected.getBytes(StandardCharsets.UTF_8))) {

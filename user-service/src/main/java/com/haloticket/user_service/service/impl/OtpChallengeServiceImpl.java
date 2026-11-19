@@ -164,7 +164,7 @@ public class OtpChallengeServiceImpl implements AuthOtpChallengeService {
         challenge.setStatus(OtpStatus.VERIFIED);
         challenge.setVerifiedAt(now);
         saveSafely(challenge);
-        return new VerifyResult(true);
+        return new VerifyResult(true, challenge.getSubject(), challenge.getPurpose());
     }
 
     /**
