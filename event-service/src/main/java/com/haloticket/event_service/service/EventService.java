@@ -3,7 +3,9 @@ package com.haloticket.event_service.service;
 import com.haloticket.event_service.dto.request.EventCreateRequest;
 import com.haloticket.event_service.dto.response.EventCategoryResponse;
 import com.haloticket.event_service.dto.response.EventResponse;
+import com.haloticket.event_service.dto.response.EventSearchPage;
 import com.haloticket.event_service.dto.response.OrganizerDto;
+import com.haloticket.event_service.search.EventSearchCriteria;
 
 import java.util.List;
 
@@ -11,8 +13,10 @@ import java.util.List;
 public interface EventService {
     /** Tạo mới hoặc cập nhật (khi request có {@code eventId}) sự kiện, đồng bộ vé sang ticket-service và gửi thông báo duyệt cho admin. */
     EventResponse createEvent(EventCreateRequest request, String authorization);
-    /** Lấy toàn bộ sự kiện. */
+    /** Lấy danh sách sự kiện công khai (đã duyệt, không riêng tư); không gồm bản nháp, chờ duyệt hay bị từ chối. */
     List<EventResponse> getAllEvents();
+    /** Tìm kiếm sự kiện công khai (đã duyệt, không riêng tư) có lọc, sắp xếp và phân trang ở phía máy chủ. */
+    EventSearchPage searchEvents(EventSearchCriteria criteria);
     /** Lấy các sự kiện mà người gọi có phân công ACTIVE; trả danh sách rỗng khi không xác định được người dùng. */
     List<EventResponse> getMyEvents(String authorization);
     /** Lấy chi tiết một sự kiện theo id. */

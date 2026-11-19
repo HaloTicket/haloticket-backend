@@ -205,7 +205,7 @@ def ai_invoke(profile: str, messages, *, actor: Optional[str] = None, tools: Opt
         raise ValueError(f"unknown AI profile: {profile}")
     use_tier = tier or prof.tier
     if profile in BUDGETED_PROFILES:
-        ratelimit.consume_budget()
+        ratelimit.consume_budget(actor=actor)
 
     candidates = _candidates(use_tier)
     if not candidates:

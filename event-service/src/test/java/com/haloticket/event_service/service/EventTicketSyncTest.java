@@ -466,4 +466,14 @@ class EventTicketSyncTest {
         assertThat(service.getEventById("missing")).isNull();
         verify(eventRepository, never()).findAll();
     }
+
+    @Test
+    void publicEventListAsksForPublicEventsOnlyNeverEverything() {
+        when(eventRepository.findPublicEvents()).thenReturn(List.of());
+
+        assertThat(service.getAllEvents()).isEmpty();
+
+        verify(eventRepository).findPublicEvents();
+        verify(eventRepository, never()).findAll();
+    }
 }

@@ -64,8 +64,8 @@ def client(monkeypatch):
 def chat_calls(monkeypatch):
     calls = []
 
-    def fake_chat(message, history, db):
-        calls.append(SimpleNamespace(message=message, history=history))
+    def fake_chat(message, history, db, selected_event_id=None):
+        calls.append(SimpleNamespace(message=message, history=history, selected_event_id=selected_event_id))
         return {"reply": "ok", "system_actions": []}
 
     monkeypatch.setattr(customer.booking_agent, "chat", fake_chat)
@@ -152,3 +152,15 @@ def test_no_code_uses_a_session_connection_as_a_context_manager():
         if re.search(r"with\s+\w+\.connection\(\)", path.read_text(encoding="utf-8"))
     ]
     assert offenders == []
+
+
+def test_the_selected_event_id_reaches_the_agent_and_is_optional(client, chat_calls):
+    client.post("/api/customer/smart-booking-chat", json={"message": "ok lấy 2 vé", "selected_event_id": "evt-123"})
+    client.post("/api/customer/smart-booking-chat", json={"message": "xin chào"})
+    assert chat_calls[0].selected_event_id == "evt-123"
+    assert chat_calls[1].selected_event_id is None
+
+
+def test_an_oversized_selected_event_id_is_refused(client, chat_calls):
+    refused = client.post("/api/customer/smart-booking-chat", json={"message": "m", "selected_event_id": "x" * 65})
+    assert refused.status_code == 422 and chat_calls == []

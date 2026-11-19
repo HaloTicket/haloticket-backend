@@ -123,6 +123,7 @@ class GatewayAuthorizationTest {
             new Route("POST", "/api/auth/reset-password"),
             new Route("GET", "/api/events"),
             new Route("GET", "/api/events/some-event"),
+            new Route("GET", "/api/events/search"),
             new Route("GET", "/api/events/categories"),
             new Route("GET", "/api/events/venues"),
             new Route("GET", "/api/events/trending-searches"),

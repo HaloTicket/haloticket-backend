@@ -57,6 +57,8 @@ class Settings(BaseSettings):
     ai_max_tokens_voucher_strategy: int = 900
     ai_max_tokens_dashboard_summary: int = 800
     ai_daily_call_budget: int = 2000
+    # phần tối đa của ngân sách ngày mà người chưa đăng nhập được dùng; phần còn lại luôn dành cho người đã đăng nhập
+    ai_anonymous_budget_share: float = 0.5
     ai_search_cache_seconds: int = 300
     ai_trusted_proxy_cidrs: str = "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8,::1"
 

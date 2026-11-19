@@ -211,14 +211,26 @@ def rate_limit(bucket: str):
     return dependency
 
 
-def consume_budget(units: int = 1) -> None:
-    """Trừ `units` lượt khỏi ngân sách gọi mô hình trong ngày (theo UTC); hết ngân sách thì ném `AI_BUDGET_EXHAUSTED` kèm số giây tới nửa đêm."""
+def consume_budget(units: int = 1, actor: Optional[str] = None) -> None:
+    """Trừ `units` lượt khỏi ngân sách gọi mô hình trong ngày (theo UTC); hết ngân sách thì ném `AI_BUDGET_EXHAUSTED` kèm số giây tới nửa đêm.
+
+    Người chưa đăng nhập (`actor` bắt đầu bằng `ip:`) chỉ được dùng tối đa `ai_anonymous_budget_share` của ngân sách: một nhóm IP ẩn danh
+    không thể tiêu hết ngân sách của cả hệ thống và khóa luôn người đã đăng nhập. Lượt ẩn danh bị từ chối vì quá phần của mình không
+    bị trừ vào ngân sách chung."""
     now = datetime.now(timezone.utc)
-    key = "aiq:budget:" + now.strftime("%Y%m%d")
+    day = now.strftime("%Y%m%d")
     seconds_left = int(86400 - (now.hour * 3600 + now.minute * 60 + now.second))
+    anonymous = bool(actor) and actor.startswith("ip:")
+    if anonymous:
+        anon_cap = int(settings.ai_daily_call_budget * max(0.0, min(1.0, settings.ai_anonymous_budget_share)))
+        anon_total = 0
+        for _ in range(max(1, units)):
+            anon_total = _incr("aiq:budget:anon:" + day, 86400 + 60)
+        if anon_total > anon_cap:
+            raise ai_error(AI_BUDGET_EXHAUSTED, retry_after=max(1, seconds_left))
     total = 0
     for _ in range(max(1, units)):
-        total = _incr(key, 86400 + 60)
+        total = _incr("aiq:budget:" + day, 86400 + 60)
     if total > settings.ai_daily_call_budget:
         raise ai_error(AI_BUDGET_EXHAUSTED, retry_after=max(1, seconds_left))
 

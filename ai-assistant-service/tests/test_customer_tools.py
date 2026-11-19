@@ -107,9 +107,9 @@ def test_database_failure_is_an_error_not_a_success_result(monkeypatch):
 def ticket_rows():
     return [
         fakes.row(id="tt-vip", showtime_id=None, name="VIP", price=Decimal("1500000"), ticket_type_status="ACTIVE",
-                  min_per_order=1, max_per_order=6),
+                  min_per_order=1, max_per_order=6, description="", total_quantity=100),
         fakes.row(id="tt-std", showtime_id=None, name="Standard", price=Decimal("500000"), ticket_type_status="ACTIVE",
-                  min_per_order=1, max_per_order=10),
+                  min_per_order=1, max_per_order=10, description="", total_quantity=100),
     ]
 
 
@@ -209,6 +209,8 @@ def test_tools_never_touch_the_shared_session(monkeypatch):
     assert find()["status"] == "success"
 
 
-def test_the_unused_search_events_tool_is_gone():
-    assert not hasattr(tools, "search_events")
+def test_the_filtered_search_tool_is_registered_and_the_old_engine_aliases_are_gone():
+    from app.services.ai import booking_agent as ba
+    agent = ba.BookingAgent()
+    assert tools.search_events in agent.tools and "search_events" in agent.dispatch
     assert not hasattr(tools, "event_engine") and not hasattr(tools, "ticket_engine")

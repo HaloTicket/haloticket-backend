@@ -226,7 +226,8 @@ def test_the_reply_never_carries_the_block_markup(monkeypatch):
 def browse_agent(monkeypatch, message_events):
     agent, calls, engines = agent_with_fake_model(monkeypatch, [fakes.FakeMessage("ok")])
     monkeypatch.setattr(agent, "_vector_events", lambda text: [])
-    engines.event = [("ILIKE", []), ("ORDER BY e.created_at DESC", [fakes.row(id="ev-1", title="Show A", city="HCM")] if message_events else [])]
+    # truy vấn từ khóa nay không phân biệt dấu nên nhận ra bằng translate(); phải đứng trước truy vấn "mới nhất"
+    engines.event = [("translate(", []), ("ORDER BY e.created_at DESC", [fakes.row(id="ev-1", title="Show A", city="HCM")] if message_events else [])]
     return agent, calls
 
 

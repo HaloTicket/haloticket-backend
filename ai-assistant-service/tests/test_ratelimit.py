@@ -159,3 +159,45 @@ def test_consume_budget(monkeypatch):
     with pytest.raises(AiError) as e:
         consume_budget()
     assert e.value.code == "AI_BUDGET_EXHAUSTED" and e.value.status == 429
+
+
+def test_anonymous_callers_cannot_use_more_than_their_share_of_the_daily_budget(monkeypatch):
+    monkeypatch.setattr(settings, "ai_daily_call_budget", 10)
+    monkeypatch.setattr(settings, "ai_anonymous_budget_share", 0.5)
+    for _ in range(5):
+        consume_budget(actor="ip:abc")
+    with pytest.raises(AiError) as e:
+        consume_budget(actor="ip:def")  # một IP khác cũng dùng chung phần ẩn danh
+    assert e.value.code == "AI_BUDGET_EXHAUSTED" and e.value.status == 429
+
+
+def test_signed_in_users_still_have_budget_after_anonymous_traffic_is_cut_off(monkeypatch):
+    monkeypatch.setattr(settings, "ai_daily_call_budget", 10)
+    monkeypatch.setattr(settings, "ai_anonymous_budget_share", 0.5)
+    for _ in range(5):
+        consume_budget(actor="ip:abc")
+    for _ in range(3):  # lượt ẩn danh bị từ chối không được trừ vào ngân sách chung
+        with pytest.raises(AiError):
+            consume_budget(actor="ip:abc")
+    for _ in range(5):
+        consume_budget(actor="sub:user1")
+    with pytest.raises(AiError):
+        consume_budget(actor="sub:user1")  # hết ngân sách chung
+
+
+def test_a_call_without_an_actor_is_counted_against_the_total_only(monkeypatch):
+    monkeypatch.setattr(settings, "ai_daily_call_budget", 3)
+    monkeypatch.setattr(settings, "ai_anonymous_budget_share", 0.0)
+    consume_budget()
+    consume_budget(actor="sub:u")
+    consume_budget()
+    with pytest.raises(AiError):
+        consume_budget()
+
+
+def test_a_zero_share_blocks_every_anonymous_call_but_not_signed_in_ones(monkeypatch):
+    monkeypatch.setattr(settings, "ai_daily_call_budget", 5)
+    monkeypatch.setattr(settings, "ai_anonymous_budget_share", 0.0)
+    with pytest.raises(AiError):
+        consume_budget(actor="ip:x")
+    consume_budget(actor="sub:u")

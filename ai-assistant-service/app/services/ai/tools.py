@@ -19,7 +19,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.errors import AiError, ai_error, AI_UNAVAILABLE
 from app.db.engines import get_chatbot_engine
-from app.services.ai.customer_sql import VALID_EVENT_FILTER
+from app.services.ai.customer_sql import VALID_EVENT_FILTER, escape_like, expand_token, fold_sql, fold_text
 
 log = logging.getLogger("ai.tools")
 
@@ -390,6 +390,11 @@ def request_user_confirmation(action_type: str, data: str) -> str:
                 FROM ticket_types
                 WHERE event_id = :eid AND ticket_type_status = 'ACTIVE'
             '''), {"eid": event_id}).fetchall()
+            layout = conn.execute(text('''
+                SELECT draft_json FROM seat_layouts WHERE event_id = :eid
+                ORDER BY (status = 'PUBLISHED') DESC LIMIT 1
+            '''), {"eid": event_id}).fetchone()
+        _has_seatmap, tier_seated_map = seated_tiers_from_layout(layout.draft_json if layout else None)
     except AiError:
         raise
     except SQLAlchemyError as failure:
@@ -426,8 +431,9 @@ def request_user_confirmation(action_type: str, data: str) -> str:
         total_qty += qty
         if t.showtime_id:
             showtime_ids.add(str(t.showtime_id))
+        seated = is_tier_seated(tier_seated_map, t.id, t.name)
         out_lines.append({"ticket_type_id": str(t.id), "tier_name": t.name, "quantity": qty,
-                          "price": float(price), "subtotal": float(subtotal)})
+                          "price": float(price), "subtotal": float(subtotal), "is_seated": seated})
 
     seats = payload.get("seats")
     if seats is None:
@@ -436,6 +442,12 @@ def request_user_confirmation(action_type: str, data: str) -> str:
         return _confirmation_error("Danh sách ghế không hợp lệ.")
     if seats and len(seats) != total_qty:
         return _confirmation_error("Số ghế không khớp với số lượng vé.")
+    seated_tiers = [line["tier_name"] for line in out_lines if line["is_seated"]]
+    if seated_tiers and not seats:
+        # hạng vé có ghế ngồi không thể đặt theo số lượng: khách phải chọn ghế cụ thể trên sơ đồ
+        return _confirmation_error(
+            f"Hạng vé {', '.join(seated_tiers)} là khu có ghế ngồi nên cần chọn ghế cụ thể. "
+            "Hãy mời khách xem sơ đồ ghế và chọn ghế, hoặc dùng công cụ tìm ghế liền kề.")
 
     showtime_id = None
     if len(showtime_ids) == 1:
@@ -510,12 +522,117 @@ def show_event_cards(event_ids: List[str]) -> str:
                 "event_id": result.id,
                 "title": result.title,
                 "banner_url": result.banner_url or result.thumbnail_url or "",
-                "min_price": float(min_price_val) if min_price_val is not None else 0,
+                "min_price": float(min_price_val) if min_price_val is not None else None,
                 "location": f"{result.location_name or ''}, {result.city or ''}".strip(", "),
                 "dates_summary": result.dates_summary or ""
             })
 
     return json.dumps({"status": "show_cards", "action_type": "SHOW_EVENT_CARDS", "data": json.dumps(cards_data, ensure_ascii=False)}, ensure_ascii=False)
+
+
+MAX_SEARCH_RESULTS = 10
+MAX_SEARCH_TOKENS = 6
+
+
+def _parse_day(value, field):
+    """Đổi chuỗi YYYY-MM-DD thành `datetime` 0 giờ (giờ Việt Nam, không múi giờ); rỗng trả None; sai định dạng ném ValueError kèm tên trường."""
+    text_value = (value or "").strip()
+    if not text_value:
+        return None
+    try:
+        return datetime.strptime(text_value[:10], "%Y-%m-%d")
+    except ValueError:
+        raise ValueError(f"{field} phải có dạng YYYY-MM-DD (ví dụ 2026-12-05).")
+
+
+@tool
+def search_events(query: str = "", city: str = "", date_from: str = "", date_to: str = "", max_price: Optional[float] = None,
+                  limit: int = 6) -> str:
+    """
+    Tìm sự kiện CÓ LỌC theo từ khóa, thành phố, khoảng ngày và ngân sách, rồi hiển thị Thẻ Sự Kiện (Bước 1).
+    Dùng khi khách nêu điều kiện cụ thể: "show cuối tuần này", "ca nhạc ở Hà Nội", "dưới 500k", "tháng 12", "nghệ sĩ X".
+    Từ khóa không phân biệt dấu và hiểu cách viết tắt thành phố (HCM, SG, HN). Ngày hôm nay có trong lời nhắc hệ thống, hãy tự đổi
+    "cuối tuần", "tháng sau"... thành khoảng ngày cụ thể trước khi gọi.
+
+    Args:
+        query: Từ khóa chủ đề hoặc tên nghệ sĩ, địa điểm (có thể để trống).
+        city: Thành phố, ví dụ "Hà Nội", "Hồ Chí Minh", "Đà Lạt" (có thể để trống).
+        date_from: Ngày bắt đầu khoảng thời gian, dạng YYYY-MM-DD (có thể để trống).
+        date_to: Ngày kết thúc khoảng thời gian, dạng YYYY-MM-DD, tính cả ngày này (có thể để trống).
+        max_price: Giá vé thấp nhất tối đa khách chấp nhận, đơn vị VND (có thể để trống).
+        limit: Số sự kiện tối đa (mặc định 6, tối đa 10).
+    """
+    try:
+        start = _parse_day(date_from, "date_from")
+        end = _parse_day(date_to, "date_to")
+    except ValueError as invalid:
+        return _json({"status": "error", "message": str(invalid)})
+    if start and end and end < start:
+        return _json({"status": "error", "message": "date_to phải sau hoặc bằng date_from."})
+    if max_price is not None:
+        try:
+            max_price = float(max_price)
+        except (TypeError, ValueError):
+            return _json({"status": "error", "message": "max_price phải là một số."})
+        if max_price < 0:
+            return _json({"status": "error", "message": "max_price không được âm."})
+    limit = _as_int(limit) or 6
+    limit = max(1, min(limit, MAX_SEARCH_RESULTS))
+
+    conditions, params = [VALID_EVENT_FILTER], {"limit": limit}
+    haystack = " || ' ' || ".join(fold_sql(col) for col in ("e.title", "e.location_name", "e.address", "e.city", "e.description"))
+    tokens = [t for t in re.split(r"\s+", (query or "").strip()) if t][:MAX_SEARCH_TOKENS]
+    for index, token in enumerate(tokens):
+        variants = expand_token(token)
+        if not variants:
+            continue
+        ors = []
+        for variant_index, variant in enumerate(variants):
+            name = f"tok_{index}_{variant_index}"
+            ors.append(f"({haystack}) LIKE :{name} ESCAPE '\\'")
+            params[name] = f"%{escape_like(variant)}%"
+        conditions.append("(" + " OR ".join(ors) + ")")
+
+    city_folded = fold_text(city).strip()
+    if city_folded:
+        place = " || ' ' || ".join(fold_sql(col) for col in ("e.city", "e.address", "e.location_name"))
+        ors = []
+        for variant_index, variant in enumerate(expand_token(city_folded) if " " not in city_folded else [city_folded]):
+            name = f"city_{variant_index}"
+            ors.append(f"({place}) LIKE :{name} ESCAPE '\\'")
+            params[name] = f"%{escape_like(variant)}%"
+        conditions.append("(" + " OR ".join(ors) + ")")
+
+    if start or end:
+        conditions.append("e.start_time IS NOT NULL")
+        if end:
+            conditions.append("e.start_time < :to_exclusive")
+            params["to_exclusive"] = end + timedelta(days=1)
+        if start:
+            conditions.append("COALESCE(e.end_time, e.start_time) >= :from_day")
+            params["from_day"] = start
+    if max_price is not None:
+        conditions.append("e.min_price IS NOT NULL AND e.min_price <= :max_price")
+        params["max_price"] = max_price
+
+    try:
+        with event_db().connect() as conn:
+            rows = conn.execute(text(
+                "SELECT e.id FROM events e WHERE " + " AND ".join(conditions)
+                + " ORDER BY e.start_time ASC NULLS LAST, e.created_at DESC LIMIT :limit"), params).fetchall()
+    except AiError:
+        raise
+    except SQLAlchemyError as failure:
+        raise _db_unavailable(failure)
+
+    applied = {k: v for k, v in {"query": query, "city": city, "date_from": date_from, "date_to": date_to,
+                                 "max_price": max_price}.items() if v not in (None, "")}
+    if not rows:
+        return _json({"status": "no_results", "applied_filters": applied,
+                      "message": "Không có sự kiện nào còn mở bán khớp với các điều kiện này."})
+    cards = json.loads(show_event_cards.invoke({"event_ids": [str(r.id) for r in rows]}))
+    cards["applied_filters"] = applied
+    return json.dumps(cards, ensure_ascii=False)
 
 
 @tool
@@ -597,21 +714,67 @@ def show_ticket_types(event_id: str) -> str:
         raise _db_unavailable(failure)
 
 
+def seated_tiers_from_layout(draft_json):
+    """Từ JSON sơ đồ ghế trả `(có_sơ_đồ, bản_đồ)`; bản đồ gồm mã hạng vé và tên khu đã chuẩn hóa (chữ thường, bỏ khoảng trắng và gạch ngang)
+    ánh xạ tới True nếu khu có ghế ngồi, False nếu là khu đứng. JSON rỗng hoặc hỏng thì không có sơ đồ."""
+    tier_seated_map = {}
+    has_seatmap = False
+    if not draft_json:
+        return has_seatmap, tier_seated_map
+    try:
+        layout_data = json.loads(draft_json)
+        zones = layout_data.get("zones", {})
+        seats = layout_data.get("seats", [])
+
+        if (isinstance(zones, dict) and len(zones) > 0) or len(seats) > 0:
+            has_seatmap = True
+
+        for zid, z in (zones.items() if isinstance(zones, dict) else enumerate(zones)):
+            z_data = z if isinstance(z, dict) else {}
+            z_name = (z_data.get("name") or "").strip()
+            z_tier_id = z_data.get("tierId")
+            z_type = z_data.get("type")
+
+            seats_in_z = [s for s in seats if s.get("zoneId") == zid or s.get("zoneId") == z_name]
+            is_seated = (len(seats_in_z) > 0) or (z_type == "SEATED")
+
+            if z_tier_id:
+                tier_seated_map[z_tier_id] = is_seated
+            if z_name:
+                clean_z_name = z_name.lower().replace(" ", "").replace("-", "")
+                tier_seated_map[clean_z_name] = is_seated
+    except Exception as e:
+        log.warning("Could not parse the seat layout JSON: %s", type(e).__name__)
+    return has_seatmap, tier_seated_map
+
+
+def is_tier_seated(tier_seated_map, ticket_id, ticket_name) -> bool:
+    """Hạng vé có thuộc khu ghế ngồi không: khớp theo mã hạng vé trước, nếu không thì theo tên khu chứa trong tên hạng vé (hoặc ngược lại)."""
+    is_seated = tier_seated_map.get(ticket_id, False)
+    if not is_seated:
+        clean_name = (ticket_name or "").lower().replace(" ", "").replace("-", "")
+        for key, value in tier_seated_map.items():
+            if isinstance(key, str) and (key in clean_name or clean_name in key):
+                is_seated = value
+                break
+    return bool(is_seated)
+
+
 def _ticket_types_payload(event_id: str) -> str:
     """Dựng JSON danh sách suất diễn, trạng thái bán và hạng vé (kèm cờ ghế ngồi/khu đứng) của một sự kiện từ event_db và ticket_db."""
     # lấy thông tin sự kiện từ event_db
     with event_db().connect() as conn:
-        ev_query = text("""
-            SELECT id, title, banner_url, thumbnail_url, location_name, city, 
-                   start_time, end_time, sale_start_time, sale_end_time
-            FROM events
-            WHERE id = :eid
+        ev_query = text(f"""
+            SELECT e.id, e.title, e.banner_url, e.thumbnail_url, e.location_name, e.city,
+                   e.start_time, e.end_time, e.sale_start_time, e.sale_end_time
+            FROM events e
+            WHERE e.id = :eid AND {VALID_EVENT_FILTER}
         """)
         ev = conn.execute(ev_query, {"eid": event_id}).fetchone()
         if not ev:
             return json.dumps({
                 "status": "error", 
-                "message": f"Không tìm thấy thông tin sự kiện '{event_id}'."
+                "message": f"Không tìm thấy sự kiện '{event_id}' hoặc sự kiện không còn mở bán."
             }, ensure_ascii=False)
 
         # lấy các suất diễn từ event_db
@@ -648,47 +811,16 @@ def _ticket_types_payload(event_id: str) -> str:
     has_seatmap = False
     seatmap_image_url = None
     tier_seated_map = {}
-
     if layout_row:
         seatmap_image_url = layout_row.image_url
-        if layout_row.draft_json:
-            try:
-                layout_data = json.loads(layout_row.draft_json)
-                zones = layout_data.get("zones", {})
-                seats = layout_data.get("seats", [])
-                
-                if (isinstance(zones, dict) and len(zones) > 0) or len(seats) > 0:
-                    has_seatmap = True
-                
-                for zid, z in (zones.items() if isinstance(zones, dict) else enumerate(zones)):
-                    z_data = z if isinstance(z, dict) else {}
-                    z_name = (z_data.get("name") or "").strip()
-                    z_tier_id = z_data.get("tierId")
-                    z_type = z_data.get("type")
-                    
-                    seats_in_z = [s for s in seats if s.get("zoneId") == zid or s.get("zoneId") == z_name]
-                    is_seated = (len(seats_in_z) > 0) or (z_type == "SEATED")
-                    
-                    if z_tier_id:
-                        tier_seated_map[z_tier_id] = is_seated
-                    if z_name:
-                        clean_z_name = z_name.lower().replace(" ", "").replace("-", "")
-                        tier_seated_map[clean_z_name] = is_seated
-            except Exception as e:
-                log.warning("Could not parse the seat layout JSON: %s", type(e).__name__)
+        has_seatmap, tier_seated_map = seated_tiers_from_layout(layout_row.draft_json)
 
     now = datetime.now(VN_TZ).replace(tzinfo=None)
     
     # định dạng toàn bộ vé của sự kiện để truy cập trực tiếp
     all_event_tickets = []
     for t in ticket_rows:
-        clean_t_name = t.name.lower().replace(" ", "").replace("-", "")
-        is_seated = tier_seated_map.get(t.id, False)
-        if not is_seated:
-            for k, val in tier_seated_map.items():
-                if k in clean_t_name or clean_t_name in k:
-                    is_seated = val
-                    break
+        is_seated = is_tier_seated(tier_seated_map, t.id, t.name)
         all_event_tickets.append({
             "id": t.id,
             "name": t.name,
@@ -736,13 +868,7 @@ def _ticket_types_payload(event_id: str) -> str:
 
             formatted_tickets = []
             for t in matched_tickets:
-                clean_t_name = t.name.lower().replace(" ", "").replace("-", "")
-                is_seated = tier_seated_map.get(t.id, False)
-                if not is_seated:
-                    for k, val in tier_seated_map.items():
-                        if k in clean_t_name or clean_t_name in k:
-                            is_seated = val
-                            break
+                is_seated = is_tier_seated(tier_seated_map, t.id, t.name)
 
                 formatted_tickets.append({
                     "id": t.id,
@@ -788,13 +914,7 @@ def _ticket_types_payload(event_id: str) -> str:
 
         formatted_tickets = []
         for t in ticket_rows:
-            clean_t_name = t.name.lower().replace(" ", "").replace("-", "")
-            is_seated = tier_seated_map.get(t.id, False)
-            if not is_seated:
-                for k, val in tier_seated_map.items():
-                    if k in clean_t_name or clean_t_name in k:
-                        is_seated = val
-                        break
+            is_seated = is_tier_seated(tier_seated_map, t.id, t.name)
 
             formatted_tickets.append({
                 "id": t.id,

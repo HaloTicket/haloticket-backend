@@ -9,6 +9,12 @@ import com.haloticket.event_service.dto.request.EventCreateRequest;
 import com.haloticket.event_service.dto.request.OrganizerPayoutAccountRequest;
 import com.haloticket.event_service.dto.response.EventCategoryResponse;
 import com.haloticket.event_service.dto.response.EventResponse;
+import com.haloticket.event_service.dto.response.EventSearchItem;
+import com.haloticket.event_service.dto.response.EventSearchPage;
+import com.haloticket.event_service.search.EventSearchCriteria;
+import com.haloticket.event_service.search.EventSpecifications;
+import org.springframework.data.domain.Page;
+import org.springframework.transaction.annotation.Transactional;
 import com.haloticket.event_service.dto.response.OrganizerDto;
 import com.haloticket.event_service.dto.response.EventMemberResponse;
 import com.haloticket.event_service.dto.response.EventShowtimeDto;
@@ -318,12 +324,36 @@ public class EventServiceImpl implements EventService {
         }
     }
 
-    /** Lấy toàn bộ sự kiện, mỗi sự kiện được ghép thêm vé từ ticket-service. */
+    /**
+     * Lấy danh sách sự kiện công khai (đã duyệt và không riêng tư), mỗi sự kiện được ghép thêm vé từ ticket-service. Bản nháp, chờ duyệt, bị
+     * từ chối và sự kiện riêng tư không có trong danh sách này; người tổ chức xem sự kiện của mình qua {@link #getMyEvents(String)}.
+     */
     @Override
     public List<EventResponse> getAllEvents() {
-        return eventRepository.findAll().stream()
+        return eventRepository.findPublicEvents().stream()
                 .map(this::mapToEventResponse)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Tìm kiếm sự kiện công khai ở phía máy chủ: chỉ sự kiện đã duyệt và không riêng tư, lọc theo từ khóa không dấu, thành phố, danh mục,
+     * khoảng ngày và miễn phí, sắp xếp rồi phân trang. Kết quả gọn (không gọi ticket-service cho từng sự kiện).
+     *
+     * @param criteria tiêu chí tìm kiếm (số trang và kích thước được giới hạn trong khoảng hợp lệ)
+     * @return một trang kết quả
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public EventSearchPage searchEvents(EventSearchCriteria criteria) {
+        EventSearchCriteria safe = criteria.normalized();
+        Page<Event> page = eventRepository.findAll(EventSpecifications.forSearch(safe, LocalDateTime.now()), PageRequest.of(safe.page(), safe.size()));
+        List<EventSearchItem> items = page.getContent().stream().map(event -> new EventSearchItem(
+                event.getId(), event.getTitle(), event.getBannerUrl(), event.getThumbnailUrl(), event.getLocationName(),
+                event.getAddress(), event.getCity(),
+                event.getCategory() != null ? event.getCategory().getId() : null,
+                event.getCategory() != null ? event.getCategory().getName() : null,
+                event.getStartTime(), event.getEndTime(), event.getSaleStartTime(), event.getSaleEndTime(), event.getMinPrice())).toList();
+        return new EventSearchPage(items, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages());
     }
 
     /** Lấy các sự kiện mà người gọi có phân công ACTIVE (mọi vai trò). Không xác định được người dùng thì trả danh sách rỗng. */

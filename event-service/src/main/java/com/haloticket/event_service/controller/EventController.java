@@ -1,5 +1,9 @@
 package com.haloticket.event_service.controller;
 
+import com.haloticket.event_service.dto.response.EventSearchPage;
+import com.haloticket.event_service.search.EventSearchCriteria;
+import org.springframework.format.annotation.DateTimeFormat;
+import java.time.LocalDate;
 import com.haloticket.event_service.dto.request.EventCreateRequest;
 import com.haloticket.event_service.dto.response.EventCategoryResponse;
 import com.haloticket.event_service.dto.response.EventResponse;
@@ -137,12 +141,45 @@ public class EventController {
     }
 
     /**
-     * Lấy danh sách tất cả sự kiện.
-     * @return danh sách sự kiện
+     * Lấy danh sách sự kiện công khai (đã duyệt, không riêng tư). Người tổ chức xem sự kiện của mình (mọi trạng thái) ở {@code /my-events}.
+     * @return danh sách sự kiện công khai
      */
     @GetMapping
     public ResponseEntity<List<EventResponse>> getAllEvents() {
         return ResponseEntity.ok(eventService.getAllEvents());
+    }
+
+    /**
+     * Tìm kiếm sự kiện công khai ở phía máy chủ, có lọc, sắp xếp và phân trang. Chỉ trả sự kiện đã duyệt và không riêng tư.
+     *
+     * @param q từ khóa (không phân biệt dấu); mọi từ đều phải xuất hiện
+     * @param city thành phố: {@code Hồ Chí Minh}, {@code Hà Nội}, {@code Đà Lạt}, {@code other} hoặc chữ tự do
+     * @param categoryId id danh mục
+     * @param category tên danh mục
+     * @param from ngày bắt đầu khoảng thời gian (yyyy-MM-dd, tính cả ngày này)
+     * @param to ngày cuối khoảng thời gian (yyyy-MM-dd, tính cả ngày này)
+     * @param free {@code true} để chỉ lấy sự kiện miễn phí
+     * @param sort {@code relevance}, {@code soonest}, {@code priceAsc} hoặc {@code priceDesc}
+     * @param includeEnded {@code true} để lấy cả sự kiện đã hết hạn
+     * @param page số trang từ 0
+     * @param size số sự kiện mỗi trang (tối đa 50)
+     * @return một trang kết quả
+     */
+    @GetMapping("/search")
+    public ResponseEntity<EventSearchPage> searchEvents(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String categoryId,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "false") boolean free,
+            @RequestParam(required = false) String sort,
+            @RequestParam(defaultValue = "false") boolean includeEnded,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size) {
+        return ResponseEntity.ok(eventService.searchEvents(new EventSearchCriteria(
+                q, city, categoryId, category, from, to, free, EventSearchCriteria.Sort.parse(sort), includeEnded, page, size)));
     }
 
     /**

@@ -1,5 +1,6 @@
 """Các route AI công khai cho khách hàng: tìm kiếm sự kiện bằng ngôn ngữ tự nhiên và chatbot đặt vé thông minh."""
 import logging
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field, field_validator
@@ -26,6 +27,7 @@ MAX_TOP_K = 10
 # Widget web gửi cả hội thoại mỗi lần, nên lịch sử dài được cắt còn các mục mới nhất chứ không bị từ chối.
 MAX_HISTORY_ITEMS = 10
 MAX_HISTORY_ITEM_CHARS = 2000
+MAX_EVENT_ID_CHARS = 64
 KEYWORD_FALLBACK_BELOW = 3  # tìm theo từ khóa bổ sung khi tìm vector ra ít sự kiện hơn ngưỡng này
 
 
@@ -136,6 +138,8 @@ class ChatRequest(BaseModel):
     """Tin nhắn mới và lịch sử hội thoại gửi cho chatbot đặt vé."""
     message: str = Field(max_length=MAX_TEXT_CHARS)
     history: list = Field(default_factory=list)
+    # sự kiện khách đang đặt vé do giao diện nhớ giúp; chỉ được dùng nếu là sự kiện còn hiệu lực (kiểm chứng trong cơ sở dữ liệu)
+    selected_event_id: Optional[str] = Field(default=None, max_length=MAX_EVENT_ID_CHARS)
 
     @field_validator("history")
     @classmethod
@@ -159,7 +163,8 @@ def smart_booking(
     """Chatbot đặt vé thông minh; đặt định danh người gọi vào context để giới hạn và ghi nhận, lỗi bất ngờ được che bằng `AI_UNAVAILABLE`."""
     token = actor_var.set(actor_of(http_request, claims))
     try:
-        return booking_agent.chat(request.message, request.history, None)
+        extra = {"selected_event_id": request.selected_event_id} if request.selected_event_id else {}
+        return booking_agent.chat(request.message, request.history, None, **extra)
     except AiError:
         raise  # 429 / 503 / 502 kèm mã lỗi riêng
     except Exception as failure:
