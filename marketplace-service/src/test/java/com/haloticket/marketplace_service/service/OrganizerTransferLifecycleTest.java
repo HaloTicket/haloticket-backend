@@ -87,21 +87,27 @@ class OrganizerTransferLifecycleTest {
         assertThatThrownBy(() -> service.acceptGift("recipient", "Bearer recipient", "gift", null)).isInstanceOf(ResponseStatusException.class).hasMessageContaining("GIFT_INVITATION_INVALID");
         verify(outbox, times(1)).save(any());
     }
+    // acceptGift bắt buộc có token lời mời khớp invitationTokenHash (SHA-256 dạng hex), nên test phải cấp token hợp lệ để chạm tới bước eKYC
+    static final String INVITE_TOKEN = "invite-token";
+    static String sha256(String value) {
+        try { return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8))); }
+        catch (Exception exception) { throw new IllegalStateException(exception); }
+    }
     @Test void recipientMustPassEkycBeforeAcceptingAGift() {
-        var gift = TicketTransfer.builder().sagaId("gift").ticketId("t1").eventId("event").fromUserId("sender").toUserId("recipient").recipientEmail("recipient@example.com").requireEkyc(true).status(TransferStatus.PENDING).invitationExpiresAt(Instant.now().plusSeconds(3600)).build();
+        var gift = TicketTransfer.builder().sagaId("gift").ticketId("t1").eventId("event").fromUserId("sender").toUserId("recipient").recipientEmail("recipient@example.com").invitationTokenHash(sha256(INVITE_TOKEN)).requireEkyc(true).status(TransferStatus.PENDING).invitationExpiresAt(Instant.now().plusSeconds(3600)).build();
         var saga = MarketplaceSaga.builder().id("gift").type("GIFT_TRANSFER").ticketId("t1").state(SagaState.WAITING_RECIPIENT).payload("{}").build();
         when(gifts.findBySagaIdForUpdate("gift")).thenReturn(Optional.of(gift));
         when(sagas.findByIdForUpdate("gift")).thenReturn(Optional.of(saga));
         when(users.getCurrentUser(anyString())).thenReturn(new UserServiceClient.CurrentUser("recipient", "recipient@example.com", "Recipient"));
         when(users.getResaleEligibility(anyString())).thenReturn(new UserServiceClient.ResaleSellerEligibility(false, "recipient", null, "NOT_VERIFIED"));
-        assertThatThrownBy(() -> service.acceptGift("recipient", "Bearer recipient", "gift", null)).isInstanceOf(ResponseStatusException.class).hasMessageContaining("EKYC_REQUIRED");
+        assertThatThrownBy(() -> service.acceptGift("recipient", "Bearer recipient", "gift", INVITE_TOKEN)).isInstanceOf(ResponseStatusException.class).hasMessageContaining("EKYC_REQUIRED");
         assertThat(saga.getState()).isEqualTo(SagaState.WAITING_RECIPIENT);
         verifyNoInteractions(outbox);
         doThrow(new ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "GIFT_DISABLED")).when(gate).requireGiftEnabled("event");
-        assertThatThrownBy(() -> service.acceptGift("recipient", "Bearer recipient", "gift", null)).isInstanceOf(ResponseStatusException.class).hasMessageContaining("GIFT_DISABLED");
+        assertThatThrownBy(() -> service.acceptGift("recipient", "Bearer recipient", "gift", INVITE_TOKEN)).isInstanceOf(ResponseStatusException.class).hasMessageContaining("GIFT_DISABLED");
         doNothing().when(gate).requireGiftEnabled("event");
         when(users.getResaleEligibility(anyString())).thenReturn(new UserServiceClient.ResaleSellerEligibility(true, "recipient", 1L, null));
-        service.acceptGift("recipient", "Bearer recipient", "gift", null);
+        service.acceptGift("recipient", "Bearer recipient", "gift", INVITE_TOKEN);
         assertThat(gift.getRecipientEkycVerified()).isTrue();
         verify(outbox).save(argThat(event -> event.getPayload().contains("\"maxGiftCount\":3")));
     }

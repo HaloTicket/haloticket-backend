@@ -37,6 +37,7 @@ class DockerJwtDecoderTest {
             SecurityConfig config = new SecurityConfig();
             ReflectionTestUtils.setField(config, "issuerUri", "https://login.example.test/realms/haloticket");
             ReflectionTestUtils.setField(config, "jwkSetUri", "http://127.0.0.1:" + server.getAddress().getPort() + "/certs");
+            ReflectionTestUtils.setField(config, "requireAudience", true);
             var decoder = config.jwtDecoder();
             String valid = token(key, "https://login.example.test/realms/haloticket", "api-gateway");
             assertThat(decoder.decode(valid).block().getSubject()).isEqualTo("demo-user");

@@ -18,7 +18,19 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(properties = "auth.otp.pepper=test-only-otp-pepper")
+// chạy được khi không có Postgres, Keycloak, Eureka: dùng H2 trong bộ nhớ, trỏ jwk-set-uri tới địa chỉ giả (không gọi mạng khi khởi động)
+@SpringBootTest(properties = {
+		"auth.otp.pepper=test-only-otp-pepper",
+		"spring.datasource.url=jdbc:h2:mem:user_ctx;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
+		"spring.datasource.username=sa",
+		"spring.datasource.password=",
+		"spring.datasource.driver-class-name=org.h2.Driver",
+		"spring.jpa.hibernate.ddl-auto=create-drop",
+		"spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
+		"eureka.client.enabled=false",
+		"spring.security.oauth2.resourceserver.jwt.issuer-uri=https://issuer.example",
+		"spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://issuer.example/jwks"
+})
 class UserServiceApplicationTests {
 
 	@Autowired

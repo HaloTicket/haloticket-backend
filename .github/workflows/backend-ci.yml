@@ -88,6 +88,48 @@ jobs:
             ai-assistant-service:
               - 'ai-assistant-service/**'
 
+  # STEP 1b: Run the tests of the changed services (reports a red mark but does not block the image build/deploy)
+  test-java:
+    name: Test ${{ matrix.service }}
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [api-gateway, user-service, event-service, ticket-service, booking-service, payment-service, marketplace-service, media-service, notification-service]
+    steps:
+      - uses: actions/checkout@v4
+        if: ${{ needs.detect-changes.outputs.shared-files == 'true' || needs.detect-changes.outputs[matrix.service] == 'true' }}
+      - uses: actions/setup-java@v4
+        if: ${{ needs.detect-changes.outputs.shared-files == 'true' || needs.detect-changes.outputs[matrix.service] == 'true' }}
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Run unit tests
+        if: ${{ needs.detect-changes.outputs.shared-files == 'true' || needs.detect-changes.outputs[matrix.service] == 'true' }}
+        working-directory: ${{ matrix.service }}
+        run: mvn -B -ntp test
+
+  test-ai-assistant:
+    name: Test ai-assistant-service
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.ai-assistant-service == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: ai-assistant-service/requirements.txt
+      - name: Install dependencies
+        working-directory: ai-assistant-service
+        run: pip install -r requirements.txt pytest
+      - name: Run tests
+        working-directory: ai-assistant-service
+        run: python -m pytest tests -q
+
   # STEP 2: Build and push the images of the changed microservices
   # 2.1. Api Gateway: build and push the image
   build-api-gateway:

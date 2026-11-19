@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     alert_ssl_domains: str = "haloticket.duckdns.org"  # ALERT_SSL_DOMAINS: các tên miền duy nhất mà /ssl-status được phép kiểm tra
 
     # gọi mô hình (app/services/ai/ai_call.py): chỉ gồm các giới hạn số
-    ai_llm_deadline_seconds: int = 20
+    ai_llm_deadline_seconds: int = 45
     ai_max_tokens_customer_chat: int = 600
     ai_max_tokens_admin_assistant: int = 700
     ai_max_tokens_risk_scoring: int = 800

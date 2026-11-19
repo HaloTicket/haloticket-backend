@@ -520,7 +520,7 @@ services:
       - AI_SQL_ALLOWED_RELATIONS=${AI_SQL_ALLOWED_RELATIONS:-v_events,v_event_showtimes,v_ticket_types,v_ticket_sales_daily,v_booking_summary_daily,v_event_views_daily,v_vouchers,v_venues,v_event_categories,v_search_terms}
       - ALERT_SSL_DOMAINS=${ALERT_SSL_DOMAINS:-haloticket-web.pages.dev,haloticket.duckdns.org}
       # giới hạn số lần gọi mô hình, kiểm soát chi phí và giới hạn tốc độ (chỉ là số; mặc định ở bên dưới).
-      - AI_LLM_DEADLINE_SECONDS=${AI_LLM_DEADLINE_SECONDS:-20}
+      - AI_LLM_DEADLINE_SECONDS=${AI_LLM_DEADLINE_SECONDS:-45}
       - AI_DAILY_CALL_BUDGET=${AI_DAILY_CALL_BUDGET:-2000}
       - AI_ANONYMOUS_BUDGET_SHARE=${AI_ANONYMOUS_BUDGET_SHARE:-0.5}
       - AI_SEARCH_CACHE_SECONDS=${AI_SEARCH_CACHE_SECONDS:-300}

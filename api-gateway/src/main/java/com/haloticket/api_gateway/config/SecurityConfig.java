@@ -6,6 +6,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
@@ -35,8 +36,12 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
     private String jwkSetUri;
 
+    /** Bật để chỉ nhận token có audience {@code api-gateway}. Mặc định tắt để không khóa người dùng khi Keycloak chưa gắn audience mapper. */
+    @Value("${gateway.jwt.require-audience:false}")
+    private boolean requireAudience;
+
     /**
-     * Tạo bộ giải mã JWT: dùng {@code jwk-set-uri} nếu được cấu hình, nếu không thì tra cứu theo issuer. Token phải đúng issuer.
+     * Tạo bộ giải mã JWT: dùng {@code jwk-set-uri} nếu được cấu hình, nếu không thì tra cứu theo issuer. Token phải đúng issuer; khi {@code gateway.jwt.require-audience=true} còn phải có audience {@code api-gateway}.
      *
      * @return bộ giải mã JWT dạng reactive
      */
@@ -45,7 +50,10 @@ public class SecurityConfig {
         NimbusReactiveJwtDecoder decoder = org.springframework.util.StringUtils.hasText(jwkSetUri)
                 ? NimbusReactiveJwtDecoder.withJwkSetUri(jwkSetUri).build()
                 : NimbusReactiveJwtDecoder.withIssuerLocation(issuerUri).build();
-        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuerUri));
+        var issuerValidator = JwtValidators.createDefaultWithIssuer(issuerUri);
+        decoder.setJwtValidator(requireAudience
+                ? new DelegatingOAuth2TokenValidator<>(issuerValidator, new AudienceValidator("api-gateway"))
+                : issuerValidator);
         return decoder;
     }
 

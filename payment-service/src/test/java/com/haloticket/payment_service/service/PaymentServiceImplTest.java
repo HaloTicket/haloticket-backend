@@ -99,7 +99,7 @@ class PaymentServiceImplTest {
     void newPayoutAccountStartsUnverified() {
         PaymentServiceImpl service = createService();
         OrganizerPayoutAccountRequest request = request("123456789", "NGUYEN VAN A");
-        when(accountRepository.findByOrganizerUserId("user-1")).thenReturn(Optional.empty());
+        when(accountRepository.findForUpdate("user-1")).thenReturn(Optional.empty());
         when(accountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = service.saveOrUpdatePayoutAccount(request);
@@ -120,7 +120,7 @@ class PaymentServiceImplTest {
                 .accountVersion(3L)
                 .build();
         PaymentServiceImpl service = createService();
-        when(accountRepository.findByOrganizerUserId("user-1")).thenReturn(Optional.of(existing));
+        when(accountRepository.findForUpdate("user-1")).thenReturn(Optional.of(existing));
         when(accountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         service.saveOrUpdatePayoutAccount(request("222222222", "NGUYEN VAN A"));
@@ -147,7 +147,7 @@ class PaymentServiceImplTest {
                 .accountVersion(3L)
                 .build();
         PaymentServiceImpl service = createService();
-        when(accountRepository.findByOrganizerUserId("user-1")).thenReturn(Optional.of(existing));
+        when(accountRepository.findForUpdate("user-1")).thenReturn(Optional.of(existing));
         when(accountRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = service.saveOrUpdatePayoutAccount(request("123456789", "NGUYEN VAN A"));

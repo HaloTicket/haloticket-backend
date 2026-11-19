@@ -17,7 +17,10 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.core.Authentication;
 
+import com.haloticket.event_service.authz.EventAccess;
 import com.haloticket.event_service.authz.Permission;
+import com.haloticket.event_service.enums.EventStatus;
+import org.springframework.web.server.ResponseStatusException;
 import com.haloticket.event_service.exception.TicketSyncFailedException;
 import com.haloticket.event_service.exception.TicketSyncRejectedException;
 import com.haloticket.event_service.service.EventAccessService;
@@ -304,16 +307,37 @@ public class EventController {
     }
 
     /**
-     * Lấy chi tiết sự kiện (công khai).
+     * Lấy chi tiết sự kiện. Sự kiện đã duyệt là công khai; sự kiện nháp, chờ duyệt hoặc bị từ chối chỉ người trong ban tổ chức
+     * của sự kiện đó hoặc admin nền tảng mới xem được, người khác nhận 404 như thể sự kiện không tồn tại.
      * @param id mã sự kiện
-     * @return sự kiện, hoặc 404 nếu không tồn tại
+     * @param authorization header Authorization nếu người gọi đã đăng nhập
+     * @return sự kiện, hoặc 404 nếu không tồn tại hoặc không được phép xem
      */
     @GetMapping("/{id}")
-    public ResponseEntity<EventResponse> getEventById(@PathVariable String id) {
+    public ResponseEntity<EventResponse> getEventById(@PathVariable String id,
+                                                      @RequestHeader(value = "Authorization", required = false) String authorization) {
         EventResponse response = eventService.getEventById(id);
-        if (response == null) {
+        if (response == null || (!isPublished(response) && !canViewUnpublished(id, authorization))) {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(response);
+    }
+
+    /** Sự kiện đã qua kiểm duyệt (đã duyệt, đang bán, đã kết thúc hoặc bị hủy) thì ai cũng xem được; nháp, chờ duyệt và bị từ chối thì không. */
+    private static boolean isPublished(EventResponse event) {
+        if (event.getEventStatus() == EventStatus.DRAFT || event.getEventStatus() == EventStatus.PENDING) return false;
+        String approval = event.getEventApprovalStatus();
+        return !("DRAFT".equals(approval) || "PENDING".equals(approval) || "REJECTED".equals(approval));
+    }
+
+    /** Người gọi có vai trò đang hoạt động trong sự kiện (chủ, quản trị, quản lý, nhân sự) hoặc là admin nền tảng; chưa đăng nhập thì không. */
+    private boolean canViewUnpublished(String eventId, String authorization) {
+        if (authorization == null || authorization.isBlank()) return false;
+        try {
+            EventAccess access = eventAccessService.forCaller(eventId, authorization);
+            return access.platformAdmin() || access.role() != null;
+        } catch (ResponseStatusException denied) {
+            return false;
+        }
     }
 }
