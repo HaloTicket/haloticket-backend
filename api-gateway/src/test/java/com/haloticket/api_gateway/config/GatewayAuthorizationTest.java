@@ -43,6 +43,8 @@ class GatewayAuthorizationTest {
             new Route("POST", "/api/organizer/agent-chat"),
             new Route("GET", "/api/payouts/admin/all"),
             new Route("POST", "/api/payouts/admin/00000000-0000-0000-0000-000000000000/approve"),
+            // delete by arbitrary key, no owner check in media-service
+            new Route("DELETE", "/api/media/delete"),
             new Route("GET", "/api/users/admin"),
             new Route("GET", "/api/users/admin/some-id"),
             new Route("PUT", "/api/users/admin/some-id/roles"),
@@ -106,7 +108,6 @@ class GatewayAuthorizationTest {
             new Route("POST", "/api/tickets/seat-layouts/event/some-event/publish"),
             new Route("POST", "/api/media/upload"),
             new Route("POST", "/api/media/upload-base64"),
-            new Route("DELETE", "/api/media/delete"),
             new Route("GET", "/api/marketplace/listings/me"),
             new Route("POST", "/api/marketplace/gifts"),
             new Route("GET", "/api/some-path-no-rule-names"));

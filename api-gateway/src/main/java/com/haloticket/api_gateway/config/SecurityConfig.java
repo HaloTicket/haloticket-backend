@@ -140,6 +140,8 @@ public class SecurityConfig {
                             .pathMatchers(HttpMethod.GET, "/api/tickets/**").permitAll()
                             .pathMatchers("/api/tickets/**").authenticated()
                             .pathMatchers(HttpMethod.GET, "/api/media/**").permitAll()
+                            // xóa tệp theo khóa tùy ý: media-service không kiểm tra chủ tệp nên chỉ admin được gọi (web và mobile không dùng)
+                            .pathMatchers(HttpMethod.DELETE, "/api/media/**").access(SecurityConfig::adminOnly)
                             .pathMatchers("/api/media/**").authenticated()
                             .pathMatchers("/api/v1/**", "/ws-notifications/**").permitAll();
                     exchange

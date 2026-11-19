@@ -74,6 +74,22 @@ class KeycloakAuthAdapterTest {
     }
 
     @Test
+    void emailLookupEncodesSpecialCharactersSoPlusAndAmpersandKeepTheirMeaning() {
+        mockServer.expect(requestTo("http://localhost:9080/realms/haloticket-realm/protocol/openid-connect/token"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"access_token\":\"admin-token\",\"expires_in\":300}", MediaType.APPLICATION_JSON));
+        mockServer.expect(requestTo("http://localhost:9080/admin/realms/haloticket-realm/users?email=a%2Bb%26c%40example.com&exact=true"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("[{\"id\":\"kc-1\"}]", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> adapter.ensureRegistrationAvailable("A+B&C@Example.com"))
+                .isInstanceOf(AuthException.class)
+                .satisfies(error -> assertThat(((AuthException) error).code()).isEqualTo("USER_ALREADY_EXISTS"));
+
+        mockServer.verify();
+    }
+
+    @Test
     void loginSuccessReturnsTokens() {
         mockServer.expect(requestTo("http://localhost:9080/realms/haloticket-realm/protocol/openid-connect/token"))
                 .andExpect(method(HttpMethod.POST))
@@ -209,7 +225,7 @@ class KeycloakAuthAdapterTest {
         String resetToken = adapter.issueResetToken("challenge-1");
         mockServer.expect(requestTo("http://localhost:9080/realms/haloticket-realm/protocol/openid-connect/token"))
                 .andRespond(withSuccess("{\"access_token\": \"admin-token\", \"expires_in\": 300}", MediaType.APPLICATION_JSON));
-        mockServer.expect(requestTo("http://localhost:9080/admin/realms/haloticket-realm/users?email=invited@example.com&exact=true"))
+        mockServer.expect(requestTo("http://localhost:9080/admin/realms/haloticket-realm/users?email=invited%40example.com&exact=true"))
                 .andRespond(withSuccess("[{\"id\": \"kc-77\", \"username\": \"invited@example.com\", \"email\": \"invited@example.com\"}]", MediaType.APPLICATION_JSON));
         mockServer.expect(requestTo("http://localhost:9080/admin/realms/haloticket-realm/users/kc-77/reset-password"))
                 .andExpect(method(HttpMethod.PUT)).andRespond(withNoContent());

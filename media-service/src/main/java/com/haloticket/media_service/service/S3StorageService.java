@@ -14,6 +14,9 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.Base64;
+import java.util.Locale;
+import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.UUID;
 
 /**
@@ -24,6 +27,21 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Slf4j
 public class S3StorageService {
+
+    /** Loại nội dung ảnh được nhận và phần mở rộng tương ứng; phần mở rộng luôn suy từ loại nội dung, không lấy từ tên tệp của client. */
+    private static final Map<String, String> ALLOWED_IMAGE_TYPES = Map.of(
+            "image/jpeg", ".jpg",
+            "image/jpg", ".jpg",
+            "image/png", ".png",
+            "image/webp", ".webp",
+            "image/gif", ".gif",
+            "image/svg+xml", ".svg");
+
+    /** Thư mục mặc định khi client không gửi hoặc gửi giá trị không hợp lệ. */
+    private static final String DEFAULT_FOLDER = "media";
+
+    /** Tối đa 3 đoạn chữ, số, gạch dưới, gạch ngang ngăn cách bằng dấu gạch chéo. */
+    private static final Pattern SAFE_FOLDER = Pattern.compile("[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+){0,2}");
 
     private final S3Client s3Client;
 
@@ -50,18 +68,13 @@ public class S3StorageService {
             throw new IllegalArgumentException("File upload cannot be empty");
         }
 
-        String contentType = file.getContentType();
-        if (contentType == null || !contentType.startsWith("image/")) {
+        String contentType = file.getContentType() == null ? null : file.getContentType().toLowerCase(Locale.ROOT);
+        String extension = contentType == null ? null : ALLOWED_IMAGE_TYPES.get(contentType);
+        if (extension == null) {
             throw new IllegalArgumentException("Only image files (JPG, PNG, WEBP, GIF, SVG) are allowed");
         }
 
-        String originalFilename = file.getOriginalFilename();
-        String extension = ".jpg";
-        if (originalFilename != null && originalFilename.contains(".")) {
-            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-        }
-
-        String folderPrefix = (folder != null && !folder.trim().isEmpty()) ? folder.trim() : "media";
+        String folderPrefix = sanitizeFolder(folder);
         String fileName = UUID.randomUUID() + extension;
         String key = folderPrefix + "/" + fileName;
 
@@ -113,14 +126,14 @@ public class S3StorageService {
             String header = parts[0];
             String data = parts[1];
 
-            String contentType = header.substring(header.indexOf(":") + 1, header.indexOf(";"));
-            String extension = ".jpg";
-            if (contentType.contains("png")) extension = ".png";
-            else if (contentType.contains("webp")) extension = ".webp";
-            else if (contentType.contains("gif")) extension = ".gif";
+            String contentType = header.substring(header.indexOf(":") + 1, header.indexOf(";")).toLowerCase(Locale.ROOT);
+            String extension = ALLOWED_IMAGE_TYPES.get(contentType);
+            if (extension == null) {
+                throw new IllegalArgumentException("Only image files (JPG, PNG, WEBP, GIF, SVG) are allowed");
+            }
 
             byte[] imageBytes = Base64.getDecoder().decode(data);
-            String folderPrefix = (folder != null && !folder.trim().isEmpty()) ? folder.trim() : "media";
+            String folderPrefix = sanitizeFolder(folder);
             String fileName = UUID.randomUUID() + extension;
             String key = folderPrefix + "/" + fileName;
 
@@ -171,6 +184,20 @@ public class S3StorageService {
             log.error("Failed to delete AWS S3 file ({}): {}", fileKey, e.getMessage());
             throw new RuntimeException("AWS S3 Delete Error: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Chuẩn hóa tên thư mục đích: chỉ nhận tối đa 3 đoạn gồm chữ, số, gạch dưới và gạch ngang, ngăn cách bằng dấu gạch chéo.
+     * Giá trị trống hoặc không hợp lệ (có {@code ..}, ký tự lạ, bắt đầu bằng gạch chéo) thì dùng {@code media}, để client không chọn
+     * được vị trí lưu tùy ý trong bucket.
+     *
+     * @param folder thư mục do client gửi, có thể {@code null}
+     * @return tên thư mục an toàn
+     */
+    static String sanitizeFolder(String folder) {
+        if (folder == null) return DEFAULT_FOLDER;
+        String trimmed = folder.trim();
+        return SAFE_FOLDER.matcher(trimmed).matches() ? trimmed : DEFAULT_FOLDER;
     }
 
     /**

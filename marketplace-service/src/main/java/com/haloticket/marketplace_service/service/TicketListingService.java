@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.*;
+import java.time.Duration;
 
 /**
  * Nghiệp vụ chính của chợ vé: kiểm tra điều kiện bán lại, đăng tin bán lại và tặng vé theo mô hình saga
@@ -30,6 +31,9 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class TicketListingService {
+    /** Thời gian chờ thêm sau khi hết giữ chỗ trước khi nhả tin có giao dịch đang xử lý thanh toán (chuyển khoản có thể đến chậm). */
+    static final Duration PAYMENT_PROCESSING_GRACE = Duration.ofMinutes(30);
+
     private final TicketListingRepository listingRepository;
     private final MarketplaceSagaRepository sagaRepository;
     private final OutboxEventRepository outboxRepository;
@@ -394,6 +398,7 @@ public class TicketListingService {
 
     /**
      * Giải phóng các giữ chỗ quá hạn: đánh dấu giao dịch chờ thanh toán là {@code EXPIRED} và đưa tin về trạng thái bán phù hợp.
+     * Giao dịch đang xử lý thanh toán ({@code PAYMENT_PROCESSING}) chỉ bị hết hạn sau thêm {@link #PAYMENT_PROCESSING_GRACE}.
      */
     @Transactional
     public void expireReservations() {
@@ -403,6 +408,15 @@ public class TicketListingService {
             if (listing == null || listing.getStatus() != ListingStatus.RESERVED || listing.getReservedUntil() == null
                     || !listing.getReservedUntil().isBefore(now)) continue;
             MarketplaceTransaction transaction = transactionRepository.findByTicketListing_IdAndStatus(listing.getId(), MarketplaceTransactionStatus.PENDING_PAYMENT).orElse(null);
+            if (transaction == null) {
+                // giao dịch đã sang PAYMENT_PROCESSING (người mua đã mở thanh toán) mà không bao giờ trả tiền hay báo lỗi, ví dụ bỏ dở mã
+                // QR chuyển khoản: nếu không hết hạn thì tin kẹt ở RESERVED mãi. Chỉ nhả sau thời gian ân hạn để một khoản chuyển khoản
+                // đến chậm vẫn kịp được ghi nhận.
+                transaction = transactionRepository.findByTicketListing_IdAndStatus(listing.getId(), MarketplaceTransactionStatus.PAYMENT_PROCESSING)
+                        .filter(candidateTx -> candidateTx.getReservationExpiresAt() != null
+                                && candidateTx.getReservationExpiresAt().plus(PAYMENT_PROCESSING_GRACE).isBefore(now))
+                        .orElse(null);
+            }
             if (transaction == null) continue;
             transaction.setStatus(MarketplaceTransactionStatus.EXPIRED);
             transaction.setCancelledAt(now);

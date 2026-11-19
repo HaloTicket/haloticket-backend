@@ -373,11 +373,17 @@ public class KeycloakAuthAdapter implements KeycloakAuthPort {
 
     /** Tìm id người dùng Keycloak theo email chính xác; không có thì trả về {@code null}. */
     private String lookupUserIdByEmail(String adminToken, String email) {
-        String searchUrl = properties.authServerUrl() + "/admin/realms/" + properties.realm()
-                + "/users?email=" + email + "&exact=true";
+        // mã hóa giá trị email: ghép chuỗi thẳng làm '+' thành dấu cách và ký tự '&' hay '#' làm hỏng truy vấn
+        URI searchUri = org.springframework.web.util.UriComponentsBuilder
+                .fromUriString(properties.authServerUrl() + "/admin/realms/" + properties.realm() + "/users")
+                .queryParam("email", "{email}")
+                .queryParam("exact", "true")
+                .encode()
+                .buildAndExpand(email)
+                .toUri();
 
         List<KeycloakUserRepresentation> users = restClient.get()
-                .uri(searchUrl)
+                .uri(searchUri)
                 .header("Authorization", "Bearer " + adminToken)
                 .retrieve()
                 .body(new ParameterizedTypeReference<List<KeycloakUserRepresentation>>() {});

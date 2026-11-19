@@ -163,6 +163,49 @@ class ResaleReservationTest {
         assertThat(transaction.getStatus()).isEqualTo(MarketplaceTransactionStatus.EXPIRED);
     }
 
+    private MarketplaceTransaction processingReservation(TicketListingRepository listings, MarketplaceTransactionRepository transactions,
+                                                          TicketListing listing, Instant reservationExpiresAt) {
+        listing.setReservedBy("buyer-1");
+        listing.setReservedUntil(reservationExpiresAt);
+        MarketplaceTransaction transaction = MarketplaceTransaction.builder().ticketListing(listing)
+                .buyerId("buyer-1").sellerId("seller-1").amount(listing.getPrice()).reservationExpiresAt(reservationExpiresAt)
+                .status(MarketplaceTransactionStatus.PAYMENT_PROCESSING).build();
+        when(listings.findByStatusAndReservedUntilBefore(eq(ListingStatus.RESERVED), any())).thenReturn(List.of(listing));
+        when(listings.findByIdForUpdate("listing-1")).thenReturn(Optional.of(listing));
+        when(transactions.findByTicketListing_IdAndStatus("listing-1", MarketplaceTransactionStatus.PAYMENT_PROCESSING))
+                .thenReturn(Optional.of(transaction));
+        return transaction;
+    }
+
+    @Test
+    void abandonedPaymentIsReleasedOnceTheGracePeriodIsOver() {
+        TicketListingRepository listings = mock(TicketListingRepository.class);
+        MarketplaceTransactionRepository transactions = mock(MarketplaceTransactionRepository.class);
+        TicketListing listing = listing("seller-1", ListingStatus.RESERVED);
+        MarketplaceTransaction transaction = processingReservation(listings, transactions, listing,
+                Instant.now().minus(TicketListingService.PAYMENT_PROCESSING_GRACE).minusSeconds(60));
+
+        service(listings, transactions).expireReservations();
+
+        assertThat(listing.getStatus()).isEqualTo(ListingStatus.ACTIVE);
+        assertThat(listing.getReservedBy()).isNull();
+        assertThat(transaction.getStatus()).isEqualTo(MarketplaceTransactionStatus.EXPIRED);
+    }
+
+    @Test
+    void paymentInProgressIsNotReleasedDuringTheGracePeriod() {
+        TicketListingRepository listings = mock(TicketListingRepository.class);
+        MarketplaceTransactionRepository transactions = mock(MarketplaceTransactionRepository.class);
+        TicketListing listing = listing("seller-1", ListingStatus.RESERVED);
+        MarketplaceTransaction transaction = processingReservation(listings, transactions, listing, Instant.now().minusSeconds(60));
+
+        service(listings, transactions).expireReservations();
+
+        assertThat(listing.getStatus()).isEqualTo(ListingStatus.RESERVED);
+        assertThat(listing.getReservedBy()).isEqualTo("buyer-1");
+        assertThat(transaction.getStatus()).isEqualTo(MarketplaceTransactionStatus.PAYMENT_PROCESSING);
+    }
+
     private static TicketListingService service(TicketListingRepository listings, MarketplaceTransactionRepository transactions) {
         return new TicketListingService(listings, mock(MarketplaceSagaRepository.class), mock(OutboxEventRepository.class),
                 mock(TicketTransferRepository.class), transactions, mock(TicketServiceClient.class),
