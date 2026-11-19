@@ -4,6 +4,7 @@ import com.haloticket.payment_service.entity.Payment;
 import com.haloticket.payment_service.enums.PaymentStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+// truy vấn báo cáo dùng DISTINCT ON của PostgreSQL nên H2 không chạy được: chỉ chạy khi có Postgres thật (RUN_DB_TESTS=1)
+@EnabledIfEnvironmentVariable(named = "RUN_DB_TESTS", matches = "1")
 @SpringBootTest(properties = {
         "spring.security.oauth2.resourceserver.jwt.issuer-uri=https://issuer.example",
         "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://issuer.example/jwks"

@@ -109,7 +109,7 @@ jobs:
       - name: Run unit tests
         if: ${{ needs.detect-changes.outputs.shared-files == 'true' || needs.detect-changes.outputs[matrix.service] == 'true' }}
         working-directory: ${{ matrix.service }}
-        run: mvn -B -ntp test
+        run: mvn -B -ntp test -Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.httpconnectionManager.ttlSeconds=25
 
   test-ai-assistant:
     name: Test ai-assistant-service
