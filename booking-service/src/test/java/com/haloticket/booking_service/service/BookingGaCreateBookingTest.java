@@ -8,6 +8,9 @@ import com.haloticket.booking_service.config.GaReservationProperties;
 import com.haloticket.booking_service.dto.request.BookingCreateRequest;
 import com.haloticket.booking_service.dto.request.BookingItemRequest;
 import com.haloticket.booking_service.dto.response.BookingResponse;
+import com.haloticket.booking_service.dto.response.EventResponse;
+import com.haloticket.booking_service.dto.response.EventShowtimeDto;
+import com.haloticket.booking_service.exception.GlobalExceptionHandler;
 import com.haloticket.booking_service.entity.Booking;
 import com.haloticket.booking_service.entity.SeatReservation;
 import com.haloticket.booking_service.repository.BookingRepository;
@@ -26,6 +29,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -62,6 +66,7 @@ class BookingGaCreateBookingTest {
     private TicketStockClient stockClient;
     private GaReservationProperties properties;
     private BookingServiceImpl service;
+    private EventServiceClient events;
     private final AtomicInteger ids = new AtomicInteger();
 
     @BeforeEach
@@ -93,8 +98,9 @@ class BookingGaCreateBookingTest {
         properties = new GaReservationProperties();
         properties.setInternalToken(TOKEN);
         GaReservationService ga = new GaReservationService(properties, stockClient, new ObjectMapper());
+        events = mock(EventServiceClient.class);
         service = new BookingServiceImpl(bookings, seatReservations, outbox, redisson, redis, new ObjectMapper(),
-                mock(EventServiceClient.class), mock(TicketServiceClient.class), ga, mock(OrderLimitValidator.class), new OrderShapeValidator());
+                events, mock(TicketServiceClient.class), ga, mock(OrderLimitValidator.class), new OrderShapeValidator());
     }
 
     private static BookingItemRequest item(String typeId, int quantity, Boolean ga) {
@@ -127,6 +133,36 @@ class BookingGaCreateBookingTest {
 
 
     // --- general admission -------------------------------------------------
+
+    @Test
+    void endedSaleReturns409BeforeSavingBookingOrReservingStock() {
+        EventShowtimeDto showtime = new EventShowtimeDto();
+        showtime.setId("show-1");
+        showtime.setSaleEndTime(LocalDateTime.now().minusDays(1));
+        assertSaleRefused(showtime, "SHOWTIME_SALE_ENDED");
+    }
+
+    @Test
+    void futureSaleReturns409BeforeSavingBookingOrReservingStock() {
+        EventShowtimeDto showtime = new EventShowtimeDto();
+        showtime.setId("show-1");
+        showtime.setSaleStartTime(LocalDateTime.now().plusDays(1));
+        assertSaleRefused(showtime, "SHOWTIME_SALE_NOT_STARTED");
+    }
+
+    private void assertSaleRefused(EventShowtimeDto showtime, String code) {
+        EventResponse event = new EventResponse();
+        event.setShowtimes(List.of(showtime));
+        when(events.getEventById("event-1")).thenReturn(event);
+
+        assertThatThrownBy(() -> service.createBooking(request("u1", List.of(), item(GA, 2, true))))
+                .isInstanceOfSatisfying(ResponseStatusException.class, exception -> {
+                    var response = new GlobalExceptionHandler().handleResponseStatus(exception);
+                    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(response.getBody().getCode()).isEqualTo(code);
+                });
+        verifyNoInteractions(bookings, seatReservations, outbox, stockClient, valueOps, setOps);
+    }
 
     @Test
     void itemsOnlyOrderHoldsStockAndCreatesNoSeatsNoRedisKeysAndNoEventLock() throws Exception {
