@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     internal_api_timeout_seconds: float = 3.0
     chatbot_event_database_url: str = ""
     chatbot_ticket_database_url: str = ""
+    mongodb_uri: str = ""
+    mongodb_database: str = "haloticket_ai_chat"
 
     # giới hạn tần suất (cửa sổ cố định)
     ai_rl_customer_search_per_minute: int = 20
@@ -83,6 +85,8 @@ class Settings(BaseSettings):
     ai_rl_voucher_strategy_per_day: int = 30
     ai_rl_data_analysis_per_hour: int = 20
     ai_rl_data_analysis_per_day: int = 100
+    ai_rl_organizer_chat_per_hour: int = 20
+    ai_rl_organizer_chat_per_day: int = 100
     ai_rl_admin_assistant_per_hour: int = 60
     ai_rl_risk_scoring_per_hour: int = 60
     ai_rl_dashboard_summary_per_day: int = 10

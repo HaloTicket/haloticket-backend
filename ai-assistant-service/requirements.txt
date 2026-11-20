@@ -11,5 +11,6 @@ py-eureka-client==0.13.3
 psycopg2-binary==2.9.13
 httpx==0.28.1
 redis>=5,<7
+pymongo>=4.9,<5
 sqlglot==30.25.0
 PyJWT[crypto]==2.15.1
