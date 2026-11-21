@@ -121,10 +121,8 @@ public class SecurityConfig {
                             .pathMatchers("/api/events/admin/reports", "/api/events/admin/reports/**",
                                     "/api/payments/admin/report-payments")
                             .access(SecurityConfig::adminOnly);
-                    // đặt trước quy tắc chung /api/organizer/** ở dưới (chỉ yêu cầu đăng nhập). Các route phân tích AI
-                    // (data-analysis, voucher-strategy) chỉ cần đăng nhập: ai-assistant giới hạn organizer trong các
-                    // sự kiện họ quản lý. Organizer agent không bị giới hạn phạm vi nên cần ROLE_ADMIN.
-                    exchange.pathMatchers("/api/organizer/agent-chat").access(SecurityConfig::adminOnly);
+                    // Các route /api/organizer/** chỉ yêu cầu đăng nhập ở gateway.
+                    // AI assistant kiểm tra quyền của người gọi theo sự kiện.
                     exchange.pathMatchers("/api/admin/**", "/api/payouts/admin/**", "/api/users/admin", "/api/users/admin/**",
                             // đặt trước quy tắc chung /api/bookings/** ở dưới (chỉ yêu cầu đăng nhập)
                             "/api/bookings/admin/**",

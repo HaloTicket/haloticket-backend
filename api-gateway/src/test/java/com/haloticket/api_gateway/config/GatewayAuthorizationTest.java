@@ -39,8 +39,6 @@ class GatewayAuthorizationTest {
             new Route("GET", "/api/admin/ssl-status"),
             new Route("POST", "/api/admin/risk-scoring"),
             new Route("POST", "/api/admin/assistant-chat"),
-            // the organizer agent is not scoped to the caller's events
-            new Route("POST", "/api/organizer/agent-chat"),
             new Route("GET", "/api/payouts/admin/all"),
             new Route("POST", "/api/payouts/admin/00000000-0000-0000-0000-000000000000/approve"),
             // delete by arbitrary key, no owner check in media-service
@@ -78,6 +76,7 @@ class GatewayAuthorizationTest {
             // ai-assistant limits an organizer to the events they manage, so a login is enough here
             new Route("POST", "/api/organizer/data-analysis"),
             new Route("POST", "/api/organizer/voucher-strategy"),
+            new Route("POST", "/api/organizer/agent-chat"),
             new Route("POST", "/api/seats/hold"),
             new Route("POST", "/api/seats/release"),
             new Route("GET", "/api/gifts/anything"),
@@ -240,20 +239,16 @@ class GatewayAuthorizationTest {
     }
 
     @Test
-    void analysisAndContentRoutesNeedOnlyALoginWhileTheOrganizerAgentNeedsAdmin() {
+    void organizerAiRoutesRequireLoginAndLeaveEventAuthorizationToTheService() {
         try (var context = context()) {
             WebTestClient client = WebTestClient.bindToApplicationContext(context).build();
-            for (String path : List.of("/api/organizer/generate-event-content", "/api/organizer/data-analysis", "/api/organizer/voucher-strategy")) {
+            for (String path : List.of("/api/organizer/generate-event-content", "/api/organizer/data-analysis",
+                    "/api/organizer/voucher-strategy", "/api/organizer/agent-chat")) {
                 Route route = new Route("POST", path);
                 assertThat(status(client, route, ANON)).as("anonymous " + path).isEqualTo(401);
                 assertThat(status(client, route, "customer")).as("customer " + path).isEqualTo(200);
                 assertThat(status(client, route, "event-staff")).as("event staff " + path).isEqualTo(200);
             }
-            Route agent = new Route("POST", "/api/organizer/agent-chat");
-            assertThat(status(client, agent, ANON)).isEqualTo(401);
-            assertThat(status(client, agent, "customer")).isEqualTo(403);
-            assertThat(status(client, agent, "event-staff")).isEqualTo(403);
-            assertThat(status(client, agent, "admin")).isEqualTo(200);
         }
     }
 
