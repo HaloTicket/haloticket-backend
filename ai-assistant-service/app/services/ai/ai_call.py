@@ -1,4 +1,4 @@
-"""Lệnh gọi mô hình có giới hạn và có đo lường cho các route thuộc phạm vi (agent-chat vẫn dùng llm_factory, không bị đụng tới).
+"""Lệnh gọi mô hình có giới hạn và có đo lường cho các route AI.
 
 - tối đa 2 nhà cung cấp cho mỗi lệnh gọi, thử lần lượt (Groq, rồi OpenAI, rồi Gemini; lấy hai nhà đầu tiên đã cấu hình)
 - hạn chót tổng cứng cho mỗi lệnh gọi (thread pool có giới hạn + `future.result(timeout)`); luồng chạy quá hạn
@@ -31,8 +31,8 @@ PROVIDERS = ("groq", "openai", "gemini")
 MAX_PROVIDERS_PER_CALL = 2
 _RING_WINDOW_SECONDS = 24 * 3600
 
-# các profile bị tính vào ngân sách ngày chung (chat hướng tới khách hàng)
-BUDGETED_PROFILES = frozenset({"customer_chat"})
+# Các profile chat dùng chung ngân sách gọi mô hình theo ngày.
+BUDGETED_PROFILES = frozenset({"customer_chat", "organizer_chat"})
 
 
 @dataclass(frozen=True)
@@ -49,6 +49,7 @@ def _build_profiles() -> dict:
     d = settings.ai_llm_deadline_seconds
     return {
         "customer_chat": AiProfile("customer_chat", "fast", settings.ai_max_tokens_customer_chat, d),
+        "organizer_chat": AiProfile("organizer_chat", "smart", settings.ai_max_tokens_event_content, d),
         "admin_assistant": AiProfile("admin_assistant", "fast", settings.ai_max_tokens_admin_assistant, d),
         "risk_scoring": AiProfile("risk_scoring", "fast", settings.ai_max_tokens_risk_scoring, d),
         "event_content": AiProfile("event_content", "smart", settings.ai_max_tokens_event_content, d),

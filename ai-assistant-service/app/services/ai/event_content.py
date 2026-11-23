@@ -1,9 +1,7 @@
 """Mô tả và điều khoản sự kiện cho ban tổ chức (POST /api/organizer/generate-event-content).
 
-Nội dung prompt và định dạng JSON {description, terms_and_conditions} giống OrganizerAgent.generate_event_content
-(organizer_agent.py không bị sửa). Khác biệt: chữ người dùng nằm trong khối dữ liệu có dấu phân cách ngẫu nhiên theo từng
-yêu cầu, có giới hạn kích thước, lời gọi đi qua ai_invoke('event_content'), và mọi lỗi đều thành AiError: văn bản báo lỗi
-không bao giờ bị trả về như thể là phần mô tả.
+Văn bản từ người dùng được đặt trong khối có dấu phân cách ngẫu nhiên và giới hạn kích thước.
+Lời gọi đi qua ai_invoke('event_content') và lỗi được trả bằng AiError.
 """
 import json
 import logging
