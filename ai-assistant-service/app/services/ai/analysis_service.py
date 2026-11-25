@@ -1,8 +1,7 @@
 """Phân tích dữ liệu và chiến lược voucher qua lớp mô hình có đo lường.
 
 Mỗi profile ('analysis', 'voucher_strategy') có SQLEngine riêng dựng với `llm=` là một runnable có đo lường, nên hai
-route dùng `ai_invoke` (giới hạn, hạn chót, ghi nhận sử dụng). Singleton `sql_engine` của sql_engine.py KHÔNG bị đụng tới:
-đường SQL_QUERY của agent-chat vẫn dùng nó. Module này chỉ ánh xạ dict kết quả của engine sang mã lỗi AiError.
+route dùng `ai_invoke` (giới hạn, hạn chót, ghi nhận sử dụng). Module này ánh xạ kết quả của engine sang mã lỗi AiError.
 """
 import contextvars
 import logging

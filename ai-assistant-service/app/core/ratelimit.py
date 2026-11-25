@@ -177,6 +177,8 @@ def _limits_for(bucket: str, authenticated: bool):
         return [("h", _HOUR, s.ai_rl_voucher_strategy_per_hour), ("d", _DAY, s.ai_rl_voucher_strategy_per_day)]
     if bucket == "data_analysis":
         return [("h", _HOUR, s.ai_rl_data_analysis_per_hour), ("d", _DAY, s.ai_rl_data_analysis_per_day)]
+    if bucket == "organizer_chat":
+        return [("h", _HOUR, s.ai_rl_organizer_chat_per_hour), ("d", _DAY, s.ai_rl_organizer_chat_per_day)]
     if bucket == "admin_assistant":
         return [("h", _HOUR, s.ai_rl_admin_assistant_per_hour)]
     if bucket == "risk_scoring":

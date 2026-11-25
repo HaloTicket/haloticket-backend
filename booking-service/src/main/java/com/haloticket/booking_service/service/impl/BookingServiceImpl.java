@@ -71,7 +71,8 @@ public class BookingServiceImpl implements BookingService {
      * @param request thông tin đơn cần tạo
      * @return đơn vừa tạo
      * @throws IllegalArgumentException khi ghế đã bị người khác giữ
-     * @throws RuntimeException khi suất chiếu chưa mở bán hoặc đã hết hạn bán, không lấy được khóa, hoặc bị gián đoạn
+     * @throws ResponseStatusException HTTP 409 khi suất chiếu chưa mở bán hoặc đã hết hạn bán
+     * @throws RuntimeException khi không lấy được khóa hoặc bị gián đoạn
      */
     @Override
     @Transactional
@@ -101,10 +102,10 @@ public class BookingServiceImpl implements BookingService {
                     if (showtime != null) {
                         LocalDateTime now = LocalDateTime.now();
                         if (showtime.getSaleStartTime() != null && now.isBefore(showtime.getSaleStartTime())) {
-                            throw new RuntimeException("Suất diễn chưa mở bán!");
+                            throw new ResponseStatusException(HttpStatus.CONFLICT, "SHOWTIME_SALE_NOT_STARTED");
                         }
                         if (showtime.getSaleEndTime() != null && now.isAfter(showtime.getSaleEndTime())) {
-                            throw new RuntimeException("Suất diễn đã kết thúc mở bán!");
+                            throw new ResponseStatusException(HttpStatus.CONFLICT, "SHOWTIME_SALE_ENDED");
                         }
                     }
                 }

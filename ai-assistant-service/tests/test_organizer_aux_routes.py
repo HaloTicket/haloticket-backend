@@ -1,4 +1,4 @@
-"""generate-event-content, data-analysis, voucher-strategy on the AI foundation (and agent-chat staying as it was)."""
+"""Organizer AI routes, including compatibility with the legacy admin chat request."""
 import json
 import time
 from types import SimpleNamespace
@@ -256,13 +256,14 @@ def test_organizer_module_still_exposes_the_patchable_attributes():
     assert organizer.sql_engine is analysis_service.LEGACY_ENGINE
 
 
-def test_agent_chat_is_untouched_by_the_rate_limit_and_uses_the_agent(api, monkeypatch):
+def test_agent_chat_uses_its_own_rate_limit_bucket(api, monkeypatch):
     seen = []
+    monkeypatch.setattr(organizer.permissions, "chat_events", lambda identity, event_id: [])
     monkeypatch.setattr(organizer, "organizer_agent", SimpleNamespace(chat=lambda **kw: seen.append(kw) or {"reply": "ok"}))
     for name in ("event_content", "voucher_strategy", "data_analysis"):
         monkeypatch.setattr(settings, f"ai_rl_{name}_per_hour", 0)
     for _ in range(3):
-        assert api.post("/api/organizer/agent-chat", json={"message": "hi"}).json() == {"reply": "ok"}
+        assert api.post("/api/organizer/agent-chat", json={"message": "hi"}).json()["reply"] == "ok"
     assert len(seen) == 3
 
 

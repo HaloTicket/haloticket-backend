@@ -191,6 +191,7 @@ def api(monkeypatch):
         return {"question": question, "reply": "ok", "data": []}
 
     monkeypatch.setattr(organizer, "sql_engine", SimpleNamespace(analyze_data=analyze))
+    monkeypatch.setattr(organizer.permissions, "chat_events", lambda identity, event_id: [])
     monkeypatch.setattr(organizer, "organizer_agent", SimpleNamespace(chat=lambda **kw: {"reply": "ok"}, generate_event_content=lambda t, b: {}))
     app = FastAPI()
     app.include_router(organizer.router, prefix="/api/organizer")
@@ -249,7 +250,7 @@ def test_an_admin_may_ask_about_any_event(api):
     assert api.post("/api/organizer/voucher-strategy", json={"event_id": "anything"}, headers=auth(["ROLE_ADMIN"])).status_code == 200
 
 
-def test_the_organizer_agent_is_still_admin_only(api):
+def test_the_legacy_organizer_agent_request_remains_admin_only(api):
     assert api.post("/api/organizer/agent-chat", json={"message": "hi"}, headers=auth(["ROLE_USER"])).status_code == 403
     assert api.post("/api/organizer/agent-chat", json={"message": "hi"}, headers=auth(["ROLE_ADMIN"])).status_code == 200
 

@@ -53,6 +53,7 @@ def client(monkeypatch, calls, tmp_path):
         return {"question": question, "reply": "ok"}
 
     monkeypatch.setattr(organizer, "sql_engine", SimpleNamespace(analyze_data=analyze))
+    monkeypatch.setattr(organizer.permissions, "chat_events", lambda identity, event_id: [])
     monkeypatch.setattr(organizer, "organizer_agent", SimpleNamespace(
         chat=lambda **kwargs: calls.append(("agent-chat",)) or {"reply": "ok"},
     ))

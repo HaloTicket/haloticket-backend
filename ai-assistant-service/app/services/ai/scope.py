@@ -100,6 +100,56 @@ def events_for_user(user_id: str) -> list:
     return sorted(row[0] for row in rows)
 
 
+@dataclass(frozen=True)
+class OrganizerChatIdentity:
+    is_admin: bool
+    user_id: str | None = None
+
+
+def chat_events(identity: OrganizerChatIdentity, event_id: str | None, page_size: int = 100) -> list[dict]:
+    """Read fresh permissions for each chat turn, with keyset paging in a single snapshot."""
+    query = text("""
+        WITH assignments AS (
+            SELECT event_id, bool_or(role = 'OWNER') AS can_view_finance
+              FROM staff_assignments
+             WHERE user_id = :uid AND status = 'ACTIVE' AND role IN ('OWNER', 'ADMIN', 'MANAGER')
+             GROUP BY event_id
+        )
+        SELECT e.id AS event_id, coalesce(nullif(e.title, ''), e.id) AS title, e.event_status AS status, e.start_time, e.end_time,
+               (:admin OR COALESCE(a.can_view_finance, false)) AS can_view_finance
+          FROM events e
+          LEFT JOIN assignments a ON a.event_id = e.id
+         WHERE (:admin OR a.event_id IS NOT NULL)
+           AND (CAST(:event_id AS text) IS NULL OR e.id = :event_id)
+           AND (CAST(:after AS text) IS NULL OR e.id > :after)
+         ORDER BY e.id LIMIT :limit
+    """)
+    events = []
+    with SessionLocal() as db:
+        db.execute(text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"))
+        db.execute(text("SELECT set_config('statement_timeout', :timeout, true)"),
+                   {"timeout": str(settings.ai_sql_timeout_ms)})
+        after = None
+        while True:
+            rows = db.execute(query, {"uid": identity.user_id, "admin": identity.is_admin,
+                                     "event_id": event_id, "after": after, "limit": page_size}).mappings().all()
+            events.extend(dict(row) for row in rows)
+            if len(rows) < page_size:
+                return events
+            after = rows[-1]["event_id"]
+
+
+def organizer_chat_identity(request: Request, claims: dict) -> OrganizerChatIdentity:
+    if roles_of(claims) & ADMIN_ROLES:
+        return OrganizerChatIdentity(True)
+    token = request.headers.get("Authorization", "").partition(" ")[2].strip()
+    try:
+        return OrganizerChatIdentity(False, fetch_user_id(token))
+    except ScopeUnavailable:
+        raise HTTPException(status_code=503, detail={"code": "SCOPE_UNAVAILABLE",
+                                                    "message": "Chưa xác định được phạm vi dữ liệu của bạn."})
+
+
 def resolve_scope(claims: dict, token: str) -> AnalysisScope:
     """Xác định phạm vi của người gọi: admin thấy tất cả, người khác được tra theo token và cache 30 giây theo `sub`."""
     if roles_of(claims) & ADMIN_ROLES:
