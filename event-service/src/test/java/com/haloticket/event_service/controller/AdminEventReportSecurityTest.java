@@ -1,5 +1,6 @@
 package com.haloticket.event_service.controller;
 
+import com.haloticket.event_service.config.DataInitializer;
 import com.haloticket.event_service.service.AdminEventReportService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:admin_event_report_sec;MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
+        "spring.datasource.username=sa",
+        "spring.datasource.password=",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.jpa.hibernate.ddl-auto=create-drop",
+        "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
+        "eureka.client.enabled=false",
         "spring.security.oauth2.resourceserver.jwt.issuer-uri=https://issuer.example",
         "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=https://issuer.example/jwks"
 })
@@ -27,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AdminEventReportSecurityTest {
     @Autowired MockMvc mvc;
     @MockitoBean AdminEventReportService reports;
+    @MockitoBean DataInitializer dataInitializer;
 
     @Test
     void rejectsNonAdminForAggregateReport() throws Exception {

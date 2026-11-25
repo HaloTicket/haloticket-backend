@@ -187,5 +187,6 @@ def test_suggested_questions_contextual_and_respects_finance_scope(api, monkeypa
     suggested = res.json()["suggested_questions"]
     assert 1 <= len(suggested) <= 3
     assert all(q.endswith("?") for q in suggested)
-    assert all("check-in" not in q.lower() or "theo ngày" in q.lower() for q in suggested)
+    assert all(q != "Đã có bao nhiêu khách check-in?" for q in suggested)
+    assert "Xem lượt check-in theo ngày trong 7 ngày qua?" in suggested
     assert all("doanh thu" not in q.lower() for q in suggested)
