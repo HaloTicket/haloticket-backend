@@ -183,9 +183,10 @@ The initialization script [postgres/init/01-create-databases.sql](file:///d:/Hal
 3. `ticket_db`: Ticket definitions, QR codes, and seat inventory.
 4. `booking_db`: Order bookings, reservations, and hold locks.
 5. `payment_db`: Payment transactions, ledger, and gateway logs.
-6. `notification_db`: Notification templates, push logs, and email history.
-7. `marketplace_db`: Secondary ticket resale marketplace.
-8. `keycloak_db`: Keycloak IAM internal system data.
+6. `marketplace_db`: Secondary ticket resale marketplace.
+7. `keycloak_db`: Keycloak IAM internal system data.
+
+The notification service uses the MongoDB database `haloticket_notifications` for its inbox, templates, delivery history and announcement batches. Existing PostgreSQL environments retain the legacy `notification_db` for migration.
 
 ---
 

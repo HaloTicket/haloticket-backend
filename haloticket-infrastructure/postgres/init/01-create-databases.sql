@@ -6,7 +6,6 @@ CREATE DATABASE event_db;
 CREATE DATABASE ticket_db;
 CREATE DATABASE booking_db;
 CREATE DATABASE payment_db;
-CREATE DATABASE notification_db;
 CREATE DATABASE marketplace_db;
 CREATE DATABASE keycloak_db;
 -- The PostgreSQL entrypoint runs this script as POSTGRES_USER. That user owns

@@ -271,6 +271,9 @@ FROM found
 WHERE rel IS NULL OR def IS NULL OR position('''' || val || '''' IN def) = 0
 ORDER BY 1, 2, 3;
 
+-- The legacy database only exists on environments provisioned before the MongoDB cutover.
+SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'notification_db') AS has_legacy_notification_db \gset
+\if :has_legacy_notification_db
 \echo === notification_db
 \c notification_db
 WITH expected(tbl, col, val) AS (VALUES
@@ -305,6 +308,8 @@ SELECT DISTINCT tbl AS table_name, col AS column_name,
 FROM found
 WHERE rel IS NULL OR def IS NULL OR position('''' || val || '''' IN def) = 0
 ORDER BY 1, 2, 3;
+
+\endif
 
 \echo === marketplace_db
 \c marketplace_db
