@@ -4,6 +4,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import com.haloticket.ticket_service.authz.EventAccessView;
 
 import java.time.LocalDateTime;
@@ -12,6 +13,10 @@ import java.util.List;
 /** Feign client gọi event-service để lấy chi tiết sự kiện và quyền của người dùng trên sự kiện. */
 @FeignClient(name = "event-service", url = "${EVENT_SERVICE_URL:}")
 public interface EventServiceClient {
+    @GetMapping("/api/internal/notification-teams/{eventId}/access")
+    void requireAnnouncementAccess(@RequestHeader("X-Internal-Token") String token, @PathVariable String eventId,
+                                   @RequestParam String actorId, @RequestParam String showtimeId);
+
 
     /** Lấy chi tiết sự kiện, gồm thời gian và các suất diễn. */
     @GetMapping("/api/events/{id}")

@@ -92,6 +92,28 @@ class EventAccessServiceTest {
         }
     }
 
+    @Test void announcementsRequireAnActiveOwnerOrManagerForTheRequestedEvent() {
+        when(assignments.findByEventIdAndUserId("owner", "person"))
+                .thenReturn(Optional.of(assignment(StaffRole.OWNER, StaffAssignmentStatus.ACTIVE)));
+        when(assignments.findByEventIdAndUserId("manager", "person"))
+                .thenReturn(Optional.of(assignment(StaffRole.MANAGER, StaffAssignmentStatus.ACTIVE)));
+        when(assignments.findByEventIdAndUserId("event-admin", "person"))
+                .thenReturn(Optional.of(assignment(StaffRole.ADMIN, StaffAssignmentStatus.ACTIVE)));
+        when(assignments.findByEventIdAndUserId("revoked", "person"))
+                .thenReturn(Optional.of(assignment(StaffRole.MANAGER, StaffAssignmentStatus.REVOKED)));
+        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("root", "n/a", "ROLE_ADMIN"));
+        try {
+            assertThat(access.requireAnnouncementAccess("owner", "Bearer token").role()).isEqualTo(StaffRole.OWNER);
+            assertThat(access.requireAnnouncementAccess("manager", "Bearer token").role()).isEqualTo(StaffRole.MANAGER);
+            for (String eventId : List.of("event-admin", "revoked", "other-event")) {
+                assertThatThrownBy(() -> access.requireAnnouncementAccess(eventId, "Bearer token"))
+                        .isInstanceOf(ResponseStatusException.class).hasMessageContaining("FORBIDDEN_ROLE");
+            }
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
     private Event event(String id) {
         Event event = new Event();
         event.setId(id);

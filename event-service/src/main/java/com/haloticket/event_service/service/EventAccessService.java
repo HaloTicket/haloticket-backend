@@ -46,6 +46,18 @@ public class EventAccessService {
         return permissions.forUser(userId, eventId, isPlatformAdmin());
     }
 
+    public EventAccess requireAnnouncementAccess(String eventId, String authorization) {
+        return requireAnnouncementActor(eventId, callers.userId(authorization));
+    }
+
+    public EventAccess requireAnnouncementActor(String eventId, String actorId) {
+        EventAccess access = permissions.forUser(actorId, eventId, false);
+        if (access.inactive() || (access.role() != StaffRole.OWNER && access.role() != StaffRole.MANAGER)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "FORBIDDEN_ROLE");
+        }
+        return access;
+    }
+
     /**
      * Yêu cầu quyền đọc chính sách: chủ sự kiện, admin hoặc manager của sự kiện; admin nền tảng cũng được.
      *

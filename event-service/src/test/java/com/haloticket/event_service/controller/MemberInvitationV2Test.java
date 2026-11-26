@@ -197,6 +197,10 @@ class MemberInvitationV2Test {
         assertThat(rowOf("u-fresh1").getStatus()).isEqualTo(StaffAssignmentStatus.ACTIVE);
         assertThat(rowOf("u-fresh1").getInvitationTokenHash()).isNull();
         mvc.perform(as(get("/api/events/" + a + "/members/my-access"), "fresh1")).andExpect(jsonPath("$.role").value("MANAGER"));
+        String assignmentId = rowOf("u-fresh1").getId();
+        mvc.perform(as(get("/api/events/" + a + "/members"), "owner-a")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == '%s')].userId".formatted(assignmentId))
+                        .value(org.hamcrest.Matchers.contains("u-fresh1")));
         // the token is single-use
         answer("accept", "fresh1", token).andExpect(status().isNotFound()).andExpect(status().reason("INVITATION_NOT_FOUND"));
         answer("preview", "fresh1", token).andExpect(status().isNotFound());

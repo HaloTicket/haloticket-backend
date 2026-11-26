@@ -15,6 +15,8 @@ import com.haloticket.ticket_service.enums.TicketTypeStatus;
 /** Kho loại vé của sự kiện, kèm các cập nhật tồn kho nguyên tử để tránh đọc rồi ghi gây xung đột. */
 @Repository
 public interface TicketTypeRepository extends JpaRepository<TicketType, String> {
+    boolean existsByIdAndEventId(String id, String eventId);
+
     /** Các loại vé của một sự kiện. */
     List<TicketType> findByEventId(String eventId);
     /** Các loại vé của một suất diễn. */
