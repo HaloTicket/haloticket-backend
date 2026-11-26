@@ -35,6 +35,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -115,6 +116,35 @@ class CheckinQueriesJpaTest {
             em.createQuery("delete from SeatZone").executeUpdate();
             em.createQuery("delete from SeatLayout").executeUpdate();
             em.createQuery("delete from TicketType").executeUpdate();
+        });
+    }
+
+    @Test
+    void announcementOwnersRespectCurrentOwnershipStatusAndSelectors() {
+        persist(Ticket.builder().eventId(EVENT).ticketType(general).ownerId("buyer-a").status(TicketStatus.VALID).build());
+        persist(Ticket.builder().eventId(EVENT).ticketType(vip).ownerId("buyer-a").status(TicketStatus.USED).build());
+        persist(Ticket.builder().eventId(EVENT).ticketType(general).ownerId("buyer-b").status(TicketStatus.VALID).build());
+        persist(Ticket.builder().eventId(EVENT).ticketType(general).ownerId("revoked").status(TicketStatus.REVOKED).build());
+        persist(Ticket.builder().eventId(EVENT).ticketType(general).ownerId("transferred").status(TicketStatus.TRANSFERED).build());
+        persist(Ticket.builder().eventId(EVENT).ticketType(general).ownerId("locked").status(TicketStatus.LOCKED_FOR_RESALE).build());
+        persist(Ticket.builder().eventId(OTHER_EVENT).ticketType(general).ownerId("other").status(TicketStatus.VALID).build());
+        var first = tickets.findAnnouncementOwners(EVENT, "", "", TicketStatus.VALID, TicketStatus.USED,
+                "", PageRequest.of(0, 1)).getFirst();
+        assertThat(first.getOwnerId()).isEqualTo("buyer-a");
+        assertThat(first.getValid()).isEqualTo(1);
+        assertThat(first.getCheckedIn()).isEqualTo(1);
+        assertThat(tickets.findAnnouncementOwners(EVENT, "", "", TicketStatus.VALID, TicketStatus.USED,
+                "buyer-a", PageRequest.of(0, 10))).extracting(TicketRepository.AnnouncementOwnership::getOwnerId)
+                .containsExactly("buyer-b");
+        assertThat(tickets.findAnnouncementOwners(EVENT, general.getId(), "", TicketStatus.VALID, TicketStatus.USED,
+                "", PageRequest.of(0, 10))).extracting(TicketRepository.AnnouncementOwnership::getCheckedIn)
+                .containsExactly(0, 0);
+        var showtime = tickets.findAnnouncementOwners(EVENT, "", SHOW_2, TicketStatus.VALID, TicketStatus.USED,
+                "", PageRequest.of(0, 10));
+        assertThat(showtime).singleElement().satisfies(owner -> {
+            assertThat(owner.getOwnerId()).isEqualTo("buyer-a");
+            assertThat(owner.getCheckedIn()).isEqualTo(1);
+            assertThat(owner.getValid()).isZero();
         });
     }
 

@@ -1,91 +1,47 @@
 package com.haloticket.notification_service.entity;
 
 import com.haloticket.notification_service.enums.NotificationChannel;
+import com.haloticket.notification_service.enums.NotificationPriority;
 import com.haloticket.notification_service.enums.NotificationStatus;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import com.haloticket.notification_service.enums.AnnouncementCategory;
+import com.haloticket.notification_service.enums.NotificationSource;
+import com.haloticket.notification_service.enums.NotificationVisibility;
+import lombok.*;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
+import org.springframework.data.mongodb.core.mapping.FieldType;
+import org.springframework.data.mongodb.core.mapping.MongoId;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
-/**
- * Thông báo gửi tới người dùng (bảng {@code notifications}). {@code eventId} là khóa chống xử lý trùng sự kiện Kafka;
- * {@code template} có thể rỗng với thông báo phát trực tiếp.
- */
-@Entity
-@Table(name = "notifications")
+@Document("notifications")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class Notification {
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @MongoId(FieldType.STRING)
     private String id;
-
-    @Column(name = "event_id", unique = true)
     private String eventId;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "template_id", nullable = true)
-    private NotificationTemplate template;
-
-    @Column(name = "user_id", nullable = false)
+    private String organizerEventId;
+    private NotificationSource source;
+    private String eventTitle;
+    private AnnouncementCategory category;
+    private NotificationVisibility visibility;
+    @Field(write = Field.Write.ALWAYS)
+    private String templateId;
     private String userId;
-
-    @Column(name = "recipient_email")
     private String recipientEmail;
-
-    @Column(name = "variables_json", columnDefinition = "TEXT")
     private String variablesJson;
-
-    @Column(name = "title", columnDefinition = "TEXT")
     private String title;
-
-    @Column(name = "message", columnDefinition = "TEXT")
     private String message;
-
-    @Column(name = "type")
     private String type;
-
-    @Column(name = "read_status")
+    private NotificationPriority priority;
     private Boolean readStatus;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private NotificationChannel channel;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private NotificationStatus status;
-
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "sent_at")
-    private LocalDateTime sentAt;
-
-    /** Trước khi lưu: gán thời điểm tạo và đặt trạng thái {@code PENDING} nếu chưa có. */
-    @PrePersist
-    protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        if (this.status == null) {
-            this.status = NotificationStatus.PENDING;
-        }
-    }
+    private Instant createdAt;
+    private Instant sentAt;
+    private Instant deletedAt;
 }

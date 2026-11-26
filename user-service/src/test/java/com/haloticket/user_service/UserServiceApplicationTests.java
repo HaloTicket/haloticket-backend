@@ -15,6 +15,10 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.time.Instant;
+import com.haloticket.user_service.controller.NotificationRecipientController;
+import org.springframework.web.server.ResponseStatusException;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -79,6 +83,39 @@ class UserServiceApplicationTests {
 		assertThat(reloaded.getFullName()).isEqualTo("Name Saved From Profile");
 		assertThat(reloaded.getAvatarUrl()).endsWith("/avatars/profile.png");
 		assertThat(userService.syncCurrentUser(jwt).getFullName()).isEqualTo("Name Saved From Profile");
+	}
+
+	@Test
+	@Transactional
+	void notificationDirectoryUsesActiveAccountsAndAStableCursor() {
+		var controller = new NotificationRecipientController(userRepository, "test-secret");
+		User alice = account("alice", UserStatus.ACTIVE);
+		User bob = account("bob", UserStatus.ACTIVE);
+		User banned = account("banned", UserStatus.BANNED);
+		Instant cutoff = Instant.now().plusSeconds(60);
+		var ordered = java.util.stream.Stream.of(alice.getId(), bob.getId()).sorted().toList();
+
+		assertThat(controller.activeIds("test-secret", cutoff, "", 1)).containsExactly(ordered.getFirst());
+		assertThat(controller.activeIds("test-secret", cutoff, ordered.getFirst(), 1)).containsExactly(ordered.getLast());
+		assertThat(controller.activeIds("test-secret", Instant.EPOCH, "", 200)).isEmpty();
+		assertThat(controller.activeMatches("test-secret", cutoff, java.util.List.of(alice.getId(), banned.getId())))
+				.containsExactly(alice.getId());
+		assertThat(controller.activeBuyerMatches("test-secret", cutoff,
+				java.util.List.of(alice.getKeycloakId(), "unmatched-booking-buyer")))
+				.containsExactly(alice.getId());
+		assertThat(controller.activeBuyerMatches("test-secret", cutoff,
+				java.util.List.of(alice.getKeycloakId(), alice.getId(), banned.getKeycloakId())))
+				.containsExactly(alice.getId());
+		assertThat(controller.resolve("test-secret", alice.getKeycloakId()).id()).isEqualTo(alice.getId());
+		assertThatThrownBy(() -> controller.activeAccount("test-secret", banned.getId(), cutoff))
+				.isInstanceOf(ResponseStatusException.class).hasMessageContaining("404");
+		assertThatThrownBy(() -> controller.activeIds(null, cutoff, "", 1))
+				.isInstanceOf(ResponseStatusException.class).hasMessageContaining("403");
+	}
+
+	private User account(String name, UserStatus status) {
+		return userRepository.saveAndFlush(User.builder().keycloakId(name + "-notification-test")
+				.email(name + "@notification.test").status(status).build());
 	}
 
 }

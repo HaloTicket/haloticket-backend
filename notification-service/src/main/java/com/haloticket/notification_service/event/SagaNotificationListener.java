@@ -10,6 +10,7 @@ import com.haloticket.notification_service.entity.NotificationTemplate;
 import com.haloticket.notification_service.repository.NotificationTemplateRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import com.haloticket.notification_service.service.NotificationService;
@@ -75,7 +76,7 @@ public class SagaNotificationListener {
                 return;
             }
 
-            NotificationTemplate template = templateRepository.findByTypeAndChannelAndStatus(
+            NotificationTemplate template = templateRepository.findFirstByTypeAndChannelAndStatusOrderByIdAsc(
                     NotificationType.TICKET_CONFIRMATION, NotificationChannel.EMAIL, NotificationTemplateStatus.ACTIVE)
                     .orElseThrow(() -> new IllegalStateException("Active ticket confirmation template is missing"));
             Map<String, String> vars = orderVariables(node, tickets);
@@ -278,8 +279,8 @@ public class SagaNotificationListener {
      * @param payload JSON sự kiện tặng vé thành công
      */
     @KafkaListener(topics = "haloticket.marketplace.gift.completed.v1", groupId = "notification-service-marketplace")
-    public void handleGiftCompleted(String payload) {
-        publishMarketplaceNotification(payload, "GIFT_COMPLETED", "Tặng vé thành công", "Vé đã được chuyển quyền sở hữu thành công.");
+    public void handleGiftCompleted(ConsumerRecord<String, String> record) {
+        publishMarketplaceNotification(record, "GIFT_COMPLETED", "Tặng vé thành công", "Vé đã được chuyển quyền sở hữu thành công.");
     }
 
     /**
@@ -288,8 +289,8 @@ public class SagaNotificationListener {
      * @param payload JSON sự kiện hủy tặng vé
      */
     @KafkaListener(topics = "haloticket.marketplace.gift.cancelled.v1", groupId = "notification-service-marketplace")
-    public void handleGiftCancelled(String payload) {
-        publishMarketplaceNotification(payload, "GIFT_CANCELLED", "Tặng vé đã hủy", "Lời mời tặng vé đã được hủy hoặc hết hạn.");
+    public void handleGiftCancelled(ConsumerRecord<String, String> record) {
+        publishMarketplaceNotification(record, "GIFT_CANCELLED", "Tặng vé đã hủy", "Lời mời tặng vé đã được hủy hoặc hết hạn.");
     }
 
     /**
@@ -298,13 +299,13 @@ public class SagaNotificationListener {
      * @param payload JSON sự kiện listing
      */
     @KafkaListener(topics = {"haloticket.marketplace.listing.activated.v1", "haloticket.marketplace.listing.failed.v1"}, groupId = "notification-service-marketplace")
-    public void handleResaleListing(String payload) {
+    public void handleResaleListing(ConsumerRecord<String, String> record) {
         JsonNode node;
-        try { node = objectMapper.readTree(payload); } catch (Exception exception) { throw new IllegalStateException("Invalid marketplace notification payload", exception); }
+        try { node = objectMapper.readTree(record.value()); } catch (Exception exception) { throw new IllegalStateException("Invalid marketplace notification payload", exception); }
         String eventType = node.has("status") && "FAILED".equals(node.get("status").asText()) ? "RESALE_LISTING_FAILED" : "RESALE_LISTING_ACTIVATED";
         String title = "RESALE_LISTING_FAILED".equals(eventType) ? "Đăng bán vé thất bại" : "Đăng bán vé thành công";
         String message = "RESALE_LISTING_FAILED".equals(eventType) ? "Không thể đăng bán vé, hệ thống đang khôi phục trạng thái vé." : "Đăng bán vé thành công. Vé đã được đưa lên sàn.";
-        publishMarketplaceNotification(node, eventType, title, message);
+        publishMarketplaceNotification(node, record, eventType, title, message);
     }
 
     /**
@@ -316,8 +317,8 @@ public class SagaNotificationListener {
      * @param message nội dung
      * @throws IllegalStateException khi JSON không hợp lệ
      */
-    private void publishMarketplaceNotification(String payload, String type, String title, String message) {
-        try { publishMarketplaceNotification(objectMapper.readTree(payload), type, title, message); }
+    private void publishMarketplaceNotification(ConsumerRecord<String, String> record, String type, String title, String message) {
+        try { publishMarketplaceNotification(objectMapper.readTree(record.value()), record, type, title, message); }
         catch (Exception exception) { throw new IllegalStateException("Invalid marketplace notification payload", exception); }
     }
 
@@ -329,10 +330,10 @@ public class SagaNotificationListener {
      * @param title tiêu đề
      * @param message nội dung
      */
-    private void publishMarketplaceNotification(JsonNode node, String type, String title, String message) {
+    private void publishMarketplaceNotification(JsonNode node, ConsumerRecord<String, String> record, String type, String title, String message) {
         String recipient = node.hasNonNull("recipientEmail") ? node.get("recipientEmail").asText() : node.path("sellerId").asText(null);
         if (recipient == null || recipient.isBlank()) return;
-        notificationService.publishDirectNotification(recipient, type, title, message);
+        notificationService.publishDirectEvent(DirectNotificationEventKey.kafkaRecordKey(record), recipient, type, title, message, null);
     }
 
     /**
@@ -430,23 +431,19 @@ public class SagaNotificationListener {
             "haloticket.event.approved.v1",
             "haloticket.event.rejected.v1"
     }, groupId = "notification-service-payout")
-    public void handleDirectAndPayoutNotifications(String payload) {
-        try {
-            JsonNode node = objectMapper.readTree(payload);
-            String recipientUserId = node.hasNonNull("recipientUserId") && !node.path("recipientUserId").asText().isBlank()
-                    ? node.path("recipientUserId").asText()
-                    : node.path("userId").asText();
-            String type = node.path("type").asText();
-            String title = node.path("title").asText();
-            String message = node.path("message").asText();
-            String variables = node.hasNonNull("variables") ? node.path("variables").asText() : null;
+    public void handleDirectAndPayoutNotifications(ConsumerRecord<String, String> record) throws Exception {
+        JsonNode node = objectMapper.readTree(record.value());
+        String recipientUserId = node.path("recipientUserId").asText("");
+        if (recipientUserId.isBlank()) recipientUserId = node.path("userId").asText("");
+        String type = node.path("type").asText("");
+        if (recipientUserId.isBlank() || type.isBlank()) return;
 
-            if (!recipientUserId.isBlank() && !type.isBlank()) {
-                notificationService.publishDirectNotification(recipientUserId, type, title, message, variables);
-                log.info("Sent direct/payout notification to {} (type: {})", recipientUserId, type);
-            }
-        } catch (Exception e) {
-            log.error("Failed to process direct/payout notification: {}", e.getMessage(), e);
-        }
+        String title = node.path("title").asText("");
+        String message = node.path("message").asText("");
+        String variables = node.path("variables").asText(null);
+        String key = DirectNotificationEventKey.sharedKey(node.path("timestamp").asText(null),
+                recipientUserId, type, title, message, variables);
+        if (key == null) key = DirectNotificationEventKey.kafkaRecordKey(record);
+        notificationService.publishDirectEvent(key, recipientUserId, type, title, message, variables);
     }
 }

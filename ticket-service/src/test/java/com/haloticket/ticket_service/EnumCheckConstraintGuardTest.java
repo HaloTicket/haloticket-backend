@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * Hibernate (ddl-auto: update) writes a CHECK constraint for every enum column when it creates the table and never changes
  * it. A value added to a Java enum later is then refused by the database until someone writes a SQL migration.
  *
- * One guard for all seven services, driven by the source files (the services are separate Maven projects, so there is no
+ * One guard for the six PostgreSQL services, driven by the source files (the services are separate Maven projects, so there is no
  * shared JPA model to ask). It checks three things:
  *  1. a value that production's constraint rejects must be listed by a migration;
  *  2. a migration that defines an enum constraint must list every value of its enum, always;
@@ -43,7 +43,7 @@ class EnumCheckConstraintGuardTest {
 
     private static final Map<String, String> DATABASE = Map.of(
             "user", "user_db", "event", "event_db", "ticket", "ticket_db", "booking", "booking_db",
-            "payment", "payment_db", "notification", "notification_db", "marketplace", "marketplace_db");
+            "payment", "payment_db", "marketplace", "marketplace_db");
 
     /** An element collection of enums: its values live in a separate table and production has no CHECK on it. */
     private static final Set<String> NOT_AUDITED = Set.of("users.user_roles");
@@ -72,7 +72,7 @@ class EnumCheckConstraintGuardTest {
 
     @Test
     void theParserFindsTheEnumColumnsAndTheProductionSnapshot() {
-        assertThat(enumColumns).as("enum columns found in the entity sources").hasSizeGreaterThanOrEqualTo(50);
+        assertThat(enumColumns).as("enum columns found in the entity sources").hasSizeGreaterThanOrEqualTo(45);
         assertThat(enumColumns).extracting(EnumColumn::database).containsAll(DATABASE.values());
         assertThat(enumColumns).allSatisfy(column -> assertThat(column.values()).as(column.label()).isNotEmpty());
         assertThat(production).as("constraints in the production snapshot").hasSizeGreaterThanOrEqualTo(35);

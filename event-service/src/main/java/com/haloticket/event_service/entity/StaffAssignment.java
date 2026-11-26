@@ -8,7 +8,8 @@ import java.time.LocalDateTime;
 
 /** Thực thể phân công nhân sự cho sự kiện (bảng {@code staff_assignments}): người dùng, vai trò, trạng thái và thông tin lời mời (băm token, hạn dùng, số lần gửi lại). */
 @Entity
-@Table(name = "staff_assignments")
+@Table(name = "staff_assignments", indexes =
+        @Index(name = "idx_staff_announcement_event_status_user", columnList = "event_id, status, user_id"))
 @Getter
 @Setter
 @NoArgsConstructor

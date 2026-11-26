@@ -28,6 +28,13 @@ import org.springframework.transaction.annotation.Transactional;
 /** Truy vấn đơn đặt vé: tra cứu, khóa bi quan khi cập nhật, thống kê doanh thu và số liệu phục vụ đối soát, báo cáo. */
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, String> {
+       @Query("SELECT DISTINCT b.customerId FROM Booking b WHERE b.eventId = :eventId " +
+              "AND b.status IN :statuses AND b.updatedAt <= :cutoff AND b.customerId > :after ORDER BY b.customerId")
+       List<String> findNotificationBuyerIds(@Param("eventId") String eventId,
+                                             @Param("statuses") Collection<BookingStatus> statuses,
+                                             @Param("cutoff") LocalDateTime cutoff, @Param("after") String after,
+                                             Pageable pageable);
+
        /** Dữ kiện báo cáo của một đơn: sự kiện, tổng số vé và trạng thái. */
        interface ReportFact {
               /** Mã đơn. */

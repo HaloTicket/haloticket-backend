@@ -48,7 +48,7 @@ class SagaNotificationListenerTest {
 
     @Test
     void issuedBatchEmailShowsExactOrderAndEscapesTicketText() {
-        when(templateRepository.findByTypeAndChannelAndStatus(any(), any(), any())).thenReturn(Optional.of(template));
+        when(templateRepository.findFirstByTypeAndChannelAndStatusOrderByIdAsc(any(), any(), any())).thenReturn(Optional.of(template));
         when(notificationService.processEvent(any(), any(), any(), any())).thenReturn(NotificationResponse.builder().id("notification-1")
                 .status(NotificationStatus.PENDING).build());
         String payload = """
@@ -76,7 +76,7 @@ class SagaNotificationListenerTest {
 
     @Test
     void replayOfSentBatchDoesNotSendAgain() {
-        when(templateRepository.findByTypeAndChannelAndStatus(any(), any(), any())).thenReturn(Optional.of(template));
+        when(templateRepository.findFirstByTypeAndChannelAndStatusOrderByIdAsc(any(), any(), any())).thenReturn(Optional.of(template));
         when(notificationService.processEvent(any(), any(), any(), any())).thenReturn(NotificationResponse.builder().id("notification-1")
                 .status(NotificationStatus.SENT).build());
 

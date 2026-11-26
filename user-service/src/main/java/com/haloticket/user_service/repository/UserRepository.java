@@ -2,6 +2,7 @@ package com.haloticket.user_service.repository;
 
 import com.haloticket.user_service.entity.User;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -76,4 +77,27 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
      */
     @Query("select u.status, count(u) from User u group by u.status")
     List<Object[]> countGroupedByStatus();
+    @Query("""
+            select u.id from User u where u.status = :status and u.id > :after
+            and (u.createdAt is null or u.createdAt <= :cutoff) order by u.id
+            """)
+    List<String> findActiveNotificationRecipientIds(@Param("status") UserStatus status,
+            @Param("cutoff") java.time.LocalDateTime cutoff, @Param("after") String after, Pageable page);
+
+    @Query("""
+            select u.id from User u where u.status = :status and u.id in :ids
+            and (u.createdAt is null or u.createdAt <= :cutoff) order by u.id
+            """)
+    List<String> matchActiveNotificationRecipientIds(@Param("status") UserStatus status,
+            @Param("cutoff") java.time.LocalDateTime cutoff, @Param("ids") List<String> ids);
+
+    @Query("""
+            select u.id from User u where u.status = :status
+            and (u.createdAt is null or u.createdAt <= :cutoff)
+            and (u.keycloakId in :ids or (u.id in :ids and not exists
+                 (select account.id from User account where account.keycloakId = u.id)))
+            order by u.id
+            """)
+    List<String> matchActiveNotificationBuyerIds(@Param("status") UserStatus status,
+            @Param("cutoff") java.time.LocalDateTime cutoff, @Param("ids") List<String> ids);
 }

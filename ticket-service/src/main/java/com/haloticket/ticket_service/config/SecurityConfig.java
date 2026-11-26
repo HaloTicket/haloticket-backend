@@ -30,6 +30,7 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/**", "/health").permitAll()
                 // Endpoint này tự kiểm tra thông tin xác thực dịch vụ trước khi truy cập DB.
                 .requestMatchers(HttpMethod.GET, "/api/internal/tickets/*/transfer-snapshot").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/internal/tickets/events/*/notification-owners").permitAll()
                 // Token dịch vụ được kiểm tra ngay trong controller trước khi truy cập DB.
                 .requestMatchers(HttpMethod.POST, "/api/internal/tickets/stock-reservations", "/api/internal/tickets/stock-reservations/*/release").permitAll()
                 // Tương tự cho việc mở lại giữ chỗ (thanh toán muộn) và các lần đọc đối soát (trang admin qua booking-service).
