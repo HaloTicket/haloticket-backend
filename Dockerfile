@@ -5,12 +5,10 @@ FROM ${BUILD_IMAGE} AS build
 ARG SERVICE
 WORKDIR /build
 COPY ${SERVICE}/pom.xml ./pom.xml
-# Maven dependencies stay in BuildKit's cache, never in the runtime image.
-RUN --mount=type=cache,id=haloticket-maven,target=/root/.m2,sharing=locked \
-    mvn -B -ntp dependency:go-offline -DskipTests -Dmaven.wagon.http.retryHandler.count=5 || true
 COPY ${SERVICE}/src ./src
+# Reuse downloaded artifacts and let Maven Resolver back off on Maven Central rate limits.
 RUN --mount=type=cache,id=haloticket-maven,target=/root/.m2,sharing=locked \
-    mvn -B -ntp package -DskipTests -Dmaven.wagon.http.retryHandler.count=5 && \
+    mvn -B -ntp package -DskipTests -Daether.transport.http.retryHandler.count=5 && \
     cp target/*.jar application.jar && \
     java -Djarmode=tools -jar application.jar extract --layers --destination extracted
 
