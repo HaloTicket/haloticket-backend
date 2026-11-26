@@ -1,10 +1,14 @@
 package com.haloticket.notification_service.service;
 
+import com.haloticket.notification_service.enums.InboxChannel;
+
 import com.haloticket.notification_service.dto.request.NotificationCreateRequest;
 import com.haloticket.notification_service.dto.request.NotificationTemplateCreateRequest;
 import com.haloticket.notification_service.dto.response.NotificationResponse;
 import com.haloticket.notification_service.dto.response.NotificationTemplateResponse;
 
+import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import com.haloticket.notification_service.event.NotificationEvent;
 
@@ -40,7 +44,11 @@ public interface NotificationService {
      * @param userId mã người dùng
      * @return danh sách thông báo
      */
-    List<NotificationResponse> getUserNotifications(String userId);
+    List<NotificationResponse> getUserNotifications(Collection<String> aliases, InboxChannel channel);
+
+    default List<NotificationResponse> getUserNotifications(Collection<String> aliases) {
+        return getUserNotifications(aliases, InboxChannel.PUBLIC);
+    }
 
     /**
      * Đánh dấu đã gửi và ghi thời điểm gửi.
@@ -67,7 +75,10 @@ public interface NotificationService {
      * @return thông báo sau cập nhật
      * @throws NotificationException khi không tìm thấy (404)
      */
-    NotificationResponse markAsRead(String id);
+    NotificationResponse markAsRead(String id, Collection<String> aliases);
+
+    /** Mark one owned notification as unread. */
+    NotificationResponse markAsUnread(String id, Collection<String> aliases);
 
     /**
      * Đánh dấu mọi thông báo của người dùng là đã đọc.
@@ -75,7 +86,11 @@ public interface NotificationService {
      * @param userId mã người dùng
      * @return danh sách sau cập nhật
      */
-    List<NotificationResponse> markAllAsRead(String userId);
+    List<NotificationResponse> markAllAsRead(Collection<String> aliases, Instant startedAt, InboxChannel channel);
+
+    void delete(String id, Collection<String> aliases);
+
+    NotificationResponse publishDirectEvent(String eventId, String userId, String type, String title, String message, String variablesJson);
 
     /**
      * Lưu thông báo từ sự kiện Kafka, idempotent theo {@code eventId}, rồi đẩy qua STOMP.

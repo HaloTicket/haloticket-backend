@@ -5,6 +5,7 @@ import com.haloticket.notification_service.dto.response.NotificationResponse;
 import com.haloticket.notification_service.entity.NotificationTemplate;
 import com.haloticket.notification_service.enums.NotificationChannel;
 import com.haloticket.notification_service.enums.NotificationStatus;
+import com.haloticket.notification_service.enums.NotificationTemplateStatus;
 import com.haloticket.notification_service.repository.NotificationTemplateRepository;
 import com.haloticket.notification_service.service.NotificationService;
 import com.haloticket.notification_service.exception.NotificationErrorCode;
@@ -37,10 +38,15 @@ public class NotificationEventConsumer {
         validate(event);
         NotificationResponse notification = notificationService.processEvent(event);
         if (notification.getStatus() == NotificationStatus.SENT) return;
-        NotificationTemplate template = templateRepository.findById(event.templateId())
+        String templateId = notification.getTemplateId() == null ? event.templateId() : notification.getTemplateId();
+        NotificationTemplate template = templateRepository.findById(templateId)
                 .orElseThrow(() -> new NotificationException(NotificationErrorCode.TEMPLATE_NOT_FOUND,
                         "Notification template not found", 404));
-        emailSender.send(template, event.recipientEmail(), event.variables());
+        if (template.getStatus() != NotificationTemplateStatus.ACTIVE) {
+            throw new NotificationException(NotificationErrorCode.TEMPLATE_INACTIVE, "Notification template must be active", 409);
+        }
+        emailSender.send(template, notification.getRecipientEmail() == null ? event.recipientEmail()
+                : notification.getRecipientEmail(), event.variables());
         notificationService.markAsSent(notification.getId());
     }
 

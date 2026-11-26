@@ -4,90 +4,66 @@ import com.haloticket.notification_service.entity.NotificationTemplate;
 import com.haloticket.notification_service.enums.NotificationChannel;
 import com.haloticket.notification_service.enums.NotificationTemplateStatus;
 import com.haloticket.notification_service.enums.NotificationType;
-import com.haloticket.notification_service.repository.NotificationTemplateRepository;
-import jakarta.persistence.EntityManager;
+import com.mongodb.client.model.IndexOptions;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.CommandLineRunner;
+import org.bson.Document;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Khởi tạo dữ liệu mẫu khi ứng dụng chạy: bỏ ràng buộc NOT NULL của cột {@code notifications.template_id}
- * và thêm các mẫu thông báo mặc định nếu chưa có.
- */
+import java.time.Instant;
+
 @Component
+@ConditionalOnProperty(name = "notification.mongo.initialize", matchIfMissing = true)
 @RequiredArgsConstructor
-@Slf4j
-public class DataInitializer implements CommandLineRunner {
+public class DataInitializer implements InitializingBean {
+    private final MongoTemplate mongo;
 
-    private final NotificationTemplateRepository notificationTemplateRepository;
-    private final EntityManager entityManager;
-
-    /**
-     * Chạy lúc khởi động: cho phép {@code template_id} rỗng (bỏ qua nếu đã làm trước đó) rồi tạo các mẫu
-     * xác nhận vé, nhắc sự kiện và kết quả eKYC.
-     *
-     * @param args tham số dòng lệnh, không dùng
-     */
     @Override
-    @Transactional
-    public void run(String... args) {
-        log.info("Initializing sample data for Notification Service...");
+    public void afterPropertiesSet() {
+        var notifications = mongo.getCollection("notifications");
+        notifications.createIndex(new Document("userId", 1).append("deletedAt", 1).append("createdAt", -1).append("_id", -1));
+        notifications.createIndex(new Document("userId", 1).append("visibility", 1).append("deletedAt", 1)
+                .append("createdAt", -1).append("_id", -1));
+        notifications.createIndex(new Document("eventId", 1), new IndexOptions().unique(true)
+                .partialFilterExpression(new Document("eventId", new Document("$type", "string"))));
+        mongo.getCollection("notification_templates")
+                .createIndex(new Document("type", 1).append("channel", 1).append("status", 1));
 
-        try {
-            entityManager.createNativeQuery("ALTER TABLE notifications ALTER COLUMN template_id DROP NOT NULL;").executeUpdate();
-            log.info("Successfully dropped NOT NULL constraint on notifications.template_id");
-        } catch (Exception e) {
-            log.info("template_id column already nullable: " + e.getMessage());
-        }
+        var jobs = mongo.getCollection("notification_announcements");
+        jobs.createIndex(new Document("actorId", 1).append("requestId", 1), new IndexOptions().unique(true));
+        jobs.createIndex(new Document("status", 1).append("availableAt", 1));
+        jobs.createIndex(new Document("status", 1).append("leaseUntil", 1));
+        jobs.createIndex(new Document("organizerEventId", 1).append("submittedAt", -1).append("_id", -1));
+        jobs.createIndex(new Document("status", 1).append("submittedAt", -1).append("_id", -1));
+        mongo.getCollection("notification_announcement_recipients").createIndex(
+                new Document("announcementId", 1).append("snapshotId", 1).append("deliveredAt", 1).append("_id", 1));
 
-        upsertTemplate("ntpl-ticket-confirmation-email",
-                NotificationType.TICKET_CONFIRMATION,
-                NotificationChannel.EMAIL,
-                "HaloTicket - Thanh toán thành công đơn {{bookingCode}}",
+        seed("ntpl-ticket-confirmation-email", NotificationType.TICKET_CONFIRMATION, NotificationChannel.EMAIL,
+                "HaloTicket - Thanh to\u00e1n th\u00e0nh c\u00f4ng \u0111\u01a1n {{bookingCode}}",
                 "Hi {{fullName}}, your booking {{bookingCode}} has been confirmed.");
-
-        upsertTemplate("ntpl-event-reminder-push",
-                NotificationType.EVENT_REMINDER,
-                NotificationChannel.PUSH,
-                "Event reminder",
-                "Your event {{eventTitle}} starts at {{startTime}}.");
-
-        upsertTemplate("ntpl-ekyc-result-email",
-                NotificationType.EKYC_RESULT,
-                NotificationChannel.EMAIL,
-                "eKYC verification result",
-                "Your eKYC verification status is {{status}}.");
-
-        log.info("Notification Service sample data initialized successfully!");
+        seed("ntpl-event-reminder-push", NotificationType.EVENT_REMINDER, NotificationChannel.PUSH,
+                "Event reminder", "Your event {{eventTitle}} starts at {{startTime}}.");
+        seed("ntpl-ekyc-result-email", NotificationType.EKYC_RESULT, NotificationChannel.EMAIL,
+                "eKYC verification result", "Your eKYC verification status is {{status}}.");
     }
 
-    /**
-     * Thêm một mẫu thông báo đang hoạt động; bỏ qua nếu mã mẫu đã tồn tại.
-     *
-     * @param id mã mẫu
-     * @param type loại thông báo
-     * @param channel kênh gửi
-     * @param subject mẫu tiêu đề
-     * @param body mẫu nội dung
-     */
-    private void upsertTemplate(String id, NotificationType type, NotificationChannel channel,
-                                 String subject, String body) {
-        if (notificationTemplateRepository.existsById(id)) {
-            log.info("Template '{}' already exists. Skipping.", id);
-            return;
+    private void seed(String id, NotificationType type, NotificationChannel channel, String subject, String body) {
+        Instant now = Instant.now();
+        Query byId = Query.query(Criteria.where("id").is(id));
+        var defaults = new Update().setOnInsert("type", type).setOnInsert("channel", channel)
+                .setOnInsert("subjectTemplate", subject).setOnInsert("bodyTemplate", body)
+                .setOnInsert("status", NotificationTemplateStatus.ACTIVE)
+                .setOnInsert("createdAt", now).setOnInsert("updatedAt", now);
+        try {
+            mongo.upsert(byId, defaults, NotificationTemplate.class);
+        } catch (DuplicateKeyException collision) {
+            if (!mongo.exists(byId, NotificationTemplate.class)) throw collision;
         }
-        NotificationTemplate template = NotificationTemplate.builder()
-                .id(id)
-                .type(type)
-                .channel(channel)
-                .subjectTemplate(subject)
-                .bodyTemplate(body)
-                .status(NotificationTemplateStatus.ACTIVE)
-                .build();
-        entityManager.persist(template);
-        log.info("Created template '{}'.", id);
     }
 }
-
