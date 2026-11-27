@@ -1,5 +1,6 @@
 package com.haloticket.event_service.dto.response;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.haloticket.event_service.enums.StaffRole;
 import lombok.Builder;
 import lombok.Data;
@@ -10,6 +11,8 @@ import java.time.LocalDateTime;
 @Builder
 public class EventMemberResponse {
     private String id;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String userId;
     private String name;
     private String email;
     private String avatar;

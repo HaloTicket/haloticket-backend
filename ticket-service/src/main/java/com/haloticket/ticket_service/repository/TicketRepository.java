@@ -20,6 +20,29 @@ import java.time.LocalDateTime;
 /** Kho vé đã phát hành, kèm các thao tác cập nhật trạng thái nguyên tử và truy vấn phục vụ check-in và đối soát. */
 @Repository
 public interface TicketRepository extends JpaRepository<Ticket, String> {
+    @Query("""
+            select t.ownerId as ownerId,
+                   max(case when t.status = :used then 1 else 0 end) as checkedIn,
+                   max(case when t.status = :valid then 1 else 0 end) as valid
+            from Ticket t join t.ticketType tt
+            where t.eventId = :eventId and tt.eventId = :eventId and t.ownerId > :after and trim(t.ownerId) <> ''
+                and t.status in (:valid, :used) and t.lockOperationId is null
+                and (:ticketTypeId = '' or tt.id = :ticketTypeId)
+                and (:showtimeId = '' or t.showtimeId = :showtimeId
+                     or (t.showtimeId is null and tt.showtimeId = :showtimeId))
+            group by t.ownerId order by t.ownerId
+            """)
+    List<AnnouncementOwnership> findAnnouncementOwners(@Param("eventId") String eventId,
+            @Param("ticketTypeId") String ticketTypeId, @Param("showtimeId") String showtimeId,
+            @Param("valid") TicketStatus valid, @Param("used") TicketStatus used, @Param("after") String after,
+            Pageable pageable);
+
+    interface AnnouncementOwnership {
+        String getOwnerId();
+        int getCheckedIn();
+        int getValid();
+    }
+
     /** Các vé của một booking. */
     List<Ticket> findByBookingId(String bookingId);
     

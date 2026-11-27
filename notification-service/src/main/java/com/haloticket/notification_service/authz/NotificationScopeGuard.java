@@ -1,6 +1,8 @@
 package com.haloticket.notification_service.authz;
 
 import com.haloticket.notification_service.client.UserServiceClient;
+import com.haloticket.notification_service.enums.InboxChannel;
+import com.haloticket.notification_service.enums.NotificationVisibility;
 import com.haloticket.notification_service.repository.NotificationRepository;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
@@ -16,78 +18,100 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
-/**
- * Kiểm tra quyền truy cập API thông báo: chủ hộp thư, chủ thông báo, hoặc dịch vụ nội bộ có token chung. Admin luôn được phép.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class NotificationScopeGuard {
+    public static final String SHARED_ADMIN = "ADMIN";
 
     private final NotificationScopeProperties scope;
     private final UserServiceClient users;
     private final NotificationRepository notifications;
 
-    /**
-     * Ghi log lỗi khi ứng dụng khởi động xong mà token nội bộ vẫn trống, vì lúc đó các lời gọi giữa dịch vụ sẽ bị từ chối.
-     */
     @EventListener(ApplicationReadyEvent.class)
     void warnWhenInternalTokenIsBlank() {
         if (scope.getInternalToken().isBlank()) {
-            log.error("[INTERNAL_TOKEN_MISSING] AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN is blank: service-to-service calls to this service "
-                    + "(creating and publishing notifications) are refused until it is set to the shared secret");
+            log.error("AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN is blank. Internal notification and directory calls are refused.");
         }
     }
 
-    /**
-     * Yêu cầu người gọi là chủ hộp thư của {@code userId}. Hợp lệ nếu là admin, nếu {@code subject} của JWT trùng, hoặc nếu mã người dùng
-     * trong {@code user-service} (lấy theo token) trùng.
-     *
-     * @param userId mã người dùng của hộp thư
-     * @param authorization header {@code Authorization} của người gọi
-     * @throws ResponseStatusException HTTP 401 khi chưa xác thực, HTTP 403 {@code FORBIDDEN_OWNER} khi không phải chủ,
-     *         HTTP 503 khi {@code user-service} không khả dụng
-     */
-    public void requireOwnerOfUserInbox(String userId, String authorization) {
-        if (isAdmin()) return;
-        String subject = subject();
-        if (subject == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED");
-        if (subject.equals(userId)) return;
-        // không phải subject: vẫn có thể là mã người dùng trong user-service của người đó (thông báo do event-service tạo dùng mã này)
-        String own;
+    public Set<String> inboxAliases(String userId) {
+        return inboxAliases(userId, InboxChannel.PUBLIC);
+    }
+
+    public Set<String> inboxAliases(String userId, InboxChannel channel) {
+        Authentication auth = currentAuth();
+        String subject = requireSubject(auth);
+        if (SHARED_ADMIN.equalsIgnoreCase(userId)) {
+            if (channel == InboxChannel.PUBLIC && isAdmin(auth)) return Set.of(SHARED_ADMIN);
+            throw forbiddenOwner();
+        }
+        boolean admin = channel == InboxChannel.PUBLIC && isAdmin(auth);
+        Set<String> aliases = personalAliases(auth, admin || subject.equals(userId));
+        if (aliases.contains(userId)) return aliases;
+        if (admin) return Set.of(userId);
+        throw forbiddenOwner();
+    }
+
+    public Set<String> readableNotificationAliases(String id) {
+        requireSubject(currentAuth());
+        var notification = notifications.findById(id)
+                .filter(found -> found.getDeletedAt() == null)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "NOTIFICATION_NOT_FOUND"));
+        return inboxAliases(notification.getUserId(), notification.getVisibility() == NotificationVisibility.STAFF
+                ? InboxChannel.STAFF : InboxChannel.PUBLIC);
+    }
+
+    public Set<String> deleteAliases() {
+        return personalAliases(currentAuth());
+    }
+
+    public Set<String> personalAliases(Authentication auth) {
+        return personalAliases(auth, true);
+    }
+
+    private Set<String> personalAliases(Authentication auth, boolean allowSubjectOnly) {
+        String subject = requireSubject(auth);
+        Set<String> aliases = new LinkedHashSet<>();
+        if (!SHARED_ADMIN.equalsIgnoreCase(subject)) aliases.add(subject);
         try {
-            var eligibility = users.getOrganizerEligibility(authorization);
-            own = eligibility == null ? null : eligibility.userId();
-        } catch (FeignException.Unauthorized e) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED");
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "USER_SERVICE_UNAVAILABLE");
+            String id = verifiedUserId(auth);
+            if (id != null && !id.isBlank() && !SHARED_ADMIN.equalsIgnoreCase(id)) aliases.add(id);
+        } catch (ResponseStatusException exception) {
+            if (!allowSubjectOnly || exception.getStatusCode() != HttpStatus.SERVICE_UNAVAILABLE) throw exception;
+            // A verified JWT subject is available even if user-service is temporarily down.
+            log.debug("Could not load user-service alias for authenticated notification session");
         }
-        if (own == null || !own.equals(userId)) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "FORBIDDEN_OWNER");
+        return Set.copyOf(aliases);
     }
 
-    /**
-     * Yêu cầu người gọi là chủ của thông báo. Thông báo không tồn tại thì bỏ qua để controller tự trả lỗi không tìm thấy.
-     *
-     * @param notificationId mã thông báo
-     * @param authorization header {@code Authorization} của người gọi
-     */
-    public void requireOwnerOfNotification(String notificationId, String authorization) {
-        if (isAdmin()) return;
-        var found = notifications.findById(notificationId);
-        if (found.isEmpty()) return; // controller vẫn trả lỗi "không tìm thấy" như trước
-        requireOwnerOfUserInbox(found.get().getUserId(), authorization);
+    private String verifiedUserId(Authentication auth) {
+        Jwt jwt = (Jwt) auth.getPrincipal();
+        try {
+            var account = users.getOrganizerEligibility("Bearer " + jwt.getTokenValue());
+            return account == null ? null : account.userId();
+        } catch (FeignException.NotFound exception) {
+            return null;
+        } catch (FeignException.Unauthorized exception) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED");
+        } catch (RuntimeException exception) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "USER_SERVICE_UNAVAILABLE", exception);
+        }
     }
 
-    /**
-     * Cho phép admin hoặc lời gọi nội bộ mang token đúng; so sánh theo thời gian không đổi để tránh lộ thông tin.
-     *
-     * @param internalToken giá trị header {@code X-Internal-Token}
-     * @throws ResponseStatusException HTTP 403 {@code FORBIDDEN} khi không phải admin và token trống, thiếu hoặc sai
-     */
+    public String requireAdmin() {
+        Authentication auth = currentAuth();
+        if (!isAdmin(auth)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "FORBIDDEN");
+        }
+        return requireSubject(auth);
+    }
+
     public void requireInternalOrAdmin(String internalToken) {
-        if (isAdmin()) return;
+        if (isAdmin(currentAuth())) return;
         String configured = scope.getInternalToken();
         if (configured.isBlank() || internalToken == null || !MessageDigest.isEqual(
                 configured.getBytes(StandardCharsets.UTF_8), internalToken.getBytes(StandardCharsets.UTF_8))) {
@@ -95,23 +119,24 @@ public class NotificationScopeGuard {
         }
     }
 
-    /**
-     * Kiểm tra người gọi hiện tại có vai trò {@code ROLE_ADMIN} hay không.
-     *
-     * @return {@code true} nếu là admin
-     */
-    private static boolean isAdmin() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return auth != null && auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+    public static boolean isAdmin(Authentication auth) {
+        return auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof Jwt
+                && auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
     }
 
-    /**
-     * Lấy {@code subject} của JWT hiện tại.
-     *
-     * @return subject, hoặc {@code null} nếu chưa xác thực bằng JWT
-     */
-    private static String subject() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return auth != null && auth.getPrincipal() instanceof Jwt jwt ? jwt.getSubject() : null;
+    private static Authentication currentAuth() {
+        return SecurityContextHolder.getContext().getAuthentication();
+    }
+
+    private static String requireSubject(Authentication auth) {
+        if (auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof Jwt jwt
+                && jwt.getSubject() != null && !jwt.getSubject().isBlank()) {
+            return jwt.getSubject();
+        }
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "UNAUTHENTICATED");
+    }
+
+    private static ResponseStatusException forbiddenOwner() {
+        return new ResponseStatusException(HttpStatus.FORBIDDEN, "FORBIDDEN_OWNER");
     }
 }

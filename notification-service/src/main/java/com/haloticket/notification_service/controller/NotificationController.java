@@ -1,26 +1,31 @@
 package com.haloticket.notification_service.controller;
 
+import com.haloticket.notification_service.authz.NotificationScopeGuard;
 import com.haloticket.notification_service.dto.request.NotificationCreateRequest;
 import com.haloticket.notification_service.dto.request.NotificationTemplateCreateRequest;
 import com.haloticket.notification_service.dto.response.NotificationResponse;
 import com.haloticket.notification_service.dto.response.NotificationTemplateResponse;
+import com.haloticket.notification_service.enums.InboxChannel;
+import com.haloticket.notification_service.event.DirectNotificationEventKey;
 import com.haloticket.notification_service.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
- * API REST {@code /api/notifications}: quản lý mẫu thông báo, tạo và đọc thông báo của người dùng, đánh dấu trạng thái.
- * Quyền truy cập được kiểm tra bởi interceptor {@code NotificationScopeGuard}, không nằm trong controller.
+ * REST endpoints for inbox items, notification templates and internal publishers.
  */
 @RestController
 @RequestMapping("/api/notifications")
@@ -28,6 +33,7 @@ import java.util.List;
 public class NotificationController {
 
     private final NotificationService notificationService;
+    private final NotificationScopeGuard scopes;
 
     /**
      * Tạo mẫu thông báo mới (chỉ dịch vụ nội bộ hoặc admin).
@@ -70,8 +76,9 @@ public class NotificationController {
      * @return danh sách thông báo của người dùng đó
      */
     @GetMapping("/users/{userId}")
-    public ResponseEntity<List<NotificationResponse>> getUserNotifications(@PathVariable String userId) {
-        return ResponseEntity.ok(notificationService.getUserNotifications(userId));
+    public ResponseEntity<List<NotificationResponse>> getUserNotifications(@PathVariable String userId,
+            @RequestParam(defaultValue = "PUBLIC") InboxChannel channel) {
+        return ResponseEntity.ok(notificationService.getUserNotifications(scopes.inboxAliases(userId, channel), channel));
     }
 
     /**
@@ -104,7 +111,13 @@ public class NotificationController {
      */
     @PatchMapping("/{id}/read")
     public ResponseEntity<NotificationResponse> markAsRead(@PathVariable String id) {
-        return ResponseEntity.ok(notificationService.markAsRead(id));
+        return ResponseEntity.ok(notificationService.markAsRead(id, scopes.readableNotificationAliases(id)));
+    }
+
+    /** Mark a notification as unread; only its verified owner can call this endpoint. */
+    @PatchMapping("/{id}/unread")
+    public ResponseEntity<NotificationResponse> markAsUnread(@PathVariable String id) {
+        return ResponseEntity.ok(notificationService.markAsUnread(id, scopes.readableNotificationAliases(id)));
     }
 
     /**
@@ -114,8 +127,10 @@ public class NotificationController {
      * @return danh sách thông báo sau cập nhật
      */
     @PatchMapping("/users/{userId}/read-all")
-    public ResponseEntity<List<NotificationResponse>> markAllAsRead(@PathVariable String userId) {
-        return ResponseEntity.ok(notificationService.markAllAsRead(userId));
+    public ResponseEntity<List<NotificationResponse>> markAllAsRead(@PathVariable String userId,
+            @RequestParam(defaultValue = "PUBLIC") InboxChannel channel) {
+        Instant startedAt = Instant.now();
+        return ResponseEntity.ok(notificationService.markAllAsRead(scopes.inboxAliases(userId, channel), startedAt, channel));
     }
 
     /**
@@ -131,6 +146,16 @@ public class NotificationController {
         String type = body.getOrDefault("type", "GENERAL");
         String title = body.getOrDefault("title", "Thông báo mới");
         String message = body.getOrDefault("message", "");
-        return ResponseEntity.ok(notificationService.publishDirectNotification(userId, type, title, message, body.get("variables")));
+        String variables = body.get("variables");
+        String key = DirectNotificationEventKey.sharedKey(body.get("timestamp"), userId, type, title, message, variables);
+        var response = key == null ? notificationService.publishDirectNotification(userId, type, title, message, variables)
+                : notificationService.publishDirectEvent(key, userId, type, title, message, variables);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable String id) {
+        notificationService.delete(id, scopes.deleteAliases());
+        return ResponseEntity.noContent().build();
     }
 }

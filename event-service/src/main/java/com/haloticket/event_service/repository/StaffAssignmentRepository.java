@@ -1,6 +1,9 @@
 package com.haloticket.event_service.repository;
 
 import com.haloticket.event_service.entity.StaffAssignment;
+import com.haloticket.event_service.enums.StaffAssignmentStatus;
+import com.haloticket.event_service.enums.StaffRole;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -34,4 +37,22 @@ public interface StaffAssignmentRepository extends JpaRepository<StaffAssignment
     /** Lấy thời điểm gửi lời mời sớm nhất của sự kiện kể từ mốc {@code since}, hoặc null nếu chưa có. */
     @Query("select min(a.invitedAt) from StaffAssignment a where a.event.id = :eventId and a.invitedAt > :since")
     LocalDateTime firstInvitationSince(@Param("eventId") String eventId, @Param("since") LocalDateTime since);
+    @Query("""
+            select distinct a.userId from StaffAssignment a where a.event.id = :eventId
+            and a.status = :status and a.role in :roles and a.userId > :after
+            and (a.assignedAt is null or a.assignedAt <= :cutoff) order by a.userId
+            """)
+    List<String> findNotificationTeamIds(@Param("eventId") String eventId, @Param("status") StaffAssignmentStatus status,
+            @Param("roles") List<StaffRole> roles, @Param("cutoff") LocalDateTime cutoff,
+            @Param("after") String after, Pageable page);
+
+    @Query("""
+            select distinct a.userId from StaffAssignment a where a.event.id = :eventId
+            and a.status = :status and a.role in :roles and a.userId > :after and trim(a.userId) <> ''
+            and (:memberId = '' or a.userId = :memberId)
+            and (a.assignedAt is null or a.assignedAt <= :cutoff) order by a.userId
+            """)
+    List<String> findAnnouncementStaff(@Param("eventId") String eventId, @Param("status") StaffAssignmentStatus status,
+            @Param("roles") List<StaffRole> roles, @Param("cutoff") LocalDateTime cutoff,
+            @Param("memberId") String memberId, @Param("after") String after, Pageable page);
 }

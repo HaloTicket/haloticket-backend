@@ -1,6 +1,12 @@
 package com.haloticket.notification_service.service.impl;
 
+import com.haloticket.notification_service.enums.InboxChannel;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.haloticket.notification_service.client.RecipientDirectory;
+import com.haloticket.notification_service.repository.NotificationUpdates;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import java.time.Instant;
 import com.haloticket.notification_service.dto.request.NotificationCreateRequest;
 import com.haloticket.notification_service.dto.request.NotificationTemplateCreateRequest;
 import com.haloticket.notification_service.dto.response.NotificationResponse;
@@ -40,6 +46,10 @@ class NotificationServiceImplTest {
     @Mock
     private NotificationTemplateRepository notificationTemplateRepository;
 
+    @Mock private NotificationUpdates updates;
+    @Mock private RecipientDirectory directory;
+    @Mock private SimpMessagingTemplate messaging;
+
     private NotificationServiceImpl notificationService;
 
     @BeforeEach
@@ -47,7 +57,7 @@ class NotificationServiceImplTest {
         notificationService = new NotificationServiceImpl(
                 notificationRepository,
                 notificationTemplateRepository,
-                new ObjectMapper()
+                new ObjectMapper(), updates, directory, messaging
         );
     }
 
@@ -59,7 +69,7 @@ class NotificationServiceImplTest {
         request.setSubjectTemplate("Ticket confirmed");
         request.setBodyTemplate("Hi {{name}}, your ticket {{ticketCode}} is ready.");
 
-        when(notificationTemplateRepository.save(any(NotificationTemplate.class)))
+        when(notificationTemplateRepository.insert(any(NotificationTemplate.class)))
                 .thenAnswer(invocation -> {
                     NotificationTemplate template = invocation.getArgument(0);
                     template.setId("template-1");
@@ -92,7 +102,8 @@ class NotificationServiceImplTest {
 
         ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
         when(notificationTemplateRepository.findById("template-1")).thenReturn(Optional.of(template));
-        when(notificationRepository.save(captor.capture()))
+        when(directory.canonicalIdOrAlias("user-1")).thenReturn("user-1");
+        when(notificationRepository.insert(captor.capture()))
                 .thenAnswer(invocation -> {
                     Notification notification = invocation.getArgument(0);
                     notification.setId("notification-1");
@@ -102,7 +113,7 @@ class NotificationServiceImplTest {
         NotificationResponse response = notificationService.createNotification(request);
 
         Notification saved = captor.getValue();
-        assertThat(saved.getTemplate()).isSameAs(template);
+        assertThat(saved.getTemplateId()).isEqualTo("template-1");
         assertThat(saved.getUserId()).isEqualTo("user-1");
         assertThat(saved.getVariablesJson()).isEqualTo("{\"startTime\":\"19:00\"}");
         assertThat(response.getId()).isEqualTo("notification-1");
@@ -132,11 +143,11 @@ class NotificationServiceImplTest {
     void markAsSentSetsSentStatusAndTimestamp() {
         Notification notification = Notification.builder()
                 .id("notification-1")
-                .status(NotificationStatus.PENDING)
+                .status(NotificationStatus.SENT)
+                .sentAt(Instant.now())
                 .build();
 
-        when(notificationRepository.findById("notification-1")).thenReturn(Optional.of(notification));
-        when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(updates.setStatus("notification-1", NotificationStatus.SENT)).thenReturn(notification);
 
         NotificationResponse response = notificationService.markAsSent("notification-1");
 
@@ -152,9 +163,9 @@ class NotificationServiceImplTest {
                 .status(NotificationStatus.PENDING)
                 .build();
 
-        when(notificationRepository.findByUserIdOrderByCreatedAtDesc("user-1")).thenReturn(List.of(notification));
+        when(updates.inbox(List.of("user-1"), InboxChannel.PUBLIC)).thenReturn(List.of(notification));
 
-        List<NotificationResponse> responses = notificationService.getUserNotifications("user-1");
+        List<NotificationResponse> responses = notificationService.getUserNotifications(List.of("user-1"));
 
         assertThat(responses).hasSize(1);
         assertThat(responses.getFirst().getId()).isEqualTo("notification-1");
@@ -164,8 +175,9 @@ class NotificationServiceImplTest {
     void processEventAssociatesNotificationWithPurchaserId() {
         NotificationEvent event = new NotificationEvent("order-confirmation:booking-1", "template-1",
                 "customer-1", "buyer@example.com", NotificationChannel.EMAIL, Map.of(), null);
+        when(directory.canonicalIdOrAlias("customer-1")).thenReturn("customer-1");
         when(notificationRepository.findByEventId(event.eventId())).thenReturn(Optional.empty());
-        when(notificationRepository.save(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(notificationRepository.insert(any(Notification.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         NotificationResponse response = notificationService.processEvent(event);
 

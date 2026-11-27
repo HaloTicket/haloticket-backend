@@ -93,17 +93,18 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(resource -> resource.decoder(jwtDecoder()).jwtAuthenticationConverter(jwt -> {
-                    Set<String> roles = new HashSet<>();
-                    List<String> direct = jwt.getClaimAsStringList("roles");
-                    if (direct != null) roles.addAll(direct);
-                    if (jwt.getClaim("realm_access") instanceof Map<?, ?> realm && realm.get("roles") instanceof Collection<?> values) {
-                        values.forEach(value -> roles.add(String.valueOf(value)));
-                    }
-                    return new JwtAuthenticationToken(jwt, roles.stream()
-                            .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role.toUpperCase(Locale.ROOT))
-                            .map(SimpleGrantedAuthority::new).toList(), jwt.getSubject());
-                })))
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(resource -> resource.decoder(jwtDecoder()).jwtAuthenticationConverter(SecurityConfig::authentication)))
                 .build();
+    }
+    static JwtAuthenticationToken authentication(org.springframework.security.oauth2.jwt.Jwt jwt) {
+        Set<String> roles = new HashSet<>();
+        List<String> direct = jwt.getClaimAsStringList("roles");
+        if (direct != null) roles.addAll(direct);
+        if (jwt.getClaim("realm_access") instanceof Map<?, ?> realm && realm.get("roles") instanceof Collection<?> values) {
+            values.forEach(value -> roles.add(String.valueOf(value)));
+        }
+        return new JwtAuthenticationToken(jwt, roles.stream()
+                .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role.toUpperCase(Locale.ROOT))
+                .map(SimpleGrantedAuthority::new).toList(), jwt.getSubject());
     }
 }

@@ -97,8 +97,11 @@ public class AuthKafkaConfiguration {
      * @return đối tượng quản trị Kafka
      */
     @Bean
-    KafkaAdmin kafkaAdmin(@Value("${spring.kafka.bootstrap-servers:localhost:9092}") String bootstrapServers) {
-        return new KafkaAdmin(Map.of("bootstrap.servers", bootstrapServers));
+    KafkaAdmin kafkaAdmin(@Value("${spring.kafka.bootstrap-servers:localhost:9092}") String bootstrapServers,
+            @Value("${spring.kafka.admin.auto-create:true}") boolean autoCreate) {
+        KafkaAdmin admin = new KafkaAdmin(Map.of("bootstrap.servers", bootstrapServers));
+        admin.setAutoCreate(autoCreate);
+        return admin;
     }
 
     /**
@@ -131,9 +134,11 @@ public class AuthKafkaConfiguration {
     @Bean(name = "kafkaListenerContainerFactory")
     ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory(
             ConsumerFactory<String, String> consumerFactory,
-            DefaultErrorHandler authOtpErrorHandler) {
+            DefaultErrorHandler authOtpErrorHandler,
+            @Value("${spring.kafka.listener.auto-startup:true}") boolean autoStartup) {
         ConcurrentKafkaListenerContainerFactory<String, String> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
+        factory.setAutoStartup(autoStartup);
         factory.setCommonErrorHandler(authOtpErrorHandler);
         return factory;
     }

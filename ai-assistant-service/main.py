@@ -13,6 +13,7 @@ from app.models.event_vector import EventVector
 from app.api.endpoints import customer
 from app.api.endpoints import organizer
 from app.api.endpoints import admin
+from app.api.endpoints import notification_scan
 
 log = logging.getLogger("ai.main")
 
@@ -103,3 +104,5 @@ app.include_router(
     prefix="/api/admin",
     tags=["Admin API"]
 )
+
+app.include_router(notification_scan.router)

@@ -116,6 +116,7 @@ public class EventMemberServiceImpl implements EventMemberService {
             }
             return EventMemberResponse.builder()
                 .id(a.getId())
+                .userId(a.getStatus() == StaffAssignmentStatus.ACTIVE ? a.getUserId() : null)
                 .name(name)
                 .email(email)
                 .avatar(avatarUrl)

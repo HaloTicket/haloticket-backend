@@ -88,6 +88,9 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/internal/notification-teams/*",
+                                "/api/internal/notification-teams/*/access",
+                                "/api/internal/notification-teams/*/staff").permitAll()
                         .requestMatchers("/actuator/**", "/health").permitAll()
                         .requestMatchers("/api/events/organizer-profile").authenticated()
                         .requestMatchers("/api/events/my-events").authenticated()

@@ -7,7 +7,11 @@ import java.time.LocalDateTime;
 
 /** Vé đã phát hành cho một chủ sở hữu (bảng {@code tickets}): loại vé, ghế, giá, mã QR, trạng thái và các khóa chống phát hành trùng. */
 @Entity
-@Table(name = "tickets")
+@Table(name = "tickets", indexes = {
+        @Index(name = "idx_ticket_announcement_event_owner", columnList = "event_id, owner_id, status"),
+        @Index(name = "idx_ticket_announcement_type", columnList = "event_id, ticket_type_id, owner_id"),
+        @Index(name = "idx_ticket_announcement_showtime", columnList = "event_id, showtime_id, owner_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor

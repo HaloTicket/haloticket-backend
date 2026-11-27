@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     keycloak_allowed_issuer_uris: str = ""
     keycloak_jwk_set_uri: str = ""
     auth_audience: str = ""  # tùy chọn; để trống = không kiểm tra audience, giống ở gateway
+    authz_event_scope_internal_token: str = ""
 
     # phân tích dữ liệu (text-to-SQL). Tài khoản là role chỉ đọc, chỉ thấy các view phân tích.
     # Cả hai đều bắt buộc: thiếu thì các route phân tích trả 503 AI_DB_NOT_CONFIGURED (bản thân dịch vụ vẫn khởi động).

@@ -27,20 +27,11 @@ x-runtime: &runtime
     retries: 12
     start_period: 60s
 
-x-environment: &environment
+x-service-environment: &service-environment
   JAVA_TOOL_OPTIONS: ${SERVICE_JAVA_OPTIONS:--XX:+UseSerialGC -Xss256k -XX:InitialRAMPercentage=10 -XX:MaxRAMPercentage=60 -XX:MaxMetaspaceSize=256m -XX:+ExitOnOutOfMemoryError -Dfile.encoding=UTF-8}
   EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
   EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
   EUREKA_CLIENT_REGISTRY_FETCH_INTERVAL_SECONDS: "5"
-  POSTGRES_USER: ${POSTGRES_USER:-haloticket}
-  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secretpassword}
-  SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-3}
-  SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: "1"
-  SPRING_JPA_SHOW_SQL: "false"
-  SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: "false"
-  SPRING_DATA_REDIS_HOST: redis
-  SPRING_DATA_REDIS_PORT: "6379"
-  SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-secretpassword}
   KAFKA_BOOTSTRAP_SERVERS: kafka:29092
   SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
   # giám sát hệ thống: Actuator chạy cổng riêng (9091 KHÔNG publish, chỉ truy cập được trong mạng compose), chỉ bật
@@ -54,6 +45,18 @@ x-environment: &environment
   LOGGING_LOGBACK_ROLLINGPOLICY_MAX_HISTORY: "2"
   LOGGING_LOGBACK_ROLLINGPOLICY_TOTAL_SIZE_CAP: 20MB
   KEYCLOAK_ALLOWED_ISSUER_URIS: ${KEYCLOAK_ALLOWED_ISSUER_URIS:-}
+
+x-environment: &environment
+  <<: *service-environment
+  POSTGRES_USER: ${POSTGRES_USER:-haloticket}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secretpassword}
+  SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: ${DB_POOL_SIZE:-3}
+  SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: "1"
+  SPRING_JPA_SHOW_SQL: "false"
+  SPRING_JPA_PROPERTIES_HIBERNATE_FORMAT_SQL: "false"
+  SPRING_DATA_REDIS_HOST: redis
+  SPRING_DATA_REDIS_PORT: "6379"
+  SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-secretpassword}
 
 x-event-scope: &event-scope
   AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN: ${AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN:-}
@@ -93,15 +96,15 @@ services:
     networks:
       - haloticket-network
 
-  # Lịch sử chatbot. Replica set một nút để lưu/xóa metadata và các tin nhắn cùng một giao dịch.
+  # MongoDB dùng chung, mỗi microservice sở hữu database riêng.
   mongodb:
     image: mongo:7
     container_name: haloticket-mongodb
     restart: unless-stopped
     logging: *logging
-    command: ["mongod", "--replSet", "${MONGODB_REPLICA_SET:-organizer-chat}", "--bind_ip_all"]
+    command: ["mongod", "--replSet", "${MONGO_REPLICA_SET:-haloticket}", "--bind_ip_all"]
     environment:
-      MONGODB_REPLICA_SET: ${MONGODB_REPLICA_SET:-organizer-chat}
+      MONGO_REPLICA_SET: ${MONGO_REPLICA_SET:-haloticket}
     ports:
       - "127.0.0.1:${MONGO_PORT:-27017}:27017"
     volumes:
@@ -116,7 +119,7 @@ services:
           try { rs.status(); }
           catch (error) {
             if (error.code !== 94) throw error;
-            rs.initiate({_id: process.env.MONGODB_REPLICA_SET, members: [{_id: 0, host: 'mongodb:27017'}]});
+            rs.initiate({_id: process.env.MONGO_REPLICA_SET, members: [{_id: 0, host: 'mongodb:27017'}]});
           }
           quit(db.hello().isWritablePrimary ? 0 : 1);
       interval: 5s
@@ -283,7 +286,7 @@ services:
         SERVICE: user-service
     ports: ["${SERVICE_BIND_ADDRESS:-127.0.0.1}:${USER_SERVICE_PORT:-8081}:8081"]
     environment:
-      <<: *environment
+      <<: [*environment, *event-scope]
       SERVER_PORT: "8081"
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/user_db
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
@@ -460,10 +463,11 @@ services:
         SERVICE: notification-service
     ports: ["${SERVICE_BIND_ADDRESS:-127.0.0.1}:${NOTIFICATION_SERVICE_PORT:-8086}:8086"]
     environment:
-      <<: [*environment, *event-scope]
+      <<: [*service-environment, *event-scope]
       SERVER_PORT: "8086"
+      NOTIFICATION_CONTENT_SCAN_URL: ${NOTIFICATION_CONTENT_SCAN_URL:-http://ai-assistant-service:8089/internal/notification-content-scan}
       TZ: Asia/Ho_Chi_Minh
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/notification_db
+      NOTIFICATION_MONGODB_URI: ${NOTIFICATION_MONGODB_URI:-mongodb://mongodb:27017/${NOTIFICATION_MONGODB_DATABASE:-haloticket_notifications}?replicaSet=${MONGO_REPLICA_SET:-haloticket}}
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/${KEYCLOAK_REALM:-haloticket-realm}/protocol/openid-connect/certs
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
@@ -475,8 +479,17 @@ services:
       SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
       NOTIFICATION_GIFT_ACCEPT_BASE_URL: ${GIFT_ACCEPT_BASE_URL:-http://localhost:5173/gifts/accept}
       PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-http://localhost:5173}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9091/actuator/health/notification-storage"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
     depends_on:
-      <<: *dependencies
+      discovery-server:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
       kafka:
         condition: service_healthy
 
@@ -525,6 +538,7 @@ services:
       - AI_ADMIN_DATABASE_URL=${AI_ADMIN_DATABASE_URL:-}
       # dữ liệu admin (sự kiện, người dùng, đối soát, bán lại) được đọc qua gateway bằng token của chính admin
       - INTERNAL_API_BASE_URL=${INTERNAL_API_BASE_URL:-http://api-gateway:8888}
+      - AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN=${AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN:-}
       - RISK_MEDIUM_THRESHOLD=${RISK_MEDIUM_THRESHOLD:-30}
       - RISK_HIGH_THRESHOLD=${RISK_HIGH_THRESHOLD:-60}
       - RISK_BLOCK_FLOOR=${RISK_BLOCK_FLOOR:-70}
@@ -538,8 +552,8 @@ services:
       - AI_MAX_TOKENS_DASHBOARD_SUMMARY=${AI_MAX_TOKENS_DASHBOARD_SUMMARY:-800}
       - CHATBOT_EVENT_DATABASE_URL=${CHATBOT_EVENT_DATABASE_URL:-}
       - CHATBOT_TICKET_DATABASE_URL=${CHATBOT_TICKET_DATABASE_URL:-}
-      - MONGODB_URI=${MONGODB_URI-mongodb://mongodb:27017/?replicaSet=${MONGODB_REPLICA_SET:-organizer-chat}}
-      - MONGODB_DATABASE=${MONGODB_DATABASE:-haloticket_ai_chat}
+      - MONGODB_URI=${MONGODB_URI-mongodb://mongodb:27017/?replicaSet=${MONGO_REPLICA_SET:-haloticket}}
+      - MONGODB_DATABASE=${CHATBOT_MONGODB_DATABASE:-${MONGODB_DATABASE:-haloticket_ai_chat}}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GROQ_API_KEY=${GROQ_API_KEY}
@@ -602,7 +616,7 @@ services:
       - haloticket-network
 volumes:
   mongodb-data:
-    name: haloticket-mongodb-data
+    name: ${MONGO_DATA_VOLUME:-haloticket-mongodb-data-v2}
   postgres_data:
     name: haloticket-postgres-data
   redis_data:

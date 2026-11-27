@@ -17,6 +17,9 @@ import com.haloticket.event_service.enums.StaffAssignmentStatus;
 /** Truy vấn bảng sự kiện {@code Event}. */
 @Repository
 public interface EventRepository extends JpaRepository<Event, String>, JpaSpecificationExecutor<Event> {
+    @Query("select count(s) > 0 from EventShowtime s where s.event.id = :eventId and s.id = :showtimeId")
+    boolean hasNotificationShowtime(@Param("eventId") String eventId, @Param("showtimeId") String showtimeId);
+
     /**
      * Các sự kiện công khai: đã duyệt ({@code APPROVED} hoặc {@code LIVE}) và không riêng tư. Bản nháp, chờ duyệt, bị từ chối và sự kiện
      * riêng tư không bao giờ nằm trong danh sách công khai.

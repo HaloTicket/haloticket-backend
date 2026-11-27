@@ -1,6 +1,8 @@
 package com.haloticket.notification_service.config;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -9,7 +11,15 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 /** Cấu hình WebSocket STOMP để đẩy thông báo thời gian thực xuống web (chuông thông báo). */
 @Configuration
 @EnableWebSocketMessageBroker
+@RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    private final StompNotificationAuthorization authorization;
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(authorization);
+    }
 
     /**
      * Bật broker đơn giản cho các đích {@code /topic} và {@code /queue}; tiền tố đích gửi từ client là {@code /app}.
