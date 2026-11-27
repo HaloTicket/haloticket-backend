@@ -57,11 +57,9 @@ public class SecurityConfig {
      */
     @Bean("reactiveJwtDecoder")
     ReactiveJwtDecoder jwtDecoder() {
-        NimbusReactiveJwtDecoder decoder = org.springframework.util.StringUtils.hasText(jwkSetUri)
         NimbusReactiveJwtDecoder decoder = StringUtils.hasText(jwkSetUri)
                 ? NimbusReactiveJwtDecoder.withJwkSetUri(jwkSetUri).build()
                 : NimbusReactiveJwtDecoder.withIssuerLocation(issuerUri).build();
-        var issuerValidator = JwtValidators.createDefaultWithIssuer(issuerUri);
         var issuerValidator = issuerValidator();
         decoder.setJwtValidator(requireAudience
                 ? new DelegatingOAuth2TokenValidator<>(issuerValidator, new AudienceValidator("api-gateway"))
