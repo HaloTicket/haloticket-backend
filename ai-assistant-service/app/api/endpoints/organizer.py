@@ -9,6 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, StringConstraints, model_validator
 from pymongo.errors import DuplicateKeyError
+from app.api.endpoints import checkin_assistant
 from app.core.config import settings
 from app.services.ai.sql_engine import sql_engine
 from app.services.ai.organizer_agent import organizer_agent
@@ -22,6 +23,7 @@ from app.services.ai.scope import AnalysisScope, analysis_scope
 
 log = logging.getLogger("ai.organizer")
 router = APIRouter()
+router.include_router(checkin_assistant.router)
 
 MAX_QUESTION_CHARS = 1000
 MAX_EVENT_ID_CHARS = 64

@@ -36,10 +36,10 @@ def _utc_now() -> datetime:
 
 
 class OrganizerChatStore:
-    def __init__(self, client: MongoClient, database: str):
+    def __init__(self, client: MongoClient, database: str, collection_prefix: str = "organizer"):
         self.client = client
-        self.conversations = client[database].organizer_conversations
-        self.messages = client[database].organizer_messages
+        self.conversations = client[database][f"{collection_prefix}_conversations"]
+        self.messages = client[database][f"{collection_prefix}_messages"]
 
     def ensure_indexes(self):
         scope_keys = [("owner_sub", 1), ("scope", 1), ("event_id", 1)]
@@ -64,8 +64,10 @@ class OrganizerChatStore:
             "view_event_ids": [], "finance_event_ids": [],
         }
 
-    def create_conversation(self, owner: str, scope: str, event_id: str | None) -> dict:
+    def create_conversation(self, owner: str, scope: str, event_id: str | None, *, conversation_id: str | None = None) -> dict:
         conversation = self._new_conversation(owner, scope, event_id, _utc_now())
+        if conversation_id is not None:
+            conversation["_id"] = conversation_id
         self.conversations.insert_one(conversation)
         return conversation
 
@@ -156,11 +158,11 @@ class OrganizerChatStore:
         return conversation_id
 
 
-@lru_cache(maxsize=1)
-def _connect(uri: str, database: str) -> OrganizerChatStore:
+@lru_cache(maxsize=2)
+def _connect(uri: str, database: str, collection_prefix: str) -> OrganizerChatStore:
     client = MongoClient(uri, tz_aware=True, serverSelectionTimeoutMS=2500, timeoutMS=5000)
     try:
-        store = OrganizerChatStore(client, database)
+        store = OrganizerChatStore(client, database, collection_prefix)
         store.ensure_indexes()
         return store
     except Exception:
@@ -172,15 +174,15 @@ _connect_lock = Lock()
 
 
 @contextmanager
-def organizer_chat_store():
+def organizer_chat_store(collection_prefix: str = "organizer"):
     if not settings.mongodb_uri:
         raise ai_error(AI_DB_NOT_CONFIGURED)
     try:
         with _connect_lock:
-            store = _connect(settings.mongodb_uri, settings.mongodb_database)
+            store = _connect(settings.mongodb_uri, settings.mongodb_database, collection_prefix)
         yield store
     except DuplicateKeyError:
         raise
     except PyMongoError as failure:
-        log.warning("Organizer chat storage failed: %s (%s)", type(failure).__name__, getattr(failure, "code", None))
+        log.warning("%s chat storage failed: %s (%s)", collection_prefix, type(failure).__name__, getattr(failure, "code", None))
         raise ai_error(AI_DB_UNAVAILABLE, "Kho lịch sử trò chuyện tạm thời không truy cập được.") from failure
