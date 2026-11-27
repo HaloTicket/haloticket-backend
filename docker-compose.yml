@@ -53,6 +53,7 @@ x-environment: &environment
   LOGGING_LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE: 5MB
   LOGGING_LOGBACK_ROLLINGPOLICY_MAX_HISTORY: "2"
   LOGGING_LOGBACK_ROLLINGPOLICY_TOTAL_SIZE_CAP: 20MB
+  KEYCLOAK_ALLOWED_ISSUER_URIS: ${KEYCLOAK_ALLOWED_ISSUER_URIS:-}
 
 x-event-scope: &event-scope
   AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN: ${AUTHZ_EVENT_SCOPE_INTERNAL_TOKEN:-}
@@ -92,13 +93,15 @@ services:
     networks:
       - haloticket-network
 
-  # Lịch sử chatbot BTC. Replica set một nút để lưu/xóa metadata và các tin nhắn cùng một giao dịch.
+  # Lịch sử chatbot. Replica set một nút để lưu/xóa metadata và các tin nhắn cùng một giao dịch.
   mongodb:
     image: mongo:7
     container_name: haloticket-mongodb
     restart: unless-stopped
     logging: *logging
-    command: ["mongod", "--replSet", "organizer-chat", "--bind_ip_all"]
+    command: ["mongod", "--replSet", "${MONGODB_REPLICA_SET:-organizer-chat}", "--bind_ip_all"]
+    environment:
+      MONGODB_REPLICA_SET: ${MONGODB_REPLICA_SET:-organizer-chat}
     ports:
       - "127.0.0.1:${MONGO_PORT:-27017}:27017"
     volumes:
@@ -113,7 +116,7 @@ services:
           try { rs.status(); }
           catch (error) {
             if (error.code !== 94) throw error;
-            rs.initiate({_id: 'organizer-chat', members: [{_id: 0, host: 'mongodb:27017'}]});
+            rs.initiate({_id: process.env.MONGODB_REPLICA_SET, members: [{_id: 0, host: 'mongodb:27017'}]});
           }
           quit(db.hello().isWritablePrimary ? 0 : 1);
       interval: 5s
@@ -204,7 +207,7 @@ services:
       KC_METRICS_ENABLED: "true"
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: ${KC_PROXY_HEADERS:-xforwarded}
-      KC_HOSTNAME_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}
+      KC_HOSTNAME_URL: ${KEYCLOAK_HOSTNAME_URL-${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}}
       KC_HOSTNAME_STRICT: ${KEYCLOAK_HOSTNAME_STRICT:-false}
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:?GOOGLE_OAUTH_CLIENT_ID must be set}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:?GOOGLE_OAUTH_CLIENT_SECRET must be set}
@@ -535,7 +538,7 @@ services:
       - AI_MAX_TOKENS_DASHBOARD_SUMMARY=${AI_MAX_TOKENS_DASHBOARD_SUMMARY:-800}
       - CHATBOT_EVENT_DATABASE_URL=${CHATBOT_EVENT_DATABASE_URL:-}
       - CHATBOT_TICKET_DATABASE_URL=${CHATBOT_TICKET_DATABASE_URL:-}
-      - MONGODB_URI=${MONGODB_URI-mongodb://mongodb:27017/?replicaSet=organizer-chat}
+      - MONGODB_URI=${MONGODB_URI-mongodb://mongodb:27017/?replicaSet=${MONGODB_REPLICA_SET:-organizer-chat}}
       - MONGODB_DATABASE=${MONGODB_DATABASE:-haloticket_ai_chat}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/1
       - GEMINI_API_KEY=${GEMINI_API_KEY}
@@ -543,6 +546,7 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - EUREKA_SERVER=http://discovery-server:8761/eureka
       - KEYCLOAK_ISSUER_URI=${KEYCLOAK_PUBLIC_URL:-http://localhost:9080}/realms/${KEYCLOAK_REALM:-haloticket-realm}
+      - KEYCLOAK_ALLOWED_ISSUER_URIS=${KEYCLOAK_ALLOWED_ISSUER_URIS:-}
       - KEYCLOAK_JWK_SET_URI=http://keycloak:8080/realms/${KEYCLOAK_REALM:-haloticket-realm}/protocol/openid-connect/certs
       - AI_DB_USER=${AI_DB_USER:-}
       - AI_DB_PASSWORD=${AI_DB_PASSWORD:-}

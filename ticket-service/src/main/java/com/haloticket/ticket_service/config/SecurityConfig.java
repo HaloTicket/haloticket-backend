@@ -4,8 +4,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.*;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.*;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.util.StringUtils;
+
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import org.springframework.http.HttpMethod;
 
@@ -15,11 +22,30 @@ import org.springframework.http.HttpMethod;
 public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri:http://localhost:9080/realms/haloticket-realm}") private String issuerUri;
     @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}") private String jwkSetUri;
+    @Value("${KEYCLOAK_ALLOWED_ISSUER_URIS:}") private String allowedIssuerUris;
     /** Tạo bộ giải mã JWT: dùng JWK set URI nếu có cấu hình, ngược lại tự tìm theo issuer; luôn kiểm tra issuer. */
     @Bean JwtDecoder jwtDecoder() {
         NimbusJwtDecoder decoder = jwkSetUri == null || jwkSetUri.isBlank() ? NimbusJwtDecoder.withIssuerLocation(issuerUri).build() : NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build();
-        decoder.setJwtValidator(JwtValidators.createDefaultWithIssuer(issuerUri));
+        decoder.setJwtValidator(issuerValidator());
         return decoder;
+    }
+    private OAuth2TokenValidator<Jwt> issuerValidator() {
+        Set<String> allowedIssuers = new LinkedHashSet<>();
+        if (StringUtils.hasText(issuerUri)) {
+            allowedIssuers.add(issuerUri.trim());
+        }
+        if (StringUtils.hasText(allowedIssuerUris)) {
+            Arrays.stream(allowedIssuerUris.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .forEach(allowedIssuers::add);
+        }
+        if (allowedIssuers.size() <= 1) {
+            return JwtValidators.createDefaultWithIssuer(issuerUri);
+        }
+        return new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefault(),
+                new JwtClaimValidator<Object>(JwtClaimNames.ISS, iss -> iss != null && allowedIssuers.contains(iss.toString())));
     }
     /**
      * Dựng chuỗi lọc bảo mật: tắt CSRF, cho phép tự do actuator, các API nội bộ giữa dịch vụ (tự kiểm tra token trong controller)

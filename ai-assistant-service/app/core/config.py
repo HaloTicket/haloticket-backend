@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     # xác thực access token của Keycloak trên các route quản trị / phân tích
     keycloak_issuer_uri: str = ""
+    keycloak_allowed_issuer_uris: str = ""
     keycloak_jwk_set_uri: str = ""
     auth_audience: str = ""  # tùy chọn; để trống = không kiểm tra audience, giống ở gateway
 

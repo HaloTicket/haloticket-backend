@@ -7,16 +7,23 @@ import org.springframework.security.config.annotation.web.reactive.EnableWebFlux
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtClaimNames;
+import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.web.server.authorization.AuthorizationContext;
 import reactor.core.publisher.Mono;
@@ -36,6 +43,9 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
     private String jwkSetUri;
 
+    @Value("${KEYCLOAK_ALLOWED_ISSUER_URIS:}")
+    private String allowedIssuerUris;
+
     /** Bật để chỉ nhận token có audience {@code api-gateway}. Mặc định tắt để không khóa người dùng khi Keycloak chưa gắn audience mapper. */
     @Value("${gateway.jwt.require-audience:false}")
     private boolean requireAudience;
@@ -48,13 +58,34 @@ public class SecurityConfig {
     @Bean("reactiveJwtDecoder")
     ReactiveJwtDecoder jwtDecoder() {
         NimbusReactiveJwtDecoder decoder = org.springframework.util.StringUtils.hasText(jwkSetUri)
+        NimbusReactiveJwtDecoder decoder = StringUtils.hasText(jwkSetUri)
                 ? NimbusReactiveJwtDecoder.withJwkSetUri(jwkSetUri).build()
                 : NimbusReactiveJwtDecoder.withIssuerLocation(issuerUri).build();
         var issuerValidator = JwtValidators.createDefaultWithIssuer(issuerUri);
+        var issuerValidator = issuerValidator();
         decoder.setJwtValidator(requireAudience
                 ? new DelegatingOAuth2TokenValidator<>(issuerValidator, new AudienceValidator("api-gateway"))
                 : issuerValidator);
         return decoder;
+    }
+
+    private OAuth2TokenValidator<Jwt> issuerValidator() {
+        Set<String> allowedIssuers = new LinkedHashSet<>();
+        if (StringUtils.hasText(issuerUri)) {
+            allowedIssuers.add(issuerUri.trim());
+        }
+        if (StringUtils.hasText(allowedIssuerUris)) {
+            Arrays.stream(allowedIssuerUris.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .forEach(allowedIssuers::add);
+        }
+        if (allowedIssuers.size() <= 1) {
+            return JwtValidators.createDefaultWithIssuer(issuerUri);
+        }
+        return new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefault(),
+                new JwtClaimValidator<Object>(JwtClaimNames.ISS, iss -> iss != null && allowedIssuers.contains(iss.toString())));
     }
 
     @Value("${management.server.port:0}")

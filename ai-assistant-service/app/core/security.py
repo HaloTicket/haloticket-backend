@@ -7,7 +7,7 @@ Các route chatbot công khai (`/api/customer/**`) không dùng các dependency 
 """
 import logging
 from functools import lru_cache
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence, Union
 
 import jwt
 from fastapi import Depends, HTTPException, Request
@@ -22,15 +22,15 @@ ADMIN_ROLES = frozenset({"ADMIN", "ROLE_ADMIN"})
 
 class TokenVerifier:
     """Bộ xác thực JWT RS256: kiểm tra chữ ký, issuer, thời hạn và (nếu có cấu hình) audience."""
-    def __init__(self, issuer: str, key_resolver: Callable[[str], object], audience: str = "", leeway_seconds: int = 10):
-        """Khởi tạo bộ xác thực với issuer, hàm tìm khóa công khai theo token, audience (rỗng = không kiểm tra) và độ lệch đồng hồ cho phép."""
+    def __init__(self, issuer: Union[str, Sequence[str]], key_resolver: Callable[[str], object], audience: str = "", leeway_seconds: int = 10):
+        """Khởi tạo bộ xác thực với issuer (hoặc danh sách issuer), hàm tìm khóa công khai theo token, audience (rỗng = không kiểm tra) và độ lệch đồng hồ cho phép."""
         self.issuer = issuer
         self.audience = audience
         self.leeway_seconds = leeway_seconds
         self._key_resolver = key_resolver
 
     @classmethod
-    def from_jwks(cls, issuer: str, jwks_uri: str, audience: str = "") -> "TokenVerifier":
+    def from_jwks(cls, issuer: Union[str, Sequence[str]], jwks_uri: str, audience: str = "") -> "TokenVerifier":
         """Tạo bộ xác thực lấy khóa ký từ endpoint JWKS (lưu đệm khóa 1 giờ, timeout 5 giây)."""
         client = PyJWKClient(jwks_uri, cache_keys=True, lifespan=3600, timeout=5)
         return cls(issuer, lambda token: client.get_signing_key_from_jwt(token).key, audience)
@@ -54,7 +54,14 @@ def get_verifier() -> Optional[TokenVerifier]:
     """Bộ xác thực dùng chung (lưu đệm); `None` nếu chưa cấu hình issuer hoặc JWKS của Keycloak."""
     if not settings.keycloak_issuer_uri or not settings.keycloak_jwk_set_uri:
         return None
-    return TokenVerifier.from_jwks(settings.keycloak_issuer_uri, settings.keycloak_jwk_set_uri, settings.auth_audience)
+    issuers = [settings.keycloak_issuer_uri.strip()]
+    if settings.keycloak_allowed_issuer_uris:
+        for item in settings.keycloak_allowed_issuer_uris.split(","):
+            item = item.strip()
+            if item and item not in issuers:
+                issuers.append(item)
+    issuer_param: Union[str, list[str]] = issuers[0] if len(issuers) == 1 else issuers
+    return TokenVerifier.from_jwks(issuer_param, settings.keycloak_jwk_set_uri, settings.auth_audience)
 
 
 def _reject(status: int, code: str, message: str) -> HTTPException:
