@@ -9,11 +9,19 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtClaimNames;
+import org.springframework.security.oauth2.jwt.JwtClaimValidator;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.util.StringUtils;
+
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /** Cấu hình bảo mật của user-service: resource server JWT, kiểm tra audience và quy tắc phân quyền theo đường dẫn. */
 @Configuration
@@ -31,6 +39,9 @@ public class SecurityConfig {
     @Value("${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
     private String jwkSetUri;
 
+    @Value("${KEYCLOAK_ALLOWED_ISSUER_URIS:}")
+    private String allowedIssuerUris;
+
     /** Bộ giải mã JWT: lấy khóa từ jwk-set-uri nếu có, ngược lại từ issuer; kiểm tra issuer và audience {@code user-service}. */
     @Bean
     JwtDecoder jwtDecoder() {
@@ -39,9 +50,28 @@ public class SecurityConfig {
                 ? NimbusJwtDecoder.withJwkSetUri(jwkSetUri).build()
                 : NimbusJwtDecoder.withIssuerLocation(issuerUri).build();
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefaultWithIssuer(issuerUri),
+                issuerValidator(),
                 new AudienceValidator("user-service")));
         return decoder;
+    }
+
+    private OAuth2TokenValidator<Jwt> issuerValidator() {
+        Set<String> allowedIssuers = new LinkedHashSet<>();
+        if (StringUtils.hasText(issuerUri)) {
+            allowedIssuers.add(issuerUri.trim());
+        }
+        if (StringUtils.hasText(allowedIssuerUris)) {
+            Arrays.stream(allowedIssuerUris.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .forEach(allowedIssuers::add);
+        }
+        if (allowedIssuers.size() <= 1) {
+            return JwtValidators.createDefaultWithIssuer(issuerUri);
+        }
+        return new DelegatingOAuth2TokenValidator<>(
+                JwtValidators.createDefault(),
+                new JwtClaimValidator<Object>(JwtClaimNames.ISS, iss -> iss != null && allowedIssuers.contains(iss.toString())));
     }
 
     /**

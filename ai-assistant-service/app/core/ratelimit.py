@@ -167,6 +167,8 @@ def _limits_for(bucket: str, authenticated: bool):
     s = settings
     if bucket == "customer_search":
         return [("m", _MIN, s.ai_rl_customer_search_per_minute)]
+    if bucket == "customer_history":
+        return [("m", _MIN, 30)]
     if bucket == "customer_chat":
         if authenticated:
             return [("m", _MIN, s.ai_rl_customer_chat_account_per_minute), ("h", _HOUR, s.ai_rl_customer_chat_account_per_hour)]

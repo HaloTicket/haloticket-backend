@@ -2,17 +2,22 @@
 chấm điểm rủi ro nhiều lớp, quyết định duyệt, KPI và tóm tắt bảng điều khiển, danh sách cần chú ý, báo cáo đã ghim, trợ lý có công cụ.
 """
 import asyncio
+import hashlib
+import json
 import logging
 from typing import Optional
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
+from pymongo.errors import DuplicateKeyError
 
 from app.core.config import settings
-from app.core.errors import ai_error, AI_INPUT_INVALID, AI_DB_NOT_CONFIGURED
+from app.core.errors import AiError, ai_error, AI_INPUT_INVALID, AI_DB_NOT_CONFIGURED
 from app.core.ratelimit import actor_of, rate_limit, check as rate_check
 from app.services.admin_intel import assistant, kpis as kpi_module, risk_service, store, summary, upstream
 from app.services.ai import ai_call
+from app.services.ai.organizer_chat_store import ConversationChanged, organizer_chat_store
 
 log = logging.getLogger("ai.admin.intel")
 
@@ -290,12 +295,100 @@ def delete_pin(pin_id: str, http: Request):
 
 # Trợ lý
 MAX_CHAT_MESSAGE_CHARS = 4000
+ADMIN_CHAT_SCOPE = "admin"
+
+
+def _history_owner(http: Request, response: Response) -> str:
+    subject = _admin_sub(http)
+    issuer = http.state.claims.get("iss") or ""
+    expected = http.headers.get("X-Admin-Chat-Owner")
+    if expected is not None and expected != (f"{issuer}#{subject}" if issuer else subject):
+        raise AiError("AI_CHAT_OWNER_CHANGED", 409, "Tài khoản quản trị đã thay đổi.")
+    response.headers["Cache-Control"] = "private, no-store"
+    return hashlib.sha256(json.dumps([issuer, subject]).encode()).hexdigest()
+
+
+def _conversation_summary(row: dict) -> dict:
+    return {"id": row["_id"], **{field: row[field] for field in ("title", "is_pinned", "created_at", "updated_at")}}
+
+
+def _conversation_missing() -> AiError:
+    return AiError("AI_CHAT_NOT_FOUND", 404, "Không tìm thấy hội thoại.")
+
+
+class AdminConversationCreate(BaseModel):
+    id: UUID
+
+
+class AdminConversationPin(BaseModel):
+    is_pinned: bool
+
+
+@router.get("/assistant-conversations")
+def list_admin_chat_conversations(owner: str = Depends(_history_owner)):
+    with organizer_chat_store("admin") as storage:
+        return [_conversation_summary(row) for row in storage.list_conversations(owner, ADMIN_CHAT_SCOPE, None)]
+
+
+@router.post("/assistant-conversations")
+def create_admin_chat_conversation(request: AdminConversationCreate, owner: str = Depends(_history_owner)):
+    conversation_id = str(request.id)
+    with organizer_chat_store("admin") as storage:
+        try:
+            row = storage.create_conversation(owner, ADMIN_CHAT_SCOPE, None, conversation_id=conversation_id)
+        except DuplicateKeyError:
+            row = storage.get_conversation(owner, conversation_id)
+            if row is None:
+                raise _conversation_missing()
+        return _conversation_summary(row)
+
+
+@router.get("/assistant-conversations/{conversation_id}")
+def get_admin_chat_conversation(conversation_id: UUID, owner: str = Depends(_history_owner)):
+    with organizer_chat_store("admin") as storage:
+        row = storage.get_conversation(owner, str(conversation_id))
+        if row is None:
+            raise _conversation_missing()
+        messages = [{
+            "id": str(message["_id"]), "role": message["role"], "content": message["content"],
+            "created_at": message["created_at"], **(message.get("payload") or {}),
+        } for message in storage.get_messages(row)]
+        return {**_conversation_summary(row), "messages": messages}
+
+
+@router.patch("/assistant-conversations/{conversation_id}")
+def pin_admin_chat_conversation(conversation_id: UUID, request: AdminConversationPin, owner: str = Depends(_history_owner)):
+    with organizer_chat_store("admin") as storage:
+        row = storage.get_conversation(owner, str(conversation_id))
+        if row is None:
+            raise _conversation_missing()
+        updated = storage.set_pinned(row, request.is_pinned)
+        if updated is None:
+            raise AiError("AI_CHAT_CHANGED", 409, "Hội thoại vừa thay đổi. Vui lòng thử lại.")
+        return _conversation_summary(updated)
+
+
+@router.delete("/assistant-conversations/{conversation_id}")
+def delete_admin_chat_conversation(conversation_id: UUID, owner: str = Depends(_history_owner)):
+    with organizer_chat_store("admin") as storage:
+        if not storage.delete_conversation(owner, str(conversation_id)):
+            raise _conversation_missing()
+        return {"deleted": True}
+
+
+@router.delete("/assistant-conversations")
+def clear_admin_chat_conversations(owner: str = Depends(_history_owner)):
+    with organizer_chat_store("admin") as storage:
+        storage.clear_conversations(owner, ADMIN_CHAT_SCOPE, None)
+        return {"deleted": True}
 
 
 class AdminChatRequest(BaseModel):
     """Tin nhắn mới và lịch sử hội thoại gửi cho trợ lý quản trị."""
     message: str
-    history: list[dict] = []
+    history: list[dict] = Field(default_factory=list)
+    conversation_id: UUID | None = None
+    request_id: UUID | None = None
 
 
 class AdminChatResponse(BaseModel):
@@ -306,9 +399,42 @@ class AdminChatResponse(BaseModel):
 
 
 @router.post("/assistant-chat", response_model=AdminChatResponse)
-def chat_admin_assistant(request: AdminChatRequest, http: Request, _limit: None = Depends(rate_limit("admin_assistant"))):
+def chat_admin_assistant(request: AdminChatRequest, http: Request, response: Response,
+                         _limit: None = Depends(rate_limit("admin_assistant"))):
     """Trợ lý có công cụ chỉ đọc. Giữ nguyên đường dẫn và trường `reply` như trước; `tools_used` và `grounded` là trường mới."""
-    if not request.message.strip() or len(request.message) > MAX_CHAT_MESSAGE_CHARS:
+    message = request.message.strip()
+    if not message or len(request.message) > MAX_CHAT_MESSAGE_CHARS:
         raise ai_error(AI_INPUT_INVALID)
     ctx = assistant.AssistantContext(authorization=upstream.token_of(http), actor=_actor(http), health=assistant.default_health)
-    return AdminChatResponse(**assistant.run(request.message, request.history, ctx, ai_call.ai_invoke))
+    if request.conversation_id is None and request.request_id is None:
+        return AdminChatResponse(**assistant.run(request.message, request.history, ctx, ai_call.ai_invoke))
+    if request.conversation_id is None or request.request_id is None:
+        raise ai_error(AI_INPUT_INVALID)
+
+    owner = _history_owner(http, response)
+    conversation_id, request_id = str(request.conversation_id), str(request.request_id)
+    request_hash = hashlib.sha256(json.dumps([conversation_id, message]).encode()).hexdigest()
+    with organizer_chat_store("admin") as storage:
+        row = storage.get_conversation(owner, conversation_id)
+        if row is None:
+            raise _conversation_missing()
+        saved = storage.find_reply(owner, ADMIN_CHAT_SCOPE, None, request_id)
+        if saved is not None:
+            if saved["request_hash"] != request_hash:
+                raise AiError("AI_CHAT_REQUEST_CONFLICT", 409, "Mã gửi lại đã được dùng cho một tin nhắn khác.")
+            return AdminChatResponse(reply=saved["content"], **saved["payload"])
+
+        history = [{"role": item["role"], "content": item["content"]} for item in storage.get_messages(row, limit=10)]
+        reply = AdminChatResponse(**assistant.run(message, history, ctx, ai_call.ai_invoke))
+        try:
+            storage.append_turn(owner=owner, scope=ADMIN_CHAT_SCOPE, event_id=None, conversation=row,
+                                question=message, response={**reply.model_dump(), "status": "ok"}, events=[],
+                                request_id=request_id, request_hash=request_hash)
+        except (ConversationChanged, DuplicateKeyError):
+            saved = storage.find_reply(owner, ADMIN_CHAT_SCOPE, None, request_id)
+            if saved is not None and saved["request_hash"] == request_hash:
+                return AdminChatResponse(reply=saved["content"], **saved["payload"])
+            if storage.get_conversation(owner, conversation_id) is None:
+                raise _conversation_missing()
+            raise AiError("AI_CHAT_CHANGED", 409, "Hội thoại vừa thay đổi. Vui lòng gửi lại.")
+        return reply
